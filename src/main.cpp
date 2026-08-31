@@ -1,12 +1,13 @@
-// CYD Sky Tracker — hardware bring-up + WiFi onboarding + config portal.
+// CYD Sky Tracker — hardware bring-up + WiFi onboarding + config portal +
+// OpenSky polling.
 //
 // Initializes LovyanGFX (configured via include/LGFX_CYD.hpp), loads the
 // persisted config (config_store), and starts WiFiManager (wifi_manager).
 // Once WiFi connects, starts the local config web page (config_portal) at
-// cyd-sky.local. The screen shows the current WiFi state (connecting /
-// connected + SSID / setup portal active), plus the config page address
-// once it's up, instead of Milestone 1's static title. No table_view/
-// radar_view yet — those land once opensky_client has data to show.
+// cyd-sky.local and begins polling OpenSky (opensky_client) on the
+// configured interval. The screen still only shows WiFi/portal status (no
+// table_view yet) — parsed Aircraft[] are printed to Serial each poll so
+// opensky_client can be verified without a display.
 
 #include <Arduino.h>
 
@@ -15,6 +16,7 @@
 #include "LGFX_CYD.hpp"
 #include "config_portal.h"
 #include "config_store.h"
+#include "opensky_client.h"
 #include "wifi_manager.h"
 
 static LGFX tft;
@@ -46,15 +48,28 @@ static void drawStatus(WifiStatus status, const std::string &ssid, bool portalAc
   }
 }
 
+static void printAircraft(const std::vector<Aircraft> &aircraft) {
+  Serial.printf("[opensky] %u aircraft in range:\n", static_cast<unsigned>(aircraft.size()));
+  for (const Aircraft &ac : aircraft) {
+    if (ac.has_position) {
+      Serial.printf("  %-6s %-8s lat=%.4f lon=%.4f alt=%.0fm v=%.0fm/s trk=%.0f\n",
+                    ac.icao24.c_str(), ac.callsign.c_str(), ac.lat, ac.lon, ac.baro_altitude,
+                    ac.velocity, ac.true_track);
+    } else {
+      Serial.printf("  %-6s %-8s (no position)\n", ac.icao24.c_str(), ac.callsign.c_str());
+    }
+  }
+}
+
 void setup() {
+  Serial.begin(115200);
+
   tft.init();
   tft.setRotation(1);  // landscape, 320x240
   tft.fillScreen(TFT_BLACK);
 
-  // Not consumed yet — later milestones (opensky_client) will read home
-  // position / radius / poll interval / OpenSky credentials from here.
-  // Loading it now exercises config_store on real NVS; config_portal reads
-  // it again itself for each web request.
+  // Not otherwise consumed here — config_portal reads/writes it itself per
+  // web request, and opensky_client reads it once per poll.
   Config cfg = loadConfig();
   (void)cfg;
 
@@ -71,10 +86,17 @@ void loop() {
   wifiManagerLoop();
 
   WifiStatus status = wifiManagerStatus();
-  // mDNS/WebServer need an active station interface — start the config
-  // portal the moment WiFi first connects, not before.
-  if (status == WifiStatus::Connected && !configPortalIsActive()) {
-    configPortalBegin();
+  // mDNS/WebServer/HTTPClient all need an active station interface — start
+  // the config portal and OpenSky polling only once WiFi first connects.
+  if (status == WifiStatus::Connected) {
+    if (!configPortalIsActive()) {
+      configPortalBegin();
+    }
+
+    std::vector<Aircraft> aircraft;
+    if (openSkyClientPoll(millis(), &aircraft)) {
+      printAircraft(aircraft);
+    }
   }
   configPortalLoop();
 
