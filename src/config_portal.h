@@ -1,0 +1,37 @@
+// config_portal — local web config page for lat/lon/radius/poll_interval/
+// OpenSky client_id/client_secret, reachable via mDNS at cyd-sky.local (see
+// CLAUDE.md "Code conventions"). Submissions are persisted through
+// config_store (Milestone 2).
+#pragma once
+
+// Area (in square degrees) of the lat/lon bounding box implied by a
+// ±radius_deg half-width scan radius (i.e. a 2*radius_deg x 2*radius_deg
+// box), matching config_store's Config::radius_deg. Pure — no WebServer/
+// Arduino dependency — tested under `pio test -e native`.
+float bboxAreaSqDeg(float radius_deg);
+
+// OpenSky /states/all credit cost per call for that bbox area, per
+// CLAUDE.md "Rate limits / credits": <=25 sq deg = 1, <=100 = 2, <=400 = 3,
+// >400 = 4. Pure — tested under `pio test -e native`.
+int openSkyCreditCost(float radius_deg);
+
+// --- Hardware adapter: serves the local config web page at cyd-sky.local
+// (mDNS) with a form for lat/lon/radius/poll_interval/OpenSky credentials,
+// read/persisted via config_store. The radius field's credit cost updates
+// live in the browser (client-side JS mirroring openSkyCreditCost() above)
+// as the user types, no round trip needed. Thin wrapper around WebServer/
+// ESPmDNS — not covered by Unity (see CLAUDE.md "Testing").
+
+// Starts the mDNS responder ("cyd-sky.local") and the config web server.
+// Call once WiFi is connected (e.g. the first loop() iteration where
+// wifiManagerStatus() == WifiStatus::Connected) — mDNS/WebServer need an
+// active station interface.
+void configPortalBegin();
+
+// Services pending HTTP requests. Safe to call every loop() iteration
+// regardless of whether configPortalBegin() has run yet (no-op until it
+// has) — non-blocking, per CLAUDE.md's millis()-based timing rule.
+void configPortalLoop();
+
+// True once configPortalBegin() has run.
+bool configPortalIsActive();
