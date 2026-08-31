@@ -4,6 +4,8 @@
 // config_store (Milestone 2).
 #pragma once
 
+#include <string>
+
 // Area (in square degrees) of the lat/lon bounding box implied by a
 // ±radius_deg half-width scan radius (i.e. a 2*radius_deg x 2*radius_deg
 // box), matching config_store's Config::radius_deg. Pure — no WebServer/
@@ -15,12 +17,29 @@ float bboxAreaSqDeg(float radius_deg);
 // >400 = 4. Pure — tested under `pio test -e native`.
 int openSkyCreditCost(float radius_deg);
 
+// Parsed OpenSky OAuth client credentials from the JSON file OpenSky's
+// account page generates for download: {"clientId":"...","clientSecret":
+// "..."}.
+struct OpenSkyCredentials {
+  bool ok = false;  // true only if both fields were present and non-empty
+  std::string client_id;
+  std::string client_secret;
+};
+
+// Parses that JSON file's contents (uploaded via the config page — see
+// below). Pure — uses ArduinoJson but no WebServer/hardware dependency —
+// tested under `pio test -e native`.
+OpenSkyCredentials parseOpenSkyCredentialsJson(const std::string &json);
+
 // --- Hardware adapter: serves the local config web page at cyd-sky.local
 // (mDNS) with a form for lat/lon/radius/poll_interval/OpenSky credentials,
 // read/persisted via config_store. The radius field's credit cost updates
 // live in the browser (client-side JS mirroring openSkyCreditCost() above)
-// as the user types, no round trip needed. Thin wrapper around WebServer/
-// ESPmDNS — not covered by Unity (see CLAUDE.md "Testing").
+// as the user types, no round trip needed. A second form lets the user
+// upload OpenSky's credentials JSON file directly instead of copy-pasting
+// clientId/clientSecret by hand (parsed via parseOpenSkyCredentialsJson()
+// above). Thin wrapper around WebServer/ESPmDNS — not covered by Unity (see
+// CLAUDE.md "Testing").
 
 // Starts the mDNS responder ("cyd-sky.local") and the config web server.
 // Call once WiFi is connected (e.g. the first loop() iteration where

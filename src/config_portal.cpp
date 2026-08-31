@@ -13,6 +13,25 @@ int openSkyCreditCost(float radius_deg) {
   return 4;
 }
 
+#include <ArduinoJson.h>
+
+OpenSkyCredentials parseOpenSkyCredentialsJson(const std::string &json) {
+  OpenSkyCredentials result;
+
+  JsonDocument doc;
+  if (deserializeJson(doc, json) != DeserializationError::Ok) {
+    return result;
+  }
+  if (doc["clientId"].isNull() || doc["clientSecret"].isNull()) {
+    return result;
+  }
+
+  result.client_id = doc["clientId"].as<std::string>();
+  result.client_secret = doc["clientSecret"].as<std::string>();
+  result.ok = !result.client_id.empty() && !result.client_secret.empty();
+  return result;
+}
+
 #ifdef ARDUINO
 
 #include <ESPmDNS.h>
@@ -51,7 +70,7 @@ std::string htmlEscape(const std::string &in) {
   return out;
 }
 
-String renderForm(const Config &cfg, const char *message) {
+String renderForm(const Config &cfg, const char *message, bool isError = false) {
   String html;
   html.reserve(2048);
   html += "<!DOCTYPE html><html><head><meta charset=\"utf-8\">";
@@ -61,14 +80,25 @@ String renderForm(const Config &cfg, const char *message) {
       "label{display:block;margin-top:1em}"
       "input{width:100%;box-sizing:border-box;padding:.4em;font-size:1em}"
       "button{margin-top:1.5em;padding:.6em 1.2em;font-size:1em}"
+      "h2{margin-top:2em;border-top:1px solid #444;padding-top:1em}"
       "#credit{color:#ffa500;font-weight:bold}</style>";
   html += "</head><body>";
   html += "<h1>CYD Sky Tracker</h1>";
   if (message != nullptr) {
-    html += "<p style=\"color:#7fff7f\">";
+    html += isError ? "<p style=\"color:#ff6f6f\">" : "<p style=\"color:#7fff7f\">";
     html += message;
     html += "</p>";
   }
+
+  html += "<h2>Load OpenSky credentials from file</h2>";
+  html += "<form method=\"POST\" action=\"/upload_credentials\" enctype=\"multipart/form-data\">";
+  html += "<label>OpenSky client JSON (the file downloaded from your OpenSky account page)"
+          "<input type=\"file\" name=\"creds_file\" accept=\"application/json,.json\" required>"
+          "</label>";
+  html += "<button type=\"submit\">Upload</button>";
+  html += "</form>";
+
+  html += "<h2>Settings</h2>";
   html += "<form method=\"POST\" action=\"/save\">";
 
   html += "<label>Home latitude<input type=\"text\" name=\"lat\" value=\"" +
@@ -134,6 +164,52 @@ void handleSave() {
 
 void handleNotFound() { server.send(404, "text/plain", "Not found"); }
 
+// State for the in-progress credentials-file upload, accumulated across the
+// UPLOAD_FILE_WRITE chunks WebServer delivers before handleCredentialsUpload
+// runs with the completed request.
+std::string uploadBuffer;
+bool uploadTooLarge = false;
+constexpr size_t kMaxUploadBytes = 4096;  // credentials JSON is a few dozen bytes
+
+void handleCredentialsUploadChunk() {
+  HTTPUpload &upload = server.upload();
+  if (upload.status == UPLOAD_FILE_START) {
+    uploadBuffer.clear();
+    uploadTooLarge = false;
+  } else if (upload.status == UPLOAD_FILE_WRITE) {
+    if (uploadBuffer.size() + upload.currentSize > kMaxUploadBytes) {
+      uploadTooLarge = true;
+    } else {
+      uploadBuffer.append(reinterpret_cast<const char *>(upload.buf), upload.currentSize);
+    }
+  }
+}
+
+void handleCredentialsUpload() {
+  Config cfg = loadConfig();
+
+  if (uploadTooLarge) {
+    server.send(200, "text/html", renderForm(cfg, "Upload failed: file too large.", true));
+    return;
+  }
+
+  OpenSkyCredentials creds = parseOpenSkyCredentialsJson(uploadBuffer);
+  if (!creds.ok) {
+    server.send(
+        200, "text/html",
+        renderForm(cfg, "Upload failed: file did not contain a valid clientId/clientSecret.",
+                   true));
+    return;
+  }
+
+  cfg.opensky_client_id = creds.client_id;
+  cfg.opensky_client_secret = creds.client_secret;
+  saveConfig(cfg);  // sanitizes internally (see config_store)
+
+  Config saved = loadConfig();
+  server.send(200, "text/html", renderForm(saved, "OpenSky credentials loaded from file."));
+}
+
 }  // namespace
 
 void configPortalBegin() {
@@ -143,6 +219,7 @@ void configPortalBegin() {
 
   server.on("/", HTTP_GET, handleRoot);
   server.on("/save", HTTP_POST, handleSave);
+  server.on("/upload_credentials", HTTP_POST, handleCredentialsUpload, handleCredentialsUploadChunk);
   server.onNotFound(handleNotFound);
   server.begin();
 

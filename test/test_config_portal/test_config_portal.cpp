@@ -43,6 +43,54 @@ static void test_credit_cost_at_zero_radius(void) {
   TEST_ASSERT_EQUAL_INT(1, openSkyCreditCost(0.0f));
 }
 
+static void test_parse_credentials_json_valid(void) {
+  OpenSkyCredentials creds =
+      parseOpenSkyCredentialsJson(R"({"clientId":"przykladowy id","clientSecret":"tajne haslo"})");
+
+  TEST_ASSERT_TRUE(creds.ok);
+  TEST_ASSERT_EQUAL_STRING("przykladowy id", creds.client_id.c_str());
+  TEST_ASSERT_EQUAL_STRING("tajne haslo", creds.client_secret.c_str());
+}
+
+static void test_parse_credentials_json_ignores_extra_fields_and_whitespace(void) {
+  OpenSkyCredentials creds = parseOpenSkyCredentialsJson(
+      "{\n  \"clientId\": \"abc123\",\n  \"clientSecret\": \"s3cr3t\",\n  \"issuedAt\": "
+      "\"2026-01-01\"\n}");
+
+  TEST_ASSERT_TRUE(creds.ok);
+  TEST_ASSERT_EQUAL_STRING("abc123", creds.client_id.c_str());
+  TEST_ASSERT_EQUAL_STRING("s3cr3t", creds.client_secret.c_str());
+}
+
+static void test_parse_credentials_json_rejects_malformed_json(void) {
+  OpenSkyCredentials creds = parseOpenSkyCredentialsJson("not json at all");
+
+  TEST_ASSERT_FALSE(creds.ok);
+  TEST_ASSERT_TRUE(creds.client_id.empty());
+  TEST_ASSERT_TRUE(creds.client_secret.empty());
+}
+
+static void test_parse_credentials_json_rejects_missing_field(void) {
+  OpenSkyCredentials missingSecret = parseOpenSkyCredentialsJson(R"({"clientId":"abc123"})");
+  TEST_ASSERT_FALSE(missingSecret.ok);
+
+  OpenSkyCredentials missingId = parseOpenSkyCredentialsJson(R"({"clientSecret":"s3cr3t"})");
+  TEST_ASSERT_FALSE(missingId.ok);
+}
+
+static void test_parse_credentials_json_rejects_empty_values(void) {
+  OpenSkyCredentials creds =
+      parseOpenSkyCredentialsJson(R"({"clientId":"","clientSecret":""})");
+
+  TEST_ASSERT_FALSE(creds.ok);
+}
+
+static void test_parse_credentials_json_rejects_empty_string(void) {
+  OpenSkyCredentials creds = parseOpenSkyCredentialsJson("");
+
+  TEST_ASSERT_FALSE(creds.ok);
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_bbox_area_matches_radius);
@@ -52,5 +100,11 @@ int main(int argc, char **argv) {
   RUN_TEST(test_credit_cost_just_below_and_above_each_boundary);
   RUN_TEST(test_credit_cost_far_over_400_sq_deg);
   RUN_TEST(test_credit_cost_at_zero_radius);
+  RUN_TEST(test_parse_credentials_json_valid);
+  RUN_TEST(test_parse_credentials_json_ignores_extra_fields_and_whitespace);
+  RUN_TEST(test_parse_credentials_json_rejects_malformed_json);
+  RUN_TEST(test_parse_credentials_json_rejects_missing_field);
+  RUN_TEST(test_parse_credentials_json_rejects_empty_values);
+  RUN_TEST(test_parse_credentials_json_rejects_empty_string);
   return UNITY_END();
 }
