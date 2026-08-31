@@ -77,6 +77,7 @@ void setup() {
   wifiManagerBegin();
 
   // TEMP: manual cache test, remove after
+  /*
   Serial.println("=== aircraft_lookup manual cache test ===");
   AircraftInfo lookup1 = lookupAircraft("4010EE");
   Serial.printf("1st call: found=%s airline=\"%s\" type=\"%s\"\n",
@@ -87,6 +88,7 @@ void setup() {
                 lookup2.found ? "true" : "false", lookup2.airline.c_str(),
                 lookup2.aircraft_type.c_str());
   Serial.println("=== end aircraft_lookup manual cache test ===");
+*/
 
   lastDrawnStatus = wifiManagerStatus();
   lastDrawnSsid = wifiManagerSsid();
