@@ -28,11 +28,15 @@ namespace {
 std::map<std::string, AircraftInfo> cache;
 }  // namespace
 
-AircraftInfo lookupAircraftWithFetcher(const std::string &icao24, AircraftFetchFn fetch) {
+AircraftInfo lookupAircraftWithFetcher(const std::string &icao24, AircraftFetchFn fetch,
+                                        bool *wasCacheHit) {
   auto it = cache.find(icao24);
   if (it != cache.end()) {
+    if (wasCacheHit != nullptr) *wasCacheHit = true;
     return it->second;
   }
+
+  if (wasCacheHit != nullptr) *wasCacheHit = false;
 
   std::string body = fetch(icao24);
   AircraftInfo info = parseAircraftLookupResponse(body);
@@ -78,7 +82,14 @@ std::string httpFetchAircraftJson(const std::string &icao24) {
 }  // namespace
 
 AircraftInfo lookupAircraft(const std::string &icao24) {
-  return lookupAircraftWithFetcher(icao24, httpFetchAircraftJson);
+  bool wasCacheHit = false;
+  AircraftInfo info = lookupAircraftWithFetcher(icao24, httpFetchAircraftJson, &wasCacheHit);
+
+  Serial.printf("[aircraft_lookup] %s: %s (found=%s, airline=%s, type=%s)\n", icao24.c_str(),
+                wasCacheHit ? "cache hit" : "HTTP request", info.found ? "true" : "false",
+                info.airline.c_str(), info.aircraft_type.c_str());
+
+  return info;
 }
 
 #endif  // ARDUINO

@@ -40,7 +40,12 @@ using AircraftFetchFn = std::string (*)(const std::string &icao24);
 // survives a reboot too, not just the current session. RAM-only is enough
 // for now — see CLAUDE.md "Testing": don't complicate a step beyond what
 // it needs.
-AircraftInfo lookupAircraftWithFetcher(const std::string &icao24, AircraftFetchFn fetch);
+//
+// `wasCacheHit`, if non-null, is set to true/false so a caller (e.g. the
+// lookupAircraft() adapter below) can log whether this call served from
+// cache or made a real HTTP request.
+AircraftInfo lookupAircraftWithFetcher(const std::string &icao24, AircraftFetchFn fetch,
+                                        bool *wasCacheHit = nullptr);
 
 // Clears the in-RAM cache. Exposed for tests; production code has no real
 // reason to call this (an icao24's airline/type/registration essentially

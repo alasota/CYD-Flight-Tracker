@@ -14,6 +14,7 @@
 #include <string>
 
 #include "LGFX_CYD.hpp"
+#include "aircraft_lookup.h"
 #include "config_portal.h"
 #include "config_store.h"
 #include "opensky_client.h"
@@ -74,6 +75,18 @@ void setup() {
   (void)cfg;
 
   wifiManagerBegin();
+
+  // TEMP: manual cache test, remove after
+  Serial.println("=== aircraft_lookup manual cache test ===");
+  AircraftInfo lookup1 = lookupAircraft("4010EE");
+  Serial.printf("1st call: found=%s airline=\"%s\" type=\"%s\"\n",
+                lookup1.found ? "true" : "false", lookup1.airline.c_str(),
+                lookup1.aircraft_type.c_str());
+  AircraftInfo lookup2 = lookupAircraft("4010EE");
+  Serial.printf("2nd call: found=%s airline=\"%s\" type=\"%s\"\n",
+                lookup2.found ? "true" : "false", lookup2.airline.c_str(),
+                lookup2.aircraft_type.c_str());
+  Serial.println("=== end aircraft_lookup manual cache test ===");
 
   lastDrawnStatus = wifiManagerStatus();
   lastDrawnSsid = wifiManagerSsid();
