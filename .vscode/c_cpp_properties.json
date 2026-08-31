@@ -10,6 +10,7 @@
             "includePath": [
                 "C:/ai_tmp/CYD-Flight-Tracker/include",
                 "C:/ai_tmp/CYD-Flight-Tracker/src",
+                "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src",
                 "C:/ai_tmp/CYD-Flight-Tracker/.pio/libdeps/cyd/ArduinoJson/src",
                 "C:/ai_tmp/CYD-Flight-Tracker/.pio/libdeps/cyd/WiFiManager",
                 "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
@@ -229,7 +230,6 @@
                 "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/Insights/src",
                 "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/LittleFS/src",
                 "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/NetBIOS/src",
-                "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src",
                 "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/RainMaker/src",
                 "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/SD/src",
                 "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/SD_MMC/src",
@@ -246,6 +246,7 @@
                 "path": [
                     "C:/ai_tmp/CYD-Flight-Tracker/include",
                     "C:/ai_tmp/CYD-Flight-Tracker/src",
+                    "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src",
                     "C:/ai_tmp/CYD-Flight-Tracker/.pio/libdeps/cyd/ArduinoJson/src",
                     "C:/ai_tmp/CYD-Flight-Tracker/.pio/libdeps/cyd/WiFiManager",
                     "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
@@ -465,7 +466,6 @@
                     "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/Insights/src",
                     "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/LittleFS/src",
                     "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/NetBIOS/src",
-                    "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src",
                     "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/RainMaker/src",
                     "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/SD/src",
                     "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/SD_MMC/src",
