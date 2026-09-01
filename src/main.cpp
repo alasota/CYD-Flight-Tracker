@@ -103,7 +103,6 @@ static constexpr float kClimbThresholdMps = 3.0f;
 
 static void redrawScreen() {
   int16_t screenW = static_cast<int16_t>(tft.width());
-  int16_t screenH = static_cast<int16_t>(tft.height());
 
   tft.fillScreen(LCARS_BLACK);
 
@@ -111,11 +110,10 @@ static void redrawScreen() {
   drawStatusBar(tft, currentScreen, /*localEpoch=*/timeSyncNowLocal(), isTimeSynced(), screenW);
 
   if (currentScreen == kScreenRadar) {
-    drawRadarView(tft, lastRows, lastRadiusDeg, 0, LCARS_HEADER_HEIGHT, screenW,
-                  static_cast<int16_t>(screenH - LCARS_HEADER_HEIGHT));
+    drawRadarView(tft, lastRows, lastRadiusDeg, lastOriginAirport, lastDestAirport, screenW);
   } else {
     // Screens 0 (Flights) and 1 (Flight) both fall back to the table until
-    // flight_screen exists (step 4).
+    // flight_screen is wired into the render path (step 7).
     drawTablePage(tft, lastRows, lastOriginAirport, lastDestAirport, screenW, currentPage);
   }
 }

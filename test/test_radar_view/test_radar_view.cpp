@@ -43,6 +43,16 @@ static void test_layout_margin_too_large_yields_zero_radius(void) {
   TEST_ASSERT_EQUAL_INT(0, layout.radius_px);
 }
 
+static void test_screen3_radar_zone_resolves_to_spec_center_and_radius(void) {
+  // CLAUDE.md "Screen 3": radar zone x:0..190, y:28..238 (h 210), 10px
+  // margin -> center (95,133), radius 85 — the exact values
+  // radar_geometry::polarToScreen()/ring math is tested against.
+  RadarLayout layout = computeRadarLayout(0, 28, 190, 210, 10);
+  TEST_ASSERT_EQUAL_INT(95, layout.center_x);
+  TEST_ASSERT_EQUAL_INT(133, layout.center_y);
+  TEST_ASSERT_EQUAL_INT(85, layout.radius_px);
+}
+
 // ---- radiusDegToKm -----------------------------------------------------------
 
 static void test_radius_deg_to_km_default_radius(void) {
@@ -66,6 +76,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_layout_limited_by_smaller_dimension);
   RUN_TEST(test_layout_zero_margin);
   RUN_TEST(test_layout_margin_too_large_yields_zero_radius);
+  RUN_TEST(test_screen3_radar_zone_resolves_to_spec_center_and_radius);
 
   RUN_TEST(test_radius_deg_to_km_default_radius);
   RUN_TEST(test_radius_deg_to_km_one_degree);

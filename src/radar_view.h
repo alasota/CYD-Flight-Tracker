@@ -1,27 +1,32 @@
-// radar_view — draws Screen 2 (LCARS-skinned radar plot), per CLAUDE.md
-// "Screen 2 — Radar": home at center, concentric distance rings, aircraft
-// as blips positioned by bearing + distance. Re-skinned in lcars_theme's
-// palette — see CLAUDE.md "Design language" — that's what distinguishes
-// it from a plain radar scope, not the underlying polar-plot math (which
-// lives in radar_geometry, reused here rather than duplicated). Static
-// plot for v1 — no sweep-line animation. Zero networking code: draws from
-// an already-enriched, already-annotated AircraftRow list (table_view's
-// type) — bearing/distance come from table_view::annotateDistances()'s
-// computeDistanceBearing() call, not recomputed here.
+// radar_view — draws Screen 3 ("Radar"), per CLAUDE.md "Screen 3 —
+// Radar": a left-hand radar plot (home at center, concentric distance
+// rings, aircraft as blips positioned by bearing + distance), an
+// LCARS_ORANGE vertical divider, and a right-hand nearest-aircraft
+// summary panel. Re-skinned in lcars_theme's palette — that's what
+// distinguishes it from a plain radar scope, not the polar-plot math
+// (which lives in radar_geometry, reused here rather than duplicated).
+// Static plot for v1 — no sweep-line animation. Zero networking code:
+// draws from an already-enriched, already-annotated AircraftRow list
+// (bearing/distance come from table_view::annotateDistances(), not
+// recomputed here) plus the nearest aircraft's route-endpoint AirportInfos.
 #pragma once
 
 #include <cstdint>
 #include <vector>
 
 #include "radar_geometry.h"
-#include "table_view.h"  // AircraftRow
+#include "route_lookup.h"  // AirportInfo
+#include "table_view.h"    // AircraftRow
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
 
 // Center and radius (px) of the largest circle that fits within
 // [x, y, w, h] with `margin` px of padding on every side — the single
-// source of truth for where drawRadarView() below places the plot.
+// source of truth for where drawRadarView() places the plot. Screen 3
+// calls this with the fixed radar zone (x:0..190, y:28..238) and a 10px
+// margin, which resolves to center (95, 133) / radius 85 — the values
+// radar_geometry's polarToScreen()/ring math is exercised with.
 struct RadarLayout {
   int16_t center_x = 0;
   int16_t center_y = 0;
@@ -40,27 +45,33 @@ RadarLayout computeRadarLayout(int16_t x, int16_t y, int16_t w, int16_t h, int16
 float radiusDegToKm(float radius_deg);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme +
-// radar_geometry. Not covered by Unity (see CLAUDE.md "Testing"). Guarded
-// here in the header too (like table_view/featured_panel) since its
-// signature needs the LGFX device type.
+// radar_geometry + aircraft_summary. Not covered by Unity (see CLAUDE.md
+// "Testing"). Guarded here in the header too since its signature needs the
+// LGFX device type.
 #ifdef ARDUINO
 
 #include "LGFX_CYD.hpp"
 
-// Draws Screen 2 into the content area [x, y, w, h]: a home marker at the
-// plot's center (computeRadarLayout()), concentric distance rings
-// (radar_geometry::computeRingDistances()) in lcars_theme colors with
-// distance labels, and a blip for every row with a known distance/bearing
-// (AircraftRow::has_distance — annotateDistances() must have already run
-// on `rows`, and bearing/distance are read from the row rather than
-// recomputed here). `radius_deg` is config_store's scan radius, converted
-// internally via radiusDegToKm(). A row whose distance exceeds that range
-// is clamped to the outer ring and drawn dimmed (smaller, outline-only,
-// paler color) rather than hidden or drawn off-canvas — see
-// radar_geometry::ScreenPoint::clamped. Uses lcars_theme for all colors,
-// nothing of its own. No sweep-line animation (static plot, per CLAUDE.md
-// "fine for v1").
-void drawRadarView(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg, int16_t x,
-                    int16_t y, int16_t w, int16_t h);
+// Draws Screen 3's content area (below the 25px status_bar header) across
+// a `screenWidth`-px display, at the fixed CLAUDE.md "Screen 3" layout:
+//   - radar plot   x:0..190   — home crosshair (LCARS_YELLOW) at center
+//     (95,133), 3 concentric rings (radar_geometry::computeRingDistances)
+//     at r=28/57/85 with km labels, and a ~5px LCARS_CYAN blip per row
+//     with a known distance/bearing (positioned via polarToScreen); a row
+//     beyond `radius_deg` range is clamped to the outer ring and drawn
+//     dimmer/smaller (radar_geometry::ScreenPoint::clamped);
+//   - divider      x:192..200 — an 8px vertical LCARS_ORANGE bar;
+//   - summary panel x:200..320 — an LCARS_MAGENTA elbow frame (swept
+//     corner facing the divider) with three rows for the nearest aircraft
+//     (rows.front()): callsign, airline, "WAW -> FCO" route (IATA only, no
+//     country codes — RouteFormat::CodesOnly), via aircraft_summary.
+// `rows` must already be annotated (annotateDistances()) and sorted
+// (sortRowsByDistance()). `nearestOrigin`/`nearestDest` are rows.front()'s
+// route-endpoint AirportInfos (pass AirportInfo{} if unresolved).
+// Empty-range state (`rows` empty): the radar still draws its empty rings
+// and home marker; the summary panel shows a centered "BRAK LOTU".
+void drawRadarView(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg,
+                   const AirportInfo &nearestOrigin, const AirportInfo &nearestDest,
+                   int16_t screenWidth);
 
 #endif  // ARDUINO

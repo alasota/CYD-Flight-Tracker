@@ -26,70 +26,132 @@ float radiusDegToKm(float radius_deg) { return radius_deg * kKmPerDegree; }
 
 #ifdef ARDUINO
 
+#include <cmath>
 #include <cstdio>
+
+#include "aircraft_summary.h"
+#include "lcars_theme.h"
 
 namespace {
 
-constexpr int kRingCount = 4;
-constexpr int16_t kMargin = 24;  // leaves room for ring-distance labels near the plot's edge
-constexpr int16_t kHomeMarkerRadius = 5;
-constexpr int16_t kHomeRingRadius = 9;
-constexpr int16_t kBlipRadius = 4;
+// Fixed content-area layout, absolute coords on the 320x240 frame, below
+// the 25px status_bar header — CLAUDE.md "Screen 3".
+constexpr int16_t kContentTop = 28;
+constexpr int16_t kContentHeight = 210;  // y:28..238
+
+constexpr int16_t kRadarZoneX = 0;
+constexpr int16_t kRadarZoneW = 190;
+constexpr int16_t kRadarMargin = 10;  // -> center (95,133), radius 85
+
+constexpr int16_t kDividerX = 192;
+constexpr int16_t kDividerW = 8;  // x:192..200
+
+constexpr int16_t kSummaryX = 200;
+constexpr int16_t kSummaryW = 120;  // x:200..320
+constexpr int16_t kSummaryCorner = 12;
+constexpr int16_t kSummaryThickness = 3;
+constexpr int16_t kSummaryTextX = 208;   // inside the frame, clear of the swept corner
+constexpr int16_t kSummaryFlightY = 95;  // three-row baselines from CLAUDE.md
+constexpr int16_t kSummaryAirlineY = 130;
+constexpr int16_t kSummaryRouteY = 165;
+
+constexpr int kRingCount = 3;
+constexpr int16_t kBlipRadius = 5;
 constexpr int16_t kClampedBlipRadius = 3;
+// Dim teal for out-of-range (clamped) blips — deliberately not LCARS_CYAN
+// so "off the scale" reads distinct from an in-range aircraft.
+constexpr uint16_t kClampedBlipColor = 0x0410;
+constexpr int16_t kHomeCrosshair = 5;
 
-}  // namespace
+void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg) {
+  RadarLayout layout =
+      computeRadarLayout(kRadarZoneX, kContentTop, kRadarZoneW, kContentHeight, kRadarMargin);
+  if (layout.radius_px <= 0) return;
 
-void drawRadarView(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg, int16_t x,
-                    int16_t y, int16_t w, int16_t h) {
-  gfx.fillRect(x, y, w, h, LCARS_BLACK);
+  const float maxKm = radiusDegToKm(radius_deg);
+  const std::vector<float> ringsKm = computeRingDistances(maxKm, kRingCount);
 
-  RadarLayout layout = computeRadarLayout(x, y, w, h, kMargin);
-  if (layout.radius_px <= 0) return;  // content area too small to plot anything
-
-  float maxKm = radiusDegToKm(radius_deg);
-
-  // Concentric distance rings, with labels — same lcars_theme accent
-  // table_view uses for its own row text (LCARS_PALE_BLUE), same single
-  // consistent stroke for every ring.
-  std::vector<float> ringsKm = computeRingDistances(maxKm, kRingCount);
-
-  gfx.setFont(LCARS_FONT_BODY);
-  gfx.setTextDatum(top_left);
-  gfx.setTextColor(LCARS_PALE_BLUE, LCARS_BLACK);
-
-  for (float ringKm : ringsKm) {
-    int16_t ringRadiusPx =
-        (maxKm > 0.0f) ? static_cast<int16_t>(layout.radius_px * (ringKm / maxKm)) : 0;
-    if (ringRadiusPx <= 0) continue;
-
-    gfx.drawCircle(layout.center_x, layout.center_y, ringRadiusPx, LCARS_PALE_BLUE);
-
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "%.0fkm", static_cast<double>(ringKm));
-    gfx.drawString(buf, static_cast<int16_t>(layout.center_x + 3),
-                   static_cast<int16_t>(layout.center_y - ringRadiusPx));
+  // Concentric rings at r = radius_px * 1/3, 2/3, 3/3, each with its
+  // km label (lcars_theme::drawRadarRing).
+  for (int i = 0; i < kRingCount; ++i) {
+    int16_t ringR = static_cast<int16_t>(layout.radius_px * (i + 1) / kRingCount);
+    if (ringR <= 0) continue;
+    int km = static_cast<int>(std::lround(ringsKm[static_cast<size_t>(i)]));
+    drawRadarRing(gfx, layout.center_x, layout.center_y, ringR, km, LCARS_CYAN);
   }
 
-  // Aircraft blips — normal ones filled/full-size in LCARS_ROSE; ones
-  // clamped to the outer ring (out of configured range) drawn dimmed:
-  // smaller, outline-only, and in the paler LCARS_PALE_BLUE rather than
-  // the vivid blip color, so they read as visibly distinct from an
-  // in-range aircraft rather than just "at the edge".
+  // Aircraft blips.
   for (const AircraftRow &row : rows) {
-    if (!row.has_distance) continue;  // no position -> nothing to plot
-
+    if (!row.has_distance) continue;
     ScreenPoint p = polarToScreen(row.bearing_deg, row.distance_km, maxKm, layout.center_x,
                                   layout.center_y, layout.radius_px);
     if (p.clamped) {
-      gfx.drawCircle(p.x, p.y, kClampedBlipRadius, LCARS_PALE_BLUE);
+      gfx.drawCircle(p.x, p.y, kClampedBlipRadius, kClampedBlipColor);
     } else {
-      gfx.fillCircle(p.x, p.y, kBlipRadius, LCARS_ROSE);
+      gfx.fillCircle(p.x, p.y, kBlipRadius, LCARS_CYAN);
     }
   }
 
-  // Home marker, drawn last so it's never obscured by a ring or blip.
-  gfx.drawCircle(layout.center_x, layout.center_y, kHomeRingRadius, LCARS_AMBER);
-  gfx.fillCircle(layout.center_x, layout.center_y, kHomeMarkerRadius, LCARS_AMBER);
+  // Home crosshair (drawn last so nothing obscures it).
+  gfx.drawFastHLine(static_cast<int16_t>(layout.center_x - kHomeCrosshair), layout.center_y,
+                    static_cast<int16_t>(2 * kHomeCrosshair + 1), LCARS_YELLOW);
+  gfx.drawFastVLine(layout.center_x, static_cast<int16_t>(layout.center_y - kHomeCrosshair),
+                    static_cast<int16_t>(2 * kHomeCrosshair + 1), LCARS_YELLOW);
+  gfx.fillCircle(layout.center_x, layout.center_y, 2, LCARS_YELLOW);
+}
+
+void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, const AirportInfo &origin,
+                      const AirportInfo &dest) {
+  drawElbowFrame(gfx, kSummaryX, kContentTop, kSummaryW, kContentHeight, kSummaryCorner,
+                 kSummaryThickness, LCARS_MAGENTA);
+
+  // Keep any long airline name from spilling past the frame into the radar.
+  gfx.setClipRect(static_cast<int16_t>(kSummaryX + kSummaryThickness), kContentTop,
+                  static_cast<int16_t>(kSummaryW - 2 * kSummaryThickness), kContentHeight);
+
+  if (rows.empty()) {
+    gfx.setFont(LCARS_FONT_BODY);
+    gfx.setTextDatum(middle_center);
+    gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+    gfx.drawString("BRAK LOTU", static_cast<int16_t>(kSummaryX + kSummaryW / 2),
+                   static_cast<int16_t>(kContentTop + kContentHeight / 2));
+    gfx.clearClipRect();
+    return;
+  }
+
+  const AircraftRow &nearest = rows.front();
+
+  gfx.setTextDatum(top_left);
+
+  // Row 1: callsign, emphasized.
+  gfx.setFont(LCARS_FONT_HEADING);
+  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+  gfx.drawString(summaryFlight(nearest).c_str(), kSummaryTextX, kSummaryFlightY);
+
+  // Row 2: airline (clipped to the panel by setClipRect above).
+  gfx.setFont(LCARS_FONT_BODY);
+  gfx.drawString(summaryAirline(nearest).c_str(), kSummaryTextX, kSummaryAirlineY);
+
+  // Row 3: route, IATA codes only (no country codes — narrow panel).
+  gfx.drawString(
+      formatSummaryRoute(nearest.route, origin, dest, RouteFormat::CodesOnly).c_str(),
+      kSummaryTextX, kSummaryRouteY);
+
+  gfx.clearClipRect();
+}
+
+}  // namespace
+
+void drawRadarView(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg,
+                   const AirportInfo &nearestOrigin, const AirportInfo &nearestDest,
+                   int16_t screenWidth) {
+  (void)screenWidth;  // fixed 320px layout — parameter kept for signature symmetry
+
+  drawRadar(gfx, rows, radius_deg);
+
+  drawVerticalDivider(gfx, kDividerX, kContentTop, kContentHeight, kDividerW, LCARS_ORANGE);
+
+  drawSummaryPanel(gfx, rows, nearestOrigin, nearestDest);
 }
 
 #endif  // ARDUINO
