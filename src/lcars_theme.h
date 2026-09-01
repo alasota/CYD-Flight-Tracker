@@ -7,6 +7,8 @@
 
 #include <cstdint>
 
+#include "touch_input.h"  // Rect — shared tappable-region type
+
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
 
@@ -38,6 +40,14 @@ struct ElbowArcPoint {
 // curve without a gap or overlap. Pure — no TFT dependency — tested under
 // `pio test -e native`.
 ElbowArcPoint elbowArcPoint(int16_t radius, float angle_deg);
+
+// On-screen bounds of the view-toggle button placeholder (top-right
+// corner) for a `screenWidth` x `screenHeight` display. Pure — shared by
+// drawViewToggleButton() below and touch hit-testing (touch_input's
+// hitTest()) so the drawn button and its tap target never disagree. Will
+// eventually toggle table_view/radar_view; for now it only logs a Serial
+// message (see main.cpp) — see CLAUDE.md "Visualization concept".
+Rect viewToggleButtonBounds(int16_t screenWidth, int16_t screenHeight);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX. Not covered by
 // Unity (see CLAUDE.md "Testing") — this module is almost entirely draw
@@ -72,5 +82,10 @@ void drawElbow(LGFX &gfx, int16_t x, int16_t y, int16_t height, int16_t headerWi
 // section headers/labels.
 void drawPillButton(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t fillColor,
                      uint16_t textColor, const char *text);
+
+// Draws the view-toggle button placeholder at viewToggleButtonBounds().
+// Purely visual — tapping it is handled by main.cpp (touch_input::hitTest()
+// against viewToggleButtonBounds()), not by this module.
+void drawViewToggleButton(LGFX &gfx, int16_t screenWidth, int16_t screenHeight);
 
 #endif  // ARDUINO

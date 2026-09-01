@@ -91,6 +91,49 @@ static void test_parse_credentials_json_rejects_empty_string(void) {
   TEST_ASSERT_FALSE(creds.ok);
 }
 
+static void test_parse_credentials_json_rejects_oversized_body(void) {
+  // Padding well past kMaxCredentialsJsonBytes — the size check must
+  // reject it before any parsing is attempted (review notes 4.3).
+  std::string oversized(kMaxCredentialsJsonBytes + 1, 'x');
+  OpenSkyCredentials creds = parseOpenSkyCredentialsJson(oversized);
+  TEST_ASSERT_FALSE(creds.ok);
+}
+
+// ---- isValidFloatString (review notes 1.6) ---------------------------------
+
+static void test_valid_float_string_accepts_typical_values(void) {
+  TEST_ASSERT_TRUE(isValidFloatString("51.5074"));
+  TEST_ASSERT_TRUE(isValidFloatString("-0.1278"));
+  TEST_ASSERT_TRUE(isValidFloatString("10"));
+  TEST_ASSERT_TRUE(isValidFloatString("0.1"));
+  TEST_ASSERT_TRUE(isValidFloatString("  12.5"));  // leading whitespace tolerated, like strtof()
+}
+
+static void test_valid_float_string_rejects_garbage(void) {
+  TEST_ASSERT_FALSE(isValidFloatString(""));
+  TEST_ASSERT_FALSE(isValidFloatString("abc"));
+  TEST_ASSERT_FALSE(isValidFloatString("12.3.4"));
+  TEST_ASSERT_FALSE(isValidFloatString("12abc"));
+  TEST_ASSERT_FALSE(isValidFloatString("12 34"));  // trailing garbage after the number
+  TEST_ASSERT_FALSE(isValidFloatString(" "));
+}
+
+// ---- isValidUnsignedIntString (review notes 1.6) ---------------------------
+
+static void test_valid_unsigned_int_string_accepts_digits(void) {
+  TEST_ASSERT_TRUE(isValidUnsignedIntString("15"));
+  TEST_ASSERT_TRUE(isValidUnsignedIntString("0"));
+  TEST_ASSERT_TRUE(isValidUnsignedIntString("3600"));
+}
+
+static void test_valid_unsigned_int_string_rejects_non_digits(void) {
+  TEST_ASSERT_FALSE(isValidUnsignedIntString(""));
+  TEST_ASSERT_FALSE(isValidUnsignedIntString("-5"));
+  TEST_ASSERT_FALSE(isValidUnsignedIntString("12.5"));
+  TEST_ASSERT_FALSE(isValidUnsignedIntString("abc"));
+  TEST_ASSERT_FALSE(isValidUnsignedIntString("15s"));
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_bbox_area_matches_radius);
@@ -106,5 +149,11 @@ int main(int argc, char **argv) {
   RUN_TEST(test_parse_credentials_json_rejects_missing_field);
   RUN_TEST(test_parse_credentials_json_rejects_empty_values);
   RUN_TEST(test_parse_credentials_json_rejects_empty_string);
+  RUN_TEST(test_parse_credentials_json_rejects_oversized_body);
+
+  RUN_TEST(test_valid_float_string_accepts_typical_values);
+  RUN_TEST(test_valid_float_string_rejects_garbage);
+  RUN_TEST(test_valid_unsigned_int_string_accepts_digits);
+  RUN_TEST(test_valid_unsigned_int_string_rejects_non_digits);
   return UNITY_END();
 }

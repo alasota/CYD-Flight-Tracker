@@ -30,6 +30,13 @@ bool tokenNeedsRefresh(const TokenState &token, uint32_t now_ms, uint32_t refres
   return elapsed_ms + margin_ms >= expires_in_ms;
 }
 
+bool isBeforeDeadline(uint32_t now_ms, uint32_t until_ms) {
+  // (until_ms - now_ms), reinterpreted as signed, is positive exactly when
+  // now_ms precedes until_ms in wraparound-correct millis() time — same
+  // trick tokenNeedsRefresh() uses.
+  return static_cast<int32_t>(until_ms - now_ms) > 0;
+}
+
 bool shouldUseOAuth(const std::string &client_id, const std::string &client_secret) {
   return !client_id.empty() && !client_secret.empty();
 }
@@ -44,6 +51,10 @@ std::string trimTrailingSpaces(const std::string &s) {
 
 std::vector<Aircraft> parseStatesResponse(const std::string &json) {
   std::vector<Aircraft> result;
+
+  if (json.size() > kMaxStatesResponseBytes) {
+    return result;  // refuse to even attempt parsing an unexpectedly huge body
+  }
 
   JsonDocument doc;
   if (deserializeJson(doc, json) != DeserializationError::Ok) {
@@ -114,6 +125,8 @@ std::string urlEncode(const std::string &value) {
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 
+#include <cstdio>
+
 #include "config_store.h"
 
 namespace {
@@ -122,6 +135,14 @@ constexpr char kTokenUrl[] =
     "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token";
 constexpr char kStatesUrlBase[] = "https://opensky-network.org/api/states/all";
 constexpr char kRetryAfterHeader[] = "X-Rate-Limit-Retry-After-Seconds";
+constexpr uint32_t kDefaultRetryAfterS = 60;
+
+// Bounds on a single blocking HTTP call (see CLAUDE.md review notes 1.1 /
+// 5.1) — without these, loop() could stall for however long HTTPClient's
+// own default happens to be, which is neither documented here nor tuned
+// for staying responsive to touch/config_portal.
+constexpr int32_t kHttpConnectTimeoutMs = 5000;
+constexpr uint16_t kHttpTimeoutMs = 8000;
 
 TokenState cachedToken;
 uint32_t rateLimitedUntilMs = 0;
@@ -135,15 +156,29 @@ bool fetchToken(const std::string &client_id, const std::string &client_secret) 
   client.setInsecure();
 
   HTTPClient http;
+  http.setConnectTimeout(kHttpConnectTimeoutMs);
+  http.setTimeout(kHttpTimeoutMs);
   if (!http.begin(client, kTokenUrl)) {
     return false;
   }
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
-  String body = "grant_type=client_credentials&client_id=" + String(urlEncode(client_id).c_str()) +
-                "&client_secret=" + String(urlEncode(client_secret).c_str());
+  // Built into a fixed buffer instead of concatenating Arduino Strings
+  // (see CLAUDE.md review notes 4.2) — client_id/secret are short OAuth
+  // client identifiers, so this buffer has generous headroom.
+  std::string encodedId = urlEncode(client_id);
+  std::string encodedSecret = urlEncode(client_secret);
+  char body[512];
+  int written =
+      std::snprintf(body, sizeof(body), "grant_type=client_credentials&client_id=%s&client_secret=%s",
+                    encodedId.c_str(), encodedSecret.c_str());
+  if (written < 0 || static_cast<size_t>(written) >= sizeof(body)) {
+    Serial.println("[opensky_client] client_id/client_secret too long for token request buffer");
+    http.end();
+    return false;
+  }
 
-  int code = http.POST(body);
+  int code = http.POST(reinterpret_cast<uint8_t *>(body), static_cast<size_t>(written));
   if (code != HTTP_CODE_OK) {
     Serial.printf("[opensky_client] token fetch failed (http=%d)\n", code);
     http.end();
@@ -171,19 +206,34 @@ bool fetchToken(const std::string &client_id, const std::string &client_secret) 
 // (no HTTP response at all); on true, *outCode carries the HTTP status.
 bool requestStatesOnce(const BoundingBox &bbox, const std::string &bearerToken, int *outCode,
                         std::string *outBody, std::string *outRetryAfter) {
+  // Built into a fixed buffer instead of concatenating Arduino Strings
+  // (see CLAUDE.md review notes 4.2).
+  char url[192];
+  int urlWritten = std::snprintf(url, sizeof(url), "%s?lamin=%.4f&lomin=%.4f&lamax=%.4f&lomax=%.4f",
+                                  kStatesUrlBase, static_cast<double>(bbox.lamin),
+                                  static_cast<double>(bbox.lomin), static_cast<double>(bbox.lamax),
+                                  static_cast<double>(bbox.lomax));
+  if (urlWritten < 0 || static_cast<size_t>(urlWritten) >= sizeof(url)) {
+    return false;
+  }
+
   WiFiClientSecure client;
   client.setInsecure();
 
   HTTPClient http;
-  String url = String(kStatesUrlBase) + "?lamin=" + String(bbox.lamin, 4) +
-               "&lomin=" + String(bbox.lomin, 4) + "&lamax=" + String(bbox.lamax, 4) +
-               "&lomax=" + String(bbox.lomax, 4);
-
+  http.setConnectTimeout(kHttpConnectTimeoutMs);
+  http.setTimeout(kHttpTimeoutMs);
   if (!http.begin(client, url)) {
     return false;
   }
   if (!bearerToken.empty()) {
-    http.addHeader("Authorization", "Bearer " + String(bearerToken.c_str()));
+    char authHeader[2048];
+    int authWritten = std::snprintf(authHeader, sizeof(authHeader), "Bearer %s", bearerToken.c_str());
+    if (authWritten >= 0 && static_cast<size_t>(authWritten) < sizeof(authHeader)) {
+      http.addHeader("Authorization", authHeader);
+    } else {
+      Serial.println("[opensky_client] bearer token too long for header buffer, sending unauthenticated");
+    }
   }
   const char *collectHeaders[] = {kRetryAfterHeader};
   http.collectHeaders(collectHeaders, 1);
@@ -207,7 +257,7 @@ bool requestStatesOnce(const BoundingBox &bbox, const std::string &bearerToken, 
 
 std::vector<Aircraft> fetchAircraftStates(float home_lat, float home_lon, float radius_deg) {
   uint32_t now = millis();
-  if (rateLimitedUntilMs != 0 && now < rateLimitedUntilMs) {
+  if (rateLimitedUntilMs != 0 && isBeforeDeadline(now, rateLimitedUntilMs)) {
     return {};  // still backing off after a previous 429
   }
 
@@ -243,7 +293,7 @@ std::vector<Aircraft> fetchAircraftStates(float home_lat, float home_lon, float 
   }
 
   if (httpCode == 429) {
-    uint32_t backoff_s = parseRetryAfterSeconds(retryAfter, 60);
+    uint32_t backoff_s = parseRetryAfterSeconds(retryAfter, kDefaultRetryAfterS);
     rateLimitedUntilMs = now + backoff_s * 1000UL;
     Serial.printf("[opensky_client] rate limited (429), backing off %us\n",
                   static_cast<unsigned>(backoff_s));

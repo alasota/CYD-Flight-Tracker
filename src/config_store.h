@@ -33,6 +33,14 @@ struct Config {
   std::string opensky_client_id;
   std::string opensky_client_secret;
   ViewMode last_view = ViewMode::Table;
+  // True once the user has saved the settings form at least once via
+  // config_portal. (0, 0) is a real place (Gulf of Guinea) — without this
+  // flag there's no way to tell "user hasn't configured their home
+  // location yet" apart from "user's home really is at 0,0", so the
+  // firmware would happily poll/display aircraft around Null Island with
+  // no indication anything needs setting up. See CLAUDE.md review notes
+  // 1.5.
+  bool home_configured = false;
 };
 
 // Hardcoded fallback values used before anything has ever been saved to NVS.

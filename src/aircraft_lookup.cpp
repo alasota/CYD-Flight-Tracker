@@ -7,6 +7,10 @@
 AircraftInfo parseAircraftLookupResponse(const std::string &json) {
   AircraftInfo info;
 
+  if (json.size() > kMaxLookupResponseBytes) {
+    return info;  // refuse to even attempt parsing an unexpectedly huge body
+  }
+
   JsonDocument doc;
   if (deserializeJson(doc, json) != DeserializationError::Ok) {
     return info;  // malformed/empty body -> found=false
@@ -38,11 +42,22 @@ AircraftInfo lookupAircraftWithFetcher(const std::string &icao24, AircraftFetchF
 
   if (wasCacheHit != nullptr) *wasCacheHit = false;
 
-  std::string body = fetch(icao24);
-  AircraftInfo info = parseAircraftLookupResponse(body);
+  FetchResult fetchResult = fetch(icao24);
+  if (!fetchResult.response_ok) {
+    // Transient failure (timeout, WiFi drop, hexdb.io unreachable, non-200
+    // status) — do NOT cache. A confirmed answer (hit or genuine miss) is
+    // what's safe to remember forever; a failed attempt isn't one, so a
+    // later poll gets to try again — see CLAUDE.md review notes 1.2.
+    return AircraftInfo{};
+  }
 
-  cache[icao24] = info;  // cache both hits and misses — see header comment
+  AircraftInfo info = parseAircraftLookupResponse(fetchResult.body);
+  cache[icao24] = info;  // cache both real hits and confirmed misses
   return info;
+}
+
+bool aircraftLookupIsCached(const std::string &icao24) {
+  return cache.find(icao24) != cache.end();
 }
 
 void aircraftLookupClearCacheForTesting() { cache.clear(); }
@@ -53,30 +68,50 @@ void aircraftLookupClearCacheForTesting() { cache.clear(); }
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 
+#include <cstdio>
+
 namespace {
 
-std::string httpFetchAircraftJson(const std::string &icao24) {
+// See CLAUDE.md review notes 1.1/5.1 — bounds how long a single hexdb.io
+// lookup can block loop().
+constexpr int32_t kHttpConnectTimeoutMs = 5000;
+constexpr uint16_t kHttpTimeoutMs = 8000;
+
+FetchResult httpFetchAircraftJson(const std::string &icao24) {
+  FetchResult result;
+
+  // Built into a fixed buffer instead of concatenating Arduino Strings
+  // (see CLAUDE.md review notes 4.2) — icao24 is always exactly 6 hex
+  // chars, so this buffer has generous headroom.
+  char url[64];
+  int written = std::snprintf(url, sizeof(url), "https://hexdb.io/api/v1/aircraft/%s",
+                               icao24.c_str());
+  if (written < 0 || static_cast<size_t>(written) >= sizeof(url)) {
+    return result;
+  }
+
   WiFiClientSecure client;
   // No CA bundle pinned — same rationale as opensky_client: acceptable for
   // a hobby device, not hardened.
   client.setInsecure();
 
   HTTPClient http;
-  String url = String("https://hexdb.io/api/v1/aircraft/") + String(icao24.c_str());
+  http.setConnectTimeout(kHttpConnectTimeoutMs);
+  http.setTimeout(kHttpTimeoutMs);
   if (!http.begin(client, url)) {
-    return "";
+    return result;
   }
 
   int code = http.GET();
-  std::string body;
-  if (code > 0) {
-    body = std::string(http.getString().c_str());
+  if (code == HTTP_CODE_OK) {
+    result.response_ok = true;
+    result.body = std::string(http.getString().c_str());
   } else {
     Serial.printf("[aircraft_lookup] hexdb.io request failed for %s (http=%d)\n", icao24.c_str(),
                   code);
   }
   http.end();
-  return body;
+  return result;
 }
 
 }  // namespace

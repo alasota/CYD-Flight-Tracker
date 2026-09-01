@@ -80,6 +80,20 @@ static void test_elbow_arc_point_matches_drawElbow_seam(void) {
   TEST_ASSERT_EQUAL_INT(-barWidth, innerAtHeader.y);
 }
 
+// ---- viewToggleButtonBounds -------------------------------------------
+
+static void test_view_toggle_button_bounds_stays_within_screen(void) {
+  Rect b = viewToggleButtonBounds(320, 240);
+
+  TEST_ASSERT_TRUE(b.x >= 0);
+  TEST_ASSERT_TRUE(b.y >= 0);
+  TEST_ASSERT_TRUE(b.x + b.w <= 320);
+  TEST_ASSERT_TRUE(b.y + b.h <= 240);
+  // Anchored to the top-right corner.
+  TEST_ASSERT_TRUE(b.x > 320 / 2);
+  TEST_ASSERT_TRUE(b.y < 240 / 2);
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
 
@@ -90,6 +104,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_elbow_arc_point_cardinal_angles);
   RUN_TEST(test_elbow_arc_point_zero_radius);
   RUN_TEST(test_elbow_arc_point_matches_drawElbow_seam);
+
+  RUN_TEST(test_view_toggle_button_bounds_stays_within_screen);
 
   return UNITY_END();
 }

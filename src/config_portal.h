@@ -26,10 +26,31 @@ struct OpenSkyCredentials {
   std::string client_secret;
 };
 
+// Hard ceiling on how large a credentials JSON body
+// parseOpenSkyCredentialsJson() will attempt to parse — matches the config
+// page's own upload size cap, but enforced here too so the function is
+// self-defending regardless of caller (see CLAUDE.md review notes 4.3).
+constexpr size_t kMaxCredentialsJsonBytes = 4096;
+
 // Parses that JSON file's contents (uploaded via the config page — see
-// below). Pure — uses ArduinoJson but no WebServer/hardware dependency —
-// tested under `pio test -e native`.
+// below). A body over kMaxCredentialsJsonBytes is rejected outright
+// without being parsed. Pure — uses ArduinoJson but no WebServer/hardware
+// dependency — tested under `pio test -e native`.
 OpenSkyCredentials parseOpenSkyCredentialsJson(const std::string &json);
+
+// True if `s` parses entirely as a valid (base-10) floating point number —
+// no trailing garbage, not empty (leading whitespace is tolerated, same as
+// strtof()). Used by the config form to reject malformed lat/lon/radius
+// input instead of silently treating it as 0, which sanitizeConfig would
+// then just clamp up to a "valid-looking" value with no feedback to the
+// user — see CLAUDE.md review notes 1.6. Pure — tested under
+// `pio test -e native`.
+bool isValidFloatString(const std::string &s);
+
+// True if `s` is a valid non-negative base-10 integer (digits only, at
+// least one digit) — same idea as isValidFloatString(), for the
+// poll-interval field.
+bool isValidUnsignedIntString(const std::string &s);
 
 // --- Hardware adapter: serves the local config web page at cyd-sky.local
 // (mDNS) with a form for lat/lon/radius/poll_interval/OpenSky credentials,

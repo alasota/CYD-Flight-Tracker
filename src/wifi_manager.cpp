@@ -10,6 +10,10 @@ WifiStatus deriveWifiStatus(bool wifi_connected, bool portal_active) {
   return WifiStatus::Connecting;
 }
 
+bool shouldRestartConnection(bool portal_was_active, bool portal_active_now, bool wifi_connected) {
+  return portal_was_active && !portal_active_now && !wifi_connected;
+}
+
 const char *wifiStatusLabel(WifiStatus status) {
   switch (status) {
     case WifiStatus::Connecting:
@@ -32,6 +36,7 @@ const char *wifiStatusLabel(WifiStatus status) {
 namespace {
 WiFiManager wm;
 WifiStatus currentStatus = WifiStatus::Disconnected;
+bool portalWasActive = false;
 constexpr char kPortalApName[] = "CYD-Sky-Tracker-Setup";
 constexpr uint16_t kPortalTimeoutS = 180;
 }  // namespace
@@ -47,11 +52,27 @@ void wifiManagerBegin() {
   if (wm.autoConnect(kPortalApName)) {
     currentStatus = WifiStatus::Connected;
   }
+  portalWasActive = wm.getConfigPortalActive();
 }
 
 void wifiManagerLoop() {
   wm.process();
-  currentStatus = deriveWifiStatus(WiFi.status() == WL_CONNECTED, wm.getConfigPortalActive());
+
+  bool portalActiveNow = wm.getConfigPortalActive();
+  bool connected = WiFi.status() == WL_CONNECTED;
+
+  // The portal timed out without ever connecting — WiFiManager doesn't
+  // retry on its own, so without this the device would be stuck reporting
+  // "Connecting" forever with no portal open and nothing actually trying
+  // to connect (see CLAUDE.md review notes 1.3). Reopen it instead.
+  if (shouldRestartConnection(portalWasActive, portalActiveNow, connected)) {
+    wm.autoConnect(kPortalApName);
+    portalActiveNow = wm.getConfigPortalActive();
+    connected = WiFi.status() == WL_CONNECTED;
+  }
+  portalWasActive = portalActiveNow;
+
+  currentStatus = deriveWifiStatus(connected, portalActiveNow);
 }
 
 WifiStatus wifiManagerStatus() { return currentStatus; }

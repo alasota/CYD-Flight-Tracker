@@ -12,6 +12,20 @@ static void test_default_config_has_sane_values(void) {
   TEST_ASSERT_TRUE(cfg.last_view == ViewMode::Table);
   TEST_ASSERT_TRUE(cfg.opensky_client_id.empty());
   TEST_ASSERT_TRUE(cfg.opensky_client_secret.empty());
+  // Never-configured by default — see review notes 1.5: (0,0) is a real
+  // place, so this flag is the only way to tell "not set up yet" apart
+  // from "home really is at 0,0".
+  TEST_ASSERT_FALSE(cfg.home_configured);
+}
+
+static void test_sanitize_config_preserves_home_configured_flag(void) {
+  Config configured;
+  configured.home_configured = true;
+  TEST_ASSERT_TRUE(sanitizeConfig(configured).home_configured);
+
+  Config unconfigured;
+  unconfigured.home_configured = false;
+  TEST_ASSERT_FALSE(sanitizeConfig(unconfigured).home_configured);
 }
 
 static void test_clamp_radius_floors_and_ceils(void) {
@@ -67,6 +81,7 @@ static void test_view_mode_from_value_defaults_to_table(void) {
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_default_config_has_sane_values);
+  RUN_TEST(test_sanitize_config_preserves_home_configured_flag);
   RUN_TEST(test_clamp_radius_floors_and_ceils);
   RUN_TEST(test_clamp_poll_interval_enforces_minimum);
   RUN_TEST(test_sanitize_config_clamps_all_fields);

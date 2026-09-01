@@ -66,6 +66,7 @@ Config loadConfig() {
   cfg.opensky_client_secret = prefs.getString("os_secret", "").c_str();
   cfg.last_view =
       viewModeFromValue(prefs.getUChar("last_view", static_cast<uint8_t>(cfg.last_view)));
+  cfg.home_configured = prefs.getBool("home_cfg", cfg.home_configured);
 
   prefs.end();
   return sanitizeConfig(cfg);
@@ -84,6 +85,7 @@ void saveConfig(const Config &cfg) {
   prefs.putString("os_id", sanitized.opensky_client_id.c_str());
   prefs.putString("os_secret", sanitized.opensky_client_secret.c_str());
   prefs.putUChar("last_view", static_cast<uint8_t>(sanitized.last_view));
+  prefs.putBool("home_cfg", sanitized.home_configured);
 
   prefs.end();
 }

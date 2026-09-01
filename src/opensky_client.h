@@ -44,6 +44,12 @@ struct TokenState {
 // keeps this correct across a millis() rollover (~49 days uptime).
 bool tokenNeedsRefresh(const TokenState &token, uint32_t now_ms, uint32_t refresh_margin_s = 60);
 
+// True if `now_ms` is still before the deadline `until_ms` (e.g. a 429
+// rate-limit cooldown), correctly handling millis() rollover the same way
+// tokenNeedsRefresh() does — see CLAUDE.md review notes 1.4 (the original
+// `now < until` comparison here was NOT rollover-safe).
+bool isBeforeDeadline(uint32_t now_ms, uint32_t until_ms);
+
 // False (anonymous access) when either credential is empty — the fallback
 // mode described in CLAUDE.md "Authentication".
 bool shouldUseOAuth(const std::string &client_id, const std::string &client_secret);
@@ -59,12 +65,22 @@ struct Aircraft {
   float true_track = 0.0f;
 };
 
+// Hard ceiling on how large a /states/all response body parseStatesResponse()
+// will attempt to parse. A well-formed response for even a maxed-out (400
+// sq deg, per config_store's radius clamp) bounding box over a busy
+// airspace is a few tens of KB; this is a defensive cap against an
+// unexpectedly huge or corrupted body consuming unbounded heap during JSON
+// parsing — ArduinoJson's JsonDocument has no capacity limit of its own
+// (see CLAUDE.md review notes 4.3).
+constexpr size_t kMaxStatesResponseBytes = 65536;  // 64 KB
+
 // Parses a /states/all JSON response body into an Aircraft list. Tolerant
 // of a missing/null "states" array (-> empty result), of state vectors
 // shorter than expected (-> skipped), and of null individual fields within
 // a state vector (left at the struct's defaults). Callsigns are
-// right-trimmed (OpenSky space-pads them to 8 chars). Pure — uses
-// ArduinoJson but no HTTP dependency.
+// right-trimmed (OpenSky space-pads them to 8 chars). A body larger than
+// kMaxStatesResponseBytes is rejected outright (-> empty result) without
+// being parsed. Pure — uses ArduinoJson but no HTTP dependency.
 std::vector<Aircraft> parseStatesResponse(const std::string &json);
 
 // Backoff duration after a 429, per CLAUDE.md "Rate limits": the

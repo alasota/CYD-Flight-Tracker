@@ -33,6 +33,29 @@ DistanceBearing computeDistanceBearing(float home_lat, float home_lon, float lat
   return result;
 }
 
+std::vector<AircraftRow> buildEnrichedRecords(
+    const std::vector<Aircraft> &aircraft,
+    const std::map<std::string, AircraftInfo> &infoByIcao24) {
+  std::vector<AircraftRow> rows;
+  rows.reserve(aircraft.size());
+
+  for (const Aircraft &ac : aircraft) {
+    AircraftRow row;
+    row.aircraft = ac;
+
+    auto it = infoByIcao24.find(ac.icao24);
+    if (it != infoByIcao24.end()) {
+      row.info = it->second;
+    }
+    // else: row.info stays default-constructed (found=false, empty
+    // airline/aircraft_type) — drawTablePage() renders that as "--".
+
+    rows.push_back(row);
+  }
+
+  return rows;
+}
+
 void annotateDistances(std::vector<AircraftRow> &rows, float home_lat, float home_lon) {
   for (AircraftRow &row : rows) {
     if (!row.aircraft.has_position) {
@@ -59,11 +82,42 @@ void sortRowsByDistance(std::vector<AircraftRow> &rows) {
 
 namespace {
 constexpr int16_t kRowHeight = 20;
+
+// Column x-offsets, as fractions of the content width, for drawTablePage()
+// below — named rather than left as bare literals inline (review notes
+// 5.4).
+constexpr float kColAirlineFrac = 0.00f;
+constexpr float kColFlightFrac = 0.34f;
+constexpr float kColTypeFrac = 0.50f;
+constexpr float kColAltFrac = 0.68f;
+constexpr float kColSpeedFrac = 0.80f;
+constexpr float kColDistFrac = 0.90f;
 }  // namespace
+
+int16_t tableRowHeightPx() { return kRowHeight; }
 
 int rowsPerPage(int16_t contentHeight) {
   if (contentHeight < kRowHeight) return 0;
   return contentHeight / kRowHeight;
+}
+
+int getPageCount(int totalRows, int rowsPerPage) {
+  if (totalRows <= 0 || rowsPerPage <= 0) return 0;
+  return (totalRows + rowsPerPage - 1) / rowsPerPage;  // ceiling division
+}
+
+std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int page,
+                                       int rowsPerPage) {
+  std::vector<AircraftRow> slice;
+  if (page < 0 || rowsPerPage <= 0) return slice;
+
+  size_t start = static_cast<size_t>(page) * static_cast<size_t>(rowsPerPage);
+  if (start >= rows.size()) return slice;
+
+  size_t end = std::min(rows.size(), start + static_cast<size_t>(rowsPerPage));
+  slice.assign(rows.begin() + static_cast<std::ptrdiff_t>(start),
+               rows.begin() + static_cast<std::ptrdiff_t>(end));
+  return slice;
 }
 
 #ifdef ARDUINO
@@ -79,31 +133,31 @@ std::string orDash(const std::string &s) { return s.empty() ? std::string("--") 
 void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t x, int16_t y,
                     int16_t w, int16_t h, int page) {
   int perPage = rowsPerPage(h);
-  if (perPage <= 0 || page < 0) return;
+  if (perPage <= 0) return;
+
+  std::vector<AircraftRow> pageRows = getPageSlice(rows, page, perPage);
+  if (pageRows.empty()) return;
 
   size_t start = static_cast<size_t>(page) * static_cast<size_t>(perPage);
-  if (start >= rows.size()) return;
-  size_t end = std::min(rows.size(), start + static_cast<size_t>(perPage));
 
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_left);
 
-  // Column x-offsets as fractions of the content width.
-  int16_t colAirline = x;
-  int16_t colFlight = x + static_cast<int16_t>(w * 0.34f);
-  int16_t colType = x + static_cast<int16_t>(w * 0.50f);
-  int16_t colAlt = x + static_cast<int16_t>(w * 0.68f);
-  int16_t colSpeed = x + static_cast<int16_t>(w * 0.80f);
-  int16_t colDist = x + static_cast<int16_t>(w * 0.90f);
+  int16_t colAirline = x + static_cast<int16_t>(w * kColAirlineFrac);
+  int16_t colFlight = x + static_cast<int16_t>(w * kColFlightFrac);
+  int16_t colType = x + static_cast<int16_t>(w * kColTypeFrac);
+  int16_t colAlt = x + static_cast<int16_t>(w * kColAltFrac);
+  int16_t colSpeed = x + static_cast<int16_t>(w * kColSpeedFrac);
+  int16_t colDist = x + static_cast<int16_t>(w * kColDistFrac);
 
-  for (size_t i = start; i < end; ++i) {
-    const AircraftRow &row = rows[i];
-    int16_t rowY = y + static_cast<int16_t>(i - start) * kRowHeight;
+  for (size_t i = 0; i < pageRows.size(); ++i) {
+    const AircraftRow &row = pageRows[i];
+    int16_t rowY = y + static_cast<int16_t>(i) * kRowHeight;
     int16_t textY = rowY + kRowHeight / 2;
 
     // Rows must already be sorted ascending by distance (sortRowsByDistance())
-    // — index 0 of the whole list is always the closest aircraft.
-    bool isClosest = (i == 0);
+    // — global index 0 of the whole list is always the closest aircraft.
+    bool isClosest = (start + i == 0);
     uint16_t bg = isClosest ? LCARS_AMBER : LCARS_BLACK;
     uint16_t fg = isClosest ? LCARS_BLACK : LCARS_PALE_BLUE;
 

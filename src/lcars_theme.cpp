@@ -12,6 +12,23 @@ ElbowArcPoint elbowArcPoint(int16_t radius, float angle_deg) {
   return p;
 }
 
+namespace {
+constexpr int16_t kToggleButtonWidth = 54;
+constexpr int16_t kToggleButtonHeight = 22;
+constexpr int16_t kToggleButtonMargin = 4;
+}  // namespace
+
+Rect viewToggleButtonBounds(int16_t screenWidth, int16_t screenHeight) {
+  (void)screenHeight;  // button is anchored to the top edge, not the bottom
+
+  Rect r;
+  r.w = kToggleButtonWidth;
+  r.h = kToggleButtonHeight;
+  r.x = static_cast<int16_t>(screenWidth - kToggleButtonWidth - kToggleButtonMargin);
+  r.y = kToggleButtonMargin;
+  return r;
+}
+
 #ifdef ARDUINO
 
 const lgfx::IFont *const LCARS_FONT_HEADING = &fonts::Font4;
@@ -59,6 +76,11 @@ void drawPillButton(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint1
   gfx.setTextDatum(middle_center);
   gfx.setTextColor(textColor, fillColor);
   gfx.drawString(text, x + w / 2, y + h / 2);
+}
+
+void drawViewToggleButton(LGFX &gfx, int16_t screenWidth, int16_t screenHeight) {
+  Rect b = viewToggleButtonBounds(screenWidth, screenHeight);
+  drawPillButton(gfx, b.x, b.y, b.w, b.h, LCARS_BLUE_VIOLET, LCARS_BLACK, "VIEW");
 }
 
 #endif  // ARDUINO

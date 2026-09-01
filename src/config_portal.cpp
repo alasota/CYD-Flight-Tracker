@@ -1,5 +1,7 @@
 #include "config_portal.h"
 
+#include <cstdlib>
+
 float bboxAreaSqDeg(float radius_deg) {
   float side = 2.0f * radius_deg;
   return side * side;
@@ -18,6 +20,10 @@ int openSkyCreditCost(float radius_deg) {
 OpenSkyCredentials parseOpenSkyCredentialsJson(const std::string &json) {
   OpenSkyCredentials result;
 
+  if (json.size() > kMaxCredentialsJsonBytes) {
+    return result;  // refuse to even attempt parsing an unexpectedly huge body
+  }
+
   JsonDocument doc;
   if (deserializeJson(doc, json) != DeserializationError::Ok) {
     return result;
@@ -32,11 +38,31 @@ OpenSkyCredentials parseOpenSkyCredentialsJson(const std::string &json) {
   return result;
 }
 
+bool isValidFloatString(const std::string &s) {
+  if (s.empty()) return false;
+  const char *start = s.c_str();
+  char *end = nullptr;
+  std::strtof(start, &end);
+  if (end == start) return false;  // no digits consumed at all
+  while (*end == ' ' || *end == '\t') ++end;
+  return *end == '\0';  // nothing but (optional trailing whitespace) left over
+}
+
+bool isValidUnsignedIntString(const std::string &s) {
+  if (s.empty()) return false;
+  for (char c : s) {
+    if (c < '0' || c > '9') return false;
+  }
+  return true;
+}
+
 #ifdef ARDUINO
 
 #include <ESPmDNS.h>
 #include <WebServer.h>
 
+#include <cstdio>
+#include <cstring>
 #include <string>
 
 #include "config_store.h"
@@ -70,96 +96,175 @@ std::string htmlEscape(const std::string &in) {
   return out;
 }
 
-String renderForm(const Config &cfg, const char *message, bool isError = false) {
-  String html;
-  html.reserve(2048);
-  html += "<!DOCTYPE html><html><head><meta charset=\"utf-8\">";
-  html += "<title>CYD Sky Tracker Setup</title>";
-  html +=
+// Sends `s` as one chunk of the in-progress chunked response, skipping the
+// call entirely when `s` is empty — WebServer::sendContent() with a
+// zero-length payload prematurely ends the chunked stream, which would
+// silently truncate the page (e.g. whenever a credential field is blank).
+void sendChunk(const char *s) {
+  size_t len = std::strlen(s);
+  if (len > 0) {
+    server.sendContent(s, len);
+  }
+}
+void sendChunk(const std::string &s) { sendChunk(s.c_str()); }
+
+// Streams the config page directly to the client instead of building it up
+// as one large Arduino String (see CLAUDE.md review notes 4.1) — static
+// chunks are literals (no allocation at all), dynamic values are formatted
+// into small stack buffers via snprintf.
+void sendConfigPage(const Config &cfg, const char *message, bool isError = false) {
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/html", "");
+
+  sendChunk("<!DOCTYPE html><html><head><meta charset=\"utf-8\">");
+  sendChunk("<title>CYD Sky Tracker Setup</title>");
+  sendChunk(
       "<style>body{font-family:sans-serif;background:#111;color:#eee;padding:1.5em}"
       "label{display:block;margin-top:1em}"
       "input{width:100%;box-sizing:border-box;padding:.4em;font-size:1em}"
       "button{margin-top:1.5em;padding:.6em 1.2em;font-size:1em}"
       "h2{margin-top:2em;border-top:1px solid #444;padding-top:1em}"
-      "#credit{color:#ffa500;font-weight:bold}</style>";
-  html += "</head><body>";
-  html += "<h1>CYD Sky Tracker</h1>";
+      "#credit{color:#ffa500;font-weight:bold}</style>");
+  sendChunk("</head><body>");
+  sendChunk("<h1>CYD Sky Tracker</h1>");
+
   if (message != nullptr) {
-    html += isError ? "<p style=\"color:#ff6f6f\">" : "<p style=\"color:#7fff7f\">";
-    html += message;
-    html += "</p>";
+    sendChunk(isError ? "<p style=\"color:#ff6f6f\">" : "<p style=\"color:#7fff7f\">");
+    sendChunk(message);
+    sendChunk("</p>");
   }
 
-  html += "<h2>Load OpenSky credentials from file</h2>";
-  html += "<form method=\"POST\" action=\"/upload_credentials\" enctype=\"multipart/form-data\">";
-  html += "<label>OpenSky client JSON (the file downloaded from your OpenSky account page)"
-          "<input type=\"file\" name=\"creds_file\" accept=\"application/json,.json\" required>"
-          "</label>";
-  html += "<button type=\"submit\">Upload</button>";
-  html += "</form>";
+  sendChunk("<h2>Load OpenSky credentials from file</h2>"
+            "<form method=\"POST\" action=\"/upload_credentials\" enctype=\"multipart/form-data\">"
+            "<label>OpenSky client JSON (the file downloaded from your OpenSky account page)"
+            "<input type=\"file\" name=\"creds_file\" accept=\"application/json,.json\" required>"
+            "</label>"
+            "<button type=\"submit\">Upload</button>"
+            "</form>");
 
-  html += "<h2>Settings</h2>";
-  html += "<form method=\"POST\" action=\"/save\">";
+  sendChunk("<h2>Settings</h2><form method=\"POST\" action=\"/save\">");
 
-  html += "<label>Home latitude<input type=\"text\" name=\"lat\" value=\"" +
-          String(cfg.home_lat, 6) + "\"></label>";
-  html += "<label>Home longitude<input type=\"text\" name=\"lon\" value=\"" +
-          String(cfg.home_lon, 6) + "\"></label>";
-  html += "<label>Scan radius, deg (bbox = 2x this on each side)"
-          "<input type=\"text\" id=\"radius\" name=\"radius\" value=\"" +
-          String(cfg.radius_deg, 2) + "\" oninput=\"updateCredit()\"></label>";
-  html += "<p>OpenSky credit cost per poll: <span id=\"credit\">" +
-          String(openSkyCreditCost(cfg.radius_deg)) + "</span></p>";
-  html += "<label>Poll interval, seconds<input type=\"number\" name=\"poll_interval\" min=\"5\" "
-          "value=\"" +
-          String(cfg.poll_interval_s) + "\"></label>";
-  html += "<label>OpenSky client ID<input type=\"text\" name=\"client_id\" value=\"" +
-          String(htmlEscape(cfg.opensky_client_id).c_str()) + "\"></label>";
-  html += "<label>OpenSky client secret<input type=\"password\" name=\"client_secret\" value=\"" +
-          String(htmlEscape(cfg.opensky_client_secret).c_str()) + "\"></label>";
-  html += "<button type=\"submit\">Save</button>";
-  html += "</form>";
+  char buf[64];
+
+  std::snprintf(buf, sizeof(buf), "%.6f", static_cast<double>(cfg.home_lat));
+  sendChunk("<label>Home latitude<input type=\"text\" name=\"lat\" value=\"");
+  sendChunk(buf);
+  sendChunk("\"></label>");
+
+  std::snprintf(buf, sizeof(buf), "%.6f", static_cast<double>(cfg.home_lon));
+  sendChunk("<label>Home longitude<input type=\"text\" name=\"lon\" value=\"");
+  sendChunk(buf);
+  sendChunk("\"></label>");
+
+  std::snprintf(buf, sizeof(buf), "%.2f", static_cast<double>(cfg.radius_deg));
+  sendChunk("<label>Scan radius, deg (bbox = 2x this on each side)"
+            "<input type=\"text\" id=\"radius\" name=\"radius\" value=\"");
+  sendChunk(buf);
+  sendChunk("\" oninput=\"updateCredit()\"></label>");
+
+  std::snprintf(buf, sizeof(buf), "%d", openSkyCreditCost(cfg.radius_deg));
+  sendChunk("<p>OpenSky credit cost per poll: <span id=\"credit\">");
+  sendChunk(buf);
+  sendChunk("</span></p>");
+
+  std::snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(cfg.poll_interval_s));
+  sendChunk("<label>Poll interval, seconds<input type=\"number\" name=\"poll_interval\" min=\"5\" "
+            "value=\"");
+  sendChunk(buf);
+  sendChunk("\"></label>");
+
+  sendChunk("<label>OpenSky client ID<input type=\"text\" name=\"client_id\" value=\"");
+  sendChunk(htmlEscape(cfg.opensky_client_id));
+  sendChunk("\"></label>");
+
+  sendChunk("<label>OpenSky client secret<input type=\"password\" name=\"client_secret\" value=\"");
+  sendChunk(htmlEscape(cfg.opensky_client_secret));
+  sendChunk("\"></label>");
+
+  sendChunk("<button type=\"submit\">Save</button></form>");
 
   // Mirrors openSkyCreditCost() above so the credit readout updates as the
   // user types, without a round trip to the device for every keystroke.
-  html +=
-      "<script>"
-      "function creditCost(radius){"
-      "var side=2*radius,area=side*side;"
-      "if(area<=25)return 1;if(area<=100)return 2;if(area<=400)return 3;return 4;"
-      "}"
-      "function updateCredit(){"
-      "var r=parseFloat(document.getElementById('radius').value)||0;"
-      "document.getElementById('credit').textContent=creditCost(r);"
-      "}"
-      "</script>";
-  html += "</body></html>";
-  return html;
+  sendChunk("<script>"
+            "function creditCost(radius){"
+            "var side=2*radius,area=side*side;"
+            "if(area<=25)return 1;if(area<=100)return 2;if(area<=400)return 3;return 4;"
+            "}"
+            "function updateCredit(){"
+            "var r=parseFloat(document.getElementById('radius').value)||0;"
+            "document.getElementById('credit').textContent=creditCost(r);"
+            "}"
+            "</script>");
+  sendChunk("</body></html>");
+
+  server.sendContent("");  // 0-length chunk closes the chunked response
 }
 
 void handleRoot() {
   Config cfg = loadConfig();
-  server.send(200, "text/html", renderForm(cfg, nullptr));
+  sendConfigPage(cfg, nullptr);
 }
 
 void handleSave() {
   Config cfg = loadConfig();
 
-  if (server.hasArg("lat")) cfg.home_lat = server.arg("lat").toFloat();
-  if (server.hasArg("lon")) cfg.home_lon = server.arg("lon").toFloat();
-  if (server.hasArg("radius")) cfg.radius_deg = server.arg("radius").toFloat();
+  // Reject malformed numeric input instead of silently treating it as 0
+  // (which sanitizeConfig would then just clamp to a "valid-looking"
+  // value with no feedback to the user) — see CLAUDE.md review notes 1.6.
+  // Rejected fields keep their previous value.
+  std::string rejected;
+
+  if (server.hasArg("lat")) {
+    std::string v = server.arg("lat").c_str();
+    if (isValidFloatString(v)) {
+      cfg.home_lat = std::strtof(v.c_str(), nullptr);
+    } else {
+      rejected += "lat ";
+    }
+  }
+  if (server.hasArg("lon")) {
+    std::string v = server.arg("lon").c_str();
+    if (isValidFloatString(v)) {
+      cfg.home_lon = std::strtof(v.c_str(), nullptr);
+    } else {
+      rejected += "lon ";
+    }
+  }
+  if (server.hasArg("radius")) {
+    std::string v = server.arg("radius").c_str();
+    if (isValidFloatString(v)) {
+      cfg.radius_deg = std::strtof(v.c_str(), nullptr);
+    } else {
+      rejected += "radius ";
+    }
+  }
   if (server.hasArg("poll_interval")) {
-    cfg.poll_interval_s = static_cast<uint32_t>(server.arg("poll_interval").toInt());
+    std::string v = server.arg("poll_interval").c_str();
+    if (isValidUnsignedIntString(v)) {
+      cfg.poll_interval_s = static_cast<uint32_t>(std::strtoul(v.c_str(), nullptr, 10));
+    } else {
+      rejected += "poll_interval ";
+    }
   }
   if (server.hasArg("client_id")) cfg.opensky_client_id = server.arg("client_id").c_str();
   if (server.hasArg("client_secret")) {
     cfg.opensky_client_secret = server.arg("client_secret").c_str();
   }
 
+  // The user has now been through the settings form at least once — see
+  // CLAUDE.md review notes 1.5. This is what main.cpp checks to tell
+  // "not configured yet" apart from "home really is at (0,0)".
+  cfg.home_configured = true;
+
   saveConfig(cfg);  // sanitizes internally (see config_store)
 
   Config saved = loadConfig();
-  server.send(200, "text/html", renderForm(saved, "Saved."));
+  if (!rejected.empty()) {
+    std::string msg = "Saved, but ignored invalid value(s) for: " + rejected + "(kept previous value).";
+    sendConfigPage(saved, msg.c_str(), true);
+  } else {
+    sendConfigPage(saved, "Saved.");
+  }
 }
 
 void handleNotFound() { server.send(404, "text/plain", "Not found"); }
@@ -189,16 +294,13 @@ void handleCredentialsUpload() {
   Config cfg = loadConfig();
 
   if (uploadTooLarge) {
-    server.send(200, "text/html", renderForm(cfg, "Upload failed: file too large.", true));
+    sendConfigPage(cfg, "Upload failed: file too large.", true);
     return;
   }
 
   OpenSkyCredentials creds = parseOpenSkyCredentialsJson(uploadBuffer);
   if (!creds.ok) {
-    server.send(
-        200, "text/html",
-        renderForm(cfg, "Upload failed: file did not contain a valid clientId/clientSecret.",
-                   true));
+    sendConfigPage(cfg, "Upload failed: file did not contain a valid clientId/clientSecret.", true);
     return;
   }
 
@@ -207,7 +309,7 @@ void handleCredentialsUpload() {
   saveConfig(cfg);  // sanitizes internally (see config_store)
 
   Config saved = loadConfig();
-  server.send(200, "text/html", renderForm(saved, "OpenSky credentials loaded from file."));
+  sendConfigPage(saved, "OpenSky credentials loaded from file.");
 }
 
 }  // namespace

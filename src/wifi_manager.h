@@ -22,6 +22,14 @@ WifiStatus deriveWifiStatus(bool wifi_connected, bool portal_active);
 // hardware calls — testable natively.
 const char *wifiStatusLabel(WifiStatus status);
 
+// True if the connection attempt should be restarted: the captive portal
+// was open a moment ago and has just closed (timed out) without a
+// successful connection. Without this, the device gets stuck reporting
+// "Connecting" forever with nothing actually trying to connect and no
+// portal to reconfigure it from — see CLAUDE.md review notes 1.3. Pure —
+// tested under `pio test -e native`.
+bool shouldRestartConnection(bool portal_was_active, bool portal_active_now, bool wifi_connected);
+
 // --- Hardware adapter: drives the actual WiFiManager/WiFi calls. Thin
 // wrapper around a hardware/SDK API — see CLAUDE.md "Testing" — not covered
 // by Unity.

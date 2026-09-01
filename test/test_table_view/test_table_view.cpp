@@ -34,6 +34,76 @@ static void test_distance_london_to_paris_sanity_check(void) {
   TEST_ASSERT_TRUE(db.bearing_deg > 90.0f && db.bearing_deg < 180.0f);  // south-east
 }
 
+// ---- buildEnrichedRecords ---------------------------------------------------
+
+static void test_build_enriched_records_found_true(void) {
+  Aircraft ac;
+  ac.icao24 = "4010ee";
+  ac.callsign = "DLH9LH";
+  ac.lat = 50.1210f;
+  ac.lon = 6.1546f;
+  ac.has_position = true;
+
+  AircraftInfo info;
+  info.found = true;
+  info.airline = "easyJet Airline";
+  info.aircraft_type = "A319 111";
+  info.registration = "G-EZBZ";
+
+  std::map<std::string, AircraftInfo> infoByIcao24 = {{"4010ee", info}};
+
+  std::vector<AircraftRow> rows = buildEnrichedRecords({ac}, infoByIcao24);
+
+  TEST_ASSERT_EQUAL_size_t(1, rows.size());
+  TEST_ASSERT_EQUAL_STRING("4010ee", rows[0].aircraft.icao24.c_str());
+  TEST_ASSERT_EQUAL_STRING("DLH9LH", rows[0].aircraft.callsign.c_str());
+  TEST_ASSERT_TRUE(rows[0].info.found);
+  TEST_ASSERT_EQUAL_STRING("easyJet Airline", rows[0].info.airline.c_str());
+  TEST_ASSERT_EQUAL_STRING("A319 111", rows[0].info.aircraft_type.c_str());
+}
+
+static void test_build_enriched_records_found_false_when_lookup_missing(void) {
+  Aircraft ac;
+  ac.icao24 = "a1b2c3";
+  ac.callsign = "N12345";
+  ac.has_position = true;
+
+  // icao24 never resolved (no entry at all — e.g. lookup still pending).
+  std::map<std::string, AircraftInfo> infoByIcao24;
+
+  std::vector<AircraftRow> rows = buildEnrichedRecords({ac}, infoByIcao24);
+
+  TEST_ASSERT_EQUAL_size_t(1, rows.size());
+  TEST_ASSERT_FALSE(rows[0].info.found);
+  // drawTablePage() renders this as "--" — see table_view.cpp's orDash().
+  TEST_ASSERT_TRUE(rows[0].info.airline.empty());
+  TEST_ASSERT_TRUE(rows[0].info.aircraft_type.empty());
+}
+
+static void test_build_enriched_records_found_false_from_cached_miss(void) {
+  Aircraft ac;
+  ac.icao24 = "ffffff";
+  ac.has_position = true;
+
+  // icao24 WAS looked up, and aircraft_lookup cached an explicit miss
+  // (hexdb.io's "not found" response) — same result either way.
+  AircraftInfo miss;  // found=false by default
+  std::map<std::string, AircraftInfo> infoByIcao24 = {{"ffffff", miss}};
+
+  std::vector<AircraftRow> rows = buildEnrichedRecords({ac}, infoByIcao24);
+
+  TEST_ASSERT_EQUAL_size_t(1, rows.size());
+  TEST_ASSERT_FALSE(rows[0].info.found);
+}
+
+static void test_build_enriched_records_empty_aircraft_list(void) {
+  std::map<std::string, AircraftInfo> infoByIcao24 = {{"4010ee", AircraftInfo{}}};
+
+  std::vector<AircraftRow> rows = buildEnrichedRecords({}, infoByIcao24);
+
+  TEST_ASSERT_TRUE(rows.empty());
+}
+
 // ---- annotateDistances -----------------------------------------------------
 
 static void test_annotate_fills_distance_for_positioned_aircraft(void) {
@@ -125,13 +195,85 @@ static void test_sort_empty_array_does_not_crash(void) {
   TEST_ASSERT_TRUE(rows.empty());
 }
 
-// ---- rowsPerPage -------------------------------------------------------------
+// ---- rowsPerPage / tableRowHeightPx ------------------------------------------
 
 static void test_rows_per_page(void) {
   TEST_ASSERT_EQUAL_INT(0, rowsPerPage(10));    // shorter than one row
   TEST_ASSERT_EQUAL_INT(1, rowsPerPage(20));
   TEST_ASSERT_EQUAL_INT(10, rowsPerPage(200));
   TEST_ASSERT_EQUAL_INT(10, rowsPerPage(209));  // partial row doesn't count
+}
+
+static void test_table_row_height_px_matches_rows_per_page(void) {
+  // tableRowHeightPx() is meant to be the single source of truth behind
+  // rowsPerPage() (see review notes 5.5) — pin down that they actually
+  // agree, rather than just asserting a hardcoded number.
+  int16_t rowHeight = tableRowHeightPx();
+  TEST_ASSERT_TRUE(rowHeight > 0);
+  TEST_ASSERT_EQUAL_INT(3, rowsPerPage(rowHeight * 3));
+  TEST_ASSERT_EQUAL_INT(0, rowsPerPage(static_cast<int16_t>(rowHeight - 1)));
+}
+
+// ---- getPageCount -------------------------------------------------------------
+
+static void test_page_count_zero_records(void) {
+  TEST_ASSERT_EQUAL_INT(0, getPageCount(0, 10));
+}
+
+static void test_page_count_exact_multiple(void) {
+  TEST_ASSERT_EQUAL_INT(3, getPageCount(30, 10));
+}
+
+static void test_page_count_inexact_multiple_rounds_up(void) {
+  TEST_ASSERT_EQUAL_INT(3, getPageCount(25, 10));  // 2.5 -> 3 pages
+  TEST_ASSERT_EQUAL_INT(1, getPageCount(1, 10));
+}
+
+static void test_page_count_non_positive_rows_per_page(void) {
+  TEST_ASSERT_EQUAL_INT(0, getPageCount(25, 0));
+  TEST_ASSERT_EQUAL_INT(0, getPageCount(25, -5));
+}
+
+// ---- getPageSlice -------------------------------------------------------------
+
+static std::vector<AircraftRow> makeNumberedRows(int count) {
+  std::vector<AircraftRow> rows;
+  for (int i = 0; i < count; ++i) {
+    AircraftRow row;
+    row.aircraft.icao24 = std::to_string(i);
+    rows.push_back(row);
+  }
+  return rows;
+}
+
+static void test_page_slice_first_page(void) {
+  std::vector<AircraftRow> rows = makeNumberedRows(25);
+  std::vector<AircraftRow> slice = getPageSlice(rows, 0, 10);
+
+  TEST_ASSERT_EQUAL_size_t(10, slice.size());
+  TEST_ASSERT_EQUAL_STRING("0", slice.front().aircraft.icao24.c_str());
+  TEST_ASSERT_EQUAL_STRING("9", slice.back().aircraft.icao24.c_str());
+}
+
+static void test_page_slice_last_partial_page(void) {
+  std::vector<AircraftRow> rows = makeNumberedRows(25);
+  std::vector<AircraftRow> slice = getPageSlice(rows, 2, 10);  // page 2 = rows 20..24
+
+  TEST_ASSERT_EQUAL_size_t(5, slice.size());
+  TEST_ASSERT_EQUAL_STRING("20", slice.front().aircraft.icao24.c_str());
+  TEST_ASSERT_EQUAL_STRING("24", slice.back().aircraft.icao24.c_str());
+}
+
+static void test_page_slice_out_of_range_page_is_empty(void) {
+  std::vector<AircraftRow> rows = makeNumberedRows(25);
+
+  TEST_ASSERT_TRUE(getPageSlice(rows, 3, 10).empty());   // past the last page (0,1,2)
+  TEST_ASSERT_TRUE(getPageSlice(rows, -1, 10).empty());  // negative page
+}
+
+static void test_page_slice_empty_input(void) {
+  std::vector<AircraftRow> rows;
+  TEST_ASSERT_TRUE(getPageSlice(rows, 0, 10).empty());
 }
 
 int main(int argc, char **argv) {
@@ -142,6 +284,11 @@ int main(int argc, char **argv) {
   RUN_TEST(test_distance_one_degree_east_at_equator);
   RUN_TEST(test_distance_london_to_paris_sanity_check);
 
+  RUN_TEST(test_build_enriched_records_found_true);
+  RUN_TEST(test_build_enriched_records_found_false_when_lookup_missing);
+  RUN_TEST(test_build_enriched_records_found_false_from_cached_miss);
+  RUN_TEST(test_build_enriched_records_empty_aircraft_list);
+
   RUN_TEST(test_annotate_fills_distance_for_positioned_aircraft);
   RUN_TEST(test_annotate_leaves_no_position_aircraft_unset);
 
@@ -151,6 +298,17 @@ int main(int argc, char **argv) {
   RUN_TEST(test_sort_empty_array_does_not_crash);
 
   RUN_TEST(test_rows_per_page);
+  RUN_TEST(test_table_row_height_px_matches_rows_per_page);
+
+  RUN_TEST(test_page_count_zero_records);
+  RUN_TEST(test_page_count_exact_multiple);
+  RUN_TEST(test_page_count_inexact_multiple_rounds_up);
+  RUN_TEST(test_page_count_non_positive_rows_per_page);
+
+  RUN_TEST(test_page_slice_first_page);
+  RUN_TEST(test_page_slice_last_partial_page);
+  RUN_TEST(test_page_slice_out_of_range_page_is_empty);
+  RUN_TEST(test_page_slice_empty_input);
 
   return UNITY_END();
 }

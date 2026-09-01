@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,20 @@ struct AircraftRow {
   bool has_distance = false;  // false when aircraft.has_position is false
 };
 
+// Joins OpenSky state vectors with their hexdb.io lookups by icao24,
+// producing the AircraftRow list table_view actually draws — this is the
+// "connect Aircraft + AircraftInfo" step CLAUDE.md's table_view input
+// contract describes. An icao24 with no entry in `infoByIcao24` (lookup
+// still pending, or main.cpp simply never called aircraft_lookup for it)
+// produces a row with a default-constructed AircraftInfo (found == false),
+// which drawTablePage() renders as "--" rather than dropping the row, per
+// CLAUDE.md. Distance is NOT computed here — call annotateDistances() (and
+// then sortRowsByDistance()) on the result afterward. Pure — no HTTP call
+// happens here, just the join; no dependency on aircraft_lookup's actual
+// lookup functions — tested under `pio test -e native`.
+std::vector<AircraftRow> buildEnrichedRecords(const std::vector<Aircraft> &aircraft,
+                                               const std::map<std::string, AircraftInfo> &infoByIcao24);
+
 // Fills distance_km/bearing_deg/has_distance on every row in `rows` from
 // (home_lat, home_lon) via computeDistanceBearing(). Rows whose
 // Aircraft::has_position is false get has_distance=false (nothing to
@@ -54,10 +69,30 @@ void annotateDistances(std::vector<AircraftRow> &rows, float home_lat, float hom
 // relative order).
 void sortRowsByDistance(std::vector<AircraftRow> &rows);
 
-// Rows that fit in a content area `contentHeight` pixels tall, at this
-// module's fixed row height — the single source of truth for row height,
-// used by drawTablePage() below and by (step 9's) touch paging logic.
+// The fixed row height (pixels) this module draws at — the actual single
+// source of truth backing rowsPerPage() below. Exposed so other modules
+// (e.g. main.cpp's touch tap-zone sizing) can stay in sync with it instead
+// of hardcoding their own independent copy of the same number — see
+// CLAUDE.md review notes 5.5.
+int16_t tableRowHeightPx();
+
+// Rows that fit in a content area `contentHeight` pixels tall, at
+// tableRowHeightPx(). Used by drawTablePage() below and by the paging
+// logic that follows.
 int rowsPerPage(int16_t contentHeight);
+
+// Number of pages needed to show `totalRows` records at `rowsPerPage` rows
+// per page (ceiling division) — 0 records or a non-positive rowsPerPage
+// both yield 0 pages, not 1. Pure — no TFT dependency.
+int getPageCount(int totalRows, int rowsPerPage);
+
+// The subset of `rows` to draw for `page` (0-based) at `rowsPerPage` rows
+// per page. An out-of-range page (negative, or past the last page) returns
+// an empty subset rather than out-of-bounds access — callers should check
+// getPageCount() if they need to clamp `page` instead of just getting
+// nothing back. Pure — no TFT dependency.
+std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int page,
+                                       int rowsPerPage);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme. Not
 // covered by Unity (see CLAUDE.md "Testing"). Guarded here in the header
@@ -70,11 +105,12 @@ int rowsPerPage(int16_t contentHeight);
 // sorted via sortRowsByDistance()) into the content area [x, y, w, h]:
 // airline, flight (callsign), aircraft type, altitude, speed, distance —
 // using lcars_theme for panels/fonts/colors, nothing of its own. `page` is
-// 0-based; only the rows that fit starting at page*rowsPerPage(h) are
-// drawn. Row 0 of the *whole* sorted list (the closest aircraft) is
-// highlighted with a brighter lcars_theme accent whenever it falls on the
-// visible page. Missing lookup/position data renders as "--" rather than
-// being hidden, per CLAUDE.md. Paging/scrolling via touch is step 9 — this
+// 0-based (internally via getPageSlice()/rowsPerPage()); an out-of-range
+// page just draws nothing. Row 0 of the *whole* sorted list (the closest
+// aircraft) is highlighted with a brighter lcars_theme accent whenever it
+// falls on the visible page. Missing lookup/position data renders as "--"
+// rather than being hidden, per CLAUDE.md. Which page is current, and
+// reacting to touch to change it, is main.cpp's job (touch_input) — this
 // only lays out whichever page it's told to draw.
 void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t x, int16_t y,
                     int16_t w, int16_t h, int page);

@@ -98,6 +98,25 @@ static void test_should_use_oauth(void) {
   TEST_ASSERT_FALSE(shouldUseOAuth("", ""));
 }
 
+// ---- isBeforeDeadline (429 backoff, review notes 1.4) ----------------------
+
+static void test_is_before_deadline_simple_cases(void) {
+  TEST_ASSERT_TRUE(isBeforeDeadline(100, 200));   // now is before the deadline
+  TEST_ASSERT_FALSE(isBeforeDeadline(200, 200));  // exactly at the deadline -> not "before"
+  TEST_ASSERT_FALSE(isBeforeDeadline(300, 200));  // now is past the deadline
+}
+
+static void test_is_before_deadline_survives_millis_rollover(void) {
+  // `until` was set shortly before a millis() rollover (2^32), `now` has
+  // wrapped past 0 but is still chronologically before `until`'s real
+  // time (2^32 + 20), by 26ms.
+  TEST_ASSERT_TRUE(isBeforeDeadline(4294967290UL, 20UL));
+
+  // `until` was set just after the rollover; `now` is shortly *after*
+  // that in real time (4294967296+10 vs 4294967290) — deadline passed.
+  TEST_ASSERT_FALSE(isBeforeDeadline(10UL, 4294967290UL));
+}
+
 // ---- parseStatesResponse ------------------------------------------------
 
 static const char *kSampleStatesResponse = R"({
@@ -169,6 +188,15 @@ static void test_parse_states_response_skips_short_state_vectors(void) {
   TEST_ASSERT_TRUE(aircraft.empty());
 }
 
+static void test_parse_states_response_rejects_oversized_body(void) {
+  // Padding well past kMaxStatesResponseBytes — even though it isn't
+  // valid JSON, the size check must reject it before any parsing is
+  // attempted (see CLAUDE.md review notes 4.3).
+  std::string oversized(kMaxStatesResponseBytes + 1, 'x');
+  std::vector<Aircraft> aircraft = parseStatesResponse(oversized);
+  TEST_ASSERT_TRUE(aircraft.empty());
+}
+
 // ---- parseRetryAfterSeconds ---------------------------------------------
 
 static void test_parse_retry_after_valid(void) {
@@ -207,12 +235,16 @@ int main(int argc, char **argv) {
   RUN_TEST(test_token_refresh_survives_millis_rollover);
   RUN_TEST(test_should_use_oauth);
 
+  RUN_TEST(test_is_before_deadline_simple_cases);
+  RUN_TEST(test_is_before_deadline_survives_millis_rollover);
+
   RUN_TEST(test_parse_states_response_valid);
   RUN_TEST(test_parse_states_response_missing_states_key);
   RUN_TEST(test_parse_states_response_null_states);
   RUN_TEST(test_parse_states_response_empty_states);
   RUN_TEST(test_parse_states_response_malformed_json);
   RUN_TEST(test_parse_states_response_skips_short_state_vectors);
+  RUN_TEST(test_parse_states_response_rejects_oversized_body);
 
   RUN_TEST(test_parse_retry_after_valid);
   RUN_TEST(test_parse_retry_after_missing_or_invalid_uses_default);

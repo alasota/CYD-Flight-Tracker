@@ -1,160 +1,137 @@
-// CYD Sky Tracker — hardware bring-up + WiFi onboarding + config portal +
-// OpenSky polling.
+// CYD Sky Tracker — main orchestration.
 //
-// Initializes LovyanGFX (configured via include/LGFX_CYD.hpp), loads the
-// persisted config (config_store), and starts WiFiManager (wifi_manager).
-// Once WiFi connects, starts the local config web page (config_portal) at
-// cyd-sky.local and begins polling OpenSky (opensky_client) on the
-// configured interval. The screen still only shows WiFi/portal status (no
-// table_view yet) — parsed Aircraft[] are printed to Serial each poll so
-// opensky_client can be verified without a display.
+// setup(): initializes LovyanGFX (configured via include/LGFX_CYD.hpp) and
+// the XPT2046 touch controller (touch_input), loads the persisted config
+// (config_store), connects WiFi (wifi_manager — falls back to its own
+// captive portal if no saved network works), and starts the local config
+// web page (config_portal) at cyd-sky.local in the background.
+//
+// loop(): non-blocking, millis()-based.
+//   - Touch: a tap on the view-toggle button placeholder (lcars_theme)
+//     logs to Serial (radar_view doesn't exist yet); a tap in the top/
+//     bottom strip pages the table backward/forward (table_view).
+//   - Once per config_store's poll_interval_s (via opensky_client's own
+//     scheduler): fetch Aircraft[] from OpenSky (opensky_client); if the
+//     user hasn't set a home location yet (config_store's
+//     home_configured), show a setup prompt instead of polling further —
+//     see CLAUDE.md review notes 1.5. Otherwise look up each icao24's
+//     airline/type (aircraft_lookup — cached, so a given icao24 only ever
+//     hits HTTP once, and capped at kMaxNewLookupsPerPoll *new* lookups
+//     per cycle so one poll can't stall loop() on an unbounded chain of
+//     blocking HTTP calls — see review notes 1.1), join both into
+//     table_view's AircraftRow list (table_view::buildEnrichedRecords),
+//     and redraw Screen 1 (table_view) with the current page.
+//
+// This file is deliberately thin: all actual logic lives in the modules
+// above — see CLAUDE.md "Testing" for why only this kind of orchestration
+// code is allowed to go untested by Unity.
 
 #include <Arduino.h>
 
+#include <map>
 #include <string>
+#include <vector>
 
 #include "LGFX_CYD.hpp"
 #include "aircraft_lookup.h"
 #include "config_portal.h"
 #include "config_store.h"
+#include "lcars_theme.h"
 #include "opensky_client.h"
 #include "table_view.h"
+#include "touch_input.h"
 #include "wifi_manager.h"
 
 static LGFX tft;
-static WifiStatus lastDrawnStatus = WifiStatus::Disconnected;
-static std::string lastDrawnSsid;
-static bool lastDrawnPortalActive = false;
-static bool statusDrawn = false;
 
-static void drawStatus(WifiStatus status, const std::string &ssid, bool portalActive) {
-  tft.fillScreen(TFT_BLACK);
+// Data + paging state for the currently-drawn table page. Persists across
+// loop() iterations so a touch-driven page change can redraw immediately
+// without waiting for the next OpenSky poll.
+static std::vector<AircraftRow> lastRows;
+static int currentPage = 0;
+static bool tableNeedsRedraw = false;
+static bool setupPromptShown = false;
+
+// Height of the top/bottom page-tap strips (see CLAUDE.md "table paging/
+// scrolling"). Deliberately not a full-blown arrow widget yet — a plain
+// tap zone is enough for this step's layout. Derived from table_view's own
+// row height (tableRowHeightPx()) rather than a second, independent magic
+// number, so the two can't silently drift apart — see review notes 5.5.
+static const int16_t kPageTapZoneHeight = tableRowHeightPx();
+
+// How many *new* (uncached) aircraft_lookup HTTP calls one poll cycle is
+// allowed to make. Each one blocks loop() for up to a few seconds; without
+// a cap, a poll that turns up many never-seen-before aircraft at once
+// could stall touch/config_portal responsiveness for a long, unbounded
+// chain of requests — see CLAUDE.md review notes 1.1. Uncached aircraft
+// past the budget just render as "--" this cycle and get their turn on a
+// later poll (they typically stay in range for several poll intervals).
+static constexpr int kMaxNewLookupsPerPoll = 5;
+
+static void redrawTable() {
+  int16_t screenW = static_cast<int16_t>(tft.width());
+  int16_t screenH = static_cast<int16_t>(tft.height());
+
+  tft.fillScreen(LCARS_BLACK);
+  drawTablePage(tft, lastRows, 0, 0, screenW, screenH, currentPage);
+  drawViewToggleButton(tft, screenW, screenH);
+}
+
+// Shown instead of the table when config_store's home_configured is still
+// false — see CLAUDE.md review notes 1.5. Drawn once (guarded by
+// setupPromptShown) rather than every poll interval.
+static void showSetupPrompt() {
+  if (setupPromptShown) return;
+
+  int16_t screenW = static_cast<int16_t>(tft.width());
+  int16_t screenH = static_cast<int16_t>(tft.height());
+
+  tft.fillScreen(LCARS_BLACK);
+  tft.setFont(LCARS_FONT_BODY);
   tft.setTextDatum(middle_center);
+  tft.setTextColor(LCARS_AMBER, LCARS_BLACK);
+  tft.drawString("Set your home location at", screenW / 2, screenH / 2 - 10);
+  tft.drawString("http://cyd-sky.local", screenW / 2, screenH / 2 + 10);
+  drawViewToggleButton(tft, screenW, screenH);
 
-  tft.setTextColor(TFT_ORANGE, TFT_BLACK);
-  tft.setTextSize(2);
-  tft.drawString("CYD Sky Tracker", tft.width() / 2, tft.height() / 2 - 16);
-
-  std::string label = wifiStatusLabel(status);
-  if (status == WifiStatus::Connected && !ssid.empty()) {
-    label += ": ";
-    label += ssid;
-  }
-
-  tft.setTextColor(TFT_CYAN, TFT_BLACK);
-  tft.setTextSize(1);
-  tft.drawString(label.c_str(), tft.width() / 2, tft.height() / 2 + 16);
-
-  if (portalActive) {
-    tft.drawString("config: http://cyd-sky.local", tft.width() / 2, tft.height() / 2 + 32);
-  }
+  setupPromptShown = true;
 }
 
-static void printAircraft(const std::vector<Aircraft> &aircraft) {
-  Serial.printf("[opensky] %u aircraft in range:\n", static_cast<unsigned>(aircraft.size()));
-  for (const Aircraft &ac : aircraft) {
-    if (ac.has_position) {
-      Serial.printf("  %-6s %-8s lat=%.4f lon=%.4f alt=%.0fm v=%.0fm/s trk=%.0f\n",
-                    ac.icao24.c_str(), ac.callsign.c_str(), ac.lat, ac.lon, ac.baro_altitude,
-                    ac.velocity, ac.true_track);
-    } else {
-      Serial.printf("  %-6s %-8s (no position)\n", ac.icao24.c_str(), ac.callsign.c_str());
-    }
+// Dispatches one touch tap: the view-toggle button placeholder, or a
+// page-back/page-forward tap zone. Called once per press (edge-detected in
+// loop(), not once per loop() iteration the finger stays down).
+static void handleTap(int16_t x, int16_t y) {
+  int16_t screenW = static_cast<int16_t>(tft.width());
+  int16_t screenH = static_cast<int16_t>(tft.height());
+
+  Rect toggleBounds = viewToggleButtonBounds(screenW, screenH);
+  if (hitTest(x, y, toggleBounds)) {
+    Serial.println("view toggle tapped (radar_view not implemented yet)");
+    return;
   }
-}
 
-// TEMP: fake data for visual check, remove in step 8
-// 6 made-up rows: different airlines/types/distances, one very close
-// (should get table_view's highlight), and one with an empty
-// airline/type simulating a missed aircraft_lookup (hexdb.io 404).
-static std::vector<AircraftRow> buildFakeAircraftRows() {
-  std::vector<AircraftRow> rows;
+  int perPage = rowsPerPage(screenH);
+  int pageCount = getPageCount(static_cast<int>(lastRows.size()), perPage);
 
-  AircraftRow lot;
-  lot.aircraft.icao24 = "3c6444";
-  lot.aircraft.callsign = "LOT281";
-  lot.aircraft.baro_altitude = 1200.0f;
-  lot.aircraft.velocity = 85.0f;
-  lot.aircraft.true_track = 270.0f;
-  lot.aircraft.has_position = true;
-  lot.info.found = true;
-  lot.info.airline = "LOT Polish Airlines";
-  lot.info.aircraft_type = "737 MAX 8";
-  lot.distance_km = 0.8f;  // very close — should get the highlight
-  lot.has_distance = true;
-  rows.push_back(lot);
+  Rect prevZone;
+  prevZone.x = 0;
+  prevZone.y = 0;
+  prevZone.w = screenW;
+  prevZone.h = kPageTapZoneHeight;
 
-  AircraftRow dlh;
-  dlh.aircraft.icao24 = "4010ee";
-  dlh.aircraft.callsign = "DLH9LH";
-  dlh.aircraft.baro_altitude = 9800.0f;
-  dlh.aircraft.velocity = 230.0f;
-  dlh.aircraft.true_track = 95.0f;
-  dlh.aircraft.has_position = true;
-  dlh.info.found = true;
-  dlh.info.airline = "Lufthansa";
-  dlh.info.aircraft_type = "A320 214";
-  dlh.distance_km = 15.0f;
-  dlh.has_distance = true;
-  rows.push_back(dlh);
+  Rect nextZone;
+  nextZone.x = 0;
+  nextZone.y = static_cast<int16_t>(screenH - kPageTapZoneHeight);
+  nextZone.w = screenW;
+  nextZone.h = kPageTapZoneHeight;
 
-  AircraftRow ryr;
-  ryr.aircraft.icao24 = "406f01";
-  ryr.aircraft.callsign = "RYR7HL";
-  ryr.aircraft.baro_altitude = 10500.0f;
-  ryr.aircraft.velocity = 245.0f;
-  ryr.aircraft.true_track = 180.0f;
-  ryr.aircraft.has_position = true;
-  ryr.info.found = true;
-  ryr.info.airline = "Ryanair";
-  ryr.info.aircraft_type = "737-800";
-  ryr.distance_km = 42.0f;
-  ryr.has_distance = true;
-  rows.push_back(ryr);
-
-  // Simulates a missed aircraft_lookup (icao24 not in hexdb.io) — airline/
-  // type stay empty; table_view should render "--" instead of hiding it.
-  AircraftRow unknown;
-  unknown.aircraft.icao24 = "a1b2c3";
-  unknown.aircraft.callsign = "N12345";
-  unknown.aircraft.baro_altitude = 3500.0f;
-  unknown.aircraft.velocity = 120.0f;
-  unknown.aircraft.true_track = 45.0f;
-  unknown.aircraft.has_position = true;
-  unknown.info.found = false;
-  unknown.distance_km = 28.0f;
-  unknown.has_distance = true;
-  rows.push_back(unknown);
-
-  AircraftRow ual;
-  ual.aircraft.icao24 = "a835af";
-  ual.aircraft.callsign = "UAL934";
-  ual.aircraft.baro_altitude = 11200.0f;
-  ual.aircraft.velocity = 250.0f;
-  ual.aircraft.true_track = 310.0f;
-  ual.aircraft.has_position = true;
-  ual.info.found = true;
-  ual.info.airline = "United Airlines";
-  ual.info.aircraft_type = "777-200";
-  ual.distance_km = 88.0f;
-  ual.has_distance = true;
-  rows.push_back(ual);
-
-  AircraftRow ezy;
-  ezy.aircraft.icao24 = "471f5b";
-  ezy.aircraft.callsign = "EZY62KX";
-  ezy.aircraft.baro_altitude = 9200.0f;
-  ezy.aircraft.velocity = 215.0f;
-  ezy.aircraft.true_track = 120.0f;
-  ezy.aircraft.has_position = true;
-  ezy.info.found = true;
-  ezy.info.airline = "easyJet";
-  ezy.info.aircraft_type = "A319 111";
-  ezy.distance_km = 120.0f;
-  ezy.has_distance = true;
-  rows.push_back(ezy);
-
-  return rows;
+  if (hitTest(x, y, prevZone) && currentPage > 0) {
+    currentPage--;
+    tableNeedsRedraw = true;
+  } else if (hitTest(x, y, nextZone) && currentPage < pageCount - 1) {
+    currentPage++;
+    tableNeedsRedraw = true;
+  }
 }
 
 void setup() {
@@ -162,75 +139,78 @@ void setup() {
 
   tft.init();
   tft.setRotation(1);  // landscape, 320x240
-  tft.fillScreen(TFT_BLACK);
+  tft.fillScreen(LCARS_BLACK);
 
-  // Not otherwise consumed here — config_portal reads/writes it itself per
-  // web request, and opensky_client reads it once per poll.
+  touchInputBegin();
+
   Config cfg = loadConfig();
-  (void)cfg;
+  (void)cfg;  // not otherwise needed here — each module below reads what it needs itself
 
-  wifiManagerBegin();
+  wifiManagerBegin();  // tries the saved network; falls back to its own captive portal
 
-  // TEMP: manual cache test, remove after
-  /*
-  Serial.println("=== aircraft_lookup manual cache test ===");
-  AircraftInfo lookup1 = lookupAircraft("4010EE");
-  Serial.printf("1st call: found=%s airline=\"%s\" type=\"%s\"\n",
-                lookup1.found ? "true" : "false", lookup1.airline.c_str(),
-                lookup1.aircraft_type.c_str());
-  AircraftInfo lookup2 = lookupAircraft("4010EE");
-  Serial.printf("2nd call: found=%s airline=\"%s\" type=\"%s\"\n",
-                lookup2.found ? "true" : "false", lookup2.airline.c_str(),
-                lookup2.aircraft_type.c_str());
-  Serial.println("=== end aircraft_lookup manual cache test ===");
-*/
-
-  lastDrawnStatus = wifiManagerStatus();
-  lastDrawnSsid = wifiManagerSsid();
-  lastDrawnPortalActive = configPortalIsActive();
-  drawStatus(lastDrawnStatus, lastDrawnSsid, lastDrawnPortalActive);
-  statusDrawn = true;
+  // Starts mDNS + the config WebServer right away, non-blocking. In the
+  // common case (a saved network that's reachable) wifiManagerBegin()
+  // above has already connected by the time we get here; in the portal
+  // fallback case cyd-sky.local won't resolve until the device later
+  // joins a real network, which is fine — the captive portal itself
+  // covers initial setup in that case.
+  configPortalBegin();
 }
 
 void loop() {
   wifiManagerLoop();
-
-  WifiStatus status = wifiManagerStatus();
-  // mDNS/WebServer/HTTPClient all need an active station interface — start
-  // the config portal only once WiFi first connects.
-  if (status == WifiStatus::Connected && !configPortalIsActive()) {
-    configPortalBegin();
-  }
   configPortalLoop();
 
-  // Real polling — disabled for the table_view visual check below.
-  // TEMP: fake data for visual check, remove in step 8 (restore this).
-  // if (status == WifiStatus::Connected) {
-  //   std::vector<Aircraft> aircraft;
-  //   if (openSkyClientPoll(millis(), &aircraft)) {
-  //     printAircraft(aircraft);
-  //   }
-  // }
+  // --- Touch: view-toggle button + table paging ---------------------------
+  static bool wasTouchPressed = false;
+  TouchPoint touch = touchInputRead();
+  if (touch.pressed && !wasTouchPressed) {
+    handleTap(touch.x, touch.y);
+  }
+  wasTouchPressed = touch.pressed;
 
-  std::string ssid = wifiManagerSsid();
-  bool portalActive = configPortalIsActive();
-  if (!statusDrawn || status != lastDrawnStatus || ssid != lastDrawnSsid ||
-      portalActive != lastDrawnPortalActive) {
-    drawStatus(status, ssid, portalActive);
-    lastDrawnStatus = status;
-    lastDrawnSsid = ssid;
-    lastDrawnPortalActive = portalActive;
-    statusDrawn = true;
+  // --- OpenSky polling (only meaningful once connected) --------------------
+  if (wifiManagerStatus() == WifiStatus::Connected) {
+    std::vector<Aircraft> aircraft;
+    if (openSkyClientPoll(millis(), &aircraft)) {
+      Config homeCfg = loadConfig();
+
+      if (!homeCfg.home_configured) {
+        showSetupPrompt();
+      } else {
+        std::map<std::string, AircraftInfo> infoByIcao24;
+        int newLookupsThisCycle = 0;
+        for (const Aircraft &ac : aircraft) {
+          bool cached = aircraftLookupIsCached(ac.icao24);
+          if (cached || newLookupsThisCycle < kMaxNewLookupsPerPoll) {
+            if (!cached) {
+              newLookupsThisCycle++;
+            }
+            infoByIcao24[ac.icao24] = lookupAircraft(ac.icao24);
+          }
+          // else: leave this icao24 out of infoByIcao24 for now —
+          // buildEnrichedRecords() renders that as "--", and it'll get
+          // looked up once it's under budget on a later poll.
+        }
+
+        lastRows = buildEnrichedRecords(aircraft, infoByIcao24);
+        annotateDistances(lastRows, homeCfg.home_lat, homeCfg.home_lon);
+        sortRowsByDistance(lastRows);
+
+        int perPage = rowsPerPage(static_cast<int16_t>(tft.height()));
+        int pageCount = getPageCount(static_cast<int>(lastRows.size()), perPage);
+        if (currentPage >= pageCount) {
+          currentPage = pageCount > 0 ? pageCount - 1 : 0;
+        }
+
+        tableNeedsRedraw = true;
+      }
+    }
   }
 
-  // TEMP: fake data for visual check, remove in step 8
-  static bool fakeTableDrawn = false;
-  if (status == WifiStatus::Connected && !fakeTableDrawn) {
-    std::vector<AircraftRow> fakeRows = buildFakeAircraftRows();
-    sortRowsByDistance(fakeRows);
-
-    tft.fillScreen(TFT_BLACK);
-    drawTablePage(tft, fakeRows, 0, 0, tft.width(), tft.height(), 0);
-    fakeTableDrawn = true;
+  // --- Redraw, if the data or the current page changed ---------------------
+  if (tableNeedsRedraw) {
+    redrawTable();
+    tableNeedsRedraw = false;
   }
 }
