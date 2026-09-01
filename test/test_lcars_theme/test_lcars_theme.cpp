@@ -94,6 +94,29 @@ static void test_view_toggle_button_bounds_stays_within_screen(void) {
   TEST_ASSERT_TRUE(b.y < 240 / 2);
 }
 
+// ---- phaseIcon --------------------------------------------------------------
+
+static void test_phase_icon_distinct_ascii_per_phase(void) {
+  char none = phaseIcon(Phase::NONE);
+  char takeoff = phaseIcon(Phase::TAKEOFF);
+  char landing = phaseIcon(Phase::LANDING);
+  char overflight = phaseIcon(Phase::OVERFLIGHT);
+
+  // All ASCII-printable (bitmap fonts generally only cover 0x20-0x7E).
+  TEST_ASSERT_TRUE(none >= 0x20 && none <= 0x7E);
+  TEST_ASSERT_TRUE(takeoff >= 0x20 && takeoff <= 0x7E);
+  TEST_ASSERT_TRUE(landing >= 0x20 && landing <= 0x7E);
+  TEST_ASSERT_TRUE(overflight >= 0x20 && overflight <= 0x7E);
+
+  // All four distinct from one another.
+  TEST_ASSERT_TRUE(none != takeoff);
+  TEST_ASSERT_TRUE(none != landing);
+  TEST_ASSERT_TRUE(none != overflight);
+  TEST_ASSERT_TRUE(takeoff != landing);
+  TEST_ASSERT_TRUE(takeoff != overflight);
+  TEST_ASSERT_TRUE(landing != overflight);
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
 
@@ -106,6 +129,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_elbow_arc_point_matches_drawElbow_seam);
 
   RUN_TEST(test_view_toggle_button_bounds_stays_within_screen);
+
+  RUN_TEST(test_phase_icon_distinct_ascii_per_phase);
 
   return UNITY_END();
 }

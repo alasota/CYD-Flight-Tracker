@@ -1,9 +1,11 @@
 // table_view — draws Screen 1 (aircraft table), per CLAUDE.md
-// "Visualization concept — Screen 1". Uses lcars_theme for all chrome
-// (panels/pills/fonts/colors) — defines none of its own. Zero networking
-// code, zero calls into opensky_client/aircraft_lookup: it takes their
-// Aircraft/AircraftInfo *types* as plain data (joined by icao24 by
-// whoever builds the AircraftRow list) and only draws.
+// "Visualization concept — Screen 1". Composes featured_panel (the
+// closest aircraft, spotlighted) with a paginated table of the rest. Uses
+// lcars_theme for all chrome (panels/pills/fonts/colors) — defines none of
+// its own. Zero networking code, zero calls into
+// opensky_client/aircraft_lookup/route_lookup: it takes their
+// Aircraft/AircraftInfo/RouteInfo *types* as plain data (joined by
+// icao24/callsign by whoever builds the AircraftRow list) and only draws.
 #pragma once
 
 #include <cstdint>
@@ -12,8 +14,11 @@
 #include <vector>
 
 #include "aircraft_lookup.h"
+#include "featured_panel.h"
+#include "flight_phase.h"
 #include "lcars_theme.h"
 #include "opensky_client.h"
+#include "route_lookup.h"
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
@@ -30,37 +35,53 @@ struct DistanceBearing {
 DistanceBearing computeDistanceBearing(float home_lat, float home_lon, float lat, float lon);
 
 // One enriched table row: an OpenSky state vector joined with its hexdb.io
-// lookup by icao24 (both structs kept as-is, no duplicated fields), plus
-// the distance/bearing from home once annotateDistances() has run.
+// aircraft lookup (by icao24) and route lookup (by callsign) — all three
+// structs kept as-is, no duplicated fields — plus the distance/bearing
+// from home (annotateDistances()) and the classified flight phase
+// (classifyPhases()) once those have run.
 struct AircraftRow {
   Aircraft aircraft;
   AircraftInfo info;
+  RouteInfo route;
+  Phase phase = Phase::NONE;
   float distance_km = 0.0f;
   float bearing_deg = 0.0f;
   bool has_distance = false;  // false when aircraft.has_position is false
 };
 
-// Joins OpenSky state vectors with their hexdb.io lookups by icao24,
-// producing the AircraftRow list table_view actually draws — this is the
-// "connect Aircraft + AircraftInfo" step CLAUDE.md's table_view input
-// contract describes. An icao24 with no entry in `infoByIcao24` (lookup
-// still pending, or main.cpp simply never called aircraft_lookup for it)
-// produces a row with a default-constructed AircraftInfo (found == false),
-// which drawTablePage() renders as "--" rather than dropping the row, per
-// CLAUDE.md. Distance is NOT computed here — call annotateDistances() (and
-// then sortRowsByDistance()) on the result afterward. Pure — no HTTP call
-// happens here, just the join; no dependency on aircraft_lookup's actual
-// lookup functions — tested under `pio test -e native`.
-std::vector<AircraftRow> buildEnrichedRecords(const std::vector<Aircraft> &aircraft,
-                                               const std::map<std::string, AircraftInfo> &infoByIcao24);
+// Joins OpenSky state vectors with their hexdb.io aircraft lookups (by
+// icao24) and route lookups (by callsign), producing the AircraftRow list
+// table_view actually draws — the "connect Aircraft + AircraftInfo +
+// RouteInfo" step CLAUDE.md's table_view input contract describes. A key
+// with no entry in the corresponding map (lookup still pending, or
+// main.cpp simply never called it for that row) produces a
+// default-constructed AircraftInfo/RouteInfo (found == false), which
+// drawTablePage()/featured_panel render as "--" rather than dropping the
+// row, per CLAUDE.md. Distance and phase are NOT computed here — call
+// annotateDistances() then classifyPhases() (then sortRowsByDistance()) on
+// the result afterward. Pure — no HTTP call happens here, just the join —
+// tested under `pio test -e native`.
+std::vector<AircraftRow> buildEnrichedRecords(
+    const std::vector<Aircraft> &aircraft, const std::map<std::string, AircraftInfo> &infoByIcao24,
+    const std::map<std::string, RouteInfo> &routeByCallsign);
 
 // Fills distance_km/bearing_deg/has_distance on every row in `rows` from
 // (home_lat, home_lon) via computeDistanceBearing(). Rows whose
 // Aircraft::has_position is false get has_distance=false (nothing to
 // compute) and are left at distance_km=0/bearing_deg=0. Call this once
-// before sortRowsByDistance()/drawTablePage() — both read the annotated
-// fields rather than recomputing per call.
+// before classifyPhases()/sortRowsByDistance()/drawTablePage() — all read
+// the annotated fields rather than recomputing per call.
 void annotateDistances(std::vector<AircraftRow> &rows, float home_lat, float home_lon);
+
+// Fills row.phase on every row via flight_phase's classifyPhase(), using
+// each row's own (already annotated) distance_km as the "distance to
+// nearest airport" input — this project has no airport coordinate
+// database, only country codes (route_lookup), so distance from HOME is
+// what's actually available; see CLAUDE.md "Flight phase". Rows with
+// has_distance == false get Phase::NONE (nothing meaningful to classify)
+// rather than a misleading guess. Call after annotateDistances().
+void classifyPhases(std::vector<AircraftRow> &rows, float near_airport_km,
+                     float climb_threshold_mps);
 
 // Sorts `rows` ascending by distance_km — closest aircraft first, per
 // CLAUDE.md "sort by distance ascending (closest aircraft on top)". Call
@@ -69,11 +90,26 @@ void annotateDistances(std::vector<AircraftRow> &rows, float home_lat, float hom
 // relative order).
 void sortRowsByDistance(std::vector<AircraftRow> &rows);
 
-// The fixed row height (pixels) this module draws at — the actual single
-// source of truth backing rowsPerPage() below. Exposed so other modules
-// (e.g. main.cpp's touch tap-zone sizing) can stay in sync with it instead
-// of hardcoding their own independent copy of the same number — see
-// CLAUDE.md review notes 5.5.
+// Result of splitting a (sorted) AircraftRow list into "the one closest
+// aircraft, for featured_panel" and "everything else, for the table
+// below it".
+struct FeaturedSplit {
+  bool hasFeatured = false;
+  AircraftRow featured;           // valid only when hasFeatured
+  std::vector<AircraftRow> rest;  // everything else, order preserved
+};
+
+// Splits `rows` (already sorted ascending by distance —
+// sortRowsByDistance()) into its first element (the closest aircraft) and
+// the remainder. Empty input -> hasFeatured=false, empty rest. A
+// single-row input -> that row featured, rest empty. Pure.
+FeaturedSplit splitFeaturedAndRest(const std::vector<AircraftRow> &rows);
+
+// The fixed row height (pixels) this module draws the *table* portion at
+// — the actual single source of truth backing rowsPerPage() below.
+// Exposed so other modules (e.g. main.cpp's touch tap-zone sizing) can
+// stay in sync with it instead of hardcoding their own independent copy
+// of the same number — see CLAUDE.md review notes 5.5.
 int16_t tableRowHeightPx();
 
 // Rows that fit in a content area `contentHeight` pixels tall, at
@@ -94,25 +130,31 @@ int getPageCount(int totalRows, int rowsPerPage);
 std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int page,
                                        int rowsPerPage);
 
-// ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme. Not
-// covered by Unity (see CLAUDE.md "Testing"). Guarded here in the header
-// too (like lcars_theme) since its signature needs the LGFX device type.
+// ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme +
+// featured_panel. Not covered by Unity (see CLAUDE.md "Testing"). Guarded
+// here in the header too (like lcars_theme/featured_panel) since its
+// signature needs the LGFX device type.
 #ifdef ARDUINO
 
 #include "LGFX_CYD.hpp"
 
-// Draws one page of `rows` (already annotated via annotateDistances() and
-// sorted via sortRowsByDistance()) into the content area [x, y, w, h]:
-// airline, flight (callsign), aircraft type, altitude, speed, distance —
-// using lcars_theme for panels/fonts/colors, nothing of its own. `page` is
-// 0-based (internally via getPageSlice()/rowsPerPage()); an out-of-range
-// page just draws nothing. Row 0 of the *whole* sorted list (the closest
-// aircraft) is highlighted with a brighter lcars_theme accent whenever it
-// falls on the visible page. Missing lookup/position data renders as "--"
-// rather than being hidden, per CLAUDE.md. Which page is current, and
-// reacting to touch to change it, is main.cpp's job (touch_input) — this
-// only lays out whichever page it's told to draw.
-void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t x, int16_t y,
-                    int16_t w, int16_t h, int page);
+// Draws Screen 1 into the content area [x, y, w, h]: featured_panel for
+// the single closest aircraft in `rows` (or its "no aircraft in range"
+// placeholder if `rows` is empty) at the top, then a paginated table of
+// everyone else below it — flight, airline, origin, destination, aircraft
+// type, phase icon — using lcars_theme for panels/fonts/colors, nothing of
+// its own. `rows` must already be annotated (annotateDistances()),
+// classified (classifyPhases()), and sorted (sortRowsByDistance()).
+// `originAirport`/`destAirport` are the featured aircraft's route
+// endpoints' AirportInfo (looked up by main.cpp only for that one row —
+// see featured_panel.h); pass default-constructed AirportInfo{} if not
+// available. `page` is 0-based, over the *rest* of the list (the featured
+// row is never repeated in the table) — an out-of-range page just draws
+// no rows below the panel. Which page is current, and reacting to touch to
+// change it, is main.cpp's job (touch_input) — this only lays out
+// whichever page it's told to draw.
+void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, const AirportInfo &originAirport,
+                    const AirportInfo &destAirport, int16_t x, int16_t y, int16_t w, int16_t h,
+                    int page);
 
 #endif  // ARDUINO

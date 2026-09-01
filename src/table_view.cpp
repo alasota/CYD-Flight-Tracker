@@ -34,8 +34,8 @@ DistanceBearing computeDistanceBearing(float home_lat, float home_lon, float lat
 }
 
 std::vector<AircraftRow> buildEnrichedRecords(
-    const std::vector<Aircraft> &aircraft,
-    const std::map<std::string, AircraftInfo> &infoByIcao24) {
+    const std::vector<Aircraft> &aircraft, const std::map<std::string, AircraftInfo> &infoByIcao24,
+    const std::map<std::string, RouteInfo> &routeByCallsign) {
   std::vector<AircraftRow> rows;
   rows.reserve(aircraft.size());
 
@@ -43,12 +43,19 @@ std::vector<AircraftRow> buildEnrichedRecords(
     AircraftRow row;
     row.aircraft = ac;
 
-    auto it = infoByIcao24.find(ac.icao24);
-    if (it != infoByIcao24.end()) {
-      row.info = it->second;
+    auto infoIt = infoByIcao24.find(ac.icao24);
+    if (infoIt != infoByIcao24.end()) {
+      row.info = infoIt->second;
     }
     // else: row.info stays default-constructed (found=false, empty
-    // airline/aircraft_type) — drawTablePage() renders that as "--".
+    // airline/aircraft_type) — rendered as "--".
+
+    auto routeIt = routeByCallsign.find(ac.callsign);
+    if (routeIt != routeByCallsign.end()) {
+      row.route = routeIt->second;
+    }
+    // else: row.route stays default-constructed (found=false, empty
+    // origin/dest) — rendered as "--".
 
     rows.push_back(row);
   }
@@ -72,6 +79,18 @@ void annotateDistances(std::vector<AircraftRow> &rows, float home_lat, float hom
   }
 }
 
+void classifyPhases(std::vector<AircraftRow> &rows, float near_airport_km,
+                     float climb_threshold_mps) {
+  for (AircraftRow &row : rows) {
+    if (!row.has_distance) {
+      row.phase = Phase::NONE;  // no position -> nothing meaningful to classify
+      continue;
+    }
+    row.phase = classifyPhase(row.distance_km, row.aircraft.vertical_rate, row.aircraft.on_ground,
+                               near_airport_km, climb_threshold_mps);
+  }
+}
+
 void sortRowsByDistance(std::vector<AircraftRow> &rows) {
   std::stable_sort(rows.begin(), rows.end(), [](const AircraftRow &a, const AircraftRow &b) {
     float da = a.has_distance ? a.distance_km : std::numeric_limits<float>::infinity();
@@ -80,18 +99,32 @@ void sortRowsByDistance(std::vector<AircraftRow> &rows) {
   });
 }
 
+FeaturedSplit splitFeaturedAndRest(const std::vector<AircraftRow> &rows) {
+  FeaturedSplit split;
+  if (rows.empty()) {
+    return split;
+  }
+
+  split.hasFeatured = true;
+  split.featured = rows.front();
+  split.rest.assign(rows.begin() + 1, rows.end());
+  return split;
+}
+
 namespace {
 constexpr int16_t kRowHeight = 20;
 
 // Column x-offsets, as fractions of the content width, for drawTablePage()
 // below — named rather than left as bare literals inline (review notes
-// 5.4).
-constexpr float kColAirlineFrac = 0.00f;
-constexpr float kColFlightFrac = 0.34f;
-constexpr float kColTypeFrac = 0.50f;
-constexpr float kColAltFrac = 0.68f;
-constexpr float kColSpeedFrac = 0.80f;
-constexpr float kColDistFrac = 0.90f;
+// 5.4). Columns: flight, airline, origin, destination, aircraft type,
+// phase icon (see CLAUDE.md "Screen 1" — altitude/speed/distance moved to
+// featured_panel's pills, shown only for the one closest aircraft).
+constexpr float kColFlightFrac = 0.00f;
+constexpr float kColAirlineFrac = 0.16f;
+constexpr float kColOriginFrac = 0.50f;
+constexpr float kColDestFrac = 0.62f;
+constexpr float kColTypeFrac = 0.74f;
+constexpr float kColPhaseFrac = 0.94f;
 }  // namespace
 
 int16_t tableRowHeightPx() { return kRowHeight; }
@@ -128,64 +161,61 @@ namespace {
 
 std::string orDash(const std::string &s) { return s.empty() ? std::string("--") : s; }
 
-}  // namespace
-
-void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t x, int16_t y,
-                    int16_t w, int16_t h, int page) {
-  int perPage = rowsPerPage(h);
-  if (perPage <= 0) return;
-
-  std::vector<AircraftRow> pageRows = getPageSlice(rows, page, perPage);
-  if (pageRows.empty()) return;
-
-  size_t start = static_cast<size_t>(page) * static_cast<size_t>(perPage);
-
+void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t x, int16_t y,
+                    int16_t w) {
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_left);
+  gfx.setTextColor(LCARS_PALE_BLUE, LCARS_BLACK);
 
-  int16_t colAirline = x + static_cast<int16_t>(w * kColAirlineFrac);
   int16_t colFlight = x + static_cast<int16_t>(w * kColFlightFrac);
+  int16_t colAirline = x + static_cast<int16_t>(w * kColAirlineFrac);
+  int16_t colOrigin = x + static_cast<int16_t>(w * kColOriginFrac);
+  int16_t colDest = x + static_cast<int16_t>(w * kColDestFrac);
   int16_t colType = x + static_cast<int16_t>(w * kColTypeFrac);
-  int16_t colAlt = x + static_cast<int16_t>(w * kColAltFrac);
-  int16_t colSpeed = x + static_cast<int16_t>(w * kColSpeedFrac);
-  int16_t colDist = x + static_cast<int16_t>(w * kColDistFrac);
+  int16_t colPhase = x + static_cast<int16_t>(w * kColPhaseFrac);
 
   for (size_t i = 0; i < pageRows.size(); ++i) {
     const AircraftRow &row = pageRows[i];
     int16_t rowY = y + static_cast<int16_t>(i) * kRowHeight;
     int16_t textY = rowY + kRowHeight / 2;
 
-    // Rows must already be sorted ascending by distance (sortRowsByDistance())
-    // — global index 0 of the whole list is always the closest aircraft.
-    bool isClosest = (start + i == 0);
-    uint16_t bg = isClosest ? LCARS_AMBER : LCARS_BLACK;
-    uint16_t fg = isClosest ? LCARS_BLACK : LCARS_PALE_BLUE;
+    gfx.fillRect(x, rowY, w, kRowHeight, LCARS_BLACK);
 
-    gfx.fillRect(x, rowY, w, kRowHeight, bg);
-    gfx.setTextColor(fg, bg);
-
-    gfx.drawString(orDash(row.info.airline).c_str(), colAirline + 2, textY);
     gfx.drawString(orDash(row.aircraft.callsign).c_str(), colFlight + 2, textY);
+    gfx.drawString(orDash(row.info.airline).c_str(), colAirline + 2, textY);
+    gfx.drawString(row.route.found ? row.route.origin_icao.c_str() : "--", colOrigin + 2, textY);
+    gfx.drawString(row.route.found ? row.route.dest_icao.c_str() : "--", colDest + 2, textY);
     gfx.drawString(orDash(row.info.aircraft_type).c_str(), colType + 2, textY);
 
-    char buf[16];
-    if (row.aircraft.has_position) {
-      std::snprintf(buf, sizeof(buf), "%.0f", static_cast<double>(row.aircraft.baro_altitude));
-      gfx.drawString(buf, colAlt + 2, textY);
-      std::snprintf(buf, sizeof(buf), "%.0f", static_cast<double>(row.aircraft.velocity));
-      gfx.drawString(buf, colSpeed + 2, textY);
-    } else {
-      gfx.drawString("--", colAlt + 2, textY);
-      gfx.drawString("--", colSpeed + 2, textY);
-    }
-
-    if (row.has_distance) {
-      std::snprintf(buf, sizeof(buf), "%.0f", static_cast<double>(row.distance_km));
-      gfx.drawString(buf, colDist + 2, textY);
-    } else {
-      gfx.drawString("--", colDist + 2, textY);
-    }
+    char phaseBuf[2] = {phaseIcon(row.phase), '\0'};
+    gfx.drawString(phaseBuf, colPhase + 2, textY);
   }
+}
+
+}  // namespace
+
+void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, const AirportInfo &originAirport,
+                    const AirportInfo &destAirport, int16_t x, int16_t y, int16_t w, int16_t h,
+                    int page) {
+  FeaturedSplit split = splitFeaturedAndRest(rows);
+
+  int16_t panelH = featuredPanelHeightPx();
+  if (split.hasFeatured) {
+    drawFeaturedPanel(gfx, split.featured, originAirport, destAirport, x, y, w, panelH);
+  } else {
+    drawFeaturedPanelEmpty(gfx, x, y, w, panelH);
+  }
+
+  int16_t tableY = static_cast<int16_t>(y + panelH);
+  int16_t tableH = static_cast<int16_t>(h - panelH);
+
+  int perPage = rowsPerPage(tableH);
+  if (perPage <= 0) return;
+
+  std::vector<AircraftRow> pageRows = getPageSlice(split.rest, page, perPage);
+  if (pageRows.empty()) return;
+
+  drawTableRows(gfx, pageRows, x, tableY, w);
 }
 
 #endif  // ARDUINO

@@ -7,7 +7,8 @@
 
 #include <cstdint>
 
-#include "touch_input.h"  // Rect — shared tappable-region type
+#include "flight_phase.h"  // Phase — for phaseIcon()
+#include "touch_input.h"   // Rect — shared tappable-region type
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
@@ -48,6 +49,14 @@ ElbowArcPoint elbowArcPoint(int16_t radius, float angle_deg);
 // eventually toggle table_view/radar_view; for now it only logs a Serial
 // message (see main.cpp) — see CLAUDE.md "Visualization concept".
 Rect viewToggleButtonBounds(int16_t screenWidth, int16_t screenHeight);
+
+// One-character glyph for a flight phase — the single place this project
+// decides how a Phase looks on screen, so featured_panel and table_view
+// (both of which display a phase icon per CLAUDE.md "Screen 1") can't
+// silently disagree. Kept ASCII (bitmap GLCD/BMP fonts generally only
+// cover 0x20-0x7E — see table_view's orDash()) rather than a fancier
+// glyph. Pure — no TFT dependency — tested under `pio test -e native`.
+char phaseIcon(Phase phase);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX. Not covered by
 // Unity (see CLAUDE.md "Testing") — this module is almost entirely draw

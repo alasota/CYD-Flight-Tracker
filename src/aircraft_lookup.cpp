@@ -103,7 +103,13 @@ FetchResult httpFetchAircraftJson(const std::string &icao24) {
   }
 
   int code = http.GET();
-  if (code == HTTP_CODE_OK) {
+  // hexdb.io's aircraft endpoint returns a genuine HTTP 404 for a missing
+  // aircraft (verified against the live API) — that's just as definitive
+  // an answer as a 200, and must be cached the same way (see
+  // lookupAircraftWithFetcher()'s header comment); a 404 is NOT a
+  // transient failure. Anything else (timeout, 5xx, connection failure)
+  // is not a confirmed answer and correctly falls through uncached.
+  if (code == HTTP_CODE_OK || code == HTTP_CODE_NOT_FOUND) {
     result.response_ok = true;
     result.body = std::string(http.getString().c_str());
   } else {

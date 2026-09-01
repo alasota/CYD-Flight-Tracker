@@ -66,8 +66,9 @@ std::vector<Aircraft> parseStatesResponse(const std::string &json) {
   // an empty result rather than needing a separate null check.
   for (JsonArrayConst state : doc["states"].as<JsonArrayConst>()) {
     // Indices per OpenSky's /states/all state vector: 0 icao24, 1 callsign,
-    // 5 longitude, 6 latitude, 7 baro_altitude, 9 velocity, 10 true_track.
-    if (state.size() < 11) continue;
+    // 5 longitude, 6 latitude, 7 baro_altitude, 8 on_ground, 9 velocity,
+    // 10 true_track, 11 vertical_rate.
+    if (state.size() < 12) continue;
 
     Aircraft ac;
     if (!state[0].isNull()) ac.icao24 = state[0].as<std::string>();
@@ -78,8 +79,10 @@ std::vector<Aircraft> parseStatesResponse(const std::string &json) {
       ac.has_position = true;
     }
     if (!state[7].isNull()) ac.baro_altitude = state[7].as<float>();
+    if (!state[8].isNull()) ac.on_ground = state[8].as<bool>();
     if (!state[9].isNull()) ac.velocity = state[9].as<float>();
     if (!state[10].isNull()) ac.true_track = state[10].as<float>();
+    if (!state[11].isNull()) ac.vertical_rate = state[11].as<float>();
 
     result.push_back(ac);
   }

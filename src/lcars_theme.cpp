@@ -29,6 +29,20 @@ Rect viewToggleButtonBounds(int16_t screenWidth, int16_t screenHeight) {
   return r;
 }
 
+char phaseIcon(Phase phase) {
+  switch (phase) {
+    case Phase::TAKEOFF:
+      return '^';
+    case Phase::LANDING:
+      return 'v';
+    case Phase::OVERFLIGHT:
+      return '>';
+    case Phase::NONE:
+    default:
+      return '-';
+  }
+}
+
 #ifdef ARDUINO
 
 const lgfx::IFont *const LCARS_FONT_HEADING = &fonts::Font4;

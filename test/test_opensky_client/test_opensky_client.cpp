@@ -142,6 +142,8 @@ static void test_parse_states_response_valid(void) {
   TEST_ASSERT_EQUAL_FLOAT(9639.3f, a0.baro_altitude);
   TEST_ASSERT_EQUAL_FLOAT(232.88f, a0.velocity);
   TEST_ASSERT_EQUAL_FLOAT(98.24f, a0.true_track);
+  TEST_ASSERT_FALSE(a0.on_ground);
+  TEST_ASSERT_EQUAL_FLOAT(4.55f, a0.vertical_rate);
 
   // Null lat/lon (e.g. grounded, no position report yet) -> has_position
   // false, numeric fields left at their defaults where the source was null.
@@ -151,6 +153,8 @@ static void test_parse_states_response_valid(void) {
   TEST_ASSERT_FALSE(a1.has_position);
   TEST_ASSERT_EQUAL_FLOAT(0.0f, a1.baro_altitude);
   TEST_ASSERT_EQUAL_FLOAT(0.0f, a1.true_track);
+  TEST_ASSERT_TRUE(a1.on_ground);
+  TEST_ASSERT_EQUAL_FLOAT(0.0f, a1.vertical_rate);  // null in the source -> default
 
   const Aircraft &a2 = aircraft[2];
   TEST_ASSERT_EQUAL_STRING("deadbe", a2.icao24.c_str());
@@ -158,6 +162,18 @@ static void test_parse_states_response_valid(void) {
   TEST_ASSERT_TRUE(a2.has_position);
   TEST_ASSERT_EQUAL_FLOAT(50.0647f, a2.lat);
   TEST_ASSERT_EQUAL_FLOAT(19.9449f, a2.lon);
+  TEST_ASSERT_FALSE(a2.on_ground);
+  TEST_ASSERT_EQUAL_FLOAT(-1.2f, a2.vertical_rate);
+}
+
+static void test_parse_states_response_skips_vectors_missing_vertical_rate(void) {
+  // Exactly 11 elements (index 0-10) — one short of the vertical_rate
+  // field at index 11 that this project now depends on. Previously the
+  // minimum-length check was 11; it was bumped to 12 alongside adding
+  // vertical_rate/on_ground extraction.
+  std::vector<Aircraft> aircraft = parseStatesResponse(
+      R"({"states": [["3c6444","DLH9LH  ","Germany",0,0,6.1546,50.1210,9639.3,false,232.88,98.24]]})");
+  TEST_ASSERT_TRUE(aircraft.empty());
 }
 
 static void test_parse_states_response_missing_states_key(void) {
@@ -244,6 +260,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_parse_states_response_empty_states);
   RUN_TEST(test_parse_states_response_malformed_json);
   RUN_TEST(test_parse_states_response_skips_short_state_vectors);
+  RUN_TEST(test_parse_states_response_skips_vectors_missing_vertical_rate);
   RUN_TEST(test_parse_states_response_rejects_oversized_body);
 
   RUN_TEST(test_parse_retry_after_valid);

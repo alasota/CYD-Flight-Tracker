@@ -63,6 +63,8 @@ struct Aircraft {
   float baro_altitude = 0.0f;
   float velocity = 0.0f;
   float true_track = 0.0f;
+  bool on_ground = false;        // state vector index 8
+  float vertical_rate = 0.0f;    // state vector index 11, m/s, positive = climbing
 };
 
 // Hard ceiling on how large a /states/all response body parseStatesResponse()
