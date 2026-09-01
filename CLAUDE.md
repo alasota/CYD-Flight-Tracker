@@ -279,8 +279,14 @@ each with a single responsibility:
   table of the rest. Takes the aircraft array + home position as input (via
   `buildEnrichedRecords()`/`annotateDistances()`/`classifyPhases()`), uses `lcars_theme` for
   chrome. No networking code.
-- `radar_view` — draws Screen 2 (LCARS-skinned radar). Same input contract as `table_view`, same
-  theme module. No networking code.
+- `radar_geometry` — pure polar-to-screen math for Screen 2 (bearing+distance -> screen
+  coordinates, concentric-ring distances). Zero LovyanGFX/Arduino dependency; converting
+  `config_store`'s `radius_deg` to km happens at the call site (`radar_view`), not here.
+- `radar_view` — draws Screen 2 (LCARS-skinned radar): home marker at the plot center, rings
+  from `radar_geometry::computeRingDistances()`, blips from `radar_geometry::polarToScreen()`
+  (reusing `table_view`'s already-computed `distance_km`/`bearing_deg`, not recomputing them).
+  Same input contract as `table_view` (an already-annotated `AircraftRow` list), same theme
+  module. No networking code. Static plot — no sweep-line animation.
 - `config_store` — Preferences/NVS read/write for all persisted settings, including which view
   (table/radar) was last active.
 

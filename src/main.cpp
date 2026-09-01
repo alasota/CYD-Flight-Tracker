@@ -2,14 +2,18 @@
 //
 // setup(): initializes LovyanGFX (configured via include/LGFX_CYD.hpp) and
 // the XPT2046 touch controller (touch_input), loads the persisted config
-// (config_store), connects WiFi (wifi_manager — falls back to its own
-// captive portal if no saved network works), and starts the local config
-// web page (config_portal) at cyd-sky.local in the background.
+// (config_store) — restoring which screen (table/radar) was last active,
+// per CLAUDE.md's config_store contract — connects WiFi (wifi_manager —
+// falls back to its own captive portal if no saved network works), and
+// starts the local config web page (config_portal) at cyd-sky.local in
+// the background.
 //
 // loop(): non-blocking, millis()-based.
-//   - Touch: a tap on the view-toggle button placeholder (lcars_theme)
-//     logs to Serial (radar_view doesn't exist yet); a tap in the top/
-//     bottom strip pages the table backward/forward (table_view).
+//   - Touch: a tap on the view-toggle button (lcars_theme) switches
+//     between table_view and radar_view and persists the choice to
+//     config_store (last_view); a tap in the top/bottom strip pages the
+//     table backward/forward (table_view only — radar_view has no
+//     pagination, it's a static plot of everything at once).
 //   - Once per config_store's poll_interval_s (via opensky_client's own
 //     scheduler): fetch Aircraft[] from OpenSky (opensky_client); if the
 //     user hasn't set a home location yet (config_store's
@@ -21,10 +25,9 @@
 //     cycle so one poll can't stall loop() on an unbounded chain of
 //     blocking HTTP calls (see review notes 1.1) — join everything into
 //     table_view's AircraftRow list (table_view::buildEnrichedRecords),
-//     annotate distance and classify flight phase, and look up the
-//     closest aircraft's route-endpoint airports (2 more bounded calls,
-//     only for that one row) before redrawing Screen 1 (table_view) with
-//     the current page.
+//     annotate distance and classify flight phase, look up the closest
+//     aircraft's route-endpoint airports (2 more bounded calls, only for
+//     that one row), and redraw whichever screen is currently active.
 //
 // This file is deliberately thin: all actual logic lives in the modules
 // above — see CLAUDE.md "Testing" for why only this kind of orchestration
@@ -42,6 +45,7 @@
 #include "config_store.h"
 #include "lcars_theme.h"
 #include "opensky_client.h"
+#include "radar_view.h"
 #include "route_lookup.h"
 #include "table_view.h"
 #include "touch_input.h"
@@ -49,14 +53,21 @@
 
 static LGFX tft;
 
-// Data + paging state for the currently-drawn table page. Persists across
-// loop() iterations so a touch-driven page change can redraw immediately
-// without waiting for the next OpenSky poll.
+// Which screen is currently shown. Restored from config_store at boot and
+// persisted back to it every time the view-toggle button is tapped — see
+// CLAUDE.md's config_store contract ("including which view was last
+// active").
+static ViewMode currentView = ViewMode::Table;
+
+// Data + paging state for the currently-drawn screen. Persists across
+// loop() iterations so a touch-driven page/view change can redraw
+// immediately without waiting for the next OpenSky poll.
 static std::vector<AircraftRow> lastRows;
-static AirportInfo lastOriginAirport;  // featured row's route origin, if resolved
-static AirportInfo lastDestAirport;    // featured row's route destination, if resolved
+static AirportInfo lastOriginAirport;   // featured row's route origin, if resolved
+static AirportInfo lastDestAirport;     // featured row's route destination, if resolved
+static float lastRadiusDeg = 2.5f;      // config_store's default — updated every poll
 static int currentPage = 0;
-static bool tableNeedsRedraw = false;
+static bool screenNeedsRedraw = false;
 static bool setupPromptShown = false;
 
 // Height of the top/bottom page-tap strips (see CLAUDE.md "table paging/
@@ -84,18 +95,23 @@ static constexpr int kMaxNewLookupsPerPoll = 5;
 static constexpr float kNearAirportKm = 15.0f;
 static constexpr float kClimbThresholdMps = 3.0f;
 
-static void redrawTable() {
+static void redrawScreen() {
   int16_t screenW = static_cast<int16_t>(tft.width());
   int16_t screenH = static_cast<int16_t>(tft.height());
 
   tft.fillScreen(LCARS_BLACK);
-  drawTablePage(tft, lastRows, lastOriginAirport, lastDestAirport, 0, 0, screenW, screenH,
-                currentPage);
+  if (currentView == ViewMode::Table) {
+    drawTablePage(tft, lastRows, lastOriginAirport, lastDestAirport, 0, 0, screenW, screenH,
+                  currentPage);
+  } else {
+    drawRadarView(tft, lastRows, lastRadiusDeg, 0, 0, screenW, screenH);
+  }
+  // Persistent chrome across both screens, per CLAUDE.md "Design language".
   drawViewToggleButton(tft, screenW, screenH);
 }
 
-// Shown instead of the table when config_store's home_configured is still
-// false — see CLAUDE.md review notes 1.5. Drawn once (guarded by
+// Shown instead of either screen when config_store's home_configured is
+// still false — see CLAUDE.md review notes 1.5. Drawn once (guarded by
 // setupPromptShown) rather than every poll interval.
 static void showSetupPrompt() {
   if (setupPromptShown) return;
@@ -114,7 +130,7 @@ static void showSetupPrompt() {
   setupPromptShown = true;
 }
 
-// Dispatches one touch tap: the view-toggle button placeholder, or a
+// Dispatches one touch tap: the view-toggle button, or (table_view only) a
 // page-back/page-forward tap zone. Called once per press (edge-detected in
 // loop(), not once per loop() iteration the finger stays down).
 static void handleTap(int16_t x, int16_t y) {
@@ -123,8 +139,18 @@ static void handleTap(int16_t x, int16_t y) {
 
   Rect toggleBounds = viewToggleButtonBounds(screenW, screenH);
   if (hitTest(x, y, toggleBounds)) {
-    Serial.println("view toggle tapped (radar_view not implemented yet)");
+    currentView = (currentView == ViewMode::Table) ? ViewMode::Radar : ViewMode::Table;
+
+    Config cfg = loadConfig();
+    cfg.last_view = currentView;
+    saveConfig(cfg);
+
+    screenNeedsRedraw = true;
     return;
+  }
+
+  if (currentView != ViewMode::Table) {
+    return;  // radar_view is a static plot of everything at once — no pagination to tap
   }
 
   // Pagination applies to the table *below* the featured panel — the
@@ -150,10 +176,10 @@ static void handleTap(int16_t x, int16_t y) {
 
   if (hitTest(x, y, prevZone) && currentPage > 0) {
     currentPage--;
-    tableNeedsRedraw = true;
+    screenNeedsRedraw = true;
   } else if (hitTest(x, y, nextZone) && currentPage < pageCount - 1) {
     currentPage++;
-    tableNeedsRedraw = true;
+    screenNeedsRedraw = true;
   }
 }
 
@@ -167,7 +193,8 @@ void setup() {
   touchInputBegin();
 
   Config cfg = loadConfig();
-  (void)cfg;  // not otherwise needed here — each module below reads what it needs itself
+  currentView = cfg.last_view;  // restore whichever screen was active last boot
+  lastRadiusDeg = cfg.radius_deg;
 
   wifiManagerBegin();  // tries the saved network; falls back to its own captive portal
 
@@ -201,6 +228,8 @@ void loop() {
       if (!homeCfg.home_configured) {
         showSetupPrompt();
       } else {
+        lastRadiusDeg = homeCfg.radius_deg;
+
         std::map<std::string, AircraftInfo> infoByIcao24;
         std::map<std::string, RouteInfo> routeByCallsign;
         int newLookupsThisCycle = 0;
@@ -245,14 +274,14 @@ void loop() {
           currentPage = pageCount > 0 ? pageCount - 1 : 0;
         }
 
-        tableNeedsRedraw = true;
+        screenNeedsRedraw = true;
       }
     }
   }
 
-  // --- Redraw, if the data or the current page changed ---------------------
-  if (tableNeedsRedraw) {
-    redrawTable();
-    tableNeedsRedraw = false;
+  // --- Redraw, if the data, the current page, or the view changed ----------
+  if (screenNeedsRedraw) {
+    redrawScreen();
+    screenNeedsRedraw = false;
   }
 }
