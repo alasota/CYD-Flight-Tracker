@@ -41,12 +41,15 @@
 
 #include "LGFX_CYD.hpp"
 #include "aircraft_lookup.h"
+#include "aircraft_summary.h"  // TEMP: remove in step 4 (preview harness only)
 #include "config_portal.h"
 #include "config_store.h"
 #include "lcars_theme.h"
 #include "opensky_client.h"
 #include "radar_view.h"
 #include "route_lookup.h"
+#include "screen_nav.h"
+#include "status_bar.h"  // TEMP: remove in step 4 (preview harness only)
 #include "table_view.h"
 #include "touch_input.h"
 #include "wifi_manager.h"
@@ -183,6 +186,47 @@ static void handleTap(int16_t x, int16_t y) {
   }
 }
 
+// TEMP: remove in step 4 --------------------------------------------------
+// Standalone preview: draw status_bar (screen name "FLIGHTS") and
+// aircraft_summary (one made-up record) with fake data, so both new
+// components can be eyeballed on the real panel before step 4 wires them
+// into the live data pipeline. When kTempPreviewOnly is true, loop()
+// early-returns so nothing repaints over the preview.
+static constexpr bool kTempPreviewOnly = true;
+
+static void tempPreviewHarness() {
+  tft.fillScreen(LCARS_BLACK);
+
+  drawStatusBar(tft, /*screenIndex=*/kScreenFlights, /*localEpoch=*/0,
+                /*timeSynced=*/false, static_cast<int16_t>(tft.width()));
+
+  AircraftRow fake;
+  fake.aircraft.callsign = "LOT281";
+  fake.aircraft.has_position = true;
+  fake.aircraft.baro_altitude = 2450.0f;
+  fake.aircraft.velocity = 168.0f;
+  fake.info.found = true;
+  fake.info.airline = "LOT Polish Airlines";
+  fake.info.aircraft_type = "B738";
+  fake.phase = Phase::TAKEOFF;
+  fake.route.found = true;
+  fake.route.origin_icao = "EPWA";
+  fake.route.dest_icao = "LIRF";
+
+  AirportInfo origin;
+  origin.found = true;
+  origin.iata_code = "WAW";
+  origin.country_code = "PL";
+  AirportInfo dest;
+  dest.found = true;
+  dest.iata_code = "FCO";
+  dest.country_code = "IT";
+
+  drawAircraftSummary(tft, fake, origin, dest, RouteFormat::WithCountry, 0, LCARS_HEADER_HEIGHT,
+                      static_cast<int16_t>(tft.width()), 60);
+}
+// TEMP: end -------------------------------------------------------------
+
 void setup() {
   Serial.begin(115200);
 
@@ -205,9 +249,20 @@ void setup() {
   // joins a real network, which is fine — the captive portal itself
   // covers initial setup in that case.
   configPortalBegin();
+
+  // TEMP: remove in step 4 — see tempPreviewHarness() above.
+  if (kTempPreviewOnly) {
+    tempPreviewHarness();
+  }
 }
 
 void loop() {
+  // TEMP: remove in step 4 — hold the preview on screen, skip real work.
+  if (kTempPreviewOnly) {
+    delay(100);
+    return;
+  }
+
   wifiManagerLoop();
   configPortalLoop();
 
