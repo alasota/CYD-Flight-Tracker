@@ -41,9 +41,9 @@
 
 #include "LGFX_CYD.hpp"
 #include "aircraft_lookup.h"
-#include "aircraft_summary.h"  // TEMP: remove in step 4 (preview harness only)
 #include "config_portal.h"
 #include "config_store.h"
+#include "flight_screen.h"
 #include "lcars_theme.h"
 #include "opensky_client.h"
 #include "radar_view.h"
@@ -206,32 +206,42 @@ static void handleTap(int16_t x, int16_t y) {
   }
 }
 
-// TEMP: remove in step 4 --------------------------------------------------
-// Standalone preview: draw status_bar (screen name "FLIGHTS") and
-// aircraft_summary (one made-up record) with fake data, so both new
-// components can be eyeballed on the real panel before step 4 wires them
-// into the live data pipeline. When kTempPreviewOnly is true, loop()
-// early-returns so nothing repaints over the preview.
+// TEMP: remove in step 7 --------------------------------------------------
+// Standalone preview: cycle flight_screen through four made-up
+// t_cpa_seconds values (approaching / imminent / just-passed / minutes
+// mode) so every countdown colour + status label can be eyeballed on the
+// panel without waiting for a real aircraft to reach each state. While
+// kTempPreviewOnly is true, loop() runs only this cycler and does no real
+// work. (This also stands in for step 4's status_bar + aircraft_summary
+// preview, which are now wired into redrawScreen() for real.)
 static constexpr bool kTempPreviewOnly = true;
 
-static void tempPreviewHarness() {
-  tft.fillScreen(LCARS_BLACK);
+static AircraftRow tempFakeNearest() {
+  AircraftRow r;
+  r.aircraft.callsign = "LOT281";
+  r.aircraft.has_position = true;
+  r.aircraft.baro_altitude = 2450.0f;
+  r.aircraft.velocity = 168.0f;
+  r.info.found = true;
+  r.info.airline = "LOT Polish Airlines";
+  r.info.aircraft_type = "B738";
+  r.phase = Phase::OVERFLIGHT;
+  r.route.found = true;
+  r.route.origin_icao = "EPWA";
+  r.route.dest_icao = "LIRF";
+  return r;
+}
 
-  drawStatusBar(tft, /*screenIndex=*/kScreenFlights, /*localEpoch=*/0,
-                /*timeSynced=*/false, static_cast<int16_t>(tft.width()));
+static void tempFlightScreenCycler() {
+  static const float kFakeCpa[] = {45.0f, 5.0f, -3.0f, 240.0f};
+  static size_t idx = 0;
+  static uint32_t lastSwitchMs = 0;
+  static bool drawnOnce = false;
 
-  AircraftRow fake;
-  fake.aircraft.callsign = "LOT281";
-  fake.aircraft.has_position = true;
-  fake.aircraft.baro_altitude = 2450.0f;
-  fake.aircraft.velocity = 168.0f;
-  fake.info.found = true;
-  fake.info.airline = "LOT Polish Airlines";
-  fake.info.aircraft_type = "B738";
-  fake.phase = Phase::TAKEOFF;
-  fake.route.found = true;
-  fake.route.origin_icao = "EPWA";
-  fake.route.dest_icao = "LIRF";
+  uint32_t now = millis();
+  if (drawnOnce && (now - lastSwitchMs) < 2500) return;
+  drawnOnce = true;
+  lastSwitchMs = now;
 
   AirportInfo origin;
   origin.found = true;
@@ -242,8 +252,16 @@ static void tempPreviewHarness() {
   dest.iata_code = "FCO";
   dest.country_code = "IT";
 
-  drawAircraftSummary(tft, fake, origin, dest, RouteFormat::WithCountry, 0, LCARS_HEADER_HEIGHT,
-                      static_cast<int16_t>(tft.width()), 60);
+  CpaPrediction cpa;
+  cpa.found = true;
+  cpa.t_cpa_seconds = kFakeCpa[idx];
+
+  int16_t w = static_cast<int16_t>(tft.width());
+  tft.fillScreen(LCARS_BLACK);
+  drawStatusBar(tft, kScreenFlight, timeSyncNowLocal(), isTimeSynced(), w);
+  drawFlightScreen(tft, tempFakeNearest(), /*hasNearest=*/true, origin, dest, cpa, w);
+
+  idx = (idx + 1) % 4;
 }
 // TEMP: end -------------------------------------------------------------
 
@@ -272,16 +290,13 @@ void setup() {
   // covers initial setup in that case.
   configPortalBegin();
 
-  // TEMP: remove in step 4 — see tempPreviewHarness() above.
-  if (kTempPreviewOnly) {
-    tempPreviewHarness();
-  }
 }
 
 void loop() {
-  // TEMP: remove in step 4 — hold the preview on screen, skip real work.
+  // TEMP: remove in step 7 — cycle the flight_screen colour/label preview.
   if (kTempPreviewOnly) {
-    delay(100);
+    tempFlightScreenCycler();
+    delay(50);
     return;
   }
 
