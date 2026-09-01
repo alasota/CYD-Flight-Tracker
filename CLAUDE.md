@@ -108,12 +108,9 @@ which is an airline name or aircraft type on its own. Enrichment is required.
   ```
   Use `RegisteredOwners` as the airline name and `Type` (or `ICAOTypeCode` if you want the short
   form) as the aircraft model.
-- **Not found**: returns a genuine **HTTP 404** status (verified against the live API — not a
-  200 with an error-shaped body, despite how that might read at a glance) for aircraft outside
-  its database (military, private, very new registrations). Handle this as "show callsign only,
-  airline/type = unknown" — never crash or block the row on a miss. Treat both a 200 and a 404
-  as a *confirmed* answer worth caching (see below) — only a real transport failure (timeout,
-  WiFi drop, 5xx) should be left uncached so a later poll can retry.
+- **Not found**: returns a 404-style body (`{"status":"404","error":"Aircraft not found."}`) for
+  aircraft outside its database (military, private, very new registrations). Handle this as
+  "show callsign only, airline/type = unknown" — never crash or block the row on a miss.
 - **This is a small hobby-run free service, not an SLA** — be a good citizen and don't hammer it:
   - **Cache every successful lookup by `icao24` in RAM (and ideally NVS)** — an aircraft's
     airline/type essentially never changes, so a given `icao24` should only ever be looked up
@@ -123,107 +120,287 @@ which is an airline name or aircraft type on its own. Enrichment is required.
     with caching, so there's no excuse to skip the cache "because the limit is generous."
   - If a lookup is slow/unavailable, show the row with whatever's cached (or just the callsign)
     rather than blocking the whole table refresh on one flaky HTTP call.
-## Route & airport lookup (nice-to-have, not MVP)
+- **Route + country lookup**: covered in its own section below ("Route & airport lookup") — it's
+  no longer a nice-to-have, the table screen depends on it.
 
-Not required to settle "what plane is that", but interesting enrichment once the table works —
-lives in its own `route_lookup` module, same caching discipline as `aircraft_lookup`:
+## Route & airport lookup: origin, destination, country codes
 
-- **Route (origin/destination) by callsign**:
+Needed for the "skąd/dokąd" columns and the featured panel's country codes (see
+"Visualization concept" below). Both come from **hexdb.io** — same provider as aircraft
+lookup, different endpoints. Verify these against the live API when implementing; documented
+here from hexdb.io's own published endpoint list, not independently tested by hand:
+
+- **Route** (origin/destination airport codes for a flight):
   ```
-  GET https://hexdb.io/api/v1/route/icao/{callsign}
+  GET https://hexdb.io/api/v1/route/iata/{callsign}
   ```
-  Returns e.g. `{"flight":"EIN17A","route":"EIDW-EGLL","updatetime":1397991739}` — split
-  `route` on its `-` into origin/destination, both **ICAO** (4-letter) airport codes. Use the
-  `/icao/` variant, not `/iata/` — OpenSky's `callsign` field is ICAO-style (e.g. `DLH9LH`), and
-  the `/iata/` route endpoint expects an IATA-style callsign this project never has.
-- **Airport country (+ IATA code) by ICAO code**:
+  Use the **IATA** variant by default — 3-letter codes (`WAW`, `FCO`) read better at a glance
+  than 4-letter ICAO codes (`EPWA`, `LIRF`) for a "what plane is that" audience standing at a
+  grill, and it costs the same one HTTP call either way. The ICAO variant
+  (`.../route/icao/{callsign}`) is a documented fallback if IATA coverage turns out sparser in
+  practice.
+  Response: `{"flight":"EIN17A","route":"EIDW-EGLL","updatetime":1397991739}` — split `route` on
+  `-` to get origin/destination codes. Not found: `{"status":"404","error":"Route not found."}`
+  — common for general aviation / non-scheduled flights with no filed route. Show "—" for
+  skąd/dokąd rather than blocking the row.
+- **Airport → country code** (only needed for the featured/nearest aircraft's expanded view):
   ```
-  GET https://hexdb.io/api/v1/airport/icao/{code}
+  GET https://hexdb.io/api/v1/airport/iata/{code}
   ```
-  Returns e.g. `{"country_code":"GB","region_name":"England","iata":"LHR","icao":"EGLL",
-  "airport":"Heathrow Airport","latitude":51.4775,"longitude":-0.461389}` — use
-  `country_code` and `iata`. Use the `/icao/` variant, not `/iata/` — this keys directly off
-  the route lookup's `origin_icao`/`dest_icao` above with no code-system conversion (this
-  project has none). The response conveniently carries both codes, so `iata` is still available
-  for display (e.g. featured_panel's "WAW (PL)").
-- **Not found**: same as `aircraft_lookup` — a genuine HTTP 404 (verified against the live API)
-  for both endpoints, not a 200-with-error-body. Treat 200 and 404 as confirmed, cacheable
-  answers; only a real transport failure should go uncached.
-- **Cache by key** (callsign for route, airport code for airport) in RAM, same reasoning as
-  `aircraft_lookup` — a route/airport doesn't change mid-flight, no reason to re-fetch.
+  Response: `{"airport":"Heathrow Airport","country_code":"GB","iata":"LHR","icao":"EGLL",...}`
+  — use `country_code`. Not found: `{"status":"404","error":"Airport not found."}` → show "—".
+- **Caching, two different keys**:
+  - Route lookups cache by **callsign** (a flight's route doesn't change mid-flight).
+  - Airport/country lookups cache by **airport code** — this cache will end up tiny in practice
+    (mostly the same handful of nearby airports repeating), so it's cheap to keep in RAM even
+    without NVS persistence.
+  - Same rule as `aircraft_lookup`: never re-fetch a cache hit, never block the table on one
+    slow/failed request, degrade to "—" instead of hiding the row.
 
-## Flight phase (derived, optional enrichment)
+## Flight phase: takeoff / landing / overflight
 
-A pure classifier — `flight_phase` module — that labels an aircraft's current phase from
-simple instantaneous signals, no history/trajectory tracking (that stays out of scope, see "Out
-of scope for MVP" below):
+Answers "kierunek" for aircraft near the airport — pure logic, no I/O, lives in its own
+`flight_phase` module (see "Code conventions") so it's trivially unit-testable:
 
-```
-classifyPhase(distance_km, vertical_rate_mps, on_ground, near_airport_km, climb_threshold_mps)
-  -> Phase { NONE, TAKEOFF, LANDING, OVERFLIGHT }
-```
+- Inputs: `distance_from_home_km`, `vertical_rate_mps` (from the OpenSky state vector),
+  `on_ground` (from the same state vector), plus two configurable thresholds:
+  `near_airport_km` (default ~15 km — tune after watching real approach/departure traffic, this
+  default is a guess, not measured) and `climb_rate_threshold_mps` (default ~1.5 m/s).
+- Classification (`Phase`: `NONE`, `TAKEOFF`, `LANDING`, `OVERFLIGHT`):
+  - `on_ground == true` → `NONE` (don't show a phase for something still taxiing).
+  - `distance_from_home_km > near_airport_km` → `NONE` — not near the airport, no icon.
+  - else if `vertical_rate_mps > climb_rate_threshold_mps` → `TAKEOFF`.
+  - else if `vertical_rate_mps < -climb_rate_threshold_mps` → `LANDING`.
+  - else → `OVERFLIGHT` (near the airport but level — transiting through, not using it).
+- Icons (drawn via `lcars_theme` primitives, not bitmap assets): up chevron = takeoff, down
+  chevron = landing, sideways chevron = overflight, nothing/blank = `NONE`.
 
-- `on_ground` always wins → `NONE`, regardless of the other inputs.
-- Otherwise: near an airport (`distance_km <= near_airport_km`, inclusive) and climbing fast
-  enough (`vertical_rate_mps >= climb_threshold_mps`, inclusive) → `TAKEOFF`; near an airport
-  and descending fast enough (`vertical_rate_mps <= -climb_threshold_mps`) → `LANDING`;
-  anything else while airborne → `OVERFLIGHT`.
-- Zero I/O, zero Arduino/LovyanGFX dependency — pure logic only, per "Testing" below.
-- **Wired into the live pipeline**: `opensky_client`'s `Aircraft` struct carries `on_ground`
-  (state vector index 8) and `vertical_rate` (index 11); `table_view::classifyPhases()` calls
-  `classifyPhase()` per row after `annotateDistances()` has run. `near_airport_km` is passed
-  each row's `distance_km` — i.e. distance from **home**, not literally the nearest airport
-  (this project has no airport coordinate database, only country codes from the airport lookup
-  above) — a reasonable stand-in since a home tracker's main interest is activity near the
-  user's own location anyway. `main.cpp` supplies the threshold constants
-  (`kNearAirportKm`/`kClimbThresholdMps`).
+## Time & WiFi status (for the header bar)
 
-## Visualization concept — data table (primary) + radar (secondary)
+Needed because every screen now shows a real clock, not just uptime — this is a new
+requirement, the firmware didn't sync wall-clock time before.
 
-Two screens, toggled by a touch tap on a persistent LCARS-style corner button. Both share the
-same "Design language" chrome below so switching feels like changing a display mode on one
-console, not jumping between two different apps.
+- **NTP sync**: after WiFi connects (in `wifi_manager` or right after in `main.cpp`), call
+  `configTzTime(TZ_WARSAW, "pool.ntp.org", "time.nist.gov")` where
+  `TZ_WARSAW = "CET-1CEST,M3.5.0,M10.5.0/3"` — the standard POSIX TZ rule for Europe/Warsaw
+  (correctly handles CEST DST switches). This is a stable, long-standing EU DST rule, but
+  double-check it hasn't changed if clocks ever look off by an hour.
+- Until the first sync completes, `time_sync` must report "not synced yet" — the header bar
+  should show a placeholder (e.g. `--:--`) rather than the garbage epoch-zero date ESP32 starts
+  with.
+- `time_sync` module: `isTimeSynced()`, plus **pure, testable** formatting functions that take
+  a `time_t` as a parameter rather than calling `time(nullptr)` internally — e.g.
+  `formatDate(time_t) -> "DD.MM.YYYY"`, `formatTime(time_t) -> "HH:MM"`. Keeping the epoch as an
+  injected parameter (instead of reading the wall clock inside the function) is what makes this
+  testable without depending on when the test happens to run.
+- **WiFi signal**: `rssiToBars(int rssi_dbm) -> 0..4`, pure function, from `WiFi.RSSI()`.
+  Rough default thresholds (adjust after seeing real readings): ≥ -55 dBm → 4, -55..-65 → 3,
+  -65..-75 → 2, -75..-85 → 1, below that → 0. Kept as a utility function even though the
+  current header layout (see "Screen chrome" below) doesn't have a slot for it — say if you
+  want it added back somewhere and I'll find room.
+- **Stardate (decorative, not canonical Star Trek lore)**: the header shows `STARDATE: XXXX.XX`
+  instead of a real calendar date. Compute it with a small deterministic formula from the real
+  date rather than hardcoding a static string — e.g. `stardate = (year - 2323) * 1000 +
+  day_of_year * 2.7378` (one of many fan approximations; there's no official formula, so this
+  is purely flavor text, tune the constants if you want a different "feel" to the numbers). Pure
+  function, same `time_t`-in / string-out pattern as `formatDate`/`formatTime`, lives in
+  `time_sync` alongside them.
 
-### Screen 1 — Aircraft table (default view, prioritize this first)
+## Flight ETA — closest point of approach (for Screen 2, "Flight")
 
-Composed of two pieces, both drawn by `table_view` — a `featured_panel` spotlighting the single
-closest aircraft, and a paginated table of everyone else below it. Sort by distance ascending
-(closest aircraft first) — recompute on every poll; the closest one is always what
-`featured_panel` shows, never repeated in the table.
+Answers "za ile sekund/minut będzie nad tobą" — how long until the nearest aircraft is closest
+to home. Pure math, lives in its own `cpa_predictor` module, no I/O:
 
-- **Featured panel** (top of screen, fixed height): the closest aircraft, since it's the one
-  most likely visible outside — this replaces the older "highlight the closest row" treatment
-  with a dedicated, larger spotlight.
-  - Line 1: flight (callsign), airline, aircraft type, and a one-character flight-phase icon
-    (`lcars_theme::phaseIcon()` — see "Flight phase").
-  - Line 2: origin → destination, e.g. `WAW (PL) -> FCO (IT)` — IATA code + country for each end
-    when the route (`route_lookup`) *and* both airports (route→airport chain, see "Route &
-    airport lookup") have resolved; falls back to the bare ICAO code for an end whose airport
-    hasn't resolved yet, and to a plain "—" for the whole line if the route itself hasn't.
-  - Altitude / speed / distance as `lcars_theme` pills along the bottom.
-  - **No aircraft in range**: its own placeholder view ("No aircraft in range"), not a blank
-    panel or a crash.
-- **Table** (below the panel): one row per *remaining* aircraft (closest excluded — it's already
-  in the panel), columns: **flight (callsign), airline, origin, destination, aircraft type,
-  phase icon**. Altitude/speed/distance moved to the featured panel, not repeated here.
-  Truncate/abbreviate rather than shrinking the font past readability on a 320x240 screen.
-- Airline/aircraft type come from `aircraft_lookup`, origin/destination from `route_lookup` (see
-  "Aircraft identification"/"Route & airport lookup" above); a lookup that hasn't resolved yet,
-  or a miss, shows the row anyway with that field as "—" rather than hiding it or blocking the
-  table/panel.
-- Row count per page (in the table) depends on the row height chosen for legibility, minus the
-  space the featured panel takes at the top; page/scroll via touch if more remaining aircraft
-  are in range than fit. Don't cram to fit everything at the cost of readability — paging is
-  fine.
-- This is the priority screen — get it solid before spending time on the radar screen.
+- **Approach**: linear extrapolation. Treat the aircraft as moving in a straight line at its
+  current speed and track (constant velocity) and compute the time at which its distance to
+  home is minimized — the standard closest-point-of-approach (CPA) calculation. This is an
+  approximation: real aircraft turn, so accuracy degrades the further out you extrapolate. It's
+  acceptable here specifically because the product only cares about the near-term result (under
+  a couple of minutes), not a long-range prediction.
+- **Math**:
+  1. Convert both home and aircraft lat/lon to local flat x/y in km around the home latitude
+     (equirectangular approximation — fine at this scale): `dx_km = (lon_ac - lon_home) *
+     111.32 * cos(lat_home_rad)`, `dy_km = (lat_ac - lat_home) * 111.32`.
+  2. Velocity vector from speed (convert m/s → km/s) and track (degrees, 0 = north, clockwise):
+     `vx = speed_kms * sin(track_rad)`, `vy = speed_kms * cos(track_rad)`.
+  3. `t_cpa_seconds = -(dx_km*vx + dy_km*vy) / (vx*vx + vy*vy)`.
+- **Edge case**: if `vx² + vy²` is ~0 (aircraft essentially stationary — on ground, hovering),
+  return "no prediction" (`found = false`) instead of dividing by zero.
+- **Result is signed**: positive = CPA is in the future, negative = CPA already happened that
+  many seconds ago. This is exactly what Screen 2's countdown needs — see "Screen 2" below for
+  how it's displayed and when it switches to a minutes format.
+- **Local ticking between polls**: aircraft data only refreshes every `poll_interval` (default
+  15s), but the countdown should feel like it's ticking every second. Keep a local countdown
+  driven by `millis()` that decrements between polls, and re-sync it to the freshly-computed
+  `t_cpa_seconds` every time a new poll comes in — don't just freeze the displayed number for
+  15 seconds and then jump.
 
-### Screen 2 — Radar (optional, secondary, build after the table works)
 
-- Classic circular sweep plot, home at center, aircraft as blips positioned by bearing +
-  distance, but re-skinned entirely in the LCARS palette/shapes from "Design language" —
-  this is what makes it different from micro-radar's radar, not the underlying polar-plot math.
-- Sweep line animation optional and low priority; a static "last refresh" plot is fine for v1.
-- Tapping a blip can jump to that aircraft's row on the table screen (nice-to-have, not MVP).
+
+## Visualization concept — three screens: Flights, Flight, Radar
+
+Three screens now, not two, cycled in this fixed order: **Flights → Flight → Radar →
+(back to Flights)**. All three share the same header chrome and `lcars_theme` styling so
+switching feels like changing a mode on one console, not jumping between apps.
+
+### Screen chrome — header bar (identical on all three screens)
+
+**Exact pixel spec, y: 0 to 25px, full width (320px):**
+- LCARS block on the left: filled rounded rectangle (`fillRoundRect`), color `LCARS_ORANGE`
+  (`0xFC00`). Label the screen name inside it in small bold text (`FLIGHTS` / `FLIGHT` /
+  `RADAR`) — this is how each screen stays identifiable now that the header's main text is
+  stardate/time rather than a screen-name label; keep the block wide enough for the longest
+  name (`FLIGHTS`, 7 characters) at whatever font size fits 25px tall comfortably.
+- To the right of that block: `STARDATE: XXXX.XX` and the real time `HH:MM:SS`, monospace /
+  built-in Adafruit-style font, color `LCARS_CYAN` (`0x07FF`) or white.
+- **WiFi bars are dropped from this header** in this revision — the earlier three-zone design
+  (date/time left, name center, WiFi right) is superseded by this spec. Say if you want signal
+  strength back somewhere; there's no slot for it here right now.
+
+Define `LCARS_HEADER_HEIGHT = 25` as a shared constant in `lcars_theme` that every screen's
+content starts below — keeps all three screens visually aligned instead of each guessing its
+own offset. Drawn by a dedicated `status_bar` module, called once per frame from `main.cpp`
+before dispatching to whichever screen is active — screens themselves don't need to know
+`status_bar` exists, they just draw their content starting at `y = LCARS_HEADER_HEIGHT`.
+
+### Screen 1 — "Flights" (default view, prioritize this first)
+
+**Exact pixel spec** (below the 25px header), no scrolling — everything drawn at fixed
+coordinates to fit the 320x240 frame, consistent with "Design language" below:
+
+**Featured flight section, y: 28 to 105px (~77px tall).**
+- Frame: an LCARS-style bordered panel in `LCARS_MAGENTA` (`0xF81F`), with the classic LCARS
+  swept/cut corner — one corner (top-left) cut at an angle or arc rather than a plain rounded
+  rect. LovyanGFX has arc primitives (`fillArc`/`drawArc`) — verify the exact method names
+  against the installed LovyanGFX version when implementing, don't assume from memory. This is
+  the same "elbow" shape already described in "Design language" — just now with a specific
+  color and bounds.
+- Highlighted text (top of the frame): flight (callsign), airline, aircraft type, phase icon —
+  what's currently Line 1 of the featured panel, unchanged in content.
+- Detail line below it (bottom of the frame): the rest — origin → destination with country
+  codes, plus the altitude/speed/distance stat chips — what's currently Line 2 + stat chips,
+  unchanged in content, rendered smaller (8px / LovyanGFX's equivalent of Adafruit "Font 2" —
+  again, verify the exact font reference name for LovyanGFX rather than assuming the TFT_eSPI
+  name carries over).
+- Empty state ("no aircraft in range") still applies here, same as before — just now within
+  these exact bounds.
+
+**Flights table section, y: 108 to 238px (~130px tall).**
+- Sub-header bar: `LCARS_CYAN` (`0x07FF`) background, black text, label `FLIGHTS`. (Yes, this
+  repeats the word already shown in the header's orange block — that's fine, LCARS designs
+  repeat short labels as a matter of style, not a bug to fix.)
+- Column header row at **y: 125px**: `LCARS_ORANGE` (`0xFC00`) background, black text, one
+  text string with column labels separated by `|` (not per-column shaded cells) — e.g.
+  `LOT | LINIA | SKĄD | DOKĄD | TYP | FAZA` matching the columns already defined below.
+- **Exactly 5 data rows**, starting at **y: 140px**, **18px step** (rows at y = 140, 158, 176,
+  194, 212) — this replaces the earlier "row count depends on row height" language with a fixed
+  number. If more than 5 aircraft are in range, page via touch (Milestone 9's mechanism) rather
+  than trying to fit more — pagination swaps which 5 are shown, it is not scrolling.
+- Columns per row: **flight (callsign), airline, from (IATA code), to (IATA code), aircraft
+  type, phase icon**. Airport codes only — no country codes, no room for them at 18px row
+  height.
+- Airline/type come from `aircraft_lookup`; from/to come from `route_lookup`; phase from
+  `flight_phase`. Any of these being unresolved/not-found shows "—" in that cell, never blocks
+  the row.
+- Sorted by distance ascending, **excluding** whichever aircraft is currently shown in the
+  featured panel above.
+- This is the priority screen — get it solid before spending time on the other two.
+
+### Screen 2 — "Flight" (single nearest aircraft + overhead countdown)
+
+Deliberately minimal — one aircraft, one number that matters: when will it actually be
+overhead. **Exact pixel spec**, below the 25px header, no scrolling:
+
+**Identity panel, y: 28 to 78px (50px tall, x: 10 to 310).**
+- Same LCARS elbow frame as Screen 1's featured panel — `LCARS_MAGENTA` (`0xF81F`) border,
+  top-left corner swept/cut, not a plain rounded rect.
+- Line 1 (~y:40): flight (callsign), airline, aircraft type, phase icon — via
+  `aircraft_summary`, same content as Screen 1's featured panel Line 1.
+- Line 2 (~y:62, smaller font, 8px / LovyanGFX's Font-2 equivalent): origin → destination as
+  IATA + country code, e.g. `WAW (PL) → FCO (IT)` — same as Screen 1's Line 2.
+
+**Countdown zone, y: 82 to 195px (113px tall), horizontally centered.**
+- The dominant visual element on this screen — large digits, roughly 70-90px tall glyphs
+  (scale a built-in font or use a larger LovyanGFX font; verify against what's actually
+  available rather than assuming a specific font name).
+- **Color-coded by urgency** (decorative LCARS "alert level" touch, adjustable):
+  - `10 < t_cpa_seconds ≤ 60`: `LCARS_CYAN` — approaching, not urgent yet.
+  - `0 ≤ t_cpa_seconds ≤ 10`: `LCARS_YELLOW` — imminent.
+  - `-10 ≤ t_cpa_seconds < 0`: `LCARS_ORANGE` — just passed, counting away.
+- **Seconds mode** (`-10..60`): big number + small `s` suffix, e.g. `42s` counting down through
+  `0` to `-10`.
+- **Minutes mode** (`t_cpa_seconds > 60`): smaller than the seconds giant-digit size (it's an
+  estimate, shouldn't look as precise) — `~4 MIN`, color `LCARS_MAGENTA`.
+- **Empty/no-prediction state** (no aircraft in range, or CPA not found): centered em-dash `—`,
+  no color-coding.
+
+**Status strip, y: 200 to 238px (38px tall), centered text.**
+- Label matching the countdown state: `ZBLIŻA SIĘ` (approaching, cyan zone) / `NAD TOBĄ`
+  (imminent, yellow zone) / `MINĄŁ` (passed, orange zone) / `SZACOWANY CZAS` (minutes mode) /
+  `BRAK LOTÓW W ZASIĘGU` (empty state).
+- Optional nice-to-have, not required: since `flight_phase` is already computed elsewhere for
+  this aircraft, its takeoff/landing/overflight chevron can sit alongside the label here too —
+  skip it if it clutters this narrow strip, the countdown is the point of this screen.
+
+**Behavior notes (unchanged from before, still apply):**
+- Same nearest-aircraft selection as Screen 1's featured panel — reuse it, don't reselect
+  independently.
+- Local countdown ticks every second via `millis()` between polls, re-synced to the
+  freshly-computed `t_cpa_seconds` on each new poll (see "local ticking" in the CPA section).
+- When `t_cpa_seconds` drops below -10, don't hold onto a stale prediction — next poll
+  recomputes "nearest aircraft" and its CPA as normal, so the screen naturally moves on to
+  whatever is nearest now.
+
+### Screen 3 — "Radar" (left: radar, right: nearest-aircraft summary)
+
+**Exact pixel spec**, below the 25px header, content area y: 28 to 238px (210px tall):
+
+**Divider, x: 192 to 200px (8px wide), full content height.**
+- A thin vertical `LCARS_ORANGE` (`0xFC00`) accent bar — the same "elbow sidebar" motif from
+  "Design language", here doing double duty as the visual split between radar and summary.
+
+**Radar, x: 0 to 190px, y: 28 to 238px.**
+- Center at `(95, 133)`, radius `85px` — fits with margin on all sides within this zone.
+- 3 concentric rings at radius `28px` / `57px` / `85px` (thirds of max radius), each labeled
+  in small text near the top of the ring with its corresponding distance in km (derived from
+  `max_distance_km / 3`, `2/3`, full — see `computeRingDistances` from the radar geometry work).
+- Home marker: small crosshair or dot, `LCARS_YELLOW` (`0xFFE0`), at center.
+- Aircraft blips: small dots (~5px), `LCARS_CYAN` (`0x07FF`) normally, dimmed/smaller if
+  `clamped == true` (beyond `max_distance_km`, per `polarToScreen`'s clamping — see the earlier
+  radar geometry step).
+- Static plot, no sweep animation, consistent with the earlier radar_view spec.
+
+**Summary panel, x: 200 to 320px (120px wide), y: 28 to 238px.**
+- Same LCARS elbow frame convention as Screen 1/2 — `LCARS_MAGENTA` (`0xF81F`) border, top-left
+  corner (the one facing the divider) swept/cut.
+- Three rows, via `aircraft_summary`, vertically spaced within the panel:
+  - Row 1 (~y:95): flight (callsign), bold/emphasized.
+  - Row 2 (~y:130): airline — truncate or abbreviate if it doesn't fit the 120px width, don't
+    let it overflow into the radar zone.
+  - Row 3 (~y:165): origin → destination as IATA codes, e.g. `WAW → FCO` (no country codes
+    here — this panel is narrower than Screen 1's featured panel, keep it to what fits).
+- **Empty state**: if no aircraft in range, radar still draws its (empty) rings and home
+  marker; this panel shows a centered `BRAK LOTU` / em-dash instead of the three rows.
+
+### Screen navigation
+
+- **Order**: Flights (0) → Flight (1) → Radar (2) → wraps back to Flights. Managed by a new
+  `screen_nav` module (current index + `nextScreen()`/`prevScreen()` with wraparound — small,
+  but worth testing, off-by-one bugs in wraparound logic are easy to introduce).
+- **Touch zones, below the header**: narrow strips at the **left and right edges** (roughly the
+  outer 15-20% of width each) switch screens — left edge = previous, right edge = next. The
+  **middle majority of the screen is deliberately left alone** for screen-specific interactions
+  — this matters concretely on Screen 1, where the table already uses touch for pagination
+  (Milestone 9); a full-width left/right split would fight with that.
+- **Bottom nav bar**: a persistent thin strip at the very bottom of the screen, present on all
+  three screens, showing three tappable dots/segments (one per screen), the active one
+  highlighted. Tapping a segment jumps directly to that screen. This is a proposed default, not
+  something explicitly specified — a single cyclic "next" button would also satisfy "przycisk
+  na dole ekranu" if you'd rather keep it simpler; flag it if you want that instead.
+- **Persistence**: current screen index saved to `config_store` as `last_screen` (0/1/2),
+  restored on boot. This replaces the old boolean-ish `last_view` field from when there were
+  only two screens (table/radar) — rename it, don't keep both fields around.
+
 
 ## Design language — LCARS-inspired (Star Trek console aesthetic)
 
@@ -232,16 +409,36 @@ system — no ripped bitmap assets, no attempt to recreate the specific trademar
 The spirit (bold color blocks, rounded "elbow" panels, chunky sidebar) is what we're after; the
 execution should be original, built from LovyanGFX primitives.
 
-- **Palette**: black background; a small set of saturated accent colors (e.g. amber/orange,
-  blue-violet, salmon/rose, pale blue) used as solid blocks — pick 3–4 and reuse them
-  consistently across both screens rather than introducing new colors per element.
-- **Shapes**: rounded-rectangle panels, an "elbow" sidebar (a vertical bar that curves into a
-  horizontal header) as a persistent frame element, pill-shaped buttons/labels for headers and
-  the view-toggle control.
+- **Palette — exact values, not vague color names**:
+  - Background: `LCARS_BLACK` = `0x0000`
+  - Orange: `LCARS_ORANGE` = `0xFC00`
+  - Magenta/pink: `LCARS_MAGENTA` = `0xF81F`
+  - Cyan/blue: `LCARS_CYAN` = `0x07FF`
+  - Yellow: `LCARS_YELLOW` = `0xFFE0`
+
+  These are standard RGB565 16-bit values (same encoding TFT_eSPI's predefined color constants
+  use) — they work as raw pixel colors on LovyanGFX the same way, since the ILI9341 panel here
+  runs in 16-bit color depth by default. Define them as named constants in `lcars_theme`, don't
+  scatter raw hex literals through the view modules.
+- **Orientation**: landscape, `setRotation(1)` or `setRotation(3)` depending on which way the
+  board ends up physically mounted (USB port up vs. down) — both are valid, pick whichever
+  matches the physical mounting once decided, don't hardcode a guess.
+- **No scrolling, ever**: every screen is drawn at fixed, pixel-perfect coordinates sized to
+  exactly fit 320x240 — "paginated" (Screen 1's table) means swapping which fixed set of rows
+  is shown, never a smooth/scrolled viewport. If content doesn't fit, it gets paginated or
+  truncated, not scrolled.
+- **Shapes**: rounded-rectangle panels, an "elbow" sidebar/panel (a rectangle with one corner
+  swept into an arc rather than a plain right angle) as a persistent motif — see Screen 1's
+  featured-flight frame for a concrete example of this shape with exact bounds and color.
+  Pill-shaped labels for the header bar's screen-name block and the bottom nav segments.
 - **Typography**: LovyanGFX's built-in fonts sized for legibility at this resolution — bold,
   chunky, minimal decoration. Numeric/status readouts in a monospace-feeling font if available.
-- **Chrome stays constant across both screens**: same sidebar, same header treatment, same
-  corner toggle button — only the content area (table vs. radar) changes.
+- **Chrome stays constant across all three screens**: same header bar, same bottom nav bar —
+  only the content area between them changes per screen.
+- **New primitives needed for this iteration**: the LCARS swept-corner "elbow" frame (see
+  Screen 1's featured panel), bottom-nav dot/segment indicators. WiFi signal bars were drawn up
+  as a pure `rssiToBars()` function but have no current home in the layout — hold off drawing
+  that primitive until/unless it gets a spot again.
 - Keep this as its own module (see `lcars_theme` below) so colors/shapes are defined once and
   reused, not re-picked per screen.
 
@@ -262,42 +459,56 @@ each with a single responsibility:
   in-memory (ideally NVS-backed) cache so a given `icao24` is only ever looked up once. No TFT
   code, no OpenSky polling logic — purely a lookup + cache layer sitting between
   `opensky_client`'s output and the view modules.
-- `route_lookup` — callsign → origin/destination airport, and airport code → country, via
-  hexdb.io (see "Route & airport lookup" above). Same caching discipline as `aircraft_lookup`,
-  same "no TFT, no OpenSky polling logic" boundary.
-- `flight_phase` — pure `classifyPhase()` classifier (see "Flight phase" above). Zero I/O, zero
-  Arduino/LovyanGFX dependency.
-- `lcars_theme` — shared color palette, panel/elbow/pill drawing helpers, fonts, and
-  `phaseIcon()` (the one place a `Phase` gets turned into a glyph, so `featured_panel` and
-  `table_view` can't disagree). Both view modules call into this rather than defining their own
-  colors/shapes.
-- `featured_panel` — draws Screen 1's top spotlight panel for the single closest aircraft (see
-  "Screen 1" above). Takes an already-enriched `table_view::AircraftRow` plus the two
-  `route_lookup::AirportInfo` results for its route's endpoints. No networking code, no OpenSky
-  polling logic, uses `lcars_theme` for chrome.
-- `table_view` — draws Screen 1: composes `featured_panel` (closest aircraft) with a paginated
-  table of the rest. Takes the aircraft array + home position as input (via
-  `buildEnrichedRecords()`/`annotateDistances()`/`classifyPhases()`), uses `lcars_theme` for
-  chrome. No networking code.
-- `radar_geometry` — pure polar-to-screen math for Screen 2 (bearing+distance -> screen
-  coordinates, concentric-ring distances). Zero LovyanGFX/Arduino dependency; converting
-  `config_store`'s `radius_deg` to km happens at the call site (`radar_view`), not here.
-- `radar_view` — draws Screen 2 (LCARS-skinned radar): home marker at the plot center, rings
-  from `radar_geometry::computeRingDistances()`, blips from `radar_geometry::polarToScreen()`
-  (reusing `table_view`'s already-computed `distance_km`/`bearing_deg`, not recomputing them).
-  Same input contract as `table_view` (an already-annotated `AircraftRow` list), same theme
-  module. No networking code. Static plot — no sweep-line animation.
-- `config_store` — Preferences/NVS read/write for all persisted settings, including which view
-  (table/radar) was last active.
+- `route_lookup` — `callsign` → origin/destination IATA codes, and airport code → country code,
+  both via hexdb.io, each with its own cache (see "Route & airport lookup"). Same rules as
+  `aircraft_lookup`: no TFT code, no blocking, degrade to "—" on a miss.
+- `flight_phase` — pure classification function (distance + vertical_rate + on_ground →
+  NONE/TAKEOFF/LANDING/OVERFLIGHT), see "Flight phase" above. No I/O of any kind — this is the
+  easiest module in the project to get full test coverage on, there's no excuse to skip it.
+- `time_sync` — NTP setup (`configTzTime`) and sync-state, plus pure date/time formatting
+  functions that take a `time_t` parameter rather than reading the wall clock internally (see
+  "Time & WiFi status"). No TFT code.
+- `cpa_predictor` — pure closest-point-of-approach time math (see "Flight ETA"). No I/O of any
+  kind, and arguably the single easiest-to-fully-test module in the project — it's just
+  trigonometry and a division.
+- `screen_nav` — current screen index (0/1/2) + `nextScreen()`/`prevScreen()` with wraparound,
+  plus touch-zone hit-testing for the left/right edge strips and bottom nav segments (reuse the
+  `hitTest` pattern from Milestone 9). No TFT drawing, no OpenSky/hexdb.io calls.
+- `lcars_theme` — shared color palette, panel/elbow/pill drawing helpers, fonts, plus the WiFi
+  signal-bars and bottom-nav-segment primitives. All view/screen modules call into this rather
+  than defining their own colors/shapes.
+- `status_bar` — draws the header bar per the exact spec in "Screen chrome": orange
+  `fillRoundRect` block on the left labeled with the active screen name, stardate + real time
+  (from `time_sync`) to its right. Called once per frame from `main.cpp`, before dispatching to
+  the active screen — individual screens don't call it themselves.
+- `aircraft_summary` — shared identity-block renderer (flight, airline, aircraft type, origin →
+  destination). Used by `featured_panel` (Screen 1's top zone), `flight_screen` (Screen 2), and
+  `radar_view`'s right-hand panel (Screen 3) — centralized specifically so this rendering isn't
+  duplicated three times across three screens.
+- `featured_panel` — draws Screen 1's top zone, now built on top of `aircraft_summary` for the
+  identity-block portion plus its own altitude/speed/distance stat chips. Takes one enriched
+  aircraft record as input, uses `lcars_theme` for chrome. No networking code.
+- `table_view` — draws Screen 1's content area (below the header): calls `featured_panel` for
+  the top zone, draws the paginated row list for everything else. Takes the enriched aircraft
+  array + home position as input, uses `lcars_theme` for chrome. No networking code.
+- `flight_screen` — draws Screen 2's content area: calls `aircraft_summary` for the identity
+  block, draws the seconds/minutes countdown using `cpa_predictor`'s output. No networking code.
+- `radar_view` — draws Screen 3's content area: the radar circle in a left-side bounding rect it
+  receives (not the full screen anymore) plus a call to `aircraft_summary` for the right-side
+  panel. Same enriched-aircraft input contract as the other screens. No networking code.
+- `config_store` — Preferences/NVS read/write for all persisted settings, including
+  `last_screen` (0/1/2) — replaces the old two-screen `last_view` field.
 
 Other rules:
 - Never hardcode WiFi or OpenSky secrets in source files.
 - Prefer `millis()`-based non-blocking timing over `delay()` so touch input and rendering stay
   responsive between polls.
-- Keep `opensky_client` fully decoupled from `table_view`/`radar_view` — that boundary is what
-  lets the two screens share one data source without duplicating polling logic.
-- `table_view` and `radar_view` should not duplicate color/shape definitions — anything visual
-  that appears on both belongs in `lcars_theme`.
+- Keep `opensky_client` fully decoupled from `table_view`/`flight_screen`/`radar_view` — that
+  boundary is what lets all three screens share one data source without duplicating polling
+  logic.
+- `table_view`, `flight_screen`, and `radar_view` should not duplicate color/shape definitions —
+  anything visual that appears on more than one screen belongs in `lcars_theme`, and anything
+  that's specifically the aircraft identity block belongs in `aircraft_summary`.
 
 ## Testing — logic gets covered first, not "later"
 
@@ -305,15 +516,18 @@ Test-first is the default here, not a cleanup pass bolted on at the end:
 
 - Before implementing any non-trivial piece of logic — bbox math, distance/bearing calculations,
   sorting aircraft by distance, altitude bucketing, token-expiry timing, cache hit/miss behavior
-  in `aircraft_lookup`, credit-cost calculation, JSON parsing/mapping, etc. — write the test for
-  it in `test/` first, or at the very least alongside it, then implement until it passes. "Add
-  tests later" is not a real plan on a solo hobby project — later doesn't happen, so don't rely
-  on it.
+  in `aircraft_lookup`/`route_lookup`, flight-phase classification, CPA time prediction,
+  RSSI-to-bars/date-time formatting, screen-index wraparound, credit-cost calculation, JSON
+  parsing/mapping, etc. — write the test for it in `test/` first, or at the very least alongside
+  it, then implement until it passes. "Add tests later" is not a real plan on a solo hobby
+  project — later doesn't happen, so don't rely on it.
 - This is exactly why the module boundaries in "Code conventions" above are non-negotiable:
-  `opensky_client`, `aircraft_lookup`, `table_view`, `radar_view`, and `lcars_theme` all keep
-  their actual logic separate from LovyanGFX / WiFiClientSecure / HTTPClient / XPT2046 calls
-  specifically so that logic can run in PlatformIO's `native` environment — no ESP32, no
-  display, no network required, just `pio test -e native`.
+  `opensky_client`, `aircraft_lookup`, `route_lookup`, `flight_phase`, `time_sync`,
+  `cpa_predictor`, `screen_nav`, `table_view`, `flight_screen`, `radar_view`, `featured_panel`,
+  `aircraft_summary`, and `lcars_theme` all keep their actual logic separate from LovyanGFX /
+  WiFiClientSecure / HTTPClient / XPT2046 calls specifically so that logic can run in
+  PlatformIO's `native` environment — no ESP32, no display, no network required, just
+  `pio test -e native`.
 - Only the thin adapter code that directly calls hardware/SDK APIs (the actual TFT draw calls,
   the actual HTTP request, the actual touch read) is allowed to go untested by Unity. Everything
   that adapter code delegates to should not be — if a function is pure enough to unit test, it
@@ -368,6 +582,22 @@ class LGFX : public lgfx::LGFX_Device {
   }
 };
 ```
+
+Also add a native test environment — this was missing from this file, but the "Testing" section
+above depends on `pio test -e native` existing:
+
+```ini
+[env:native]
+platform = native
+test_framework = unity
+build_flags =
+    -std=c++17
+; No LovyanGFX/Arduino.h here on purpose — this env only compiles modules whose testable
+; logic is plain C++ (structs, functions), which is exactly what "Code conventions" and
+; "Testing" above require. If a file won't compile under `native`, that's a signal it still
+; has hardware-only code mixed into logic that should be pure.
+```
+
 This is a starting point, not gospel — verify it compiles and renders correctly on the real
 board before building anything on top of it; TFT/panel setups are notoriously fiddly and small
 mistakes here waste hours of debugging later.
@@ -386,3 +616,7 @@ mistakes here waste hours of debugging later.
 - Multi-aircraft trajectory prediction or trails.
 - Own-receiver mode (`/states/own`) — this project consumes network-wide data, not a personal
   ADS-B feeder.
+- Animated screen transitions (slide/fade between Flights/Flight/Radar) — instant redraw is
+  fine, don't spend time on transition animation.
+- Turn-aware flight path prediction — `cpa_predictor` is straight-line extrapolation only, on
+  purpose (see "Flight ETA"); don't try to model turns or holding patterns.
