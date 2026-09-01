@@ -86,7 +86,7 @@ static void test_build_enriched_records_found_false_when_lookup_missing(void) {
   TEST_ASSERT_EQUAL_size_t(1, rows.size());
   TEST_ASSERT_FALSE(rows[0].info.found);
   // drawTablePage()/featured_panel render this as "--" — see orDash()/
-  // formatFeaturedLine2().
+  // aircraft_summary::formatSummaryRoute().
   TEST_ASSERT_TRUE(rows[0].info.airline.empty());
   TEST_ASSERT_TRUE(rows[0].info.aircraft_type.empty());
 }
@@ -297,23 +297,28 @@ static void test_sort_empty_array_does_not_crash(void) {
   TEST_ASSERT_TRUE(rows.empty());
 }
 
-// ---- rowsPerPage / tableRowHeightPx ------------------------------------------
+// ---- fixed table geometry (CLAUDE.md "Screen 1") ----------------------------
 
-static void test_rows_per_page(void) {
-  TEST_ASSERT_EQUAL_INT(0, rowsPerPage(10));    // shorter than one row
-  TEST_ASSERT_EQUAL_INT(1, rowsPerPage(20));
-  TEST_ASSERT_EQUAL_INT(10, rowsPerPage(200));
-  TEST_ASSERT_EQUAL_INT(10, rowsPerPage(209));  // partial row doesn't count
+static void test_table_shows_exactly_five_rows_per_page(void) {
+  TEST_ASSERT_EQUAL_INT(5, kTableRowsPerPage);
+  TEST_ASSERT_EQUAL_INT(5, tableRowsPerPage());
 }
 
-static void test_table_row_height_px_matches_rows_per_page(void) {
-  // tableRowHeightPx() is meant to be the single source of truth behind
-  // rowsPerPage() (see review notes 5.5) — pin down that they actually
-  // agree, rather than just asserting a hardcoded number.
-  int16_t rowHeight = tableRowHeightPx();
-  TEST_ASSERT_TRUE(rowHeight > 0);
-  TEST_ASSERT_EQUAL_INT(3, rowsPerPage(rowHeight * 3));
-  TEST_ASSERT_EQUAL_INT(0, rowsPerPage(static_cast<int16_t>(rowHeight - 1)));
+static void test_table_row_step_is_18px_from_y140(void) {
+  // Rows at y = 140, 158, 176, 194, 212 — an 18px step from y:140.
+  TEST_ASSERT_EQUAL_INT(18, tableRowHeightPx());
+  TEST_ASSERT_EQUAL_INT(140, tableFirstRowY());
+  // The 5th row's top stays on the 320x240 frame.
+  int16_t lastRowY = static_cast<int16_t>(tableFirstRowY() + (kTableRowsPerPage - 1) * tableRowHeightPx());
+  TEST_ASSERT_EQUAL_INT(212, lastRowY);
+  TEST_ASSERT_TRUE(lastRowY + tableRowHeightPx() <= 240);
+}
+
+static void test_page_count_uses_fixed_five_row_pages(void) {
+  TEST_ASSERT_EQUAL_INT(0, getPageCount(0, tableRowsPerPage()));
+  TEST_ASSERT_EQUAL_INT(1, getPageCount(5, tableRowsPerPage()));
+  TEST_ASSERT_EQUAL_INT(2, getPageCount(6, tableRowsPerPage()));
+  TEST_ASSERT_EQUAL_INT(3, getPageCount(11, tableRowsPerPage()));
 }
 
 // ---- getPageCount -------------------------------------------------------------
@@ -407,8 +412,9 @@ int main(int argc, char **argv) {
   RUN_TEST(test_split_featured_and_rest_single_row);
   RUN_TEST(test_split_featured_and_rest_empty);
 
-  RUN_TEST(test_rows_per_page);
-  RUN_TEST(test_table_row_height_px_matches_rows_per_page);
+  RUN_TEST(test_table_shows_exactly_five_rows_per_page);
+  RUN_TEST(test_table_row_step_is_18px_from_y140);
+  RUN_TEST(test_page_count_uses_fixed_five_row_pages);
 
   RUN_TEST(test_page_count_zero_records);
   RUN_TEST(test_page_count_exact_multiple);

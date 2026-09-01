@@ -105,17 +105,18 @@ struct FeaturedSplit {
 // single-row input -> that row featured, rest empty. Pure.
 FeaturedSplit splitFeaturedAndRest(const std::vector<AircraftRow> &rows);
 
-// The fixed row height (pixels) this module draws the *table* portion at
-// — the actual single source of truth backing rowsPerPage() below.
-// Exposed so other modules (e.g. main.cpp's touch tap-zone sizing) can
-// stay in sync with it instead of hardcoding their own independent copy
-// of the same number — see CLAUDE.md review notes 5.5.
-int16_t tableRowHeightPx();
+// Screen 1's table shows **exactly 5** data rows at a fixed 18px step
+// (rows at y = 140, 158, 176, 194, 212), per CLAUDE.md "Screen 1" — no
+// height-derived row count any more. More than 5 aircraft in range are
+// paged through via touch (getPageSlice()), not scrolled.
+constexpr int kTableRowsPerPage = 5;
 
-// Rows that fit in a content area `contentHeight` pixels tall, at
-// tableRowHeightPx(). Used by drawTablePage() below and by the paging
-// logic that follows.
-int rowsPerPage(int16_t contentHeight);
+// Accessors so other modules (e.g. main.cpp's touch tap-zone sizing) stay
+// in sync with these instead of hardcoding their own copies — see
+// CLAUDE.md review notes 5.5.
+int tableRowsPerPage();   // kTableRowsPerPage (5)
+int16_t tableRowHeightPx();  // the 18px row step
+int16_t tableFirstRowY();    // 140 — y of the first data row
 
 // Number of pages needed to show `totalRows` records at `rowsPerPage` rows
 // per page (ceiling division) — 0 records or a non-positive rowsPerPage
@@ -138,23 +139,25 @@ std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int 
 
 #include "LGFX_CYD.hpp"
 
-// Draws Screen 1 into the content area [x, y, w, h]: featured_panel for
-// the single closest aircraft in `rows` (or its "no aircraft in range"
-// placeholder if `rows` is empty) at the top, then a paginated table of
-// everyone else below it — flight, airline, origin, destination, aircraft
-// type, phase icon — using lcars_theme for panels/fonts/colors, nothing of
-// its own. `rows` must already be annotated (annotateDistances()),
-// classified (classifyPhases()), and sorted (sortRowsByDistance()).
+// Draws Screen 1's content area (everything below the 25px status_bar
+// header) across a `screenWidth`-px display, at the fixed coordinates
+// CLAUDE.md "Screen 1" specifies:
+//   - featured_panel for the single closest aircraft in `rows` (or its
+//     "no aircraft in range" placeholder if `rows` is empty), y:28..105;
+//   - a cyan "FLIGHTS" sub-header bar, then an orange "|"-separated column
+//     header row at y:125;
+//   - exactly kTableRowsPerPage (5) data rows from y:140 at an 18px step
+//     — flight, airline, origin IATA, destination IATA, aircraft type,
+//     phase icon — for everyone *except* the featured aircraft.
+// `rows` must already be annotated (annotateDistances()), classified
+// (classifyPhases()), and sorted (sortRowsByDistance()).
 // `originAirport`/`destAirport` are the featured aircraft's route
-// endpoints' AirportInfo (looked up by main.cpp only for that one row —
-// see featured_panel.h); pass default-constructed AirportInfo{} if not
-// available. `page` is 0-based, over the *rest* of the list (the featured
-// row is never repeated in the table) — an out-of-range page just draws
-// no rows below the panel. Which page is current, and reacting to touch to
-// change it, is main.cpp's job (touch_input) — this only lays out
+// endpoints' AirportInfo (pass AirportInfo{} if not resolved). `page` is
+// 0-based over the *rest* of the list (the featured row is never repeated
+// in the table); an out-of-range page draws no data rows. Which page is
+// current, and reacting to touch, is main.cpp's job — this only lays out
 // whichever page it's told to draw.
 void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, const AirportInfo &originAirport,
-                    const AirportInfo &destAirport, int16_t x, int16_t y, int16_t w, int16_t h,
-                    int page);
+                    const AirportInfo &destAirport, int16_t screenWidth, int page);
 
 #endif  // ARDUINO

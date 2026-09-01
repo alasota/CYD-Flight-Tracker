@@ -9,7 +9,7 @@ static void test_default_config_has_sane_values(void) {
   Config cfg = defaultConfig();
   TEST_ASSERT_EQUAL_FLOAT(2.5f, cfg.radius_deg);
   TEST_ASSERT_EQUAL_UINT32(15, cfg.poll_interval_s);
-  TEST_ASSERT_TRUE(cfg.last_view == ViewMode::Table);
+  TEST_ASSERT_EQUAL_INT(0, cfg.last_screen);  // Flights
   TEST_ASSERT_TRUE(cfg.opensky_client_id.empty());
   TEST_ASSERT_TRUE(cfg.opensky_client_secret.empty());
   // Never-configured by default — see review notes 1.5: (0,0) is a real
@@ -72,10 +72,26 @@ static void test_sanitize_config_leaves_in_range_values_untouched(void) {
   TEST_ASSERT_EQUAL_UINT32(30, out.poll_interval_s);
 }
 
-static void test_view_mode_from_value_defaults_to_table(void) {
-  TEST_ASSERT_TRUE(viewModeFromValue(0) == ViewMode::Table);
-  TEST_ASSERT_TRUE(viewModeFromValue(1) == ViewMode::Radar);
-  TEST_ASSERT_TRUE(viewModeFromValue(255) == ViewMode::Table);
+static void test_clamp_last_screen_accepts_0_1_2(void) {
+  TEST_ASSERT_EQUAL_INT(0, clampLastScreen(0));
+  TEST_ASSERT_EQUAL_INT(1, clampLastScreen(1));
+  TEST_ASSERT_EQUAL_INT(2, clampLastScreen(2));
+}
+
+static void test_clamp_last_screen_falls_back_to_flights(void) {
+  TEST_ASSERT_EQUAL_INT(0, clampLastScreen(-1));
+  TEST_ASSERT_EQUAL_INT(0, clampLastScreen(3));
+  TEST_ASSERT_EQUAL_INT(0, clampLastScreen(255));
+}
+
+static void test_sanitize_config_clamps_last_screen(void) {
+  Config cfg;
+  cfg.last_screen = 9;
+  TEST_ASSERT_EQUAL_INT(0, sanitizeConfig(cfg).last_screen);
+
+  Config ok;
+  ok.last_screen = 2;
+  TEST_ASSERT_EQUAL_INT(2, sanitizeConfig(ok).last_screen);
 }
 
 int main(int argc, char **argv) {
@@ -86,6 +102,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_clamp_poll_interval_enforces_minimum);
   RUN_TEST(test_sanitize_config_clamps_all_fields);
   RUN_TEST(test_sanitize_config_leaves_in_range_values_untouched);
-  RUN_TEST(test_view_mode_from_value_defaults_to_table);
+  RUN_TEST(test_clamp_last_screen_accepts_0_1_2);
+  RUN_TEST(test_clamp_last_screen_falls_back_to_flights);
+  RUN_TEST(test_sanitize_config_clamps_last_screen);
   return UNITY_END();
 }

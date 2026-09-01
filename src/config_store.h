@@ -1,6 +1,6 @@
 // config_store — Preferences/NVS-backed persistence for all user-configurable
 // settings (home position, scan radius, poll interval, OpenSky OAuth
-// credentials, last-active view). See CLAUDE.md "Code conventions".
+// credentials, last-active screen). See CLAUDE.md "Code conventions".
 //
 // Split in two per CLAUDE.md "Testing": the struct + pure validation/default
 // helpers below have no hardware dependency and run under `pio test -e
@@ -11,17 +11,11 @@
 #include <cstdint>
 #include <string>
 
-// Which screen (see CLAUDE.md "Visualization concept") was last shown -
-// persisted so the display comes back up on the same view after a reboot.
-enum class ViewMode : uint8_t {
-  Table = 0,
-  Radar = 1,
-};
-
-// Coerces a raw stored byte back into a ViewMode, falling back to Table for
-// any value that isn't a known enumerator (e.g. NVS never written, or a
-// stale value left behind by a future format change).
-ViewMode viewModeFromValue(uint8_t raw);
+// Clamps a persisted screen index to a valid screen_nav index
+// (0 = Flights, 1 = Flight, 2 = Radar — see CLAUDE.md "Screen
+// navigation"). Any out-of-range value (NVS never written, or a stale
+// value left behind by a future format change) falls back to 0 (Flights).
+int clampLastScreen(int raw);
 
 struct Config {
   float home_lat = 0.0f;
@@ -32,7 +26,10 @@ struct Config {
   uint32_t poll_interval_s = 15;
   std::string opensky_client_id;
   std::string opensky_client_secret;
-  ViewMode last_view = ViewMode::Table;
+  // Which of the three screens was showing at last power-down (0/1/2),
+  // restored on boot — replaces the old two-screen `last_view` boolean now
+  // that there are three screens (see CLAUDE.md "Screen navigation").
+  int last_screen = 0;
   // True once the user has saved the settings form at least once via
   // config_portal. (0, 0) is a real place (Gulf of Guinea) — without this
   // flag there's no way to tell "user hasn't configured their home

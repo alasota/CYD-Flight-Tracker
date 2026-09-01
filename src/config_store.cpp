@@ -15,15 +15,9 @@ float clampLat(float lat) { return std::min(std::max(lat, kMinLatDeg), kMaxLatDe
 float clampLon(float lon) { return std::min(std::max(lon, kMinLonDeg), kMaxLonDeg); }
 }  // namespace
 
-ViewMode viewModeFromValue(uint8_t raw) {
-  switch (raw) {
-    case static_cast<uint8_t>(ViewMode::Table):
-      return ViewMode::Table;
-    case static_cast<uint8_t>(ViewMode::Radar):
-      return ViewMode::Radar;
-    default:
-      return ViewMode::Table;
-  }
+int clampLastScreen(int raw) {
+  if (raw < 0 || raw > 2) return 0;
+  return raw;
 }
 
 Config defaultConfig() { return Config{}; }
@@ -42,6 +36,7 @@ Config sanitizeConfig(const Config &cfg) {
   out.home_lon = clampLon(out.home_lon);
   out.radius_deg = clampRadiusDeg(out.radius_deg);
   out.poll_interval_s = clampPollIntervalS(out.poll_interval_s);
+  out.last_screen = clampLastScreen(out.last_screen);
   return out;
 }
 
@@ -64,8 +59,7 @@ Config loadConfig() {
   cfg.poll_interval_s = prefs.getUInt("poll_s", cfg.poll_interval_s);
   cfg.opensky_client_id = prefs.getString("os_id", "").c_str();
   cfg.opensky_client_secret = prefs.getString("os_secret", "").c_str();
-  cfg.last_view =
-      viewModeFromValue(prefs.getUChar("last_view", static_cast<uint8_t>(cfg.last_view)));
+  cfg.last_screen = clampLastScreen(prefs.getInt("last_screen", cfg.last_screen));
   cfg.home_configured = prefs.getBool("home_cfg", cfg.home_configured);
 
   prefs.end();
@@ -84,7 +78,7 @@ void saveConfig(const Config &cfg) {
   prefs.putUInt("poll_s", sanitized.poll_interval_s);
   prefs.putString("os_id", sanitized.opensky_client_id.c_str());
   prefs.putString("os_secret", sanitized.opensky_client_secret.c_str());
-  prefs.putUChar("last_view", static_cast<uint8_t>(sanitized.last_view));
+  prefs.putInt("last_screen", sanitized.last_screen);
   prefs.putBool("home_cfg", sanitized.home_configured);
 
   prefs.end();

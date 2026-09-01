@@ -112,9 +112,16 @@ FeaturedSplit splitFeaturedAndRest(const std::vector<AircraftRow> &rows) {
 }
 
 namespace {
-constexpr int16_t kRowHeight = 20;
+// Fixed layout from CLAUDE.md "Screen 1" — absolute y on the 320x240
+// frame, below the 25px status_bar header.
+constexpr int16_t kSubHeaderY = 108;   // cyan "FLIGHTS" bar
+constexpr int16_t kSubHeaderH = 15;
+constexpr int16_t kColHeaderY = 125;   // orange "|"-separated column labels
+constexpr int16_t kColHeaderH = 14;
+constexpr int16_t kFirstRowY = 140;
+constexpr int16_t kRowStep = 18;
 
-// Column x-offsets, as fractions of the content width, for drawTablePage()
+// Column x-offsets, as fractions of the content width, for drawTableRows()
 // below — named rather than left as bare literals inline (review notes
 // 5.4). Columns: flight, airline, origin, destination, aircraft type,
 // phase icon (see CLAUDE.md "Screen 1" — altitude/speed/distance moved to
@@ -127,12 +134,9 @@ constexpr float kColTypeFrac = 0.74f;
 constexpr float kColPhaseFrac = 0.94f;
 }  // namespace
 
-int16_t tableRowHeightPx() { return kRowHeight; }
-
-int rowsPerPage(int16_t contentHeight) {
-  if (contentHeight < kRowHeight) return 0;
-  return contentHeight / kRowHeight;
-}
+int tableRowsPerPage() { return kTableRowsPerPage; }
+int16_t tableRowHeightPx() { return kRowStep; }
+int16_t tableFirstRowY() { return kFirstRowY; }
 
 int getPageCount(int totalRows, int rowsPerPage) {
   if (totalRows <= 0 || rowsPerPage <= 0) return 0;
@@ -155,31 +159,32 @@ std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int 
 
 #ifdef ARDUINO
 
-#include <cstdio>
-
 namespace {
 
 std::string orDash(const std::string &s) { return s.empty() ? std::string("--") : s; }
 
-void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t x, int16_t y,
-                    int16_t w) {
+void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t screenWidth) {
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_left);
-  gfx.setTextColor(LCARS_PALE_BLUE, LCARS_BLACK);
+  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
 
-  int16_t colFlight = x + static_cast<int16_t>(w * kColFlightFrac);
-  int16_t colAirline = x + static_cast<int16_t>(w * kColAirlineFrac);
-  int16_t colOrigin = x + static_cast<int16_t>(w * kColOriginFrac);
-  int16_t colDest = x + static_cast<int16_t>(w * kColDestFrac);
-  int16_t colType = x + static_cast<int16_t>(w * kColTypeFrac);
-  int16_t colPhase = x + static_cast<int16_t>(w * kColPhaseFrac);
+  int16_t w = screenWidth;
+  int16_t colFlight = static_cast<int16_t>(w * kColFlightFrac);
+  int16_t colAirline = static_cast<int16_t>(w * kColAirlineFrac);
+  int16_t colOrigin = static_cast<int16_t>(w * kColOriginFrac);
+  int16_t colDest = static_cast<int16_t>(w * kColDestFrac);
+  int16_t colType = static_cast<int16_t>(w * kColTypeFrac);
+  int16_t colPhase = static_cast<int16_t>(w * kColPhaseFrac);
 
-  for (size_t i = 0; i < pageRows.size(); ++i) {
-    const AircraftRow &row = pageRows[i];
-    int16_t rowY = y + static_cast<int16_t>(i) * kRowHeight;
-    int16_t textY = rowY + kRowHeight / 2;
+  // Exactly kTableRowsPerPage slots; clear all of them so a short page
+  // doesn't leave stale rows from a previous draw.
+  for (int i = 0; i < kTableRowsPerPage; ++i) {
+    int16_t rowY = static_cast<int16_t>(kFirstRowY + i * kRowStep);
+    gfx.fillRect(0, rowY, w, kRowStep, LCARS_BLACK);
 
-    gfx.fillRect(x, rowY, w, kRowHeight, LCARS_BLACK);
+    if (i >= static_cast<int>(pageRows.size())) continue;
+    const AircraftRow &row = pageRows[static_cast<size_t>(i)];
+    int16_t textY = static_cast<int16_t>(rowY + kRowStep / 2);
 
     gfx.drawString(orDash(row.aircraft.callsign).c_str(), colFlight + 2, textY);
     gfx.drawString(orDash(row.info.airline).c_str(), colAirline + 2, textY);
@@ -195,27 +200,35 @@ void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t 
 }  // namespace
 
 void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, const AirportInfo &originAirport,
-                    const AirportInfo &destAirport, int16_t x, int16_t y, int16_t w, int16_t h,
-                    int page) {
+                    const AirportInfo &destAirport, int16_t screenWidth, int page) {
   FeaturedSplit split = splitFeaturedAndRest(rows);
 
-  int16_t panelH = featuredPanelHeightPx();
   if (split.hasFeatured) {
-    drawFeaturedPanel(gfx, split.featured, originAirport, destAirport, x, y, w, panelH);
+    drawFeaturedPanel(gfx, split.featured, originAirport, destAirport, screenWidth);
   } else {
-    drawFeaturedPanelEmpty(gfx, x, y, w, panelH);
+    drawFeaturedPanelEmpty(gfx, screenWidth);
   }
 
-  int16_t tableY = static_cast<int16_t>(y + panelH);
-  int16_t tableH = static_cast<int16_t>(h - panelH);
+  // Cyan "FLIGHTS" sub-header bar (black text) — CLAUDE.md notes the
+  // repeated label is intentional LCARS style, not a bug.
+  gfx.fillRect(0, kSubHeaderY, screenWidth, kSubHeaderH, LCARS_CYAN);
+  gfx.setFont(LCARS_FONT_BODY);
+  gfx.setTextDatum(middle_left);
+  gfx.setTextColor(LCARS_BLACK, LCARS_CYAN);
+  gfx.drawString("FLIGHTS", 4, static_cast<int16_t>(kSubHeaderY + kSubHeaderH / 2));
 
-  int perPage = rowsPerPage(tableH);
-  if (perPage <= 0) return;
+  // Orange column-header row at y:125 — one "|"-separated string, black
+  // text (ASCII only: bitmap fonts don't carry the Polish diacritics, per
+  // CLAUDE.md table_view note — so "SKAD"/"DOKAD", not "SKĄD"/"DOKĄD").
+  gfx.fillRect(0, kColHeaderY, screenWidth, kColHeaderH, LCARS_ORANGE);
+  gfx.setTextColor(LCARS_BLACK, LCARS_ORANGE);
+  gfx.drawString("LOT | LINIA | SKAD | DOKAD | TYP | FAZA", 4,
+                 static_cast<int16_t>(kColHeaderY + kColHeaderH / 2));
 
-  std::vector<AircraftRow> pageRows = getPageSlice(split.rest, page, perPage);
-  if (pageRows.empty()) return;
-
-  drawTableRows(gfx, pageRows, x, tableY, w);
+  // Exactly 5 data rows from y:140, over the list *without* the featured
+  // aircraft; paging swaps which 5 (not scrolling).
+  std::vector<AircraftRow> pageRows = getPageSlice(split.rest, page, kTableRowsPerPage);
+  drawTableRows(gfx, pageRows, screenWidth);
 }
 
 #endif  // ARDUINO

@@ -3,92 +3,81 @@
 #include "table_view.h"  // full AircraftRow definition
 
 namespace {
-constexpr int16_t kPanelHeight = 74;
+constexpr int16_t kPanelTop = 28;
+constexpr int16_t kPanelHeight = 77;  // y:28..105 per CLAUDE.md "Screen 1"
 }  // namespace
 
+int16_t featuredPanelTopPx() { return kPanelTop; }
 int16_t featuredPanelHeightPx() { return kPanelHeight; }
-
-std::string formatFeaturedLine1(const AircraftRow &row) {
-  std::string flight = row.aircraft.callsign.empty() ? "--" : row.aircraft.callsign;
-  std::string airline = row.info.found ? row.info.airline : "--";
-  std::string type = row.info.found ? row.info.aircraft_type : "--";
-
-  std::string line = flight + "  " + airline + "  " + type + "  ";
-  line += phaseIcon(row.phase);
-  return line;
-}
-
-std::string formatFeaturedLine2(const RouteInfo &route, const AirportInfo &originAirport,
-                                 const AirportInfo &destAirport) {
-  if (!route.found) {
-    return "--";
-  }
-
-  std::string originLabel = (originAirport.found && !originAirport.iata_code.empty())
-                                 ? originAirport.iata_code + " (" + originAirport.country_code + ")"
-                                 : route.origin_icao;
-  std::string destLabel = (destAirport.found && !destAirport.iata_code.empty())
-                               ? destAirport.iata_code + " (" + destAirport.country_code + ")"
-                               : route.dest_icao;
-
-  return originLabel + " -> " + destLabel;
-}
 
 #ifdef ARDUINO
 
 #include <cstdio>
 
 namespace {
-constexpr int16_t kLineHeight = 20;
+constexpr int16_t kSideMargin = 4;     // frame inset from the screen edges
+constexpr int16_t kFrameCorner = 14;   // swept top-left corner radius
+constexpr int16_t kFrameThickness = 3;
+constexpr int16_t kIdentityY = 34;     // identity line, clears the swept corner
+constexpr int16_t kRouteY = 56;        // "WAW (PL) -> FCO (IT)" line
+constexpr int16_t kPillY = 78;         // altitude / speed / distance chips
 constexpr int16_t kPillHeight = 22;
 constexpr int16_t kPillGap = 4;
-constexpr int16_t kTextMargin = 6;
 }  // namespace
 
 void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, const AirportInfo &originAirport,
-                        const AirportInfo &destAirport, int16_t x, int16_t y, int16_t w,
-                        int16_t h) {
-  drawPanel(gfx, x, y, w, h, LCARS_AMBER);
+                       const AirportInfo &destAirport, int16_t screenWidth) {
+  int16_t w = static_cast<int16_t>(screenWidth - 2 * kSideMargin);
+
+  drawElbowFrame(gfx, kSideMargin, kPanelTop, w, kPanelHeight, kFrameCorner, kFrameThickness,
+                 LCARS_MAGENTA);
 
   gfx.setFont(LCARS_FONT_BODY);
+  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+
+  // Identity line — indented past the swept corner.
   gfx.setTextDatum(top_left);
-  gfx.setTextColor(LCARS_BLACK, LCARS_AMBER);
+  gfx.drawString(formatSummaryIdentity(row).c_str(),
+                 static_cast<int16_t>(kSideMargin + kFrameCorner + 4), kIdentityY);
 
-  std::string line1 = formatFeaturedLine1(row);
-  gfx.drawString(line1.c_str(), x + kTextMargin, y + kTextMargin);
+  // Route line, with country codes (Screen 1 detail level).
+  gfx.drawString(
+      formatSummaryRoute(row.route, originAirport, destAirport, RouteFormat::WithCountry).c_str(),
+      static_cast<int16_t>(kSideMargin + kFrameThickness + 4), kRouteY);
 
-  std::string line2 = formatFeaturedLine2(row.route, originAirport, destAirport);
-  gfx.drawString(line2.c_str(), x + kTextMargin, y + kTextMargin + kLineHeight);
-
-  // Altitude / speed / distance pills along the bottom of the panel.
-  int16_t pillY = static_cast<int16_t>(y + h - kPillHeight - kPillGap);
-  int16_t pillW = static_cast<int16_t>((w - 4 * kPillGap) / 3);
+  // Altitude / speed / distance pills along the bottom of the frame.
+  int16_t pillAreaX = static_cast<int16_t>(kSideMargin + kFrameThickness + 2);
+  int16_t pillAreaW = static_cast<int16_t>(w - 2 * (kFrameThickness + 2));
+  int16_t pillW = static_cast<int16_t>((pillAreaW - 2 * kPillGap) / 3);
 
   char buf[16];
 
   std::snprintf(buf, sizeof(buf), "%.0fm",
                 row.aircraft.has_position ? static_cast<double>(row.aircraft.baro_altitude) : 0.0);
-  drawPillButton(gfx, static_cast<int16_t>(x + kPillGap), pillY, pillW, kPillHeight,
-                 LCARS_BLUE_VIOLET, LCARS_BLACK, buf);
+  drawPillButton(gfx, pillAreaX, kPillY, pillW, kPillHeight, LCARS_BLUE_VIOLET, LCARS_BLACK, buf);
 
   std::snprintf(buf, sizeof(buf), "%.0fm/s",
                 row.aircraft.has_position ? static_cast<double>(row.aircraft.velocity) : 0.0);
-  drawPillButton(gfx, static_cast<int16_t>(x + 2 * kPillGap + pillW), pillY, pillW, kPillHeight,
+  drawPillButton(gfx, static_cast<int16_t>(pillAreaX + pillW + kPillGap), kPillY, pillW, kPillHeight,
                  LCARS_BLUE_VIOLET, LCARS_BLACK, buf);
 
   std::snprintf(buf, sizeof(buf), "%.0fkm",
                 row.has_distance ? static_cast<double>(row.distance_km) : 0.0);
-  drawPillButton(gfx, static_cast<int16_t>(x + 3 * kPillGap + 2 * pillW), pillY, pillW, kPillHeight,
-                 LCARS_BLUE_VIOLET, LCARS_BLACK, buf);
+  drawPillButton(gfx, static_cast<int16_t>(pillAreaX + 2 * (pillW + kPillGap)), kPillY, pillW,
+                 kPillHeight, LCARS_BLUE_VIOLET, LCARS_BLACK, buf);
 }
 
-void drawFeaturedPanelEmpty(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h) {
-  drawPanel(gfx, x, y, w, h, LCARS_BLACK);
+void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth) {
+  int16_t w = static_cast<int16_t>(screenWidth - 2 * kSideMargin);
+
+  drawElbowFrame(gfx, kSideMargin, kPanelTop, w, kPanelHeight, kFrameCorner, kFrameThickness,
+                 LCARS_MAGENTA);
 
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_center);
-  gfx.setTextColor(LCARS_PALE_BLUE, LCARS_BLACK);
-  gfx.drawString("No aircraft in range", x + w / 2, y + h / 2);
+  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+  gfx.drawString("No aircraft in range", static_cast<int16_t>(screenWidth / 2),
+                 static_cast<int16_t>(kPanelTop + kPanelHeight / 2));
 }
 
 #endif  // ARDUINO

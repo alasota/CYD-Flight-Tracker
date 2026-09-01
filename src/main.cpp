@@ -9,11 +9,11 @@
 // the background.
 //
 // loop(): non-blocking, millis()-based.
-//   - Touch: a tap on the view-toggle button (lcars_theme) switches
-//     between table_view and radar_view and persists the choice to
-//     config_store (last_view); a tap in the top/bottom strip pages the
-//     table backward/forward (table_view only — radar_view has no
-//     pagination, it's a static plot of everything at once).
+//   - Touch: a tap on a screen_nav edge strip switches screen and
+//     persists the choice to config_store (last_screen, 0/1/2); a tap in
+//     the middle strip pages the table backward/forward (table screen
+//     only — radar_view has no pagination, it's a static plot of
+//     everything at once). Bottom nav bar + per-screen renderers: step 4.
 //   - Once per config_store's poll_interval_s (via opensky_client's own
 //     scheduler): fetch Aircraft[] from OpenSky (opensky_client); if the
 //     user hasn't set a home location yet (config_store's
@@ -49,18 +49,21 @@
 #include "radar_view.h"
 #include "route_lookup.h"
 #include "screen_nav.h"
-#include "status_bar.h"  // TEMP: remove in step 4 (preview harness only)
+#include "status_bar.h"
 #include "table_view.h"
+#include "time_sync.h"
 #include "touch_input.h"
 #include "wifi_manager.h"
 
 static LGFX tft;
 
-// Which screen is currently shown. Restored from config_store at boot and
-// persisted back to it every time the view-toggle button is tapped — see
-// CLAUDE.md's config_store contract ("including which view was last
-// active").
-static ViewMode currentView = ViewMode::Table;
+// Which of the three screens (0 Flights / 1 Flight / 2 Radar — see
+// screen_nav) is currently shown. Restored from config_store's last_screen
+// at boot, persisted back whenever it changes. NOTE: the full Screen 1/2/3
+// navigation (bottom nav bar, per-screen renderers) is step 4 — for now
+// this drives table_view (screens 0/1) vs radar_view (screen 2), switched
+// by screen_nav's edge strips.
+static int currentScreen = kScreenFlights;
 
 // Data + paging state for the currently-drawn screen. Persists across
 // loop() iterations so a touch-driven page/view change can redraw
@@ -103,14 +106,18 @@ static void redrawScreen() {
   int16_t screenH = static_cast<int16_t>(tft.height());
 
   tft.fillScreen(LCARS_BLACK);
-  if (currentView == ViewMode::Table) {
-    drawTablePage(tft, lastRows, lastOriginAirport, lastDestAirport, 0, 0, screenW, screenH,
-                  currentPage);
+
+  // Shared header chrome first, then the active screen's content below it.
+  drawStatusBar(tft, currentScreen, /*localEpoch=*/timeSyncNowLocal(), isTimeSynced(), screenW);
+
+  if (currentScreen == kScreenRadar) {
+    drawRadarView(tft, lastRows, lastRadiusDeg, 0, LCARS_HEADER_HEIGHT, screenW,
+                  static_cast<int16_t>(screenH - LCARS_HEADER_HEIGHT));
   } else {
-    drawRadarView(tft, lastRows, lastRadiusDeg, 0, 0, screenW, screenH);
+    // Screens 0 (Flights) and 1 (Flight) both fall back to the table until
+    // flight_screen exists (step 4).
+    drawTablePage(tft, lastRows, lastOriginAirport, lastDestAirport, screenW, currentPage);
   }
-  // Persistent chrome across both screens, per CLAUDE.md "Design language".
-  drawViewToggleButton(tft, screenW, screenH);
 }
 
 // Shown instead of either screen when config_store's home_configured is
@@ -133,47 +140,60 @@ static void showSetupPrompt() {
   setupPromptShown = true;
 }
 
-// Dispatches one touch tap: the view-toggle button, or (table_view only) a
-// page-back/page-forward tap zone. Called once per press (edge-detected in
-// loop(), not once per loop() iteration the finger stays down).
+static void goToScreen(int screen) {
+  int next = clampLastScreen(screen);
+  if (next == currentScreen) return;
+  currentScreen = next;
+  currentPage = 0;
+
+  Config cfg = loadConfig();
+  cfg.last_screen = currentScreen;
+  saveConfig(cfg);
+
+  screenNeedsRedraw = true;
+}
+
+// Dispatches one touch tap: a screen_nav edge strip (prev/next screen), or
+// — on the table screen, in the middle — a page-back/page-forward tap
+// zone. Called once per press (edge-detected in loop(), not once per
+// loop() iteration the finger stays down). The bottom nav bar and its
+// segments are step 4.
 static void handleTap(int16_t x, int16_t y) {
   int16_t screenW = static_cast<int16_t>(tft.width());
   int16_t screenH = static_cast<int16_t>(tft.height());
 
-  Rect toggleBounds = viewToggleButtonBounds(screenW, screenH);
-  if (hitTest(x, y, toggleBounds)) {
-    currentView = (currentView == ViewMode::Table) ? ViewMode::Radar : ViewMode::Table;
-
-    Config cfg = loadConfig();
-    cfg.last_view = currentView;
-    saveConfig(cfg);
-
-    screenNeedsRedraw = true;
-    return;
+  NavHit nav = navHitTest(x, y, screenW, screenH, LCARS_HEADER_HEIGHT);
+  switch (nav.action) {
+    case NavAction::Prev:
+      goToScreen(prevScreen(currentScreen));
+      return;
+    case NavAction::Next:
+      goToScreen(nextScreen(currentScreen));
+      return;
+    case NavAction::JumpTo:
+      goToScreen(nav.target);
+      return;
+    case NavAction::None:
+      break;
   }
 
-  if (currentView != ViewMode::Table) {
-    return;  // radar_view is a static plot of everything at once — no pagination to tap
+  if (currentScreen == kScreenRadar) {
+    return;  // radar_view is a static plot of everything at once — no pagination
   }
 
-  // Pagination applies to the table *below* the featured panel — the
-  // featured row itself is never part of it (see splitFeaturedAndRest()).
-  int16_t panelH = featuredPanelHeightPx();
-  int16_t tableH = static_cast<int16_t>(screenH - panelH);
-  int perPage = rowsPerPage(tableH);
-
+  // Pagination over the table rows (everyone except the featured aircraft).
   FeaturedSplit split = splitFeaturedAndRest(lastRows);
-  int pageCount = getPageCount(static_cast<int>(split.rest.size()), perPage);
+  int pageCount = getPageCount(static_cast<int>(split.rest.size()), tableRowsPerPage());
 
   Rect prevZone;
   prevZone.x = 0;
-  prevZone.y = panelH;  // top of the table area, just below the panel
+  prevZone.y = tableFirstRowY();  // top of the data-row area
   prevZone.w = screenW;
   prevZone.h = kPageTapZoneHeight;
 
   Rect nextZone;
   nextZone.x = 0;
-  nextZone.y = static_cast<int16_t>(screenH - kPageTapZoneHeight);
+  nextZone.y = static_cast<int16_t>(screenH - kBottomNavHeight - kPageTapZoneHeight);
   nextZone.w = screenW;
   nextZone.h = kPageTapZoneHeight;
 
@@ -237,10 +257,12 @@ void setup() {
   touchInputBegin();
 
   Config cfg = loadConfig();
-  currentView = cfg.last_view;  // restore whichever screen was active last boot
+  currentScreen = clampLastScreen(cfg.last_screen);  // restore last-active screen
   lastRadiusDeg = cfg.radius_deg;
 
   wifiManagerBegin();  // tries the saved network; falls back to its own captive portal
+
+  timeSyncBegin();  // NTP (Europe/Warsaw), after WiFi; header shows --:-- until it lands
 
   // Starts mDNS + the config WebServer right away, non-blocking. In the
   // common case (a saved network that's reachable) wifiManagerBegin()
@@ -322,9 +344,7 @@ void loop() {
         }
 
         FeaturedSplit split = splitFeaturedAndRest(lastRows);
-        int16_t tableH = static_cast<int16_t>(tft.height() - featuredPanelHeightPx());
-        int perPage = rowsPerPage(tableH);
-        int pageCount = getPageCount(static_cast<int>(split.rest.size()), perPage);
+        int pageCount = getPageCount(static_cast<int>(split.rest.size()), tableRowsPerPage());
         if (currentPage >= pageCount) {
           currentPage = pageCount > 0 ? pageCount - 1 : 0;
         }
