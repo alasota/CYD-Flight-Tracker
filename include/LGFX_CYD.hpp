@@ -6,6 +6,17 @@
 //
 // Touch (XPT2046) is intentionally NOT wired up here — it stays on the
 // separate XPT2046_Touchscreen library on its own SPI bus, per CLAUDE.md.
+//
+// The display bus below is deliberately pinned to HSPI_HOST, not VSPI_HOST
+// — XPT2046_Touchscreen::begin() (see touch_input.cpp) hardcodes use of
+// the Arduino core's global `SPI` object, which is itself hardcoded to
+// VSPI on classic ESP32 (see SPI.cpp: `SPIClass SPI(VSPI);`). Putting the
+// display on VSPI too would silently fight the touch controller for the
+// same physical SPI peripheral (different pins, same hardware unit) —
+// symptom: touch input flaky or dead, e.g. the view-toggle button not
+// responding. Both peripherals are free to use arbitrary GPIOs via the
+// ESP32's GPIO matrix regardless of which SPI unit they're bound to, so
+// this doesn't require changing any pin numbers below.
 #pragma once
 
 #define LGFX_USE_V1
@@ -20,7 +31,7 @@ class LGFX : public lgfx::LGFX_Device {
   LGFX(void) {
     {  // Display SPI bus
       auto cfg = _bus_instance.config();
-      cfg.spi_host = VSPI_HOST;
+      cfg.spi_host = HSPI_HOST;  // VSPI is claimed by touch's global SPI object — see note above
       cfg.spi_mode = 0;
       cfg.freq_write = 40000000;
       cfg.freq_read = 16000000;

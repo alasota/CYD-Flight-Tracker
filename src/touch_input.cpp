@@ -45,9 +45,15 @@ int16_t mapRange(int32_t v, int32_t inMin, int32_t inMax, int32_t outMin, int32_
 
 void touchInputBegin() {
   // XPT2046_Touchscreen::begin() calls the global SPI.begin() internally
-  // with no arguments (default hardware pins). Pre-configuring the bus
-  // here with the touch controller's actual pins first makes that
-  // internal call a no-op on the pins we actually want.
+  // with no arguments (default hardware pins) — it hardcodes the Arduino
+  // core's global `SPI` object (bound to VSPI on classic ESP32), there's
+  // no way to hand it a different SPIClass instance. Pre-configuring that
+  // global bus here with the touch controller's actual pins first makes
+  // the internal no-arg call a no-op on the pins we actually want. This
+  // is also *why* LGFX_CYD.hpp deliberately puts the display on HSPI
+  // instead of VSPI — otherwise the two peripherals would fight over the
+  // same physical SPI unit with different pins, and touch would be flaky
+  // or dead (see that header's comment).
   SPI.begin(kTouchClkPin, kTouchMisoPin, kTouchMosiPin, -1);
   touch.begin();
   touch.setRotation(1);  // match tft.setRotation(1) in main.cpp
