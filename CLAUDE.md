@@ -108,9 +108,12 @@ which is an airline name or aircraft type on its own. Enrichment is required.
   ```
   Use `RegisteredOwners` as the airline name and `Type` (or `ICAOTypeCode` if you want the short
   form) as the aircraft model.
-- **Not found**: returns a 404-style body (`{"status":"404","error":"Aircraft not found."}`) for
-  aircraft outside its database (military, private, very new registrations). Handle this as
-  "show callsign only, airline/type = unknown" — never crash or block the row on a miss.
+- **Not found**: returns a genuine **HTTP 404** status (verified against the live API — not a
+  200 with an error-shaped body, despite how that might read at a glance) for aircraft outside
+  its database (military, private, very new registrations). Handle this as "show callsign only,
+  airline/type = unknown" — never crash or block the row on a miss. Treat both a 200 and a 404
+  as a *confirmed* answer worth caching (see below) — only a real transport failure (timeout,
+  WiFi drop, 5xx) should be left uncached so a later poll can retry.
 - **This is a small hobby-run free service, not an SLA** — be a good citizen and don't hammer it:
   - **Cache every successful lookup by `icao24` in RAM (and ideally NVS)** — an aircraft's
     airline/type essentially never changes, so a given `icao24` should only ever be looked up
@@ -120,9 +123,60 @@ which is an airline name or aircraft type on its own. Enrichment is required.
     with caching, so there's no excuse to skip the cache "because the limit is generous."
   - If a lookup is slow/unavailable, show the row with whatever's cached (or just the callsign)
     rather than blocking the whole table refresh on one flaky HTTP call.
-- **Nice-to-have, not MVP**: hexdb.io also exposes a route lookup
-  (`https://hexdb.io/api/v1/route/icao/{callsign}` → origin/destination airports). Interesting
-  for later, not required to settle "what plane is that."
+## Route & airport lookup (nice-to-have, not MVP)
+
+Not required to settle "what plane is that", but interesting enrichment once the table works —
+lives in its own `route_lookup` module, same caching discipline as `aircraft_lookup`:
+
+- **Route (origin/destination) by callsign**:
+  ```
+  GET https://hexdb.io/api/v1/route/icao/{callsign}
+  ```
+  Returns e.g. `{"flight":"EIN17A","route":"EIDW-EGLL","updatetime":1397991739}` — split
+  `route` on its `-` into origin/destination, both **ICAO** (4-letter) airport codes. Use the
+  `/icao/` variant, not `/iata/` — OpenSky's `callsign` field is ICAO-style (e.g. `DLH9LH`), and
+  the `/iata/` route endpoint expects an IATA-style callsign this project never has.
+- **Airport country (+ IATA code) by ICAO code**:
+  ```
+  GET https://hexdb.io/api/v1/airport/icao/{code}
+  ```
+  Returns e.g. `{"country_code":"GB","region_name":"England","iata":"LHR","icao":"EGLL",
+  "airport":"Heathrow Airport","latitude":51.4775,"longitude":-0.461389}` — use
+  `country_code` and `iata`. Use the `/icao/` variant, not `/iata/` — this keys directly off
+  the route lookup's `origin_icao`/`dest_icao` above with no code-system conversion (this
+  project has none). The response conveniently carries both codes, so `iata` is still available
+  for display (e.g. featured_panel's "WAW (PL)").
+- **Not found**: same as `aircraft_lookup` — a genuine HTTP 404 (verified against the live API)
+  for both endpoints, not a 200-with-error-body. Treat 200 and 404 as confirmed, cacheable
+  answers; only a real transport failure should go uncached.
+- **Cache by key** (callsign for route, airport code for airport) in RAM, same reasoning as
+  `aircraft_lookup` — a route/airport doesn't change mid-flight, no reason to re-fetch.
+
+## Flight phase (derived, optional enrichment)
+
+A pure classifier — `flight_phase` module — that labels an aircraft's current phase from
+simple instantaneous signals, no history/trajectory tracking (that stays out of scope, see "Out
+of scope for MVP" below):
+
+```
+classifyPhase(distance_km, vertical_rate_mps, on_ground, near_airport_km, climb_threshold_mps)
+  -> Phase { NONE, TAKEOFF, LANDING, OVERFLIGHT }
+```
+
+- `on_ground` always wins → `NONE`, regardless of the other inputs.
+- Otherwise: near an airport (`distance_km <= near_airport_km`, inclusive) and climbing fast
+  enough (`vertical_rate_mps >= climb_threshold_mps`, inclusive) → `TAKEOFF`; near an airport
+  and descending fast enough (`vertical_rate_mps <= -climb_threshold_mps`) → `LANDING`;
+  anything else while airborne → `OVERFLIGHT`.
+- Zero I/O, zero Arduino/LovyanGFX dependency — pure logic only, per "Testing" below.
+- **Wired into the live pipeline**: `opensky_client`'s `Aircraft` struct carries `on_ground`
+  (state vector index 8) and `vertical_rate` (index 11); `table_view::classifyPhases()` calls
+  `classifyPhase()` per row after `annotateDistances()` has run. `near_airport_km` is passed
+  each row's `distance_km` — i.e. distance from **home**, not literally the nearest airport
+  (this project has no airport coordinate database, only country codes from the airport lookup
+  above) — a reasonable stand-in since a home tracker's main interest is activity near the
+  user's own location anyway. `main.cpp` supplies the threshold constants
+  (`kNearAirportKm`/`kClimbThresholdMps`).
 
 ## Visualization concept — data table (primary) + radar (secondary)
 
@@ -132,19 +186,35 @@ console, not jumping between two different apps.
 
 ### Screen 1 — Aircraft table (default view, prioritize this first)
 
-- Scrollable/paged list, one row per aircraft, columns: **airline, flight (callsign), aircraft
-  type, altitude, speed, distance from home**. This is the whole point of the project — get
-  these columns right before worrying about anything else. Truncate/abbreviate rather than
-  shrinking the font past readability on a 320x240 screen.
-- Airline and aircraft type come from `aircraft_lookup` (see "Aircraft identification" above);
-  if a lookup hasn't resolved yet or the aircraft isn't in the database, show the row anyway
-  with airline/type as "—" rather than hiding it or blocking the table.
-- Sort by distance ascending (closest aircraft on top) — recompute sort on every poll.
-- Row count per page depends on the row height chosen for legibility; page/scroll via touch if
-  more aircraft are in range than fit on screen. Don't cram to fit everything at the cost of
-  readability — paging is fine.
-- Highlight the closest row (e.g. brighter accent color / bolder) since it's the one most likely
-  visible outside.
+Composed of two pieces, both drawn by `table_view` — a `featured_panel` spotlighting the single
+closest aircraft, and a paginated table of everyone else below it. Sort by distance ascending
+(closest aircraft first) — recompute on every poll; the closest one is always what
+`featured_panel` shows, never repeated in the table.
+
+- **Featured panel** (top of screen, fixed height): the closest aircraft, since it's the one
+  most likely visible outside — this replaces the older "highlight the closest row" treatment
+  with a dedicated, larger spotlight.
+  - Line 1: flight (callsign), airline, aircraft type, and a one-character flight-phase icon
+    (`lcars_theme::phaseIcon()` — see "Flight phase").
+  - Line 2: origin → destination, e.g. `WAW (PL) -> FCO (IT)` — IATA code + country for each end
+    when the route (`route_lookup`) *and* both airports (route→airport chain, see "Route &
+    airport lookup") have resolved; falls back to the bare ICAO code for an end whose airport
+    hasn't resolved yet, and to a plain "—" for the whole line if the route itself hasn't.
+  - Altitude / speed / distance as `lcars_theme` pills along the bottom.
+  - **No aircraft in range**: its own placeholder view ("No aircraft in range"), not a blank
+    panel or a crash.
+- **Table** (below the panel): one row per *remaining* aircraft (closest excluded — it's already
+  in the panel), columns: **flight (callsign), airline, origin, destination, aircraft type,
+  phase icon**. Altitude/speed/distance moved to the featured panel, not repeated here.
+  Truncate/abbreviate rather than shrinking the font past readability on a 320x240 screen.
+- Airline/aircraft type come from `aircraft_lookup`, origin/destination from `route_lookup` (see
+  "Aircraft identification"/"Route & airport lookup" above); a lookup that hasn't resolved yet,
+  or a miss, shows the row anyway with that field as "—" rather than hiding it or blocking the
+  table/panel.
+- Row count per page (in the table) depends on the row height chosen for legibility, minus the
+  space the featured panel takes at the top; page/scroll via touch if more remaining aircraft
+  are in range than fit. Don't cram to fit everything at the cost of readability — paging is
+  fine.
 - This is the priority screen — get it solid before spending time on the radar screen.
 
 ### Screen 2 — Radar (optional, secondary, build after the table works)
@@ -192,10 +262,23 @@ each with a single responsibility:
   in-memory (ideally NVS-backed) cache so a given `icao24` is only ever looked up once. No TFT
   code, no OpenSky polling logic — purely a lookup + cache layer sitting between
   `opensky_client`'s output and the view modules.
-- `lcars_theme` — shared color palette, panel/elbow/pill drawing helpers, fonts. Both view
-  modules call into this rather than defining their own colors/shapes.
-- `table_view` — draws Screen 1 (aircraft table). Takes the aircraft array + home position as
-  input, uses `lcars_theme` for chrome. No networking code.
+- `route_lookup` — callsign → origin/destination airport, and airport code → country, via
+  hexdb.io (see "Route & airport lookup" above). Same caching discipline as `aircraft_lookup`,
+  same "no TFT, no OpenSky polling logic" boundary.
+- `flight_phase` — pure `classifyPhase()` classifier (see "Flight phase" above). Zero I/O, zero
+  Arduino/LovyanGFX dependency.
+- `lcars_theme` — shared color palette, panel/elbow/pill drawing helpers, fonts, and
+  `phaseIcon()` (the one place a `Phase` gets turned into a glyph, so `featured_panel` and
+  `table_view` can't disagree). Both view modules call into this rather than defining their own
+  colors/shapes.
+- `featured_panel` — draws Screen 1's top spotlight panel for the single closest aircraft (see
+  "Screen 1" above). Takes an already-enriched `table_view::AircraftRow` plus the two
+  `route_lookup::AirportInfo` results for its route's endpoints. No networking code, no OpenSky
+  polling logic, uses `lcars_theme` for chrome.
+- `table_view` — draws Screen 1: composes `featured_panel` (closest aircraft) with a paginated
+  table of the rest. Takes the aircraft array + home position as input (via
+  `buildEnrichedRecords()`/`annotateDistances()`/`classifyPhases()`), uses `lcars_theme` for
+  chrome. No networking code.
 - `radar_view` — draws Screen 2 (LCARS-skinned radar). Same input contract as `table_view`, same
   theme module. No networking code.
 - `config_store` — Preferences/NVS read/write for all persisted settings, including which view
