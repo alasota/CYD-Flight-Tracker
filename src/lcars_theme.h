@@ -19,14 +19,29 @@ constexpr uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b) {
   return static_cast<uint16_t>(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
 }
 
-// The project's palette: black background plus 3-4 saturated accent
-// colors, reused everywhere (see CLAUDE.md "Design language") rather than
-// introducing new colors per element.
-constexpr uint16_t LCARS_BLACK = 0x0000;
-constexpr uint16_t LCARS_AMBER = rgb565(0xFF, 0x99, 0x00);        // amber/orange
-constexpr uint16_t LCARS_BLUE_VIOLET = rgb565(0x99, 0x66, 0xFF);  // blue-violet
-constexpr uint16_t LCARS_ROSE = rgb565(0xFF, 0x66, 0x66);         // salmon/rose
-constexpr uint16_t LCARS_PALE_BLUE = rgb565(0x99, 0xCC, 0xFF);    // pale blue
+// The project's palette — the exact RGB565 values from CLAUDE.md "Design
+// language" ("exact values, not vague color names"). Every screen spec
+// (Screen 1/2/3) refers to these names, so they are the canonical set;
+// define colors once here rather than scattering raw hex literals.
+constexpr uint16_t LCARS_BLACK = 0x0000;    // background
+constexpr uint16_t LCARS_ORANGE = 0xFC00;   // header block, column headers, divider, home marker
+constexpr uint16_t LCARS_MAGENTA = 0xF81F;  // elbow-frame borders (featured / identity / summary panels)
+constexpr uint16_t LCARS_CYAN = 0x07FF;     // sub-headers, stardate/time text, radar blips
+constexpr uint16_t LCARS_YELLOW = 0xFFE0;   // radar home crosshair, "imminent" countdown
+
+// Shared header-bar height (see CLAUDE.md "Screen chrome"): status_bar
+// draws y:0..LCARS_HEADER_HEIGHT, every screen's content starts at
+// y = LCARS_HEADER_HEIGHT so all three stay visually aligned.
+constexpr int16_t LCARS_HEADER_HEIGHT = 25;
+
+// --- Legacy palette (predates the canonical values above). Still
+// referenced by featured_panel / table_view / radar_view / main; those
+// modules should migrate to the canonical names, after which these can be
+// removed. Kept for now so this change stays scoped to lcars_theme.
+constexpr uint16_t LCARS_AMBER = rgb565(0xFF, 0x99, 0x00);        // ~ LCARS_ORANGE
+constexpr uint16_t LCARS_BLUE_VIOLET = rgb565(0x99, 0x66, 0xFF);  // pill buttons
+constexpr uint16_t LCARS_ROSE = rgb565(0xFF, 0x66, 0x66);         // ~ LCARS_MAGENTA
+constexpr uint16_t LCARS_PALE_BLUE = rgb565(0x99, 0xCC, 0xFF);    // ~ LCARS_CYAN
 
 // A point on the elbow's connecting arc, relative to the arc's center.
 struct ElbowArcPoint {
@@ -96,5 +111,45 @@ void drawPillButton(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint1
 // Purely visual — tapping it is handled by main.cpp (touch_input::hitTest()
 // against viewToggleButtonBounds()), not by this module.
 void drawViewToggleButton(LGFX &gfx, int16_t screenWidth, int16_t screenHeight);
+
+// The LCARS swept-corner "elbow frame": a hollow rectangular border
+// `thickness` px thick around (x, y, w, h), with the top-left corner
+// swept into a quarter-circle of radius `cornerRadius` instead of a plain
+// right angle. The other three corners stay square. This is the frame
+// around Screen 1's featured panel, Screen 2's identity panel and Screen
+// 3's summary panel (all `LCARS_MAGENTA`) — see CLAUDE.md "Design
+// language" / "Visualization concept".
+//
+// Drawn as four `fillRect` edges plus one `fillArc` quarter-annulus for
+// the corner (inner radius `cornerRadius - thickness`, outer
+// `cornerRadius`, swept 180deg->270deg — the top-left quadrant — per
+// LovyanGFX 1.2.28's fillArc(x, y, r_outer, r_inner, angle0, angle1)
+// convention: degrees, 0 = east, clockwise, screen y down). The seam
+// geometry is exposed pure via elbowArcPoint() for tests.
+void drawElbowFrame(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h,
+                    int16_t cornerRadius, int16_t thickness, uint16_t color);
+
+// Vertical accent/divider bar — a filled `thickness`-px-wide column of
+// height `h` at (x, y). Screen 3 uses one in `LCARS_ORANGE` (x:192,
+// 8px wide, full content height) as the split between the radar and the
+// summary panel; also the generic "elbow sidebar" motif.
+void drawVerticalDivider(LGFX &gfx, int16_t x, int16_t y, int16_t h, int16_t thickness,
+                         uint16_t color);
+
+// One radar range ring: a `drawCircle` outline at `radiusPx` around
+// (centerX, centerY), plus its distance in whole km labelled in small
+// text at the ring's 12-o'clock point (per CLAUDE.md "Screen 3 —
+// Radar"). Call once per ring from computeRingDistances()' output.
+void drawRadarRing(LGFX &gfx, int16_t centerX, int16_t centerY, int16_t radiusPx,
+                   int distanceKm, uint16_t color);
+
+// Header-bar name block: a filled rounded rectangle (`fillRoundRect`,
+// corner radius `cornerRadius`) with `label` centered inside in small
+// bold text. Screen chrome uses this on the left of the header in
+// `LCARS_ORANGE` with the active screen name (`FLIGHTS` / `FLIGHT` /
+// `RADAR`) — see CLAUDE.md "Screen chrome". Also serves the bottom-nav
+// segment pills.
+void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int16_t cornerRadius,
+                     uint16_t fillColor, uint16_t textColor, const char *label);
 
 #endif  // ARDUINO

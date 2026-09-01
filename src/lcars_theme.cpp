@@ -1,6 +1,7 @@
 #include "lcars_theme.h"
 
 #include <cmath>
+#include <cstdio>
 
 ElbowArcPoint elbowArcPoint(int16_t radius, float angle_deg) {
   constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
@@ -95,6 +96,55 @@ void drawPillButton(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint1
 void drawViewToggleButton(LGFX &gfx, int16_t screenWidth, int16_t screenHeight) {
   Rect b = viewToggleButtonBounds(screenWidth, screenHeight);
   drawPillButton(gfx, b.x, b.y, b.w, b.h, LCARS_BLUE_VIOLET, LCARS_BLACK, "VIEW");
+}
+
+void drawElbowFrame(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h,
+                    int16_t cornerRadius, int16_t thickness, uint16_t color) {
+  int16_t r = cornerRadius;
+  int16_t t = thickness;
+  if (r < t) r = t;  // a corner smaller than the border can't be swept
+
+  // Four straight edges. The top and left ones start past the swept
+  // corner; the bottom and right ones run the full span (square corners).
+  gfx.fillRect(x + r, y, w - r, t, color);            // top
+  gfx.fillRect(x, y + h - t, w, t, color);            // bottom
+  gfx.fillRect(x, y + r, t, h - r, color);            // left
+  gfx.fillRect(x + w - t, y, t, h, color);            // right
+
+  // Swept top-left corner: quarter annulus centered at (x+r, y+r), outer
+  // radius r, inner radius r-t, swept 180deg (west — meets the left edge
+  // at (x, y+r)) to 270deg (north — meets the top edge at (x+r, y)). See
+  // elbowArcPoint() for the same math, exposed for tests.
+  gfx.fillArc(x + r, y + r, r, static_cast<int16_t>(r - t), 180.0f, 270.0f, color);
+}
+
+void drawVerticalDivider(LGFX &gfx, int16_t x, int16_t y, int16_t h, int16_t thickness,
+                         uint16_t color) {
+  gfx.fillRect(x, y, thickness, h, color);
+}
+
+void drawRadarRing(LGFX &gfx, int16_t centerX, int16_t centerY, int16_t radiusPx,
+                   int distanceKm, uint16_t color) {
+  gfx.drawCircle(centerX, centerY, radiusPx, color);
+
+  char buf[12];
+  std::snprintf(buf, sizeof(buf), "%dkm", distanceKm);
+  gfx.setFont(LCARS_FONT_BODY);
+  gfx.setTextDatum(top_center);
+  gfx.setTextColor(color, LCARS_BLACK);
+  // Just inside the ring at its 12-o'clock point, so the text clears both
+  // the outer circle and the next ring out.
+  gfx.drawString(buf, centerX, static_cast<int16_t>(centerY - radiusPx + 1));
+}
+
+void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int16_t cornerRadius,
+                     uint16_t fillColor, uint16_t textColor, const char *label) {
+  gfx.fillRoundRect(x, y, w, h, cornerRadius, fillColor);
+
+  gfx.setFont(LCARS_FONT_BODY);
+  gfx.setTextDatum(middle_center);
+  gfx.setTextColor(textColor, fillColor);
+  gfx.drawString(label, static_cast<int16_t>(x + w / 2), static_cast<int16_t>(y + h / 2));
 }
 
 #endif  // ARDUINO
