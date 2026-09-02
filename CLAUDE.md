@@ -400,6 +400,47 @@ overhead. **Exact pixel spec**, below the 25px header, no scrolling:
 - **Persistence**: current screen index saved to `config_store` as `last_screen` (0/1/2),
   restored on boot. This replaces the old boolean-ish `last_view` field from when there were
   only two screens (table/radar) — rename it, don't keep both fields around.
+- **Any screen change resets the auto-cycle timer** (see "Auto screen cycling" below) — whether
+  the change came from a manual touch or an automatic switch. Without this, a manual tap could
+  be immediately undone by an auto-switch a moment later, which would feel broken.
+
+### Auto screen cycling (new, off by default)
+
+Two new `config_store` fields, both configurable via `config_portal`:
+- `auto_cycle_enabled` (bool, **default `false`**).
+- `auto_cycle_interval_s` (int, **default `15`**).
+
+**Basic behavior when enabled**: a `millis()`-based timer counts up from the last screen change
+(manual or automatic). Once it reaches `auto_cycle_interval_s`, advance to the next screen via
+the same `nextScreen()` used for manual navigation (Flights → Flight → Radar → wraps to
+Flights), then reset the timer.
+
+**Exception — don't interrupt an imminent overhead moment on Screen 2 ("Flight")**: if the
+auto-cycle timer fires while the active screen is `FLIGHT` and the currently-displayed
+countdown is "close" (see thresholds below), **defer** the switch — don't advance yet, keep
+re-checking every loop iteration, and switch as soon as the condition clears. The interval
+timer does not reset while deferred; the switch happens the moment the hold condition clears,
+however long that took.
+
+- **Hold condition** (pure, testable — put this in `screen_nav` as e.g.
+  `shouldDeferAutoSwitch(currentScreen, cpaFound, tCpaSeconds) -> bool`, taking `t_cpa_seconds`
+  as a parameter rather than reaching into `cpa_predictor` itself, same decoupling discipline
+  as everywhere else in this project):
+  ```
+  shouldDeferAutoSwitch = (currentScreen == FLIGHT)
+                        && cpaFound
+                        && (tCpaSeconds < 6)
+                        && (tCpaSeconds > -5)
+  ```
+- In plain terms: less than 6 seconds until the aircraft is overhead → hold. Keep holding
+  through the overhead moment and for 5 seconds after (`t_cpa_seconds` reaching `-5` or below
+  clears the hold). If `cpaFound` is false, or the screen isn't `FLIGHT`, there's nothing to
+  hold for — switch normally.
+- These two constants (`6` and `-5`) are fixed, not exposed in `config_portal` — only
+  `auto_cycle_enabled` and `auto_cycle_interval_s` are user-configurable per this request.
+- Edge case worth noting, not necessarily guarding against: if a *new* nearest aircraft becomes
+  imminent right as the previous hold clears, the hold condition will naturally re-trigger for
+  it on the next check — that's expected behavior, not a bug to fix.
 
 
 ## Design language — LCARS-inspired (Star Trek console aesthetic)
@@ -450,7 +491,8 @@ each with a single responsibility:
 - `wifi_manager` — WiFi connect + captive-portal fallback (WiFiManager library), no display or
   networking-to-OpenSky logic here.
 - `config_portal` — local web page (WebServer or ESPAsyncWebServer) for lat/lon, radius, OpenSky
-  client_id/secret, poll interval. Reachable via mDNS (e.g. `cyd-sky.local`), same pattern as
+  client_id/secret, poll interval, and now `auto_cycle_enabled` / `auto_cycle_interval_s` (see
+  "Auto screen cycling"). Reachable via mDNS (e.g. `cyd-sky.local`), same pattern as
   micro-radar's `microradar.local`.
 - `opensky_client` — token fetch/refresh + `/states/all` polling. Returns a plain struct/array
   of aircraft. **No TFT/drawing code in this module** — must be swappable/testable independently
@@ -472,15 +514,20 @@ each with a single responsibility:
   kind, and arguably the single easiest-to-fully-test module in the project — it's just
   trigonometry and a division.
 - `screen_nav` — current screen index (0/1/2) + `nextScreen()`/`prevScreen()` with wraparound,
-  plus touch-zone hit-testing for the left/right edge strips and bottom nav segments (reuse the
-  `hitTest` pattern from Milestone 9). No TFT drawing, no OpenSky/hexdb.io calls.
+  touch-zone hit-testing for the left/right edge strips and bottom nav segments (reuse the
+  `hitTest` pattern from Milestone 9), and the auto-cycle timer + `shouldDeferAutoSwitch()` (see
+  "Auto screen cycling") — takes `t_cpa_seconds` as a parameter, doesn't call `cpa_predictor`
+  itself. No TFT drawing, no OpenSky/hexdb.io calls.
 - `lcars_theme` — shared color palette, panel/elbow/pill drawing helpers, fonts, plus the WiFi
   signal-bars and bottom-nav-segment primitives. All view/screen modules call into this rather
   than defining their own colors/shapes.
-- `status_bar` — draws the header bar per the exact spec in "Screen chrome": orange
+- `status_bar` — draws the shared chrome: the header bar per "Screen chrome" (orange
   `fillRoundRect` block on the left labeled with the active screen name, stardate + real time
-  (from `time_sync`) to its right. Called once per frame from `main.cpp`, before dispatching to
-  the active screen — individual screens don't call it themselves.
+  from `time_sync` to its right), **and** the bottom nav bar's dot/segment indicators from
+  "Screen navigation" (highlighting whichever index `screen_nav` reports as current). Both
+  called once per frame from `main.cpp`, before/after dispatching to the active screen — kept
+  here rather than in `screen_nav` so `screen_nav` itself stays TFT-free and fully testable;
+  `status_bar` just reads the current index, it doesn't own navigation state or hit-testing.
 - `aircraft_summary` — shared identity-block renderer (flight, airline, aircraft type, origin →
   destination). Used by `featured_panel` (Screen 1's top zone), `flight_screen` (Screen 2), and
   `radar_view`'s right-hand panel (Screen 3) — centralized specifically so this rendering isn't
@@ -497,7 +544,8 @@ each with a single responsibility:
   receives (not the full screen anymore) plus a call to `aircraft_summary` for the right-side
   panel. Same enriched-aircraft input contract as the other screens. No networking code.
 - `config_store` — Preferences/NVS read/write for all persisted settings, including
-  `last_screen` (0/1/2) — replaces the old two-screen `last_view` field.
+  `last_screen` (0/1/2) — replaces the old two-screen `last_view` field — and
+  `auto_cycle_enabled` / `auto_cycle_interval_s` (see "Auto screen cycling").
 
 Other rules:
 - Never hardcode WiFi or OpenSky secrets in source files.
@@ -517,10 +565,11 @@ Test-first is the default here, not a cleanup pass bolted on at the end:
 - Before implementing any non-trivial piece of logic — bbox math, distance/bearing calculations,
   sorting aircraft by distance, altitude bucketing, token-expiry timing, cache hit/miss behavior
   in `aircraft_lookup`/`route_lookup`, flight-phase classification, CPA time prediction,
-  RSSI-to-bars/date-time formatting, screen-index wraparound, credit-cost calculation, JSON
-  parsing/mapping, etc. — write the test for it in `test/` first, or at the very least alongside
-  it, then implement until it passes. "Add tests later" is not a real plan on a solo hobby
-  project — later doesn't happen, so don't rely on it.
+  RSSI-to-bars/date-time formatting, screen-index wraparound, `shouldDeferAutoSwitch`'s hold
+  condition (boundary cases at exactly `6`/`-5` seconds matter here), credit-cost calculation,
+  JSON parsing/mapping, etc. — write the test for it in `test/` first, or at the very least
+  alongside it, then implement until it passes. "Add tests later" is not a real plan on a solo
+  hobby project — later doesn't happen, so don't rely on it.
 - This is exactly why the module boundaries in "Code conventions" above are non-negotiable:
   `opensky_client`, `aircraft_lookup`, `route_lookup`, `flight_phase`, `time_sync`,
   `cpa_predictor`, `screen_nav`, `table_view`, `flight_screen`, `radar_view`, `featured_panel`,
