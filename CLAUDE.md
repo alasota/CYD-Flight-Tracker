@@ -257,11 +257,15 @@ switching feels like changing a mode on one console, not jumping between apps.
   (date/time left, name center, WiFi right) is superseded by this spec. Say if you want signal
   strength back somewhere; there's no slot for it here right now.
 
-Define `LCARS_HEADER_HEIGHT = 25` as a shared constant in `lcars_theme` that every screen's
-content starts below — keeps all three screens visually aligned instead of each guessing its
-own offset. Drawn by a dedicated `status_bar` module, called once per frame from `main.cpp`
-before dispatching to whichever screen is active — screens themselves don't need to know
-`status_bar` exists, they just draw their content starting at `y = LCARS_HEADER_HEIGHT`.
+Define `LCARS_HEADER_HEIGHT = 25` and `LCARS_BOTTOM_NAV_HEIGHT = 15` as shared constants in
+`lcars_theme`. Every screen's content is bounded by both: `y = LCARS_HEADER_HEIGHT` (28,
+leaving a 3px gap) to `y = 240 - LCARS_BOTTOM_NAV_HEIGHT` (225) — **not** all the way to 240.
+Getting this wrong (leaving no real space for the bottom nav bar) is exactly what happened in
+the first pass of this spec — every screen's content area has since been corrected from a
+`y:238` bottom bound to `y:225`, see each screen's section above. Drawn by a dedicated
+`status_bar` module, called once per frame from `main.cpp` before dispatching to whichever
+screen is active — screens themselves don't need to know `status_bar` exists, they just draw
+their content within these fixed bounds.
 
 ### Screen 1 — "Flights" (default view, prioritize this first)
 
@@ -285,17 +289,21 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
 - Empty state ("no aircraft in range") still applies here, same as before — just now within
   these exact bounds.
 
-**Flights table section, y: 108 to 238px (~130px tall).**
-- Sub-header bar: `LCARS_CYAN` (`0x07FF`) background, black text, label `FLIGHTS`. (Yes, this
-  repeats the word already shown in the header's orange block — that's fine, LCARS designs
-  repeat short labels as a matter of style, not a bug to fix.)
-- Column header row at **y: 125px**: `LCARS_ORANGE` (`0xFC00`) background, black text, one
-  text string with column labels separated by `|` (not per-column shaded cells) — e.g.
-  `LOT | LINIA | SKĄD | DOKĄD | TYP | FAZA` matching the columns already defined below.
-- **Exactly 5 data rows**, starting at **y: 140px**, **18px step** (rows at y = 140, 158, 176,
-  194, 212) — this replaces the earlier "row count depends on row height" language with a fixed
-  number. If more than 5 aircraft are in range, page via touch (Milestone 9's mechanism) rather
-  than trying to fit more — pagination swaps which 5 are shown, it is not scrolling.
+**Flights table section, y: 108 to 225px (~117px tall) — was 238, corrected, see below.**
+- Sub-header bar: `LCARS_CYAN` (`0x07FF`) background, black text, label `FLIGHTS`, y: 108 to
+  118px (10px tall — thin label strip). (Yes, this repeats the word already shown in the
+  header's orange block — that's fine, LCARS designs repeat short labels as a matter of style,
+  not a bug to fix.)
+- Column header row at **y: 119 to 134px** (text centered ~y:127): `LCARS_ORANGE` (`0xFC00`)
+  background, black text, one text string with column labels separated by `|` (not per-column
+  shaded cells) — e.g. `LOT | LINIA | SKĄD | DOKĄD | TYP | FAZA` matching the columns already
+  defined below.
+- **5 data rows**, starting at **y: 138px**, **17px step** (rows at y = 138, 155, 172, 189,
+  206) — tightened from the original 18px/y:140 start to fit within the corrected boundary; the
+  last row's text (top y:206, ~14-16px tall) ends around y:221-222, inside the 225px boundary
+  with a few px to spare. If more than 5 aircraft are in range, page via touch (Milestone 9's
+  mechanism) rather than trying to fit more — pagination swaps which 5 are shown, it is not
+  scrolling.
 - Columns per row: **flight (callsign), airline, from (IATA code), to (IATA code), aircraft
   type, phase icon**. Airport codes only — no country codes, no room for them at 18px row
   height.
@@ -334,7 +342,8 @@ overhead. **Exact pixel spec**, below the 25px header, no scrolling:
 - **Empty/no-prediction state** (no aircraft in range, or CPA not found): centered em-dash `—`,
   no color-coding.
 
-**Status strip, y: 200 to 238px (38px tall), centered text.**
+**Status strip, y: 200 to 225px (25px tall, was 238 — corrected, see Screen 1's note on the
+bottom nav bar), centered text.**
 - Label matching the countdown state: `ZBLIŻA SIĘ` (approaching, cyan zone) / `NAD TOBĄ`
   (imminent, yellow zone) / `MINĄŁ` (passed, orange zone) / `SZACOWANY CZAS` (minutes mode) /
   `BRAK LOTÓW W ZASIĘGU` (empty state).
@@ -353,14 +362,17 @@ overhead. **Exact pixel spec**, below the 25px header, no scrolling:
 
 ### Screen 3 — "Radar" (left: radar, right: nearest-aircraft summary)
 
-**Exact pixel spec**, below the 25px header, content area y: 28 to 238px (210px tall):
+**Exact pixel spec**, below the 25px header, content area y: 28 to 225px (197px tall — was
+238, corrected: see the bottom-nav-bar fix noted in Screen 1):
 
-**Divider, x: 192 to 200px (8px wide), full content height.**
+**Divider, x: 192 to 200px (8px wide), full content height (y: 28 to 225px).**
 - A thin vertical `LCARS_ORANGE` (`0xFC00`) accent bar — the same "elbow sidebar" motif from
   "Design language", here doing double duty as the visual split between radar and summary.
 
-**Radar, x: 0 to 190px, y: 28 to 238px.**
-- Center at `(95, 133)`, radius `85px` — fits with margin on all sides within this zone.
+**Radar, x: 0 to 190px, y: 28 to 225px.**
+- Center at `(95, 127)`, radius `85px` (center moved up from `133` to `127` to re-center in the
+  shorter content area; radius unchanged, still fits with margin: top `127-85=42`, bottom
+  `127+85=212`, both within `28..225`).
 - 3 concentric rings at radius `28px` / `57px` / `85px` (thirds of max radius), each labeled
   in small text near the top of the ring with its corresponding distance in km (derived from
   `max_distance_km / 3`, `2/3`, full — see `computeRingDistances` from the radar geometry work).
@@ -370,14 +382,15 @@ overhead. **Exact pixel spec**, below the 25px header, no scrolling:
   radar geometry step).
 - Static plot, no sweep animation, consistent with the earlier radar_view spec.
 
-**Summary panel, x: 200 to 320px (120px wide), y: 28 to 238px.**
+**Summary panel, x: 200 to 320px (120px wide), y: 28 to 225px.**
 - Same LCARS elbow frame convention as Screen 1/2 — `LCARS_MAGENTA` (`0xF81F`) border, top-left
   corner (the one facing the divider) swept/cut.
-- Three rows, via `aircraft_summary`, vertically spaced within the panel:
-  - Row 1 (~y:95): flight (callsign), bold/emphasized.
-  - Row 2 (~y:130): airline — truncate or abbreviate if it doesn't fit the 120px width, don't
+- Three rows, via `aircraft_summary`, vertically spaced within the shorter panel (row positions
+  shifted up slightly from the original 95/130/165 to re-center in the 28-225 zone):
+  - Row 1 (~y:92): flight (callsign), bold/emphasized.
+  - Row 2 (~y:127): airline — truncate or abbreviate if it doesn't fit the 120px width, don't
     let it overflow into the radar zone.
-  - Row 3 (~y:165): origin → destination as IATA codes, e.g. `WAW → FCO` (no country codes
+  - Row 3 (~y:162): origin → destination as IATA codes, e.g. `WAW → FCO` (no country codes
     here — this panel is narrower than Screen 1's featured panel, keep it to what fits).
 - **Empty state**: if no aircraft in range, radar still draws its (empty) rings and home
   marker; this panel shows a centered `BRAK LOTU` / em-dash instead of the three rows.
@@ -387,16 +400,26 @@ overhead. **Exact pixel spec**, below the 25px header, no scrolling:
 - **Order**: Flights (0) → Flight (1) → Radar (2) → wraps back to Flights. Managed by a new
   `screen_nav` module (current index + `nextScreen()`/`prevScreen()` with wraparound — small,
   but worth testing, off-by-one bugs in wraparound logic are easy to introduce).
-- **Touch zones, below the header**: narrow strips at the **left and right edges** (roughly the
-  outer 15-20% of width each) switch screens — left edge = previous, right edge = next. The
-  **middle majority of the screen is deliberately left alone** for screen-specific interactions
-  — this matters concretely on Screen 1, where the table already uses touch for pagination
-  (Milestone 9); a full-width left/right split would fight with that.
-- **Bottom nav bar**: a persistent thin strip at the very bottom of the screen, present on all
-  three screens, showing three tappable dots/segments (one per screen), the active one
-  highlighted. Tapping a segment jumps directly to that screen. This is a proposed default, not
-  something explicitly specified — a single cyclic "next" button would also satisfy "przycisk
-  na dole ekranu" if you'd rather keep it simpler; flag it if you want that instead.
+- **Touch zones, y: 28 to 225px (content area only, not the header or bottom nav bar)**: narrow
+  strips at the **left and right edges** (roughly the outer 15-20% of width each) switch
+  screens — left edge = previous, right edge = next. The **middle majority of the screen is
+  deliberately left alone** for screen-specific interactions — this matters concretely on
+  Screen 1, where the table already uses touch for pagination (Milestone 9); a full-width
+  left/right split would fight with that. Confining these strips to `y < 225` also keeps them
+  from overlapping the bottom nav bar below — without that boundary, a tap in a bottom corner
+  would be ambiguous between "edge swipe" and "nav bar segment."
+- **Bottom nav bar, y: 225 to 240px (`LCARS_BOTTOM_NAV_HEIGHT = 15px`, full 320px width)** — a
+  persistent strip, present on all three screens, showing three tappable dots/segments (one per
+  screen, each roughly a 320/3 ≈ 107px-wide tap zone), the active one highlighted (filled
+  `LCARS_ORANGE`, inactive ones dim/outline only). Tapping a segment jumps directly to that
+  screen. **This is the fix for the bottom bar being invisible/unreachable** — earlier versions
+  of this spec never actually reserved real height for it, which is why it rendered as a sliver.
+  All three screens' content areas now stop at `y:225` specifically to make room for this.
+  15px is tight for a touch target — consider giving the touch **hit-test** zone a bit more
+  vertical margin than the visual bar itself (e.g. treat `y > 215` as "bottom nav" for touch
+  purposes even though the bar only *draws* from `y:225`), so it's not painful to tap precisely.
+  This was a proposed default, not something explicitly specified originally — a single cyclic
+  "next" button would also work if three segments still feel cramped at this height.
 - **Persistence**: current screen index saved to `config_store` as `last_screen` (0/1/2),
   restored on boot. This replaces the old boolean-ish `last_view` field from when there were
   only two screens (table/radar) — rename it, don't keep both fields around.
