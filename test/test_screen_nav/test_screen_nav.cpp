@@ -63,6 +63,48 @@ static void test_wrap_screen_leaves_valid_values_untouched(void) {
   TEST_ASSERT_EQUAL_INT(2, wrapScreen(2));
 }
 
+// ---- ScreenNav (stateful tracker) -----------------------------------
+
+static void test_screen_nav_defaults_to_flights(void) {
+  ScreenNav nav;
+  TEST_ASSERT_EQUAL_INT(kScreenFlights, nav.current());
+}
+
+static void test_screen_nav_seeds_from_initial_with_wraparound(void) {
+  TEST_ASSERT_EQUAL_INT(kScreenRadar, ScreenNav(kScreenRadar).current());
+  TEST_ASSERT_EQUAL_INT(kScreenFlights, ScreenNav(3).current());   // wraps
+  TEST_ASSERT_EQUAL_INT(kScreenRadar, ScreenNav(-1).current());    // wraps
+}
+
+static void test_screen_nav_next_prev_report_change(void) {
+  ScreenNav nav(kScreenFlights);
+
+  TEST_ASSERT_TRUE(nav.next());
+  TEST_ASSERT_EQUAL_INT(kScreenFlight, nav.current());
+  TEST_ASSERT_TRUE(nav.next());
+  TEST_ASSERT_EQUAL_INT(kScreenRadar, nav.current());
+  TEST_ASSERT_TRUE(nav.next());  // wraps
+  TEST_ASSERT_EQUAL_INT(kScreenFlights, nav.current());
+
+  TEST_ASSERT_TRUE(nav.prev());  // wraps back
+  TEST_ASSERT_EQUAL_INT(kScreenRadar, nav.current());
+}
+
+static void test_screen_nav_set_to_same_screen_reports_no_change(void) {
+  ScreenNav nav(kScreenFlight);
+  TEST_ASSERT_FALSE(nav.set(kScreenFlight));
+  TEST_ASSERT_EQUAL_INT(kScreenFlight, nav.current());
+
+  TEST_ASSERT_TRUE(nav.set(kScreenRadar));
+  TEST_ASSERT_EQUAL_INT(kScreenRadar, nav.current());
+}
+
+static void test_screen_nav_set_wraps_garbage(void) {
+  ScreenNav nav;
+  TEST_ASSERT_TRUE(nav.set(7));  // 7 % 3 == 1
+  TEST_ASSERT_EQUAL_INT(kScreenFlight, nav.current());
+}
+
 // ---- touch hit-testing: edge strips ----------------------------------
 
 static void test_left_edge_strip_is_prev(void) {
@@ -153,6 +195,12 @@ int main(int, char **) {
 
   RUN_TEST(test_wrap_screen_normalizes_out_of_range);
   RUN_TEST(test_wrap_screen_leaves_valid_values_untouched);
+
+  RUN_TEST(test_screen_nav_defaults_to_flights);
+  RUN_TEST(test_screen_nav_seeds_from_initial_with_wraparound);
+  RUN_TEST(test_screen_nav_next_prev_report_change);
+  RUN_TEST(test_screen_nav_set_to_same_screen_reports_no_change);
+  RUN_TEST(test_screen_nav_set_wraps_garbage);
 
   RUN_TEST(test_left_edge_strip_is_prev);
   RUN_TEST(test_right_edge_strip_is_next);

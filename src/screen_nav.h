@@ -29,6 +29,33 @@ int wrapScreen(int index);
 int nextScreen(int current);
 int prevScreen(int current);
 
+// Stateful current-screen tracker — the "current index + nextScreen()/
+// prevScreen()" CLAUDE.md's "Screen navigation" describes. main.cpp keeps
+// one, seeds it from config_store's persisted last_screen at boot, and
+// re-persists current() whenever a mutator reports a change. Header-only:
+// it's just wrapScreen() bookkeeping, still exercised under
+// `pio test -e native`.
+class ScreenNav {
+ public:
+  explicit ScreenNav(int initialScreen = kScreenFlights) : current_(wrapScreen(initialScreen)) {}
+
+  int current() const { return current_; }
+
+  // Each returns true iff the active screen actually changed — the signal
+  // for the caller to persist last_screen and trigger a redraw.
+  bool set(int screen) {
+    int next = wrapScreen(screen);
+    if (next == current_) return false;
+    current_ = next;
+    return true;
+  }
+  bool next() { return set(nextScreen(current_)); }
+  bool prev() { return set(prevScreen(current_)); }
+
+ private:
+  int current_ = kScreenFlights;
+};
+
 // ---- Touch geometry -------------------------------------------------------
 //
 // The content area sits between the header (top, `headerHeight` px) and
