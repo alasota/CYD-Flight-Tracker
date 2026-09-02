@@ -34,6 +34,12 @@ constexpr uint16_t LCARS_YELLOW = 0xFFE0;   // radar home crosshair, "imminent" 
 // y = LCARS_HEADER_HEIGHT so all three stay visually aligned.
 constexpr int16_t LCARS_HEADER_HEIGHT = 25;
 
+// Bottom-nav inactive-segment fill - a dim slate so unselected segments
+// read as recessed against LCARS_BLACK while the active one (LCARS_ORANGE)
+// pops. Not part of CLAUDE.md's five-colour palette (that's the canonical
+// set above); this is a supporting shade, same role as the legacy tints.
+constexpr uint16_t LCARS_NAV_INACTIVE = 0x2124;
+
 // --- Legacy palette (predates the canonical values above). Still
 // referenced by featured_panel / table_view / radar_view / main; those
 // modules should migrate to the canonical names, after which these can be
@@ -123,8 +129,11 @@ void drawViewToggleButton(LGFX &gfx, int16_t screenWidth, int16_t screenHeight);
 // Drawn as four `fillRect` edges plus one `fillArc` quarter-annulus for
 // the corner (inner radius `cornerRadius - thickness`, outer
 // `cornerRadius`, swept 180deg->270deg — the top-left quadrant — per
-// LovyanGFX 1.2.28's fillArc(x, y, r_outer, r_inner, angle0, angle1)
-// convention: degrees, 0 = east, clockwise, screen y down). The seam
+// LovyanGFX 1.2.28's fillArc(x, y, r0, r1, angle0, angle1, color) —
+// verified in src/lgfx/v1/LGFXBase.{hpp,cpp}: it forwards to
+// fillEllipseArc(), which swaps r0/r1 so inner/outer order doesn't
+// matter; angles are degrees, 0 = east, increasing clockwise with screen
+// y down). The seam
 // geometry is exposed pure via elbowArcPoint() for tests.
 void drawElbowFrame(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h,
                     int16_t cornerRadius, int16_t thickness, uint16_t color);
@@ -151,5 +160,15 @@ void drawRadarRing(LGFX &gfx, int16_t centerX, int16_t centerY, int16_t radiusPx
 // segment pills.
 void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int16_t cornerRadius,
                      uint16_t fillColor, uint16_t textColor, const char *label);
+
+// The persistent bottom navigation bar (present on all three screens -
+// CLAUDE.md "Screen navigation"): `kScreenCount` equal-width segments, the
+// active one highlighted. Segment geometry comes straight from
+// screen_nav's bottomNavSegment(), so the drawn indicators line up exactly
+// with navHitTest()'s JumpTo hit zones. Each segment gets a centred pill:
+// the active screen a wide filled `LCARS_ORANGE` bar, the rest a short
+// `LCARS_CYAN` outline dot. Repaints its own strip first, so it's safe to
+// call every frame.
+void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t screenHeight);
 
 #endif  // ARDUINO

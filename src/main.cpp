@@ -27,6 +27,13 @@
 //     polls: currentCpa() extrapolates lastPolledCpa forward by the
 //     elapsed millis(), and the screen is flagged for redraw at 1 Hz
 //     while it's active (see CLAUDE.md "local ticking").
+//   - Auto screen cycling (off unless config_store's auto_cycle_enabled):
+//     a millis() timer from the last screen change (manual or automatic);
+//     once it passes auto_cycle_interval_s, advance via nav.next() —
+//     unless screen_nav::shouldDeferAutoSwitch() says an overhead moment
+//     is imminent on the Flight screen, in which case hold and re-check
+//     every loop until it clears. screen_nav::shouldAutoAdvance() is the
+//     pure decision; every screen change resets the timer.
 //   - Redraw (only when something changed): status_bar header, then the
 //     active screen's content (table_view / flight_screen / radar_view)
 //     dispatched on screen_nav::current(), then the persistent bottom nav
@@ -73,6 +80,15 @@ static std::vector<AircraftRow> lastRows;
 static AirportInfo lastOriginAirport;  // nearest row's route origin, if resolved
 static AirportInfo lastDestAirport;    // nearest row's route destination, if resolved
 static float lastRadiusDeg = 2.5f;     // config_store's default — updated every poll
+
+// Auto screen cycling state (CLAUDE.md "Auto screen cycling"). The two
+// config values are cached (refreshed at boot and every poll) so loop()
+// doesn't hit NVS every iteration; lastScreenChangeMs is the timer base,
+// reset by onScreenChanged() on every screen change — manual or auto.
+static bool autoCycleEnabled = false;
+static uint32_t autoCycleIntervalS = 15;
+static bool homeConfigured = false;
+static uint32_t lastScreenChangeMs = 0;
 static int currentPage = 0;
 static bool screenNeedsRedraw = false;
 static bool setupPromptShown = false;
@@ -87,10 +103,6 @@ static uint32_t lastCpaPollMs = 0;
 // Height of the table's page-back / page-forward tap strips — table_view's
 // own row height, so the two can't drift apart (review notes 5.5).
 static const int16_t kPageTapZoneHeight = tableRowHeightPx();
-
-// Bottom-nav inactive-segment fill (dim slate) — the active one is
-// LCARS_ORANGE.
-static constexpr uint16_t kNavInactiveFill = 0x2124;
 
 // How many *new* (uncached) aircraft_lookup/route_lookup HTTP calls one
 // poll cycle is allowed to make, combined — each blocks loop() for up to a
@@ -112,19 +124,6 @@ static CpaPrediction currentCpa() {
     p.t_cpa_seconds -= static_cast<float>(millis() - lastCpaPollMs) / 1000.0f;
   }
   return p;
-}
-
-// The persistent bottom nav bar (all three screens): three tappable
-// segment pills, the active one highlighted. Geometry from screen_nav so
-// it lines up exactly with navHitTest()'s JumpTo zones.
-static void drawBottomNav(int16_t screenW, int16_t screenH) {
-  for (int i = 0; i < kScreenCount; ++i) {
-    Rect seg = bottomNavSegment(i, screenW, screenH);
-    bool active = (i == nav.current());
-    drawHeaderBlock(tft, seg.x, seg.y, seg.w, seg.h, /*cornerRadius=*/3,
-                    active ? LCARS_ORANGE : kNavInactiveFill, active ? LCARS_BLACK : LCARS_CYAN,
-                    statusBarScreenName(i).c_str());
-  }
 }
 
 static void redrawScreen() {
@@ -153,7 +152,7 @@ static void redrawScreen() {
       break;
   }
 
-  drawBottomNav(screenW, screenH);
+  drawBottomNav(tft, nav.current(), screenW, screenH);
 }
 
 // Shown instead of a screen while config_store's home_configured is still
@@ -175,12 +174,12 @@ static void showSetupPrompt() {
 }
 
 // Persist + redraw after screen_nav reports the active screen changed.
+// Called for every change — a touch, or an auto-cycle advance.
 static void onScreenChanged() {
   currentPage = 0;
+  lastScreenChangeMs = millis();  // any change resets the auto-cycle timer
 
-  Config cfg = loadConfig();
-  cfg.last_screen = nav.current();
-  saveConfig(cfg);
+  saveLastScreen(nav.current());  // targeted single-key write (see config_store)
 
   screenNeedsRedraw = true;
 }
@@ -244,6 +243,10 @@ void setup() {
   Config cfg = loadConfig();
   nav.set(cfg.last_screen);  // restore the last-active screen
   lastRadiusDeg = cfg.radius_deg;
+  autoCycleEnabled = cfg.auto_cycle_enabled;
+  autoCycleIntervalS = cfg.auto_cycle_interval_s;
+  homeConfigured = cfg.home_configured;
+  lastScreenChangeMs = millis();
 
   wifiManagerBegin();  // tries the saved network; falls back to its own captive portal
 
@@ -276,6 +279,9 @@ void loop() {
     std::vector<Aircraft> aircraft;
     if (openSkyClientPoll(millis(), &aircraft)) {
       Config homeCfg = loadConfig();
+      autoCycleEnabled = homeCfg.auto_cycle_enabled;
+      autoCycleIntervalS = homeCfg.auto_cycle_interval_s;
+      homeConfigured = homeCfg.home_configured;
 
       if (!homeCfg.home_configured) {
         showSetupPrompt();
@@ -349,6 +355,16 @@ void loop() {
   if (!clockAppeared && isTimeSynced()) {
     clockAppeared = true;
     screenNeedsRedraw = true;
+  }
+
+  // --- Auto screen cycling (CLAUDE.md "Auto screen cycling") ------------
+  if (autoCycleEnabled && homeConfigured) {
+    CpaPrediction cpa = currentCpa();
+    bool deferHold = shouldDeferAutoSwitch(nav.current(), cpa.found, cpa.t_cpa_seconds);
+    if (shouldAutoAdvance(millis() - lastScreenChangeMs, autoCycleIntervalS, deferHold)) {
+      nav.next();          // 3 distinct screens, wraps — always a real change
+      onScreenChanged();   // persists last_screen, resets the timer + page, forces redraw
+    }
   }
 
   // --- Redraw, if anything changed --------------------------------------

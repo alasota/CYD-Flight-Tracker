@@ -10,6 +10,8 @@ static void test_default_config_has_sane_values(void) {
   TEST_ASSERT_EQUAL_FLOAT(2.5f, cfg.radius_deg);
   TEST_ASSERT_EQUAL_UINT32(15, cfg.poll_interval_s);
   TEST_ASSERT_EQUAL_INT(0, cfg.last_screen);  // Flights
+  TEST_ASSERT_FALSE(cfg.auto_cycle_enabled);            // off by default
+  TEST_ASSERT_EQUAL_UINT32(15, cfg.auto_cycle_interval_s);
   TEST_ASSERT_TRUE(cfg.opensky_client_id.empty());
   TEST_ASSERT_TRUE(cfg.opensky_client_secret.empty());
   // Never-configured by default — see review notes 1.5: (0,0) is a real
@@ -94,6 +96,38 @@ static void test_sanitize_config_clamps_last_screen(void) {
   TEST_ASSERT_EQUAL_INT(2, sanitizeConfig(ok).last_screen);
 }
 
+
+static void test_clamp_auto_cycle_interval_enforces_minimum(void) {
+  // CLAUDE.md "Auto screen cycling": user-configurable, but must be > 0 —
+  // and in practice not so short the screen flips faster than the eye can
+  // follow. Floor is 3s; anything below snaps up to it.
+  TEST_ASSERT_EQUAL_UINT32(3, clampAutoCycleIntervalS(0));
+  TEST_ASSERT_EQUAL_UINT32(3, clampAutoCycleIntervalS(1));
+  TEST_ASSERT_EQUAL_UINT32(3, clampAutoCycleIntervalS(3));
+  TEST_ASSERT_EQUAL_UINT32(15, clampAutoCycleIntervalS(15));   // the default
+  TEST_ASSERT_EQUAL_UINT32(3600, clampAutoCycleIntervalS(3600));  // no ceiling
+}
+
+static void test_sanitize_config_clamps_auto_cycle_interval(void) {
+  Config cfg;
+  cfg.auto_cycle_interval_s = 0;
+  TEST_ASSERT_EQUAL_UINT32(3, sanitizeConfig(cfg).auto_cycle_interval_s);
+
+  Config ok;
+  ok.auto_cycle_interval_s = 30;
+  TEST_ASSERT_EQUAL_UINT32(30, sanitizeConfig(ok).auto_cycle_interval_s);
+}
+
+static void test_sanitize_config_preserves_auto_cycle_enabled(void) {
+  Config on;
+  on.auto_cycle_enabled = true;
+  TEST_ASSERT_TRUE(sanitizeConfig(on).auto_cycle_enabled);
+
+  Config off;
+  off.auto_cycle_enabled = false;
+  TEST_ASSERT_FALSE(sanitizeConfig(off).auto_cycle_enabled);
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_default_config_has_sane_values);
@@ -105,5 +139,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_clamp_last_screen_accepts_0_1_2);
   RUN_TEST(test_clamp_last_screen_falls_back_to_flights);
   RUN_TEST(test_sanitize_config_clamps_last_screen);
+  RUN_TEST(test_clamp_auto_cycle_interval_enforces_minimum);
+  RUN_TEST(test_sanitize_config_clamps_auto_cycle_interval);
+  RUN_TEST(test_sanitize_config_preserves_auto_cycle_enabled);
   return UNITY_END();
 }

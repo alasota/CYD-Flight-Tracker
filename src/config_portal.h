@@ -1,5 +1,6 @@
 // config_portal — local web config page for lat/lon/radius/poll_interval/
-// OpenSky client_id/client_secret, reachable via mDNS at cyd-sky.local (see
+// OpenSky client_id/client_secret/auto-cycle settings, reachable via mDNS
+// at cyd-sky.local (see
 // CLAUDE.md "Code conventions"). Submissions are persisted through
 // config_store (Milestone 2).
 #pragma once
@@ -53,7 +54,8 @@ bool isValidFloatString(const std::string &s);
 bool isValidUnsignedIntString(const std::string &s);
 
 // --- Hardware adapter: serves the local config web page at cyd-sky.local
-// (mDNS) with a form for lat/lon/radius/poll_interval/OpenSky credentials,
+// (mDNS) with a form for lat/lon/radius/poll_interval/auto_cycle_enabled/
+// auto_cycle_interval_s/OpenSky credentials,
 // read/persisted via config_store. The radius field's credit cost updates
 // live in the browser (client-side JS mirroring openSkyCreditCost() above)
 // as the user types, no round trip needed. A second form lets the user

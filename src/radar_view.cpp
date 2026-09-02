@@ -24,6 +24,20 @@ RadarLayout computeRadarLayout(int16_t x, int16_t y, int16_t w, int16_t h, int16
 
 float radiusDegToKm(float radius_deg) { return radius_deg * kKmPerDegree; }
 
+std::string truncateAirline(const std::string &s, int maxChars) {
+  if (maxChars <= 0) return std::string();
+  if (static_cast<int>(s.size()) <= maxChars) return s;
+
+  constexpr int kEllipsisLen = 3;  // "..."
+  if (maxChars < kEllipsisLen + 1) {
+    return s.substr(0, static_cast<size_t>(maxChars));  // too tight for an ellipsis
+  }
+
+  std::string head = s.substr(0, static_cast<size_t>(maxChars - kEllipsisLen));
+  while (!head.empty() && head.back() == ' ') head.pop_back();
+  return head + "...";
+}
+
 #ifdef ARDUINO
 
 #include <cmath>
@@ -54,6 +68,10 @@ constexpr int16_t kSummaryTextX = 208;   // inside the frame, clear of the swept
 constexpr int16_t kSummaryFlightY = 95;  // three-row baselines from CLAUDE.md
 constexpr int16_t kSummaryAirlineY = 130;
 constexpr int16_t kSummaryRouteY = 165;
+// Fits the ~110px of text width between kSummaryTextX and the frame's
+// right edge in LCARS_FONT_BODY (Font2, ~7px/char). setClipRect still
+// guards the pixels; this keeps the string itself sane.
+constexpr int kSummaryMaxAirlineChars = 15;
 
 constexpr int kRingCount = 3;
 constexpr int16_t kBlipRadius = 5;
@@ -74,7 +92,9 @@ void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg
   // Concentric rings at r = radius_px * 1/3, 2/3, 3/3, each with its
   // km label (lcars_theme::drawRadarRing).
   for (int i = 0; i < kRingCount; ++i) {
-    int16_t ringR = static_cast<int16_t>(layout.radius_px * (i + 1) / kRingCount);
+    // Round to nearest so radius 85 lands on the spec's 28/57/85, not 28/56/85.
+    int16_t ringR = static_cast<int16_t>(
+        (layout.radius_px * (i + 1) + kRingCount / 2) / kRingCount);
     if (ringR <= 0) continue;
     int km = static_cast<int>(std::lround(ringsKm[static_cast<size_t>(i)]));
     drawRadarRing(gfx, layout.center_x, layout.center_y, ringR, km, LCARS_CYAN);
@@ -130,7 +150,8 @@ void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, const Air
 
   // Row 2: airline (clipped to the panel by setClipRect above).
   gfx.setFont(LCARS_FONT_BODY);
-  gfx.drawString(summaryAirline(nearest).c_str(), kSummaryTextX, kSummaryAirlineY);
+  gfx.drawString(truncateAirline(summaryAirline(nearest), kSummaryMaxAirlineChars).c_str(),
+                 kSummaryTextX, kSummaryAirlineY);
 
   // Row 3: route, IATA codes only (no country codes — narrow panel).
   gfx.drawString(

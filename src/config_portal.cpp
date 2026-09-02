@@ -122,6 +122,7 @@ void sendConfigPage(const Config &cfg, const char *message, bool isError = false
       "<style>body{font-family:sans-serif;background:#111;color:#eee;padding:1.5em}"
       "label{display:block;margin-top:1em}"
       "input{width:100%;box-sizing:border-box;padding:.4em;font-size:1em}"
+      "input[type=checkbox]{width:auto;margin-left:.5em}"
       "button{margin-top:1.5em;padding:.6em 1.2em;font-size:1em}"
       "h2{margin-top:2em;border-top:1px solid #444;padding-top:1em}"
       "#credit{color:#ffa500;font-weight:bold}</style>");
@@ -170,6 +171,17 @@ void sendConfigPage(const Config &cfg, const char *message, bool isError = false
   std::snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(cfg.poll_interval_s));
   sendChunk("<label>Poll interval, seconds<input type=\"number\" name=\"poll_interval\" min=\"5\" "
             "value=\"");
+  sendChunk(buf);
+  sendChunk("\"></label>");
+
+  sendChunk("<label>Auto-cycle through screens"
+            "<input type=\"checkbox\" name=\"auto_cycle\" value=\"1\"");
+  sendChunk(cfg.auto_cycle_enabled ? " checked" : "");
+  sendChunk("></label>");
+
+  std::snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(cfg.auto_cycle_interval_s));
+  sendChunk("<label>Auto-cycle interval, seconds"
+            "<input type=\"number\" name=\"auto_cycle_interval\" min=\"3\" value=\"");
   sendChunk(buf);
   sendChunk("\"></label>");
 
@@ -246,6 +258,20 @@ void handleSave() {
       rejected += "poll_interval ";
     }
   }
+  // Checkbox: the browser sends this arg only when it's ticked. handleSave
+  // always runs on a full settings-form submit, so a missing arg here
+  // genuinely means "unchecked", not "field absent".
+  cfg.auto_cycle_enabled = server.hasArg("auto_cycle");
+
+  if (server.hasArg("auto_cycle_interval")) {
+    std::string v = server.arg("auto_cycle_interval").c_str();
+    if (isValidUnsignedIntString(v)) {
+      cfg.auto_cycle_interval_s = static_cast<uint32_t>(std::strtoul(v.c_str(), nullptr, 10));
+    } else {
+      rejected += "auto_cycle_interval ";
+    }
+  }
+
   if (server.hasArg("client_id")) cfg.opensky_client_id = server.arg("client_id").c_str();
   if (server.hasArg("client_secret")) {
     cfg.opensky_client_secret = server.arg("client_secret").c_str();

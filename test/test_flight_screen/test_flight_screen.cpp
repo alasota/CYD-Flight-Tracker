@@ -96,7 +96,7 @@ static void test_minutes_rounds_to_nearest_minute(void) {
   TEST_ASSERT_EQUAL_STRING("~4", computeCountdownDisplay(cpaAt(240.0f)).bigText.c_str());
 }
 
-// ---- the four TEMP-harness preview values (main.cpp) --------------------
+// ---- representative countdown values: colour + text spot-checks ---------
 
 static void test_the_four_preview_values(void) {
   CountdownDisplay a = computeCountdownDisplay(cpaAt(45.0f));

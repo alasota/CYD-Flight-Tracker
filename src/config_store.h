@@ -11,6 +11,14 @@
 #include <cstdint>
 #include <string>
 
+// Clamps the auto-cycle interval (see CLAUDE.md "Auto screen cycling") to
+// a sane floor — a few seconds minimum, so the display can't be
+// configured to flip faster than the eye can follow, and never zero
+// (CLAUDE.md's "must be > 0"). No ceiling: a very long interval is a
+// legitimate "basically don't cycle" choice. Pure — no NVS access — so
+// it's covered by native tests.
+uint32_t clampAutoCycleIntervalS(uint32_t interval_s);
+
 // Clamps a persisted screen index to a valid screen_nav index
 // (0 = Flights, 1 = Flight, 2 = Radar — see CLAUDE.md "Screen
 // navigation"). Any out-of-range value (NVS never written, or a stale
@@ -30,6 +38,13 @@ struct Config {
   // restored on boot — replaces the old two-screen `last_view` boolean now
   // that there are three screens (see CLAUDE.md "Screen navigation").
   int last_screen = 0;
+  // Auto screen cycling (CLAUDE.md "Auto screen cycling"). Off by default;
+  // when enabled, the active screen advances every auto_cycle_interval_s
+  // seconds (the Screen 2 "imminent overhead" deferral lives in
+  // screen_nav::shouldDeferAutoSwitch()). Both are user-configurable via
+  // config_portal.
+  bool auto_cycle_enabled = false;
+  uint32_t auto_cycle_interval_s = 15;
   // True once the user has saved the settings form at least once via
   // config_portal. (0, 0) is a real place (Gulf of Guinea) — without this
   // flag there's no way to tell "user hasn't configured their home
@@ -57,3 +72,10 @@ uint32_t clampPollIntervalS(uint32_t poll_interval_s);
 // covered by Unity. Both always sanitize before returning/persisting.
 Config loadConfig();
 void saveConfig(const Config &cfg);
+
+// Persists just the last-active screen index (0/1/2), clamped via
+// clampLastScreen(). A targeted single-key write for the frequently-
+// changing nav state — a screen change (especially under auto-cycle,
+// which fires every few seconds) shouldn't rewrite lat/lon/credentials/
+// every other setting the way saveConfig() does.
+void saveLastScreen(int screen);

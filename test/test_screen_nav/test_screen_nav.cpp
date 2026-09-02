@@ -184,6 +184,88 @@ static void test_bottom_nav_segment_out_of_range_is_empty(void) {
   TEST_ASSERT_EQUAL_INT(0, r.h);
 }
 
+
+// ---- shouldDeferAutoSwitch: hold condition for Screen 2 ----------------
+//
+// defer <=> currentScreen==FLIGHT && cpaFound && -5 < tCpa < 6
+// (both bounds strict — see CLAUDE.md "Auto screen cycling").
+
+static void test_defer_only_on_flight_screen(void) {
+  TEST_ASSERT_TRUE(shouldDeferAutoSwitch(kScreenFlight, true, 3.0f));
+  TEST_ASSERT_FALSE(shouldDeferAutoSwitch(kScreenFlights, true, 3.0f));
+  TEST_ASSERT_FALSE(shouldDeferAutoSwitch(kScreenRadar, true, 3.0f));
+}
+
+static void test_defer_requires_cpa_found(void) {
+  TEST_ASSERT_FALSE(shouldDeferAutoSwitch(kScreenFlight, false, 3.0f));
+  TEST_ASSERT_FALSE(shouldDeferAutoSwitch(kScreenFlight, false, 0.0f));
+  TEST_ASSERT_FALSE(shouldDeferAutoSwitch(kScreenFlight, false, -1.0f));
+}
+
+static void test_defer_inside_window_holds(void) {
+  TEST_ASSERT_TRUE(shouldDeferAutoSwitch(kScreenFlight, true, 5.9f));
+  TEST_ASSERT_TRUE(shouldDeferAutoSwitch(kScreenFlight, true, 0.0f));
+  TEST_ASSERT_TRUE(shouldDeferAutoSwitch(kScreenFlight, true, -4.9f));
+}
+
+static void test_defer_boundary_exactly_6_does_not_hold(void) {
+  // tCpaSeconds < 6 is strict.
+  TEST_ASSERT_FALSE(shouldDeferAutoSwitch(kScreenFlight, true, 6.0f));
+  TEST_ASSERT_TRUE(shouldDeferAutoSwitch(kScreenFlight, true, 5.999f));
+  TEST_ASSERT_FALSE(shouldDeferAutoSwitch(kScreenFlight, true, 6.001f));
+}
+
+static void test_defer_boundary_exactly_minus_5_does_not_hold(void) {
+  // tCpaSeconds > -5 is strict.
+  TEST_ASSERT_FALSE(shouldDeferAutoSwitch(kScreenFlight, true, -5.0f));
+  TEST_ASSERT_TRUE(shouldDeferAutoSwitch(kScreenFlight, true, -4.999f));
+  TEST_ASSERT_FALSE(shouldDeferAutoSwitch(kScreenFlight, true, -5.001f));
+}
+
+static void test_defer_outside_window_switches_normally(void) {
+  TEST_ASSERT_FALSE(shouldDeferAutoSwitch(kScreenFlight, true, 30.0f));
+  TEST_ASSERT_FALSE(shouldDeferAutoSwitch(kScreenFlight, true, 100.0f));
+  TEST_ASSERT_FALSE(shouldDeferAutoSwitch(kScreenFlight, true, -20.0f));
+}
+
+
+// ---- shouldAutoAdvance: "is it time to auto-switch" -------------------
+//
+// advance <=> elapsedMs >= intervalS*1000 && !deferHold. This is the last
+// auto-cycle-related piece that's testable without the device (main.cpp
+// owns only the millis() bookkeeping around it).
+
+static void test_auto_advance_false_before_interval(void) {
+  TEST_ASSERT_FALSE(shouldAutoAdvance(0, 15, false));
+  TEST_ASSERT_FALSE(shouldAutoAdvance(14999, 15, false));
+}
+
+static void test_auto_advance_true_at_and_after_interval(void) {
+  TEST_ASSERT_TRUE(shouldAutoAdvance(15000, 15, false));   // exactly the interval
+  TEST_ASSERT_TRUE(shouldAutoAdvance(15001, 15, false));
+  TEST_ASSERT_TRUE(shouldAutoAdvance(60000, 15, false));   // long overdue
+}
+
+static void test_auto_advance_defer_hold_blocks_switch(void) {
+  // deferHold true -> never advance, however overdue the timer is.
+  TEST_ASSERT_FALSE(shouldAutoAdvance(15000, 15, true));
+  TEST_ASSERT_FALSE(shouldAutoAdvance(600000, 15, true));
+}
+
+static void test_auto_advance_fires_immediately_once_hold_clears(void) {
+  // Same elapsed time, hold just cleared -> advance now (main.cpp doesn't
+  // reset its timer while deferred, so elapsed stays large).
+  TEST_ASSERT_FALSE(shouldAutoAdvance(30000, 15, true));
+  TEST_ASSERT_TRUE(shouldAutoAdvance(30000, 15, false));
+}
+
+static void test_auto_advance_no_overflow_on_huge_interval(void) {
+  // intervalS * 1000 must not wrap uint32: 5,000,000 s * 1000 = 5e9 > 2^32.
+  // 4e9 ms elapsed is still short of a 5e9 ms interval -> no advance.
+  TEST_ASSERT_FALSE(shouldAutoAdvance(4000000000u, 5000000u, false));
+  TEST_ASSERT_TRUE(shouldAutoAdvance(4000000000u, 3000000u, false));  // 3e9 ms interval, reached
+}
+
 int main(int, char **) {
   UNITY_BEGIN();
 
@@ -212,6 +294,19 @@ int main(int, char **) {
   RUN_TEST(test_bottom_nav_segments_jump_to_each_screen);
   RUN_TEST(test_bottom_nav_segments_tile_the_bar_without_gaps);
   RUN_TEST(test_bottom_nav_segment_out_of_range_is_empty);
+
+  RUN_TEST(test_defer_only_on_flight_screen);
+  RUN_TEST(test_defer_requires_cpa_found);
+  RUN_TEST(test_defer_inside_window_holds);
+  RUN_TEST(test_defer_boundary_exactly_6_does_not_hold);
+  RUN_TEST(test_defer_boundary_exactly_minus_5_does_not_hold);
+  RUN_TEST(test_defer_outside_window_switches_normally);
+
+  RUN_TEST(test_auto_advance_false_before_interval);
+  RUN_TEST(test_auto_advance_true_at_and_after_interval);
+  RUN_TEST(test_auto_advance_defer_hold_blocks_switch);
+  RUN_TEST(test_auto_advance_fires_immediately_once_hold_clears);
+  RUN_TEST(test_auto_advance_no_overflow_on_huge_interval);
 
   return UNITY_END();
 }

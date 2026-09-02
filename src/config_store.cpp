@@ -6,6 +6,8 @@ namespace {
 constexpr float kMinRadiusDeg = 0.1f;
 constexpr float kMaxRadiusDeg = 10.0f;
 constexpr uint32_t kMinPollIntervalS = 5;
+// Floor for the screen auto-cycle interval — see clampAutoCycleIntervalS().
+constexpr uint32_t kMinAutoCycleIntervalS = 3;
 constexpr float kMinLatDeg = -90.0f;
 constexpr float kMaxLatDeg = 90.0f;
 constexpr float kMinLonDeg = -180.0f;
@@ -30,6 +32,10 @@ uint32_t clampPollIntervalS(uint32_t poll_interval_s) {
   return std::max(poll_interval_s, kMinPollIntervalS);
 }
 
+uint32_t clampAutoCycleIntervalS(uint32_t interval_s) {
+  return std::max(interval_s, kMinAutoCycleIntervalS);
+}
+
 Config sanitizeConfig(const Config &cfg) {
   Config out = cfg;
   out.home_lat = clampLat(out.home_lat);
@@ -37,6 +43,7 @@ Config sanitizeConfig(const Config &cfg) {
   out.radius_deg = clampRadiusDeg(out.radius_deg);
   out.poll_interval_s = clampPollIntervalS(out.poll_interval_s);
   out.last_screen = clampLastScreen(out.last_screen);
+  out.auto_cycle_interval_s = clampAutoCycleIntervalS(out.auto_cycle_interval_s);
   return out;
 }
 
@@ -60,6 +67,8 @@ Config loadConfig() {
   cfg.opensky_client_id = prefs.getString("os_id", "").c_str();
   cfg.opensky_client_secret = prefs.getString("os_secret", "").c_str();
   cfg.last_screen = clampLastScreen(prefs.getInt("last_screen", cfg.last_screen));
+  cfg.auto_cycle_enabled = prefs.getBool("auto_cyc", cfg.auto_cycle_enabled);
+  cfg.auto_cycle_interval_s = prefs.getUInt("auto_cyc_s", cfg.auto_cycle_interval_s);
   cfg.home_configured = prefs.getBool("home_cfg", cfg.home_configured);
 
   prefs.end();
@@ -79,8 +88,17 @@ void saveConfig(const Config &cfg) {
   prefs.putString("os_id", sanitized.opensky_client_id.c_str());
   prefs.putString("os_secret", sanitized.opensky_client_secret.c_str());
   prefs.putInt("last_screen", sanitized.last_screen);
+  prefs.putBool("auto_cyc", sanitized.auto_cycle_enabled);
+  prefs.putUInt("auto_cyc_s", sanitized.auto_cycle_interval_s);
   prefs.putBool("home_cfg", sanitized.home_configured);
 
+  prefs.end();
+}
+
+void saveLastScreen(int screen) {
+  Preferences prefs;
+  prefs.begin(kNamespace, /*readOnly=*/false);
+  prefs.putInt("last_screen", clampLastScreen(screen));
   prefs.end();
 }
 

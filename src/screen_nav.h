@@ -56,6 +56,46 @@ class ScreenNav {
   int current_ = kScreenFlights;
 };
 
+// ---- Auto screen cycling ------------------------------------------------
+//
+// See CLAUDE.md "Auto screen cycling". The auto-cycle timer itself lives
+// in main.cpp (a millis() delta from the last screen change); the one
+// piece worth isolating and testing here is the "don't interrupt an
+// imminent overhead moment" hold condition.
+//
+// Pure predicate: returns true when an auto-switch should be *deferred*
+// because the Flight screen is showing an aircraft that's about to be (or
+// just was) overhead. Takes t_cpa_seconds as a parameter rather than
+// reaching into cpa_predictor - same decoupling discipline as the rest of
+// the project.
+//
+//   defer  <=>  currentScreen == kScreenFlight
+//           &&  cpaFound
+//           &&  tCpaSeconds < 6      (strictly less - exactly 6 does NOT hold)
+//           &&  tCpaSeconds > -5     (strictly greater - exactly -5 does NOT hold)
+//
+// In plain terms: less than 6 s until overhead -> hold; keep holding
+// through the pass and for 5 s after; tCpaSeconds reaching -5 clears it.
+// The 6 / -5 thresholds are fixed, not user-configurable.
+constexpr float kAutoSwitchHoldBeforeS = 6.0f;
+constexpr float kAutoSwitchHoldAfterS = -5.0f;
+
+bool shouldDeferAutoSwitch(int currentScreen, bool cpaFound, float tCpaSeconds);
+
+// Auto-cycle "advance now?" decision, pure so it's testable without
+// main.cpp or a real millis() clock. Inputs:
+//   elapsedMs  - millis() elapsed since the last screen change
+//   intervalS  - configured auto_cycle_interval_s (config_store)
+//   deferHold  - the current shouldDeferAutoSwitch() result
+//
+//   advance  <=>  elapsedMs >= intervalS * 1000  &&  !deferHold
+//
+// While deferHold is true this stays false and the caller must NOT reset
+// its timer, so the switch fires on the first loop iteration after the
+// hold clears - however long that took. Compared in 64-bit so a large
+// misconfigured interval can't overflow intervalS * 1000.
+bool shouldAutoAdvance(uint32_t elapsedMs, uint32_t intervalS, bool deferHold);
+
 // ---- Touch geometry -------------------------------------------------------
 //
 // The content area sits between the header (top, `headerHeight` px) and

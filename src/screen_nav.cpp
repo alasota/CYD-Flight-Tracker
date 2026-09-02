@@ -91,3 +91,15 @@ NavHit navHitTest(int16_t x, int16_t y, int16_t screenWidth, int16_t screenHeigh
 
   return hit;  // NavAction::None
 }
+
+bool shouldDeferAutoSwitch(int currentScreen, bool cpaFound, float tCpaSeconds) {
+  if (currentScreen != kScreenFlight) return false;
+  if (!cpaFound) return false;
+  return tCpaSeconds < kAutoSwitchHoldBeforeS && tCpaSeconds > kAutoSwitchHoldAfterS;
+}
+
+bool shouldAutoAdvance(uint32_t elapsedMs, uint32_t intervalS, bool deferHold) {
+  if (deferHold) return false;
+  const uint64_t intervalMs = static_cast<uint64_t>(intervalS) * 1000ULL;
+  return static_cast<uint64_t>(elapsedMs) >= intervalMs;
+}

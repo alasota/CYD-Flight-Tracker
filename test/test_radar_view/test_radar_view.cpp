@@ -68,6 +68,56 @@ static void test_radius_deg_to_km_zero(void) {
   TEST_ASSERT_EQUAL_FLOAT(0.0f, radiusDegToKm(0.0f));
 }
 
+
+// ---- truncateAirline ------------------------------------------------------
+
+static void test_truncate_airline_short_string_unchanged(void) {
+  TEST_ASSERT_EQUAL_STRING("Ryanair", truncateAirline("Ryanair", 15).c_str());
+}
+
+static void test_truncate_airline_exact_length_unchanged(void) {
+  // size == maxChars is a fit, not an overflow.
+  TEST_ASSERT_EQUAL_STRING("123456789012345", truncateAirline("123456789012345", 15).c_str());
+}
+
+static void test_truncate_airline_long_string_gets_ellipsis(void) {
+  std::string out = truncateAirline("LOT Polish Airlines", 13);
+  TEST_ASSERT_EQUAL_STRING("LOT Polish...", out.c_str());
+  TEST_ASSERT_TRUE(out.size() <= 13);
+}
+
+static void test_truncate_airline_trims_trailing_space_before_ellipsis(void) {
+  // Head would end "...LOT " — the space is dropped so it's not "LOT ...".
+  TEST_ASSERT_EQUAL_STRING("LOT...", truncateAirline("LOT Airlines", 7).c_str());
+}
+
+static void test_truncate_airline_result_never_exceeds_maxchars(void) {
+  const std::string name = "Scandinavian Airlines System Denmark Norway Sweden";
+  for (int m = 1; m <= 20; ++m) {
+    TEST_ASSERT_TRUE(static_cast<int>(truncateAirline(name, m).size()) <= m);
+  }
+}
+
+static void test_truncate_airline_too_tight_for_ellipsis_hard_cuts(void) {
+  // maxChars < 4 can't fit "X..." — plain cut, no ellipsis.
+  TEST_ASSERT_EQUAL_STRING("Lu", truncateAirline("Lufthansa", 2).c_str());
+  TEST_ASSERT_EQUAL_STRING("Luf", truncateAirline("Lufthansa", 3).c_str());
+}
+
+static void test_truncate_airline_nonpositive_maxchars_is_empty(void) {
+  TEST_ASSERT_EQUAL_STRING("", truncateAirline("Lufthansa", 0).c_str());
+  TEST_ASSERT_EQUAL_STRING("", truncateAirline("Lufthansa", -5).c_str());
+}
+
+static void test_truncate_airline_ascii_ellipsis_only(void) {
+  // Must stay within the bitmap font's 0x20-0x7E range (no "…").
+  std::string out = truncateAirline("Some Very Long Airline Name Ltd", 12);
+  for (char c : out) {
+    TEST_ASSERT_TRUE(static_cast<unsigned char>(c) >= 0x20 &&
+                     static_cast<unsigned char>(c) <= 0x7E);
+  }
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
 
@@ -81,6 +131,15 @@ int main(int argc, char **argv) {
   RUN_TEST(test_radius_deg_to_km_default_radius);
   RUN_TEST(test_radius_deg_to_km_one_degree);
   RUN_TEST(test_radius_deg_to_km_zero);
+
+  RUN_TEST(test_truncate_airline_short_string_unchanged);
+  RUN_TEST(test_truncate_airline_exact_length_unchanged);
+  RUN_TEST(test_truncate_airline_long_string_gets_ellipsis);
+  RUN_TEST(test_truncate_airline_trims_trailing_space_before_ellipsis);
+  RUN_TEST(test_truncate_airline_result_never_exceeds_maxchars);
+  RUN_TEST(test_truncate_airline_too_tight_for_ellipsis_hard_cuts);
+  RUN_TEST(test_truncate_airline_nonpositive_maxchars_is_empty);
+  RUN_TEST(test_truncate_airline_ascii_ellipsis_only);
 
   return UNITY_END();
 }

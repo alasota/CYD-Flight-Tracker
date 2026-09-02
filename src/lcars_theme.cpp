@@ -46,6 +46,8 @@ char phaseIcon(Phase phase) {
 
 #ifdef ARDUINO
 
+#include "screen_nav.h"  // kScreenCount, bottomNavBounds(), bottomNavSegment()
+
 const lgfx::IFont *const LCARS_FONT_HEADING = &fonts::Font4;
 const lgfx::IFont *const LCARS_FONT_BODY = &fonts::Font2;
 const lgfx::IFont *const LCARS_FONT_NUMERIC = &fonts::Font7;
@@ -145,6 +147,34 @@ void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int1
   gfx.setTextDatum(middle_center);
   gfx.setTextColor(textColor, fillColor);
   gfx.drawString(label, static_cast<int16_t>(x + w / 2), static_cast<int16_t>(y + h / 2));
+}
+
+void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t screenHeight) {
+  // Repaint the whole strip first so a screen change doesn't leave the
+  // previous active bar behind.
+  Rect bar = bottomNavBounds(screenWidth, screenHeight);
+  gfx.fillRect(bar.x, bar.y, bar.w, bar.h, LCARS_BLACK);
+
+  constexpr int16_t kPillHeight = 6;
+
+  for (int i = 0; i < kScreenCount; ++i) {
+    Rect seg = bottomNavSegment(i, screenWidth, screenHeight);
+    const bool active = (i == activeIndex);
+
+    // Active: a wide filled bar spanning ~60% of the segment. Inactive: a
+    // short outline dot. Both centred in the segment.
+    const int16_t pillW = active ? static_cast<int16_t>(seg.w * 3 / 5) : kPillHeight * 2;
+    const int16_t px = static_cast<int16_t>(seg.x + (seg.w - pillW) / 2);
+    const int16_t py = static_cast<int16_t>(seg.y + (seg.h - kPillHeight) / 2);
+    const int16_t r = kPillHeight / 2;
+
+    if (active) {
+      gfx.fillRoundRect(px, py, pillW, kPillHeight, r, LCARS_ORANGE);
+    } else {
+      gfx.fillRoundRect(px, py, pillW, kPillHeight, r, LCARS_NAV_INACTIVE);
+      gfx.drawRoundRect(px, py, pillW, kPillHeight, r, LCARS_CYAN);
+    }
+  }
 }
 
 #endif  // ARDUINO
