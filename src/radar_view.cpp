@@ -17,8 +17,10 @@ RadarLayout computeRadarLayout(int16_t x, int16_t y, int16_t w, int16_t h, int16
   if (diameter < 0) diameter = 0;
 
   layout.radius_px = static_cast<int16_t>(diameter / 2);
-  layout.center_x = static_cast<int16_t>(x + w / 2);
-  layout.center_y = static_cast<int16_t>(y + h / 2);
+  // Round the centre to nearest so an odd content height (y:28..225 -> 197)
+  // lands on CLAUDE.md's stated (95, 127) rather than 1px low.
+  layout.center_x = static_cast<int16_t>(x + (w + 1) / 2);
+  layout.center_y = static_cast<int16_t>(y + (h + 1) / 2);
   return layout;
 }
 
@@ -51,11 +53,11 @@ namespace {
 // Fixed content-area layout, absolute coords on the 320x240 frame, below
 // the 25px status_bar header — CLAUDE.md "Screen 3".
 constexpr int16_t kContentTop = 28;
-constexpr int16_t kContentHeight = 210;  // y:28..238
+constexpr int16_t kContentHeight = 197;  // y:28..225 (bottom nav reserves 225..240)
 
 constexpr int16_t kRadarZoneX = 0;
 constexpr int16_t kRadarZoneW = 190;
-constexpr int16_t kRadarMargin = 10;  // -> center (95,133), radius 85
+constexpr int16_t kRadarMargin = 10;  // -> center (95,127), radius 85
 
 constexpr int16_t kDividerX = 192;
 constexpr int16_t kDividerW = 8;  // x:192..200
@@ -65,9 +67,9 @@ constexpr int16_t kSummaryW = 120;  // x:200..320
 constexpr int16_t kSummaryCorner = 12;
 constexpr int16_t kSummaryThickness = 3;
 constexpr int16_t kSummaryTextX = 208;   // inside the frame, clear of the swept corner
-constexpr int16_t kSummaryFlightY = 95;  // three-row baselines from CLAUDE.md
-constexpr int16_t kSummaryAirlineY = 130;
-constexpr int16_t kSummaryRouteY = 165;
+constexpr int16_t kSummaryFlightY = 92;  // three-row baselines from CLAUDE.md
+constexpr int16_t kSummaryAirlineY = 127;  // (shifted up for the y:28..225 zone)
+constexpr int16_t kSummaryRouteY = 162;
 // Fits the ~110px of text width between kSummaryTextX and the frame's
 // right edge in LCARS_FONT_BODY (Font2, ~7px/char). setClipRect still
 // guards the pixels; this keeps the string itself sane.

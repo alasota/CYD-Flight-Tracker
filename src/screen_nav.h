@@ -10,6 +10,7 @@
 
 #include <cstdint>
 
+#include "lcars_theme.h"  // LCARS_HEADER_HEIGHT, LCARS_BOTTOM_NAV_HEIGHT
 #include "touch_input.h"  // Rect, hitTest
 
 // Screen order (also the persisted `last_screen` value in config_store):
@@ -99,12 +100,19 @@ bool shouldAutoAdvance(uint32_t elapsedMs, uint32_t intervalS, bool deferHold);
 // ---- Touch geometry -------------------------------------------------------
 //
 // The content area sits between the header (top, `headerHeight` px) and
-// the bottom nav bar (`kBottomNavHeight` px at the very bottom). The
-// outer ~18% of width on each side, within that content area, are the
-// screen-switch edge strips; the middle is left alone for screen-specific
-// interactions (e.g. Screen 1's table pagination).
-
-constexpr int16_t kBottomNavHeight = 18;
+// the bottom nav bar. The outer ~18% of width on each side, within that
+// content area, are the screen-switch edge strips; the middle is left
+// alone for screen-specific interactions (e.g. Screen 1's table
+// pagination).
+//
+// The bottom nav bar only *draws* LCARS_BOTTOM_NAV_HEIGHT (15) px tall
+// (y:225..240 on the 240px panel), but 15px is a cramped finger target,
+// so navHitTest() treats a tap anywhere in the taller band y:215..240 as
+// a nav-bar tap (CLAUDE.md "Screen navigation" — "treat y > 215 as bottom
+// nav for touch purposes even though the bar only draws from y:225"). The
+// edge strips stop at the visual bar top (y:225); the nav bar's priority
+// in navHitTest() resolves the 215..225 overlap.
+constexpr int16_t kBottomNavTouchExtra = 10;
 // Edge strip width as a percentage of screen width, per side.
 constexpr int16_t kEdgeStripPercent = 18;
 
@@ -113,8 +121,10 @@ Rect leftEdgeZone(int16_t screenWidth, int16_t screenHeight, int16_t headerHeigh
 // Right edge strip: tapping it goes to the next screen.
 Rect rightEdgeZone(int16_t screenWidth, int16_t screenHeight, int16_t headerHeight);
 
-// Full bottom nav bar, and the bounds of one of its `kScreenCount`
-// equal-width tappable segments (segment i jumps directly to screen i).
+// The bottom nav bar as it is *drawn* (y:225..240, LCARS_BOTTOM_NAV_HEIGHT
+// tall), and the bounds of one of its `kScreenCount` equal-width segments
+// (segment i jumps directly to screen i). navHitTest() accepts taps in a
+// taller band than this — see kBottomNavTouchExtra.
 Rect bottomNavBounds(int16_t screenWidth, int16_t screenHeight);
 Rect bottomNavSegment(int index, int16_t screenWidth, int16_t screenHeight);
 
@@ -130,7 +140,7 @@ struct NavHit {
   int target = -1;  // valid screen index only when action == JumpTo
 };
 
-// Classifies a tap. The bottom nav bar takes priority over the edge
-// strips where they'd overlap (the strips stop above the nav bar anyway).
+// Classifies a tap. The bottom nav bar (touch band y:215..240) takes
+// priority over the edge strips (y:headerHeight..225) where they overlap.
 NavHit navHitTest(int16_t x, int16_t y, int16_t screenWidth, int16_t screenHeight,
                   int16_t headerHeight);

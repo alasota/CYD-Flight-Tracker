@@ -8,7 +8,7 @@
 //   - identity panel   y:28..78   — same LCARS_MAGENTA elbow frame as
 //                                    featured_panel, text via aircraft_summary
 //   - countdown zone    y:82..195  — giant digits, colour-coded by urgency
-//   - status strip      y:200..238 — a text label matching the countdown state
+//   - status strip      y:200..225 — a text label matching the countdown state
 //
 // Zero networking code — draws from an already-enriched AircraftRow
 // (table_view's type), its two route-endpoint AirportInfos, and a
@@ -40,7 +40,7 @@ int16_t flightIdentityHeightPx();   // 50   (28..78)
 int16_t flightCountdownTopPx();     // 82
 int16_t flightCountdownHeightPx();  // 113  (82..195)
 int16_t flightStatusTopPx();        // 200
-int16_t flightStatusHeightPx();     // 38   (200..238)
+int16_t flightStatusHeightPx();     // 25   (200..225)
 
 // How the countdown zone renders a given CpaPrediction.
 struct CountdownDisplay {

@@ -44,12 +44,12 @@ static void test_layout_margin_too_large_yields_zero_radius(void) {
 }
 
 static void test_screen3_radar_zone_resolves_to_spec_center_and_radius(void) {
-  // CLAUDE.md "Screen 3": radar zone x:0..190, y:28..238 (h 210), 10px
-  // margin -> center (95,133), radius 85 — the exact values
+  // CLAUDE.md "Screen 3": radar zone x:0..190, y:28..225 (h 197), 10px
+  // margin -> center (95,127), radius 85 — the exact values
   // radar_geometry::polarToScreen()/ring math is tested against.
-  RadarLayout layout = computeRadarLayout(0, 28, 190, 210, 10);
+  RadarLayout layout = computeRadarLayout(0, 28, 190, 197, 10);
   TEST_ASSERT_EQUAL_INT(95, layout.center_x);
-  TEST_ASSERT_EQUAL_INT(133, layout.center_y);
+  TEST_ASSERT_EQUAL_INT(127, layout.center_y);
   TEST_ASSERT_EQUAL_INT(85, layout.radius_px);
 }
 

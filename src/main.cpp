@@ -218,7 +218,7 @@ static void handleTap(int16_t x, int16_t y) {
 
   Rect nextZone;
   nextZone.x = 0;
-  nextZone.y = static_cast<int16_t>(screenH - kBottomNavHeight - kPageTapZoneHeight);
+  nextZone.y = static_cast<int16_t>(screenH - LCARS_BOTTOM_NAV_HEIGHT - kPageTapZoneHeight);
   nextZone.w = screenW;
   nextZone.h = kPageTapZoneHeight;
 

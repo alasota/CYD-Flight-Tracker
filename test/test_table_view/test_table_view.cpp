@@ -304,14 +304,15 @@ static void test_table_shows_exactly_five_rows_per_page(void) {
   TEST_ASSERT_EQUAL_INT(5, tableRowsPerPage());
 }
 
-static void test_table_row_step_is_18px_from_y140(void) {
-  // Rows at y = 140, 158, 176, 194, 212 — an 18px step from y:140.
-  TEST_ASSERT_EQUAL_INT(18, tableRowHeightPx());
-  TEST_ASSERT_EQUAL_INT(140, tableFirstRowY());
-  // The 5th row's top stays on the 320x240 frame.
+static void test_table_row_step_is_17px_from_y138(void) {
+  // Rows at y = 138, 155, 172, 189, 206 — a 17px step from y:138 (CLAUDE.md
+  // "Screen 1", tightened from 18px/y:140 for the y:225 content bound).
+  TEST_ASSERT_EQUAL_INT(17, tableRowHeightPx());
+  TEST_ASSERT_EQUAL_INT(138, tableFirstRowY());
   int16_t lastRowY = static_cast<int16_t>(tableFirstRowY() + (kTableRowsPerPage - 1) * tableRowHeightPx());
-  TEST_ASSERT_EQUAL_INT(212, lastRowY);
-  TEST_ASSERT_TRUE(lastRowY + tableRowHeightPx() <= 240);
+  TEST_ASSERT_EQUAL_INT(206, lastRowY);
+  // The 5th row's ~15px of text ends inside the 225px content boundary.
+  TEST_ASSERT_TRUE(lastRowY + tableRowHeightPx() <= 225);
 }
 
 static void test_page_count_uses_fixed_five_row_pages(void) {
@@ -413,7 +414,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_split_featured_and_rest_empty);
 
   RUN_TEST(test_table_shows_exactly_five_rows_per_page);
-  RUN_TEST(test_table_row_step_is_18px_from_y140);
+  RUN_TEST(test_table_row_step_is_17px_from_y138);
   RUN_TEST(test_page_count_uses_fixed_five_row_pages);
 
   RUN_TEST(test_page_count_zero_records);

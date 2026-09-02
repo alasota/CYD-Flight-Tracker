@@ -21,13 +21,14 @@ static void test_zone_geometry_matches_spec(void) {
   TEST_ASSERT_EQUAL_INT(82, flightCountdownTopPx());
   TEST_ASSERT_EQUAL_INT(113, flightCountdownHeightPx());
   TEST_ASSERT_EQUAL_INT(200, flightStatusTopPx());
-  TEST_ASSERT_EQUAL_INT(38, flightStatusHeightPx());
+  TEST_ASSERT_EQUAL_INT(25, flightStatusHeightPx());  // y:200..225
 }
 
 static void test_zones_do_not_overlap_and_fit_on_screen(void) {
   TEST_ASSERT_TRUE(flightIdentityTopPx() + flightIdentityHeightPx() <= flightCountdownTopPx());
   TEST_ASSERT_TRUE(flightCountdownTopPx() + flightCountdownHeightPx() <= flightStatusTopPx());
-  TEST_ASSERT_TRUE(flightStatusTopPx() + flightStatusHeightPx() <= 240);
+  // Status strip ends at the content boundary (240 - 15px bottom nav).
+  TEST_ASSERT_TRUE(flightStatusTopPx() + flightStatusHeightPx() <= 225);
   TEST_ASSERT_TRUE(flightIdentityTopPx() >= 25);  // clears the status_bar header
 }
 

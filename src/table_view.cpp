@@ -114,12 +114,12 @@ FeaturedSplit splitFeaturedAndRest(const std::vector<AircraftRow> &rows) {
 namespace {
 // Fixed layout from CLAUDE.md "Screen 1" — absolute y on the 320x240
 // frame, below the 25px status_bar header.
-constexpr int16_t kSubHeaderY = 108;   // cyan "FLIGHTS" bar
-constexpr int16_t kSubHeaderH = 15;
-constexpr int16_t kColHeaderY = 125;   // orange "|"-separated column labels
-constexpr int16_t kColHeaderH = 14;
-constexpr int16_t kFirstRowY = 140;
-constexpr int16_t kRowStep = 18;
+constexpr int16_t kSubHeaderY = 108;   // cyan "FLIGHTS" bar, y:108..118
+constexpr int16_t kSubHeaderH = 10;    // thin label strip (CLAUDE.md "Screen 1")
+constexpr int16_t kColHeaderY = 119;   // orange "|"-separated column labels, y:119..134
+constexpr int16_t kColHeaderH = 15;    // text centered ~y:127
+constexpr int16_t kFirstRowY = 138;    // rows at 138,155,172,189,206 (last text ends ~y:222)
+constexpr int16_t kRowStep = 17;       // tightened from 18 for the y:225 content bound
 
 // Column x-offsets, as fractions of the content width, for drawTableRows()
 // below — named rather than left as bare literals inline (review notes
@@ -217,7 +217,7 @@ void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, const Airpor
   gfx.setTextColor(LCARS_BLACK, LCARS_CYAN);
   gfx.drawString("FLIGHTS", 4, static_cast<int16_t>(kSubHeaderY + kSubHeaderH / 2));
 
-  // Orange column-header row at y:125 — one "|"-separated string, black
+  // Orange column-header row at y:119..134 (text centred ~y:127) — one "|"-separated string, black
   // text (ASCII only: bitmap fonts don't carry the Polish diacritics, per
   // CLAUDE.md table_view note — so "SKAD"/"DOKAD", not "SKĄD"/"DOKĄD").
   gfx.fillRect(0, kColHeaderY, screenWidth, kColHeaderH, LCARS_ORANGE);
@@ -225,7 +225,7 @@ void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, const Airpor
   gfx.drawString("LOT | LINIA | SKAD | DOKAD | TYP | FAZA", 4,
                  static_cast<int16_t>(kColHeaderY + kColHeaderH / 2));
 
-  // Exactly 5 data rows from y:140, over the list *without* the featured
+  // Exactly 5 data rows from y:138 (17px step), over the list *without* the featured
   // aircraft; paging swaps which 5 (not scrolling).
   std::vector<AircraftRow> pageRows = getPageSlice(split.rest, page, kTableRowsPerPage);
   drawTableRows(gfx, pageRows, screenWidth);

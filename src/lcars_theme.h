@@ -34,6 +34,13 @@ constexpr uint16_t LCARS_YELLOW = 0xFFE0;   // radar home crosshair, "imminent" 
 // y = LCARS_HEADER_HEIGHT so all three stay visually aligned.
 constexpr int16_t LCARS_HEADER_HEIGHT = 25;
 
+// Height of the persistent bottom nav bar (CLAUDE.md "Screen navigation").
+// Every screen's content area is bounded below by this: it runs from
+// y = LCARS_HEADER_HEIGHT (28) to y = 240 - LCARS_BOTTOM_NAV_HEIGHT (225),
+// NOT all the way to 240 — the bar draws in y:225..240. (screen_nav gives
+// its touch hit-zone a bit more vertical slack than these 15px.)
+constexpr int16_t LCARS_BOTTOM_NAV_HEIGHT = 15;
+
 // Bottom-nav inactive-segment fill - a dim slate so unselected segments
 // read as recessed against LCARS_BLACK while the active one (LCARS_ORANGE)
 // pops. Not part of CLAUDE.md's five-colour palette (that's the canonical

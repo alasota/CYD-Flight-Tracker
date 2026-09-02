@@ -10,7 +10,7 @@ constexpr int16_t kIdentityHeight = 50;   // y:28..78
 constexpr int16_t kCountdownTop = 82;
 constexpr int16_t kCountdownHeight = 113;  // y:82..195
 constexpr int16_t kStatusTop = 200;
-constexpr int16_t kStatusHeight = 38;      // y:200..238
+constexpr int16_t kStatusHeight = 25;      // y:200..225 (was 238 — bottom nav reserves 225..240)
 
 // Empty-state colour — deliberately outside the urgency palette
 // ("no colour-coding" in CLAUDE.md).
@@ -141,7 +141,7 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
   }
   gfx.setTextSize(1);  // don't leak scale to later draws
 
-  // ---- Status strip, y:200..238 — label matching the countdown state.
+  // ---- Status strip, y:200..225 — label matching the countdown state.
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_center);
   gfx.setTextColor(cd.color, LCARS_BLACK);

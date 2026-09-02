@@ -15,10 +15,16 @@ int16_t edgeStripWidth(int16_t screenWidth) {
   return static_cast<int16_t>(static_cast<int>(screenWidth) * kEdgeStripPercent / 100);
 }
 
-// Bottom of the content area — where the edge strips stop and the nav bar
-// begins.
+// Bottom of the content area — where the edge strips stop (also the top
+// of the *visually drawn* nav bar): y:225 on a 240px panel.
 int16_t contentBottom(int16_t screenHeight) {
-  return static_cast<int16_t>(screenHeight - kBottomNavHeight);
+  return static_cast<int16_t>(screenHeight - LCARS_BOTTOM_NAV_HEIGHT);
+}
+
+// Top of the nav bar's touch band — kBottomNavTouchExtra px above where
+// the bar draws, so a 15px bar isn't a painful tap target (y:215).
+int16_t navTouchTop(int16_t screenHeight) {
+  return static_cast<int16_t>(screenHeight - LCARS_BOTTOM_NAV_HEIGHT - kBottomNavTouchExtra);
 }
 
 }  // namespace
@@ -45,9 +51,9 @@ Rect rightEdgeZone(int16_t screenWidth, int16_t screenHeight, int16_t headerHeig
 Rect bottomNavBounds(int16_t screenWidth, int16_t screenHeight) {
   Rect r;
   r.x = 0;
-  r.y = contentBottom(screenHeight);
+  r.y = static_cast<int16_t>(screenHeight - LCARS_BOTTOM_NAV_HEIGHT);  // y:225
   r.w = screenWidth;
-  r.h = kBottomNavHeight;
+  r.h = LCARS_BOTTOM_NAV_HEIGHT;  // draws 15px; navHitTest() accepts a taller band
   return r;
 }
 
@@ -69,15 +75,19 @@ NavHit navHitTest(int16_t x, int16_t y, int16_t screenWidth, int16_t screenHeigh
                   int16_t headerHeight) {
   NavHit hit;
 
-  if (hitTest(x, y, bottomNavBounds(screenWidth, screenHeight))) {
+  // Bottom nav bar first — its touch band (y:215..240) is taller than the
+  // 15px it draws, and it wins the y:215..225 overlap with the edge
+  // strips. Segment is picked by x only (the whole band is the bar).
+  if (y >= navTouchTop(screenHeight) && y < screenHeight && x >= 0 && x < screenWidth) {
     for (int i = 0; i < kScreenCount; ++i) {
-      if (hitTest(x, y, bottomNavSegment(i, screenWidth, screenHeight))) {
+      Rect seg = bottomNavSegment(i, screenWidth, screenHeight);
+      if (x >= seg.x && x < static_cast<int16_t>(seg.x + seg.w)) {
         hit.action = NavAction::JumpTo;
         hit.target = i;
         return hit;
       }
     }
-    return hit;  // inside the bar but between segments (shouldn't happen) — no-op
+    return hit;  // in the band but between segments (shouldn't happen) — no-op
   }
 
   if (hitTest(x, y, leftEdgeZone(screenWidth, screenHeight, headerHeight))) {

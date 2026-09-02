@@ -42,6 +42,12 @@ static void test_lcars_header_height(void) {
   TEST_ASSERT_EQUAL_INT(25, LCARS_HEADER_HEIGHT);
 }
 
+static void test_lcars_bottom_nav_height(void) {
+  TEST_ASSERT_EQUAL_INT(15, LCARS_BOTTOM_NAV_HEIGHT);
+  // Content area is header..(240 - bottom nav) = 28..225.
+  TEST_ASSERT_EQUAL_INT(225, 240 - LCARS_BOTTOM_NAV_HEIGHT);
+}
+
 // ---- elbowArcPoint ---------------------------------------------------------
 
 static void test_elbow_arc_point_cardinal_angles(void) {
@@ -170,6 +176,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_rgb565_palette_constants);
   RUN_TEST(test_canonical_palette_values);
   RUN_TEST(test_lcars_header_height);
+  RUN_TEST(test_lcars_bottom_nav_height);
 
   RUN_TEST(test_elbow_arc_point_cardinal_angles);
   RUN_TEST(test_elbow_arc_point_zero_radius);

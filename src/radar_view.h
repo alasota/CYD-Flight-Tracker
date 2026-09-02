@@ -25,8 +25,8 @@
 // Center and radius (px) of the largest circle that fits within
 // [x, y, w, h] with `margin` px of padding on every side — the single
 // source of truth for where drawRadarView() places the plot. Screen 3
-// calls this with the fixed radar zone (x:0..190, y:28..238) and a 10px
-// margin, which resolves to center (95, 133) / radius 85 — the values
+// calls this with the fixed radar zone (x:0..190, y:28..225) and a 10px
+// margin, which resolves to center (95, 127) / radius 85 — the values
 // radar_geometry's polarToScreen()/ring math is exercised with.
 struct RadarLayout {
   int16_t center_x = 0;
@@ -73,7 +73,7 @@ std::string truncateAirline(const std::string &s, int maxChars);
 // Draws Screen 3's content area (below the 25px status_bar header) across
 // a `screenWidth`-px display, at the fixed CLAUDE.md "Screen 3" layout:
 //   - radar plot   x:0..190   — home crosshair (LCARS_YELLOW) at center
-//     (95,133), 3 concentric rings (radar_geometry::computeRingDistances)
+//     (95,127), 3 concentric rings (radar_geometry::computeRingDistances)
 //     at r=28/57/85 with km labels, and a ~5px LCARS_CYAN blip per row
 //     with a known distance/bearing (positioned via polarToScreen); a row
 //     beyond `radius_deg` range is clamped to the outer ring and drawn

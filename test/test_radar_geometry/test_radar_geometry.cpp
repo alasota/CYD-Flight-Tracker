@@ -151,43 +151,43 @@ static void test_ring_distances_zero_or_negative_count_is_empty(void) {
 }
 
 // ---- polarToScreen: Screen 3's real plot geometry ------------------------
-// center (95,133), radius 85px (see CLAUDE.md "Screen 3 — Radar"). Scan
+// center (95,127), radius 85px (see CLAUDE.md "Screen 3 — Radar"). Scan
 // radius is set to 85 km here so distance maps 1:1 to pixels, keeping the
 // expected coordinates exact.
 static constexpr int16_t kS3Cx = 95;
-static constexpr int16_t kS3Cy = 133;
+static constexpr int16_t kS3Cy = 127;
 static constexpr int16_t kS3RadiusPx = 85;
 static constexpr float kS3MaxKm = 85.0f;
 
 static void test_s3_north_edge(void) {
   ScreenPoint p = polarToScreen(0.0f, 85.0f, kS3MaxKm, kS3Cx, kS3Cy, kS3RadiusPx);
   TEST_ASSERT_EQUAL_INT(95, p.x);
-  TEST_ASSERT_EQUAL_INT(48, p.y);  // 133 - 85
+  TEST_ASSERT_EQUAL_INT(42, p.y);  // 127 - 85
   TEST_ASSERT_FALSE(p.clamped);
 }
 
 static void test_s3_east_edge(void) {
   ScreenPoint p = polarToScreen(90.0f, 85.0f, kS3MaxKm, kS3Cx, kS3Cy, kS3RadiusPx);
   TEST_ASSERT_EQUAL_INT(180, p.x);  // 95 + 85
-  TEST_ASSERT_EQUAL_INT(133, p.y);
+  TEST_ASSERT_EQUAL_INT(127, p.y);
 }
 
 static void test_s3_south_edge(void) {
   ScreenPoint p = polarToScreen(180.0f, 85.0f, kS3MaxKm, kS3Cx, kS3Cy, kS3RadiusPx);
   TEST_ASSERT_EQUAL_INT(95, p.x);
-  TEST_ASSERT_EQUAL_INT(218, p.y);  // 133 + 85
+  TEST_ASSERT_EQUAL_INT(212, p.y);  // 127 + 85
 }
 
 static void test_s3_west_edge(void) {
   ScreenPoint p = polarToScreen(270.0f, 85.0f, kS3MaxKm, kS3Cx, kS3Cy, kS3RadiusPx);
   TEST_ASSERT_EQUAL_INT(10, p.x);  // 95 - 85
-  TEST_ASSERT_EQUAL_INT(133, p.y);
+  TEST_ASSERT_EQUAL_INT(127, p.y);
 }
 
 static void test_s3_center_when_distance_zero(void) {
   ScreenPoint p = polarToScreen(123.0f, 0.0f, kS3MaxKm, kS3Cx, kS3Cy, kS3RadiusPx);
   TEST_ASSERT_EQUAL_INT(95, p.x);
-  TEST_ASSERT_EQUAL_INT(133, p.y);
+  TEST_ASSERT_EQUAL_INT(127, p.y);
   TEST_ASSERT_FALSE(p.clamped);
 }
 
@@ -195,13 +195,13 @@ static void test_s3_fractional_distance_north(void) {
   // 17 km of 85 -> 17 px toward the top.
   ScreenPoint p = polarToScreen(0.0f, 17.0f, kS3MaxKm, kS3Cx, kS3Cy, kS3RadiusPx);
   TEST_ASSERT_EQUAL_INT(95, p.x);
-  TEST_ASSERT_EQUAL_INT(116, p.y);  // 133 - 17
+  TEST_ASSERT_EQUAL_INT(110, p.y);  // 127 - 17
 }
 
 static void test_s3_diagonal_lands_on_circle(void) {
   ScreenPoint p = polarToScreen(45.0f, 85.0f, kS3MaxKm, kS3Cx, kS3Cy, kS3RadiusPx);
   TEST_ASSERT_INT_WITHIN(1, 155, p.x);  // 95 + 85*sin45 ~= 155
-  TEST_ASSERT_INT_WITHIN(1, 73, p.y);   // 133 - 85*cos45 ~= 73
+  TEST_ASSERT_INT_WITHIN(1, 67, p.y);   // 127 - 85*cos45 ~= 67
   float dx = static_cast<float>(p.x - kS3Cx);
   float dy = static_cast<float>(p.y - kS3Cy);
   TEST_ASSERT_FLOAT_WITHIN(1.0f, 85.0f, sqrtf(dx * dx + dy * dy));
@@ -211,7 +211,7 @@ static void test_s3_beyond_scan_radius_clamps_to_ring(void) {
   ScreenPoint p = polarToScreen(90.0f, 200.0f, kS3MaxKm, kS3Cx, kS3Cy, kS3RadiusPx);
   TEST_ASSERT_TRUE(p.clamped);
   TEST_ASSERT_EQUAL_INT(180, p.x);  // still exactly on the outer ring
-  TEST_ASSERT_EQUAL_INT(133, p.y);
+  TEST_ASSERT_EQUAL_INT(127, p.y);
 }
 
 int main(int argc, char **argv) {
