@@ -70,12 +70,9 @@ void aircraftLookupClearCacheForTesting() { cache.clear(); }
 
 #include <cstdio>
 
-namespace {
+#include "net_config.h"  // shared HTTP timeouts (review notes 5.1)
 
-// See CLAUDE.md review notes 1.1/5.1 — bounds how long a single hexdb.io
-// lookup can block loop().
-constexpr int32_t kHttpConnectTimeoutMs = 5000;
-constexpr uint16_t kHttpTimeoutMs = 8000;
+namespace {
 
 FetchResult httpFetchAircraftJson(const std::string &icao24) {
   FetchResult result;
@@ -97,7 +94,7 @@ FetchResult httpFetchAircraftJson(const std::string &icao24) {
 
   HTTPClient http;
   http.setConnectTimeout(kHttpConnectTimeoutMs);
-  http.setTimeout(kHttpTimeoutMs);
+  http.setTimeout(kHexdbHttpTimeoutMs);
   if (!http.begin(client, url)) {
     return result;
   }

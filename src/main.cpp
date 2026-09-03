@@ -16,12 +16,14 @@
 //     Otherwise, on the Flights screen, a tap in the top/bottom row strip
 //     pages the table (swap which 5 rows show — never scroll).
 //   - Once per config_store's poll_interval_s (opensky_client's own
-//     scheduler): fetch Aircraft[] from OpenSky; if home isn't configured
-//     yet (config_store's home_configured) show a setup prompt instead;
-//     otherwise enrich each row (aircraft_lookup + route_lookup, both
-//     cached, together capped at kMaxNewLookupsPerPoll *new* HTTP calls
-//     per cycle — review notes 1.1), annotate distance + flight phase,
-//     sort by distance, look up the nearest aircraft's route airports,
+//     scheduler): fetch Aircraft[] from OpenSky. A failed poll (auth /
+//     rate-limit / network) keeps the last good list on screen and shows a
+//     header health tag rather than blanking (review notes 1.2-1.4); if
+//     home isn't configured yet a setup prompt is shown instead. On a
+//     clean poll: rank aircraft nearest-first, then enrich only as many as
+//     lookup_budget's planLookups() allows new HTTP calls for this cycle
+//     (kDefaultLookupBudget — review notes 1.1/3.2), annotate distance +
+//     flight phase, sort, look up the nearest aircraft's route airports,
 //     and recompute its closest-point-of-approach time (cpa_predictor).
 //   - The Flight screen's countdown ticks locally every second between
 //     polls: currentCpa() extrapolates lastPolledCpa forward by the
@@ -56,6 +58,7 @@
 #include "cpa_predictor.h"
 #include "flight_screen.h"
 #include "lcars_theme.h"
+#include "lookup_budget.h"
 #include "opensky_client.h"
 #include "radar_view.h"
 #include "route_lookup.h"
@@ -81,17 +84,28 @@ static AirportInfo lastOriginAirport;  // nearest row's route origin, if resolve
 static AirportInfo lastDestAirport;    // nearest row's route destination, if resolved
 static float lastRadiusDeg = 2.5f;     // config_store's default — updated every poll
 
-// Auto screen cycling state (CLAUDE.md "Auto screen cycling"). The two
-// config values are cached (refreshed at boot and every poll) so loop()
-// doesn't hit NVS every iteration; lastScreenChangeMs is the timer base,
-// reset by onScreenChanged() on every screen change — manual or auto.
-static bool autoCycleEnabled = false;
-static uint32_t autoCycleIntervalS = 15;
-static bool homeConfigured = false;
+// Whole config, loaded once at boot and refreshed after every poll that
+// actually ran (review notes 4.3) — loop() and openSkyClientPoll() read
+// this instead of hitting NVS every iteration. A config_portal save is
+// picked up within one poll interval.
+static Config cachedCfg;
+
+// lastScreenChangeMs is the auto-cycle timer base, reset by
+// onScreenChanged() on every screen change — manual or auto.
 static uint32_t lastScreenChangeMs = 0;
 static int currentPage = 0;
 static bool screenNeedsRedraw = false;
-static bool setupPromptShown = false;
+
+// last_screen NVS-write debouncing (review notes 5.9): what we last wrote,
+// and when — so an auto-cycle firing every few seconds doesn't rewrite the
+// same key thousands of times a day.
+static int lastPersistedScreen = 0;
+static uint32_t lastScreenPersistMs = 0;
+
+// OpenSky feed health from the most recent poll — drives the header tag
+// and whether a failed poll is allowed to blank the aircraft list (it
+// isn't — review notes 1.2).
+static OpenSkyHealth lastHealth = OpenSkyHealth::Ok;
 
 // Closest-point-of-approach for the nearest aircraft, as computed at the
 // last poll, plus the millis() timestamp of that poll — currentCpa()
@@ -104,26 +118,10 @@ static uint32_t lastCpaPollMs = 0;
 // own row height, so the two can't drift apart (review notes 5.5).
 static const int16_t kPageTapZoneHeight = tableRowHeightPx();
 
-// How many *new* (uncached) aircraft_lookup/route_lookup HTTP calls one
-// poll cycle is allowed to make, combined — each blocks loop() for up to a
-// few seconds (review notes 1.1). Aircraft past the budget render as "--"
-// this cycle and get their turn on a later poll.
-static constexpr int kMaxNewLookupsPerPoll = 5;
-
-// flight_phase thresholds for classifyPhases() (CLAUDE.md "Flight phase").
-// near_airport_km is really "near HOME" — this project has no airport
-// coordinate database, only country codes, so distance from the configured
-// home position is what's actually available.
-static constexpr float kNearAirportKm = 15.0f;
-static constexpr float kClimbThresholdMps = 3.0f;
-
-// Nearest aircraft's CPA, extrapolated from the last poll to "now".
+// Nearest aircraft's CPA, extrapolated from the last poll to "now"
+// (cpa_predictor owns the math — review notes 3.4).
 static CpaPrediction currentCpa() {
-  CpaPrediction p = lastPolledCpa;
-  if (p.found) {
-    p.t_cpa_seconds -= static_cast<float>(millis() - lastCpaPollMs) / 1000.0f;
-  }
-  return p;
+  return extrapolateCpa(lastPolledCpa, millis() - lastCpaPollMs);
 }
 
 static void redrawScreen() {
@@ -133,7 +131,7 @@ static void redrawScreen() {
   tft.fillScreen(LCARS_BLACK);
 
   // Shared header chrome, then the active screen's content, then the nav bar.
-  drawStatusBar(tft, nav.current(), timeSyncNowLocal(), isTimeSynced(), screenW);
+  drawStatusBar(tft, nav.current(), timeSyncNowLocal(), isTimeSynced(), lastHealth, screenW);
 
   switch (nav.current()) {
     case kScreenFlight: {
@@ -156,10 +154,10 @@ static void redrawScreen() {
 }
 
 // Shown instead of a screen while config_store's home_configured is still
-// false (review notes 1.5). Drawn once (guarded) rather than every poll.
+// false (review notes 1.5/1.6). Redrawn whenever screenNeedsRedraw is set
+// (cheap: a fill + two strings), so a stray touch can't permanently
+// dismiss it the way the old draw-once guard let it.
 static void showSetupPrompt() {
-  if (setupPromptShown) return;
-
   int16_t screenW = static_cast<int16_t>(tft.width());
   int16_t screenH = static_cast<int16_t>(tft.height());
 
@@ -169,17 +167,23 @@ static void showSetupPrompt() {
   tft.setTextColor(LCARS_AMBER, LCARS_BLACK);
   tft.drawString("Set your home location at", screenW / 2, screenH / 2 - 10);
   tft.drawString("http://cyd-sky.local", screenW / 2, screenH / 2 + 10);
-
-  setupPromptShown = true;
 }
 
-// Persist + redraw after screen_nav reports the active screen changed.
-// Called for every change — a touch, or an auto-cycle advance.
-static void onScreenChanged() {
+// Persist (debounced) + redraw after screen_nav reports the active screen
+// changed. `userInitiated` is true for a touch, false for an auto-cycle
+// advance — auto-cycle screen writes are rate-limited so a short cycle
+// interval doesn't wear the flash (review notes 5.9).
+static void onScreenChanged(bool userInitiated) {
   currentPage = 0;
   lastScreenChangeMs = millis();  // any change resets the auto-cycle timer
 
-  saveLastScreen(nav.current());  // targeted single-key write (see config_store)
+  if (nav.current() != lastPersistedScreen &&
+      shouldPersistScreenChange(userInitiated, millis() - lastScreenPersistMs,
+                                kScreenPersistMinIntervalMs)) {
+    saveLastScreen(nav.current());  // targeted single-key write (see config_store)
+    lastPersistedScreen = nav.current();
+    lastScreenPersistMs = millis();
+  }
 
   screenNeedsRedraw = true;
 }
@@ -192,13 +196,13 @@ static void handleTap(int16_t x, int16_t y) {
   NavHit hit = navHitTest(x, y, screenW, screenH, LCARS_HEADER_HEIGHT);
   switch (hit.action) {
     case NavAction::Prev:
-      if (nav.prev()) onScreenChanged();
+      if (nav.prev()) onScreenChanged(/*userInitiated=*/true);
       return;
     case NavAction::Next:
-      if (nav.next()) onScreenChanged();
+      if (nav.next()) onScreenChanged(/*userInitiated=*/true);
       return;
     case NavAction::JumpTo:
-      if (nav.set(hit.target)) onScreenChanged();
+      if (nav.set(hit.target)) onScreenChanged(/*userInitiated=*/true);
       return;
     case NavAction::None:
       break;
@@ -240,13 +244,12 @@ void setup() {
 
   touchInputBegin();
 
-  Config cfg = loadConfig();
-  nav.set(cfg.last_screen);  // restore the last-active screen
-  lastRadiusDeg = cfg.radius_deg;
-  autoCycleEnabled = cfg.auto_cycle_enabled;
-  autoCycleIntervalS = cfg.auto_cycle_interval_s;
-  homeConfigured = cfg.home_configured;
+  cachedCfg = loadConfig();
+  nav.set(cachedCfg.last_screen);  // restore the last-active screen
+  lastPersistedScreen = nav.current();
+  lastRadiusDeg = cachedCfg.radius_deg;
   lastScreenChangeMs = millis();
+  lastScreenPersistMs = millis();
 
   wifiManagerBegin();  // tries the saved network; falls back to its own captive portal
 
@@ -276,42 +279,68 @@ void loop() {
 
   // --- OpenSky polling (only meaningful once connected) -------------------
   if (wifiManagerStatus() == WifiStatus::Connected) {
-    std::vector<Aircraft> aircraft;
-    if (openSkyClientPoll(millis(), &aircraft)) {
-      Config homeCfg = loadConfig();
-      autoCycleEnabled = homeCfg.auto_cycle_enabled;
-      autoCycleIntervalS = homeCfg.auto_cycle_interval_s;
-      homeConfigured = homeCfg.home_configured;
+    OpenSkyPollResult poll = openSkyClientPoll(millis(), cachedCfg);
 
-      if (!homeCfg.home_configured) {
-        showSetupPrompt();
-      } else {
-        lastRadiusDeg = homeCfg.radius_deg;
+    if (poll.status != OpenSkyPollStatus::NotDue) {
+      // A poll actually ran — refresh the cached config so config_portal
+      // edits (home, radius, credentials, thresholds) take effect, and
+      // update the header health tag.
+      cachedCfg = loadConfig();
+      lastRadiusDeg = cachedCfg.radius_deg;
+
+      switch (poll.status) {
+        case OpenSkyPollStatus::Ok:
+          lastHealth = OpenSkyHealth::Ok;
+          break;
+        case OpenSkyPollStatus::RateLimited:
+          lastHealth = OpenSkyHealth::RateLimited;
+          break;
+        case OpenSkyPollStatus::AuthError:
+          lastHealth = OpenSkyHealth::AuthError;
+          break;
+        default:
+          lastHealth = OpenSkyHealth::NetworkError;
+          break;
+      }
+      screenNeedsRedraw = true;  // at least the header tag changed
+
+      // Only a clean poll updates the aircraft list — a failure keeps the
+      // last good data on screen rather than blanking it (review notes 1.2).
+      if (poll.status == OpenSkyPollStatus::Ok && cachedCfg.home_configured) {
+        const std::vector<Aircraft> &aircraft = poll.aircraft;
+
+        // Rank aircraft nearest-home-first so the limited per-poll lookup
+        // budget is spent on the ones the user actually sees first.
+        lastRows = buildEnrichedRecords(aircraft, {}, {});
+        annotateDistances(lastRows, cachedCfg.home_lat, cachedCfg.home_lon);
+        sortRowsByDistance(lastRows);
+
+        std::vector<LookupKeys> byPriority;
+        byPriority.reserve(lastRows.size());
+        for (const AircraftRow &r : lastRows) {
+          byPriority.push_back({r.aircraft.icao24, r.aircraft.callsign});
+        }
+        LookupPlan plan = planLookups(byPriority, aircraftLookupIsCached, routeLookupIsCached,
+                                      kDefaultLookupBudget);
 
         std::map<std::string, AircraftInfo> infoByIcao24;
+        for (const std::string &hex : plan.icao24) {
+          infoByIcao24[hex] = lookupAircraft(hex);
+        }
         std::map<std::string, RouteInfo> routeByCallsign;
-        int newLookupsThisCycle = 0;
-
-        for (const Aircraft &ac : aircraft) {
-          bool infoCached = aircraftLookupIsCached(ac.icao24);
-          if (infoCached || newLookupsThisCycle < kMaxNewLookupsPerPoll) {
-            if (!infoCached) newLookupsThisCycle++;
-            infoByIcao24[ac.icao24] = lookupAircraft(ac.icao24);
-          }
-          // else: leave this icao24 out for now — rendered as "--", looked
-          // up once back under budget on a later poll.
-
-          bool routeCached = routeLookupIsCached(ac.callsign);
-          if (routeCached || newLookupsThisCycle < kMaxNewLookupsPerPoll) {
-            if (!routeCached) newLookupsThisCycle++;
-            routeByCallsign[ac.callsign] = lookupRoute(ac.callsign);
-          }
+        for (const std::string &cs : plan.callsigns) {
+          routeByCallsign[cs] = lookupRoute(cs);
         }
 
-        lastRows = buildEnrichedRecords(aircraft, infoByIcao24, routeByCallsign);
-        annotateDistances(lastRows, homeCfg.home_lat, homeCfg.home_lon);
-        classifyPhases(lastRows, kNearAirportKm, kClimbThresholdMps);
-        sortRowsByDistance(lastRows);
+        // Fold the enrichment into the already-sorted rows in place —
+        // it doesn't change distance, so no re-sort needed.
+        for (AircraftRow &r : lastRows) {
+          auto info = infoByIcao24.find(r.aircraft.icao24);
+          if (info != infoByIcao24.end()) r.info = info->second;
+          auto route = routeByCallsign.find(r.aircraft.callsign);
+          if (route != routeByCallsign.end()) r.route = route->second;
+        }
+        classifyPhases(lastRows, cachedCfg.near_airport_km, cachedCfg.climb_rate_threshold_mps);
 
         // The nearest aircraft's route-endpoint airports, for the identity
         // line's "WAW (PL) -> FCO (IT)" — 2 bounded calls, for that one row.
@@ -327,8 +356,8 @@ void loop() {
         lastPolledCpa = CpaPrediction{};
         if (!lastRows.empty() && lastRows.front().aircraft.has_position) {
           const Aircraft &ac = lastRows.front().aircraft;
-          lastPolledCpa = predictCpa(homeCfg.home_lat, homeCfg.home_lon, ac.lat, ac.lon, ac.velocity,
-                                     ac.true_track);
+          lastPolledCpa = predictCpa(cachedCfg.home_lat, cachedCfg.home_lon, ac.lat, ac.lon,
+                                     ac.velocity, ac.true_track);
         }
         lastCpaPollMs = millis();
 
@@ -337,8 +366,6 @@ void loop() {
         if (currentPage >= pageCount) {
           currentPage = pageCount > 0 ? pageCount - 1 : 0;
         }
-
-        screenNeedsRedraw = true;
       }
     }
   }
@@ -358,18 +385,23 @@ void loop() {
   }
 
   // --- Auto screen cycling (CLAUDE.md "Auto screen cycling") ------------
-  if (autoCycleEnabled && homeConfigured) {
+  if (cachedCfg.auto_cycle_enabled && cachedCfg.home_configured) {
     CpaPrediction cpa = currentCpa();
     bool deferHold = shouldDeferAutoSwitch(nav.current(), cpa.found, cpa.t_cpa_seconds);
-    if (shouldAutoAdvance(millis() - lastScreenChangeMs, autoCycleIntervalS, deferHold)) {
-      nav.next();          // 3 distinct screens, wraps — always a real change
-      onScreenChanged();   // persists last_screen, resets the timer + page, forces redraw
+    if (shouldAutoAdvance(millis() - lastScreenChangeMs, cachedCfg.auto_cycle_interval_s,
+                          deferHold)) {
+      nav.next();                        // 3 distinct screens, wraps — always a real change
+      onScreenChanged(/*userInitiated=*/false);  // resets the timer + page, forces redraw
     }
   }
 
   // --- Redraw, if anything changed --------------------------------------
   if (screenNeedsRedraw) {
-    redrawScreen();
+    if (cachedCfg.home_configured) {
+      redrawScreen();
+    } else {
+      showSetupPrompt();  // "set your home location" until config_portal is used
+    }
     screenNeedsRedraw = false;
   }
 }

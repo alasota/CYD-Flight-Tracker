@@ -8,6 +8,11 @@ constexpr float kMaxRadiusDeg = 10.0f;
 constexpr uint32_t kMinPollIntervalS = 5;
 // Floor for the screen auto-cycle interval — see clampAutoCycleIntervalS().
 constexpr uint32_t kMinAutoCycleIntervalS = 3;
+// flight_phase thresholds: strictly-positive floor, roomy ceiling.
+constexpr float kMinNearAirportKm = 0.5f;
+constexpr float kMaxNearAirportKm = 500.0f;
+constexpr float kMinClimbRateThresholdMps = 0.1f;
+constexpr float kMaxClimbRateThresholdMps = 50.0f;
 constexpr float kMinLatDeg = -90.0f;
 constexpr float kMaxLatDeg = 90.0f;
 constexpr float kMinLonDeg = -180.0f;
@@ -36,6 +41,15 @@ uint32_t clampAutoCycleIntervalS(uint32_t interval_s) {
   return std::max(interval_s, kMinAutoCycleIntervalS);
 }
 
+float clampNearAirportKm(float near_airport_km) {
+  return std::min(std::max(near_airport_km, kMinNearAirportKm), kMaxNearAirportKm);
+}
+
+float clampClimbRateThresholdMps(float climb_rate_threshold_mps) {
+  return std::min(std::max(climb_rate_threshold_mps, kMinClimbRateThresholdMps),
+                  kMaxClimbRateThresholdMps);
+}
+
 Config sanitizeConfig(const Config &cfg) {
   Config out = cfg;
   out.home_lat = clampLat(out.home_lat);
@@ -44,6 +58,8 @@ Config sanitizeConfig(const Config &cfg) {
   out.poll_interval_s = clampPollIntervalS(out.poll_interval_s);
   out.last_screen = clampLastScreen(out.last_screen);
   out.auto_cycle_interval_s = clampAutoCycleIntervalS(out.auto_cycle_interval_s);
+  out.near_airport_km = clampNearAirportKm(out.near_airport_km);
+  out.climb_rate_threshold_mps = clampClimbRateThresholdMps(out.climb_rate_threshold_mps);
   return out;
 }
 
@@ -69,6 +85,8 @@ Config loadConfig() {
   cfg.last_screen = clampLastScreen(prefs.getInt("last_screen", cfg.last_screen));
   cfg.auto_cycle_enabled = prefs.getBool("auto_cyc", cfg.auto_cycle_enabled);
   cfg.auto_cycle_interval_s = prefs.getUInt("auto_cyc_s", cfg.auto_cycle_interval_s);
+  cfg.near_airport_km = prefs.getFloat("near_km", cfg.near_airport_km);
+  cfg.climb_rate_threshold_mps = prefs.getFloat("climb_mps", cfg.climb_rate_threshold_mps);
   cfg.home_configured = prefs.getBool("home_cfg", cfg.home_configured);
 
   prefs.end();
@@ -90,6 +108,8 @@ void saveConfig(const Config &cfg) {
   prefs.putInt("last_screen", sanitized.last_screen);
   prefs.putBool("auto_cyc", sanitized.auto_cycle_enabled);
   prefs.putUInt("auto_cyc_s", sanitized.auto_cycle_interval_s);
+  prefs.putFloat("near_km", sanitized.near_airport_km);
+  prefs.putFloat("climb_mps", sanitized.climb_rate_threshold_mps);
   prefs.putBool("home_cfg", sanitized.home_configured);
 
   prefs.end();

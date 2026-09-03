@@ -304,6 +304,23 @@ static void test_auto_advance_no_overflow_on_huge_interval(void) {
   TEST_ASSERT_TRUE(shouldAutoAdvance(4000000000u, 3000000u, false));  // 3e9 ms interval, reached
 }
 
+static void test_persist_screen_user_change_always_writes(void) {
+  // Manual tap: persist now, regardless of how recently we last wrote.
+  TEST_ASSERT_TRUE(shouldPersistScreenChange(true, 0, kScreenPersistMinIntervalMs));
+  TEST_ASSERT_TRUE(shouldPersistScreenChange(true, 1, kScreenPersistMinIntervalMs));
+}
+
+static void test_persist_screen_auto_change_rate_limited(void) {
+  // Auto-cycle: only persist once the min interval has elapsed.
+  TEST_ASSERT_FALSE(shouldPersistScreenChange(false, 0, kScreenPersistMinIntervalMs));
+  TEST_ASSERT_FALSE(
+      shouldPersistScreenChange(false, kScreenPersistMinIntervalMs - 1, kScreenPersistMinIntervalMs));
+  TEST_ASSERT_TRUE(
+      shouldPersistScreenChange(false, kScreenPersistMinIntervalMs, kScreenPersistMinIntervalMs));
+  TEST_ASSERT_TRUE(shouldPersistScreenChange(false, kScreenPersistMinIntervalMs + 5000,
+                                             kScreenPersistMinIntervalMs));
+}
+
 int main(int, char **) {
   UNITY_BEGIN();
 
@@ -348,6 +365,9 @@ int main(int, char **) {
   RUN_TEST(test_auto_advance_defer_hold_blocks_switch);
   RUN_TEST(test_auto_advance_fires_immediately_once_hold_clears);
   RUN_TEST(test_auto_advance_no_overflow_on_huge_interval);
+
+  RUN_TEST(test_persist_screen_user_change_always_writes);
+  RUN_TEST(test_persist_screen_auto_change_rate_limited);
 
   return UNITY_END();
 }

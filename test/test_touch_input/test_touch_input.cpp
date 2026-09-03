@@ -61,6 +61,30 @@ static void test_hit_test_zero_size_bounds(void) {
   TEST_ASSERT_FALSE(hitTest(6, 5, point));
 }
 
+// ---- mapTouchAxis (raw ADC -> screen pixel) -----------------------------
+
+static void test_map_touch_axis_endpoints_and_midpoint(void) {
+  // Typical calibration: raw 200..3900 -> pixel 0..319.
+  TEST_ASSERT_EQUAL_INT16(0, mapTouchAxis(200, 200, 3900, 0, 319));
+  TEST_ASSERT_EQUAL_INT16(319, mapTouchAxis(3900, 200, 3900, 0, 319));
+  TEST_ASSERT_EQUAL_INT16(159, mapTouchAxis(2050, 200, 3900, 0, 319));  // midpoint
+}
+
+static void test_map_touch_axis_clamps_out_of_range_raw(void) {
+  TEST_ASSERT_EQUAL_INT16(0, mapTouchAxis(-100, 200, 3900, 0, 319));   // below inMin
+  TEST_ASSERT_EQUAL_INT16(319, mapTouchAxis(9999, 200, 3900, 0, 319));  // above inMax
+}
+
+static void test_map_touch_axis_degenerate_range_does_not_divide_by_zero(void) {
+  TEST_ASSERT_EQUAL_INT16(0, mapTouchAxis(1234, 500, 500, 0, 319));
+}
+
+static void test_map_touch_axis_supports_inverted_output(void) {
+  // Some digitizers are wired so higher raw = lower pixel.
+  TEST_ASSERT_EQUAL_INT16(319, mapTouchAxis(200, 200, 3900, 319, 0));
+  TEST_ASSERT_EQUAL_INT16(0, mapTouchAxis(3900, 200, 3900, 319, 0));
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
 
@@ -69,6 +93,11 @@ int main(int argc, char **argv) {
   RUN_TEST(test_hit_on_edges_and_corners);
   RUN_TEST(test_miss_just_outside_each_edge);
   RUN_TEST(test_hit_test_zero_size_bounds);
+
+  RUN_TEST(test_map_touch_axis_endpoints_and_midpoint);
+  RUN_TEST(test_map_touch_axis_clamps_out_of_range_raw);
+  RUN_TEST(test_map_touch_axis_degenerate_range_does_not_divide_by_zero);
+  RUN_TEST(test_map_touch_axis_supports_inverted_output);
 
   return UNITY_END();
 }

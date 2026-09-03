@@ -37,3 +37,14 @@ struct CpaPrediction {
 // velocity vector (km/s). Returns found=false if |v| is ~0.
 CpaPrediction predictCpa(double home_lat, double home_lon, double ac_lat, double ac_lon,
                          double speed_mps, double track_deg);
+
+// Advances a previously-computed prediction forward by `elapsed_ms` of
+// wall-clock — the "local ticking between polls" from CLAUDE.md "Flight
+// ETA". OpenSky data only refreshes every poll_interval, but Screen 2's
+// countdown should tick every second, so main.cpp re-derives the current
+// t_cpa from the last polled value plus the millis() elapsed since that
+// poll, instead of re-running predictCpa() (which it can't — it has no
+// fresher aircraft position between polls). A not-found prediction stays
+// not-found. Pure — no clock read here, `elapsed_ms` is injected — so it's
+// covered by native tests.
+CpaPrediction extrapolateCpa(const CpaPrediction &polled, unsigned long elapsed_ms);

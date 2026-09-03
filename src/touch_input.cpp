@@ -5,6 +5,15 @@ bool hitTest(int16_t touchX, int16_t touchY, const Rect &bounds) {
          touchY <= bounds.y + bounds.h;
 }
 
+int16_t mapTouchAxis(int32_t raw, int32_t inMin, int32_t inMax, int32_t outMin, int32_t outMax) {
+  if (inMin == inMax) {
+    return static_cast<int16_t>(outMin);  // degenerate calibration range — don't divide by zero
+  }
+  if (raw < inMin) raw = inMin;
+  if (raw > inMax) raw = inMax;
+  return static_cast<int16_t>(outMin + (raw - inMin) * (outMax - outMin) / (inMax - inMin));
+}
+
 #ifdef ARDUINO
 
 #include <Arduino.h>
@@ -35,12 +44,6 @@ constexpr int32_t kRawYMax = 3900;
 constexpr int16_t kScreenWidth = 320;
 constexpr int16_t kScreenHeight = 240;
 
-int16_t mapRange(int32_t v, int32_t inMin, int32_t inMax, int32_t outMin, int32_t outMax) {
-  if (v < inMin) v = inMin;
-  if (v > inMax) v = inMax;
-  return static_cast<int16_t>(outMin + (v - inMin) * (outMax - outMin) / (inMax - inMin));
-}
-
 }  // namespace
 
 void touchInputBegin() {
@@ -69,8 +72,8 @@ TouchPoint touchInputRead() {
   // Which raw axis maps to which screen axis (and whether either needs
   // inverting) depends on the physical digitizer's wiring — verify on
   // real hardware and adjust if X/Y come out swapped or mirrored.
-  p.x = mapRange(raw.x, kRawXMin, kRawXMax, 0, kScreenWidth - 1);
-  p.y = mapRange(raw.y, kRawYMin, kRawYMax, 0, kScreenHeight - 1);
+  p.x = mapTouchAxis(raw.x, kRawXMin, kRawXMax, 0, kScreenWidth - 1);
+  p.y = mapTouchAxis(raw.y, kRawYMin, kRawYMax, 0, kScreenHeight - 1);
   p.pressed = true;
   return p;
 }

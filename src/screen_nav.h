@@ -97,6 +97,22 @@ bool shouldDeferAutoSwitch(int currentScreen, bool cpaFound, float tCpaSeconds);
 // misconfigured interval can't overflow intervalS * 1000.
 bool shouldAutoAdvance(uint32_t elapsedMs, uint32_t intervalS, bool deferHold);
 
+// Minimum gap between NVS writes of `last_screen` when the screen change
+// was NOT user-initiated (i.e. an auto-cycle advance). Manual taps persist
+// immediately; auto-cycle — which can fire every few seconds — is
+// rate-limited to this so it doesn't wear the flash writing the same key
+// thousands of times a day (see CLAUDE.md review notes 5.9). 10 minutes:
+// on a reboot you resume within 10 min of where auto-cycle left off,
+// which is plenty for a decorative feature.
+constexpr uint32_t kScreenPersistMinIntervalMs = 10UL * 60UL * 1000UL;
+
+// Whether to write `last_screen` to NVS right now. A user-initiated change
+// always persists; an auto-cycle change persists only if at least
+// `minIntervalMs` has passed since the last write. Pure — `msSinceLastPersist`
+// is injected — native-tested.
+bool shouldPersistScreenChange(bool userInitiated, uint32_t msSinceLastPersist,
+                               uint32_t minIntervalMs);
+
 // ---- Touch geometry -------------------------------------------------------
 //
 // The content area sits between the header (top, `headerHeight` px) and

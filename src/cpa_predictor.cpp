@@ -31,3 +31,11 @@ CpaPrediction predictCpa(double home_lat, double home_lon, double ac_lat, double
   result.t_cpa_seconds = static_cast<float>(-(dx_km * vx + dy_km * vy) / v2);
   return result;
 }
+
+CpaPrediction extrapolateCpa(const CpaPrediction &polled, unsigned long elapsed_ms) {
+  CpaPrediction out = polled;
+  if (out.found) {
+    out.t_cpa_seconds -= static_cast<float>(elapsed_ms) / 1000.0f;
+  }
+  return out;
+}

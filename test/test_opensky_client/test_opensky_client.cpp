@@ -226,6 +226,36 @@ static void test_parse_retry_after_missing_or_invalid_uses_default(void) {
   TEST_ASSERT_EQUAL_UINT32(60, parseRetryAfterSeconds("-5", 60));
 }
 
+static void test_parse_retry_after_clamps_absurd_values(void) {
+  // A hostile/buggy header must not wedge the client into days of silence
+  // (review notes 1.4) — clamped to the 3600s cap.
+  TEST_ASSERT_EQUAL_UINT32(3600, parseRetryAfterSeconds("999999999", 60));
+  TEST_ASSERT_EQUAL_UINT32(3600, parseRetryAfterSeconds("99999999999999999999", 60));
+  TEST_ASSERT_EQUAL_UINT32(120, parseRetryAfterSeconds("120", 60));  // in range, untouched
+  // Explicit lower cap still honoured.
+  TEST_ASSERT_EQUAL_UINT32(30, parseRetryAfterSeconds("5000", 60, 30));
+}
+
+// ---- shouldPollNow (interval gating, review notes 3.3) ------------------
+
+static void test_should_poll_now_first_call_always_polls(void) {
+  TEST_ASSERT_TRUE(shouldPollNow(0, 0, /*ever_polled*/ false, 15000));
+  TEST_ASSERT_TRUE(shouldPollNow(999999, 0, false, 15000));
+}
+
+static void test_should_poll_now_respects_interval(void) {
+  TEST_ASSERT_FALSE(shouldPollNow(10000, 0, true, 15000));  // 10s < 15s
+  TEST_ASSERT_TRUE(shouldPollNow(15000, 0, true, 15000));   // exactly at
+  TEST_ASSERT_TRUE(shouldPollNow(20000, 0, true, 15000));   // past
+}
+
+static void test_should_poll_now_survives_millis_rollover(void) {
+  // last poll at 4294967290, now wrapped to 12 — true elapsed ~18ms.
+  TEST_ASSERT_FALSE(shouldPollNow(12UL, 4294967290UL, true, 15000));
+  // ...and once 15s of real time has passed across the wrap.
+  TEST_ASSERT_TRUE(shouldPollNow(15000UL, 4294967290UL, true, 15000));
+}
+
 // ---- urlEncode ------------------------------------------------------------
 
 static void test_url_encode_leaves_unreserved_chars(void) {
@@ -265,6 +295,11 @@ int main(int argc, char **argv) {
 
   RUN_TEST(test_parse_retry_after_valid);
   RUN_TEST(test_parse_retry_after_missing_or_invalid_uses_default);
+  RUN_TEST(test_parse_retry_after_clamps_absurd_values);
+
+  RUN_TEST(test_should_poll_now_first_call_always_polls);
+  RUN_TEST(test_should_poll_now_respects_interval);
+  RUN_TEST(test_should_poll_now_survives_millis_rollover);
 
   RUN_TEST(test_url_encode_leaves_unreserved_chars);
   RUN_TEST(test_url_encode_escapes_special_chars);

@@ -50,6 +50,14 @@ bool tokenNeedsRefresh(const TokenState &token, uint32_t now_ms, uint32_t refres
 // `now < until` comparison here was NOT rollover-safe).
 bool isBeforeDeadline(uint32_t now_ms, uint32_t until_ms);
 
+// Whether a fresh /states/all poll is due: true if one has never run, or
+// if at least `interval_ms` has elapsed since the last one. Unsigned
+// subtraction keeps it correct across a millis() rollover. Factored out of
+// openSkyClientPoll()'s adapter so the "never hammer the API faster than
+// the configured interval" rule (CLAUDE.md "Rate limits") is native-tested
+// rather than living only in device-only code — see review notes 3.3.
+bool shouldPollNow(uint32_t now_ms, uint32_t last_poll_ms, bool ever_polled, uint32_t interval_ms);
+
 // False (anonymous access) when either credential is empty — the fallback
 // mode described in CLAUDE.md "Authentication".
 bool shouldUseOAuth(const std::string &client_id, const std::string &client_secret);
@@ -87,30 +95,52 @@ std::vector<Aircraft> parseStatesResponse(const std::string &json);
 
 // Backoff duration after a 429, per CLAUDE.md "Rate limits": the
 // X-Rate-Limit-Retry-After-Seconds header value if present and a valid
-// non-negative integer, otherwise `default_backoff_s`.
-uint32_t parseRetryAfterSeconds(const std::string &header_value, uint32_t default_backoff_s);
+// non-negative integer, otherwise `default_backoff_s`. The result is
+// clamped to `max_backoff_s` so a bogus/hostile header value (e.g.
+// "999999999") can't wedge the client into a multi-day silence — see
+// review notes 1.4.
+uint32_t parseRetryAfterSeconds(const std::string &header_value, uint32_t default_backoff_s,
+                                uint32_t max_backoff_s = 3600);
 
 // Percent-encodes a string for use in an application/x-www-form-urlencoded
 // POST body (used for the OAuth token request's client_id/client_secret).
 std::string urlEncode(const std::string &value);
 
+// Outcome of one poll attempt. The distinction between "polled OK, nothing
+// in range" and "poll failed" matters: main.cpp keeps the last good
+// aircraft list on a failure instead of blanking the screen, and surfaces
+// a header tag — see CLAUDE.md review notes 1.2/1.3/1.4.
+enum class OpenSkyPollStatus {
+  NotDue,        // interval hasn't elapsed — `aircraft` is empty, ignore it
+  Ok,            // fresh data in `aircraft` (may legitimately be empty)
+  RateLimited,   // 429 — credits exhausted; still inside the backoff window
+  AuthError,     // 401 persisted through a token refresh — check credentials
+  NetworkError,  // transport failure or an unexpected HTTP status
+};
+
+struct OpenSkyPollResult {
+  OpenSkyPollStatus status = OpenSkyPollStatus::NotDue;
+  std::vector<Aircraft> aircraft;      // meaningful only when status == Ok
+  uint32_t retry_after_s = 0;          // set when status == RateLimited
+};
+
 // --- Hardware adapter: OAuth token fetch, /states/all HTTP call, 401 retry
 // and 429 backoff. Thin wrapper around WiFiClientSecure/HTTPClient — not
 // covered by Unity (see CLAUDE.md "Testing"). No TFT/drawing code.
+struct Config;  // config_store.h — full type only needed by the .cpp
 
-// Fetches aircraft currently in the bounding box around (home_lat,
-// home_lon, radius_deg). Ensures a fresh OAuth token first when
-// config_store has client_id/client_secret set (falls back to anonymous
-// otherwise), retries once on 401, and skips the request entirely while
-// still inside a 429-triggered cooldown. Returns an empty vector on any
-// failure — callers should treat that as "no update this poll", not a
-// fatal error.
-std::vector<Aircraft> fetchAircraftStates(float home_lat, float home_lon, float radius_deg);
+// Fetches aircraft currently in the bounding box around the configured
+// home, using `cfg` for home/radius/credentials (no internal loadConfig()
+// — the caller owns config now, see review notes 4.3). Ensures a fresh
+// OAuth token first when credentials are set (falls back to anonymous
+// otherwise), retries once on 401, and reports 429/auth/transport failures
+// distinctly rather than collapsing them all to "empty".
+OpenSkyPollResult fetchAircraftStates(const Config &cfg);
 
-// Non-blocking poll scheduler: call every loop() iteration. Runs at most
-// one fetchAircraftStates() per config_store's poll_interval_s, never
-// faster even if called more often — per CLAUDE.md's "never hammer the API
-// faster than the configured interval" rule, using home position/radius
-// from config_store. Returns true and fills `*out` when a poll ran this
-// call; returns false (leaving `*out` untouched) otherwise.
-bool openSkyClientPoll(uint32_t now_ms, std::vector<Aircraft> *out);
+// Non-blocking poll scheduler: call every loop() iteration with the
+// caller's cached Config. Runs at most one fetchAircraftStates() per
+// cfg.poll_interval_s (shouldPollNow()), never faster even if called more
+// often — CLAUDE.md's "never hammer the API faster than the configured
+// interval". Returns {NotDue} without touching the network when a poll
+// isn't due yet; otherwise returns the fetch result.
+OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const Config &cfg);

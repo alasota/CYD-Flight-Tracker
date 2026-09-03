@@ -56,6 +56,18 @@ static void test_clock_uses_time_sync_when_synced(void) {
   TEST_ASSERT_EQUAL_STRING("02:40", statusBarClock(kEpoch, true).c_str());
 }
 
+// ---- statusBarHealthTag ---------------------------------------------
+
+static void test_health_tag_empty_when_ok(void) {
+  TEST_ASSERT_EQUAL_STRING("", statusBarHealthTag(OpenSkyHealth::Ok));
+}
+
+static void test_health_tag_per_failure_mode(void) {
+  TEST_ASSERT_EQUAL_STRING("RATE", statusBarHealthTag(OpenSkyHealth::RateLimited));
+  TEST_ASSERT_EQUAL_STRING("AUTH", statusBarHealthTag(OpenSkyHealth::AuthError));
+  TEST_ASSERT_EQUAL_STRING("NET", statusBarHealthTag(OpenSkyHealth::NetworkError));
+}
+
 int main(int, char **) {
   UNITY_BEGIN();
 
@@ -68,6 +80,9 @@ int main(int, char **) {
 
   RUN_TEST(test_clock_placeholder_until_synced);
   RUN_TEST(test_clock_uses_time_sync_when_synced);
+
+  RUN_TEST(test_health_tag_empty_when_ok);
+  RUN_TEST(test_health_tag_per_failure_mode);
 
   return UNITY_END();
 }

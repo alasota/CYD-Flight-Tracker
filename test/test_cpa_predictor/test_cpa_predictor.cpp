@@ -91,6 +91,46 @@ static void test_high_latitude_home_inbound_from_east(void) {
   TEST_ASSERT_FLOAT_WITHIN(1.0f, 100.0f, p.t_cpa_seconds);
 }
 
+// ---- extrapolateCpa (local ticking between polls) ------------------------
+
+static void test_extrapolate_counts_down_by_elapsed_seconds(void) {
+  CpaPrediction polled;
+  polled.found = true;
+  polled.t_cpa_seconds = 42.0f;
+
+  CpaPrediction now = extrapolateCpa(polled, 5000);  // 5s later
+  TEST_ASSERT_TRUE(now.found);
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 37.0f, now.t_cpa_seconds);
+}
+
+static void test_extrapolate_can_go_negative(void) {
+  CpaPrediction polled;
+  polled.found = true;
+  polled.t_cpa_seconds = 3.0f;
+
+  CpaPrediction now = extrapolateCpa(polled, 8000);  // 8s later
+  TEST_ASSERT_TRUE(now.found);
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, -5.0f, now.t_cpa_seconds);
+}
+
+static void test_extrapolate_zero_elapsed_is_identity(void) {
+  CpaPrediction polled;
+  polled.found = true;
+  polled.t_cpa_seconds = 12.5f;
+
+  CpaPrediction now = extrapolateCpa(polled, 0);
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 12.5f, now.t_cpa_seconds);
+}
+
+static void test_extrapolate_not_found_stays_not_found(void) {
+  CpaPrediction polled;  // found == false
+  polled.t_cpa_seconds = 999.0f;
+
+  CpaPrediction now = extrapolateCpa(polled, 5000);
+  TEST_ASSERT_FALSE(now.found);
+  TEST_ASSERT_EQUAL_FLOAT(999.0f, now.t_cpa_seconds);  // untouched
+}
+
 int main(int, char **) {
   UNITY_BEGIN();
 
@@ -105,6 +145,11 @@ int main(int, char **) {
   RUN_TEST(test_default_constructed_result_is_not_found);
 
   RUN_TEST(test_high_latitude_home_inbound_from_east);
+
+  RUN_TEST(test_extrapolate_counts_down_by_elapsed_seconds);
+  RUN_TEST(test_extrapolate_can_go_negative);
+  RUN_TEST(test_extrapolate_zero_elapsed_is_identity);
+  RUN_TEST(test_extrapolate_not_found_stays_not_found);
 
   return UNITY_END();
 }

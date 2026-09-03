@@ -113,3 +113,9 @@ bool shouldAutoAdvance(uint32_t elapsedMs, uint32_t intervalS, bool deferHold) {
   const uint64_t intervalMs = static_cast<uint64_t>(intervalS) * 1000ULL;
   return static_cast<uint64_t>(elapsedMs) >= intervalMs;
 }
+
+bool shouldPersistScreenChange(bool userInitiated, uint32_t msSinceLastPersist,
+                               uint32_t minIntervalMs) {
+  if (userInitiated) return true;
+  return msSinceLastPersist >= minIntervalMs;
+}

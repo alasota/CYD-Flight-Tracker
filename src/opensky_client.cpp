@@ -6,6 +6,8 @@
 
 #include <ArduinoJson.h>
 
+#include "net_config.h"
+
 namespace {
 float clampf(float v, float lo, float hi) { return std::min(std::max(v, lo), hi); }
 }  // namespace
@@ -37,6 +39,13 @@ bool isBeforeDeadline(uint32_t now_ms, uint32_t until_ms) {
   return static_cast<int32_t>(until_ms - now_ms) > 0;
 }
 
+bool shouldPollNow(uint32_t now_ms, uint32_t last_poll_ms, bool ever_polled, uint32_t interval_ms) {
+  if (!ever_polled) {
+    return true;
+  }
+  return (now_ms - last_poll_ms) >= interval_ms;  // unsigned: rollover-safe
+}
+
 bool shouldUseOAuth(const std::string &client_id, const std::string &client_secret) {
   return !client_id.empty() && !client_secret.empty();
 }
@@ -47,24 +56,14 @@ std::string trimTrailingSpaces(const std::string &s) {
   while (end > 0 && s[end - 1] == ' ') --end;
   return s.substr(0, end);
 }
-}  // namespace
 
-std::vector<Aircraft> parseStatesResponse(const std::string &json) {
+// Shared extraction: turn OpenSky's "states" array (an array of state
+// vectors) into Aircraft records. Used by both the string-based
+// parseStatesResponse() (tests) and the device's streaming parse path
+// (fetchAircraftStates()), so the field mapping lives in exactly one place.
+std::vector<Aircraft> extractAircraftFromStates(JsonArrayConst states) {
   std::vector<Aircraft> result;
-
-  if (json.size() > kMaxStatesResponseBytes) {
-    return result;  // refuse to even attempt parsing an unexpectedly huge body
-  }
-
-  JsonDocument doc;
-  if (deserializeJson(doc, json) != DeserializationError::Ok) {
-    return result;
-  }
-
-  // doc["states"] being missing/null yields an empty JsonArrayConst here
-  // (ArduinoJson), so a response with no aircraft in range just produces
-  // an empty result rather than needing a separate null check.
-  for (JsonArrayConst state : doc["states"].as<JsonArrayConst>()) {
+  for (JsonArrayConst state : states) {
     // Indices per OpenSky's /states/all state vector: 0 icao24, 1 callsign,
     // 5 longitude, 6 latitude, 7 baro_altitude, 8 on_ground, 9 velocity,
     // 10 true_track, 11 vertical_rate.
@@ -86,24 +85,45 @@ std::vector<Aircraft> parseStatesResponse(const std::string &json) {
 
     result.push_back(ac);
   }
-
   return result;
 }
+}  // namespace
 
-uint32_t parseRetryAfterSeconds(const std::string &header_value, uint32_t default_backoff_s) {
-  if (header_value.empty()) {
-    return default_backoff_s;
+std::vector<Aircraft> parseStatesResponse(const std::string &json) {
+  if (json.size() > kMaxStatesResponseBytes) {
+    return {};  // refuse to even attempt parsing an unexpectedly huge body
   }
-  for (char c : header_value) {
-    if (c < '0' || c > '9') {
-      return default_backoff_s;  // not a plain non-negative integer
+
+  JsonDocument doc;
+  if (deserializeJson(doc, json) != DeserializationError::Ok) {
+    return {};
+  }
+
+  // doc["states"] being missing/null yields an empty JsonArrayConst here
+  // (ArduinoJson), so a response with no aircraft in range just produces
+  // an empty result rather than needing a separate null check.
+  return extractAircraftFromStates(doc["states"].as<JsonArrayConst>());
+}
+
+uint32_t parseRetryAfterSeconds(const std::string &header_value, uint32_t default_backoff_s,
+                                uint32_t max_backoff_s) {
+  uint32_t seconds = default_backoff_s;
+  if (!header_value.empty()) {
+    bool allDigits = true;
+    for (char c : header_value) {
+      if (c < '0' || c > '9') {
+        allDigits = false;
+        break;
+      }
+    }
+    if (allDigits) {
+      // strtoul saturates to ULONG_MAX on overflow rather than wrapping,
+      // so an absurd header still ends up clamped below, not tiny.
+      unsigned long parsed = std::strtoul(header_value.c_str(), nullptr, 10);
+      seconds = parsed > max_backoff_s ? max_backoff_s : static_cast<uint32_t>(parsed);
     }
   }
-  long parsed = std::strtol(header_value.c_str(), nullptr, 10);
-  if (parsed < 0) {
-    return default_backoff_s;
-  }
-  return static_cast<uint32_t>(parsed);
+  return seconds > max_backoff_s ? max_backoff_s : seconds;
 }
 
 std::string urlEncode(const std::string &value) {
@@ -140,17 +160,24 @@ constexpr char kStatesUrlBase[] = "https://opensky-network.org/api/states/all";
 constexpr char kRetryAfterHeader[] = "X-Rate-Limit-Retry-After-Seconds";
 constexpr uint32_t kDefaultRetryAfterS = 60;
 
-// Bounds on a single blocking HTTP call (see CLAUDE.md review notes 1.1 /
-// 5.1) — without these, loop() could stall for however long HTTPClient's
-// own default happens to be, which is neither documented here nor tuned
-// for staying responsive to touch/config_portal.
-constexpr int32_t kHttpConnectTimeoutMs = 5000;
-constexpr uint16_t kHttpTimeoutMs = 8000;
+// HTTP timeouts are shared across the networking modules — see net_config.h.
 
 TokenState cachedToken;
 uint32_t rateLimitedUntilMs = 0;
 uint32_t lastPollMs = 0;
 bool everPolled = false;
+
+// One /states/all attempt, with the 200-response body parsed inline
+// straight from the socket (streaming + an ArduinoJson field filter) so a
+// big busy-airspace response never has to exist in RAM as one contiguous
+// String + std::string + document all at once — see review notes 4.1.
+struct StatesAttempt {
+  bool transport_ok = false;  // got any HTTP response at all
+  int code = 0;               // HTTP status when transport_ok
+  bool body_ok = false;       // a 200 whose body parsed cleanly
+  std::string retry_after;    // X-Rate-Limit-Retry-After-Seconds, if sent
+  std::vector<Aircraft> aircraft;
+};
 
 bool fetchToken(const std::string &client_id, const std::string &client_secret) {
   WiFiClientSecure client;
@@ -160,7 +187,7 @@ bool fetchToken(const std::string &client_id, const std::string &client_secret) 
 
   HTTPClient http;
   http.setConnectTimeout(kHttpConnectTimeoutMs);
-  http.setTimeout(kHttpTimeoutMs);
+  http.setTimeout(kOpenSkyHttpTimeoutMs);
   if (!http.begin(client, kTokenUrl)) {
     return false;
   }
@@ -205,10 +232,9 @@ bool fetchToken(const std::string &client_id, const std::string &client_secret) 
   return true;
 }
 
-// One /states/all attempt. Returns false only on a transport-level failure
-// (no HTTP response at all); on true, *outCode carries the HTTP status.
-bool requestStatesOnce(const BoundingBox &bbox, const std::string &bearerToken, int *outCode,
-                        std::string *outBody, std::string *outRetryAfter) {
+StatesAttempt requestStatesOnce(const BoundingBox &bbox, const std::string &bearerToken) {
+  StatesAttempt att;
+
   // Built into a fixed buffer instead of concatenating Arduino Strings
   // (see CLAUDE.md review notes 4.2).
   char url[192];
@@ -217,7 +243,7 @@ bool requestStatesOnce(const BoundingBox &bbox, const std::string &bearerToken, 
                                   static_cast<double>(bbox.lomin), static_cast<double>(bbox.lamax),
                                   static_cast<double>(bbox.lomax));
   if (urlWritten < 0 || static_cast<size_t>(urlWritten) >= sizeof(url)) {
-    return false;
+    return att;
   }
 
   WiFiClientSecure client;
@@ -225,18 +251,16 @@ bool requestStatesOnce(const BoundingBox &bbox, const std::string &bearerToken, 
 
   HTTPClient http;
   http.setConnectTimeout(kHttpConnectTimeoutMs);
-  http.setTimeout(kHttpTimeoutMs);
+  http.setTimeout(kOpenSkyHttpTimeoutMs);
   if (!http.begin(client, url)) {
-    return false;
+    return att;
   }
   if (!bearerToken.empty()) {
-    char authHeader[2048];
-    int authWritten = std::snprintf(authHeader, sizeof(authHeader), "Bearer %s", bearerToken.c_str());
-    if (authWritten >= 0 && static_cast<size_t>(authWritten) < sizeof(authHeader)) {
-      http.addHeader("Authorization", authHeader);
-    } else {
-      Serial.println("[opensky_client] bearer token too long for header buffer, sending unauthenticated");
-    }
+    // std::string on the heap, not a 2KB stack buffer (review notes 4.2) —
+    // a bearer JWT is ~1KB and loopTask's stack is only 8KB.
+    std::string authHeader = "Bearer ";
+    authHeader += bearerToken;
+    http.addHeader("Authorization", authHeader.c_str());
   }
   const char *collectHeaders[] = {kRetryAfterHeader};
   http.collectHeaders(collectHeaders, 1);
@@ -244,27 +268,54 @@ bool requestStatesOnce(const BoundingBox &bbox, const std::string &bearerToken, 
   int code = http.GET();
   if (code <= 0) {
     http.end();
-    return false;
+    return att;  // transport_ok stays false
   }
 
-  *outCode = code;
-  *outBody = std::string(http.getString().c_str());
+  att.transport_ok = true;
+  att.code = code;
   if (http.hasHeader(kRetryAfterHeader)) {
-    *outRetryAfter = std::string(http.header(kRetryAfterHeader).c_str());
+    att.retry_after = std::string(http.header(kRetryAfterHeader).c_str());
   }
+
+  if (code == HTTP_CODE_OK) {
+    int len = http.getSize();  // -1 when chunked / unknown
+    if (len > 0 && static_cast<size_t>(len) > kMaxStatesResponseBytes) {
+      Serial.printf("[opensky_client] /states/all body too large (%d bytes) — skipping parse\n",
+                    len);
+    } else {
+      // Filter: keep every element of each state vector, drop the rest of
+      // the envelope. Parsed directly from the socket stream.
+      JsonDocument filter;
+      filter["states"][0] = true;
+      JsonDocument doc;
+      DeserializationError err =
+          deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+      if (err) {
+        Serial.printf("[opensky_client] /states/all parse error: %s\n", err.c_str());
+      } else {
+        att.aircraft = extractAircraftFromStates(doc["states"].as<JsonArrayConst>());
+        att.body_ok = true;
+      }
+    }
+  }
+
   http.end();
-  return true;
+  return att;
 }
 
 }  // namespace
 
-std::vector<Aircraft> fetchAircraftStates(float home_lat, float home_lon, float radius_deg) {
+OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
+  OpenSkyPollResult result;
   uint32_t now = millis();
+
   if (rateLimitedUntilMs != 0 && isBeforeDeadline(now, rateLimitedUntilMs)) {
-    return {};  // still backing off after a previous 429
+    int32_t remain_ms = static_cast<int32_t>(rateLimitedUntilMs - now);
+    result.status = OpenSkyPollStatus::RateLimited;
+    result.retry_after_s = remain_ms > 0 ? static_cast<uint32_t>((remain_ms + 999) / 1000) : 0;
+    return result;
   }
 
-  Config cfg = loadConfig();
   bool useAuth = shouldUseOAuth(cfg.opensky_client_id, cfg.opensky_client_secret);
 
   if (useAuth && tokenNeedsRefresh(cachedToken, now)) {
@@ -275,58 +326,64 @@ std::vector<Aircraft> fetchAircraftStates(float home_lat, float home_lon, float 
     }
   }
 
-  BoundingBox bbox = computeBoundingBox(home_lat, home_lon, radius_deg);
+  BoundingBox bbox = computeBoundingBox(cfg.home_lat, cfg.home_lon, cfg.radius_deg);
 
-  int httpCode = 0;
-  std::string body;
-  std::string retryAfter;
-  bool ok = requestStatesOnce(bbox, useAuth ? cachedToken.access_token : std::string(), &httpCode,
-                               &body, &retryAfter);
+  StatesAttempt att =
+      requestStatesOnce(bbox, useAuth ? cachedToken.access_token : std::string());
 
-  if (ok && httpCode == 401 && useAuth) {
-    // Treat 401 as "refresh once and retry", not fatal — see CLAUDE.md.
+  if (att.transport_ok && att.code == 401 && useAuth) {
+    // Treat a first 401 as "refresh once and retry", not fatal — see CLAUDE.md.
     if (fetchToken(cfg.opensky_client_id, cfg.opensky_client_secret)) {
-      ok = requestStatesOnce(bbox, cachedToken.access_token, &httpCode, &body, &retryAfter);
+      att = requestStatesOnce(bbox, cachedToken.access_token);
     }
   }
 
-  if (!ok) {
+  if (!att.transport_ok) {
     Serial.println("[opensky_client] /states/all request failed (no HTTP response)");
-    return {};
+    result.status = OpenSkyPollStatus::NetworkError;
+    return result;
   }
 
-  if (httpCode == 429) {
-    uint32_t backoff_s = parseRetryAfterSeconds(retryAfter, kDefaultRetryAfterS);
+  if (att.code == 429) {
+    uint32_t backoff_s = parseRetryAfterSeconds(att.retry_after, kDefaultRetryAfterS);
     rateLimitedUntilMs = now + backoff_s * 1000UL;
     Serial.printf("[opensky_client] rate limited (429), backing off %us\n",
                   static_cast<unsigned>(backoff_s));
-    return {};
+    result.status = OpenSkyPollStatus::RateLimited;
+    result.retry_after_s = backoff_s;
+    return result;
   }
 
-  if (httpCode != 200) {
-    Serial.printf("[opensky_client] /states/all failed (http=%d)\n", httpCode);
-    return {};
+  if (att.code == 401 || att.code == 403) {
+    // Still rejected after a fresh token — the credentials are wrong, not a
+    // transient blip. Surface it instead of silently going empty forever
+    // (review notes 1.3).
+    Serial.printf("[opensky_client] auth rejected (http=%d) — check client_id/secret\n", att.code);
+    result.status = OpenSkyPollStatus::AuthError;
+    return result;
   }
 
-  return parseStatesResponse(body);
+  if (att.code != 200 || !att.body_ok) {
+    Serial.printf("[opensky_client] /states/all failed (http=%d, parsed=%d)\n", att.code,
+                  att.body_ok ? 1 : 0);
+    result.status = OpenSkyPollStatus::NetworkError;
+    return result;
+  }
+
+  result.status = OpenSkyPollStatus::Ok;
+  result.aircraft = std::move(att.aircraft);
+  return result;
 }
 
-bool openSkyClientPoll(uint32_t now_ms, std::vector<Aircraft> *out) {
-  Config cfg = loadConfig();
-  uint32_t interval_ms = cfg.poll_interval_s * 1000UL;
-
-  if (everPolled && (now_ms - lastPollMs) < interval_ms) {
-    return false;
+OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const Config &cfg) {
+  if (!shouldPollNow(now_ms, lastPollMs, everPolled, cfg.poll_interval_s * 1000UL)) {
+    return {};  // OpenSkyPollStatus::NotDue
   }
 
-  std::vector<Aircraft> aircraft = fetchAircraftStates(cfg.home_lat, cfg.home_lon, cfg.radius_deg);
+  OpenSkyPollResult result = fetchAircraftStates(cfg);
   lastPollMs = now_ms;
   everPolled = true;
-
-  if (out != nullptr) {
-    *out = aircraft;
-  }
-  return true;
+  return result;
 }
 
 #endif  // ARDUINO

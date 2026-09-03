@@ -31,6 +31,22 @@ std::string statusBarStardate(std::time_t localEpoch, bool timeSynced);
 // sync completes.
 std::string statusBarClock(std::time_t localEpoch, bool timeSynced);
 
+// Health of the OpenSky data feed, surfaced as a short header tag so a
+// silent failure (persistent 401, exhausted rate-limit credits, a dead
+// network) isn't invisible — the aircraft list on screen may be stale
+// (main.cpp keeps the last good data rather than blanking it). See
+// CLAUDE.md review notes 1.2/1.3/1.4.
+enum class OpenSkyHealth {
+  Ok,            // last poll succeeded
+  RateLimited,   // 429 — credits exhausted, backing off
+  AuthError,     // 401 persisted after a token refresh — check credentials
+  NetworkError,  // transport / other HTTP failure
+};
+
+// Short right-aligned header tag for `health` — "" when Ok, otherwise a
+// 3-4 char code ("RATE" / "AUTH" / "NET"). Pure — native-tested.
+const char *statusBarHealthTag(OpenSkyHealth health);
+
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme. Not
 // covered by Unity (see CLAUDE.md "Testing"). Guarded here in the header
 // too (like lcars_theme/featured_panel) since the signature needs the
@@ -46,6 +62,6 @@ std::string statusBarClock(std::time_t localEpoch, bool timeSynced);
 // placeholder. Repaints its own black background first, so it's safe to
 // call every frame.
 void drawStatusBar(LGFX &gfx, int screenIndex, std::time_t localEpoch, bool timeSynced,
-                   int16_t screenWidth);
+                   OpenSkyHealth health, int16_t screenWidth);
 
 #endif  // ARDUINO

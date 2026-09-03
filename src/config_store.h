@@ -45,6 +45,12 @@ struct Config {
   // config_portal.
   bool auto_cycle_enabled = false;
   uint32_t auto_cycle_interval_s = 15;
+  // flight_phase thresholds (CLAUDE.md "Flight phase") — previously
+  // hardcoded in main.cpp. near_airport_km is really "near HOME" (this
+  // project has no airport coordinate database). Defaults match CLAUDE.md:
+  // ~15 km, and ~1.5 m/s for the climb/descent cutoff.
+  float near_airport_km = 15.0f;
+  float climb_rate_threshold_mps = 1.5f;
   // True once the user has saved the settings form at least once via
   // config_portal. (0, 0) is a real place (Gulf of Guinea) — without this
   // flag there's no way to tell "user hasn't configured their home
@@ -66,6 +72,13 @@ Config sanitizeConfig(const Config &cfg);
 
 float clampRadiusDeg(float radius_deg);
 uint32_t clampPollIntervalS(uint32_t poll_interval_s);
+
+// flight_phase threshold clamps — both must stay strictly positive (a
+// zero/negative "near airport" radius or climb cutoff would make
+// classifyPhase() nonsensical), with a generous ceiling so a fat-fingered
+// value in config_portal can't break the classifier. Pure — native-tested.
+float clampNearAirportKm(float near_airport_km);
+float clampClimbRateThresholdMps(float climb_rate_threshold_mps);
 
 // --- Hardware adapter: reads/writes ESP32 NVS via the Preferences library.
 // Thin wrapper around a hardware/SDK API — see CLAUDE.md "Testing" — not

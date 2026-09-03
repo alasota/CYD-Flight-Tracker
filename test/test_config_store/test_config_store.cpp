@@ -18,6 +18,39 @@ static void test_default_config_has_sane_values(void) {
   // place, so this flag is the only way to tell "not set up yet" apart
   // from "home really is at 0,0".
   TEST_ASSERT_FALSE(cfg.home_configured);
+  // flight_phase thresholds — CLAUDE.md "Flight phase" defaults.
+  TEST_ASSERT_EQUAL_FLOAT(15.0f, cfg.near_airport_km);
+  TEST_ASSERT_EQUAL_FLOAT(1.5f, cfg.climb_rate_threshold_mps);
+}
+
+static void test_clamp_near_airport_km_floors_and_ceils(void) {
+  TEST_ASSERT_EQUAL_FLOAT(0.5f, clampNearAirportKm(0.0f));
+  TEST_ASSERT_EQUAL_FLOAT(0.5f, clampNearAirportKm(-3.0f));
+  TEST_ASSERT_EQUAL_FLOAT(15.0f, clampNearAirportKm(15.0f));
+  TEST_ASSERT_EQUAL_FLOAT(500.0f, clampNearAirportKm(9999.0f));
+}
+
+static void test_clamp_climb_rate_threshold_floors_and_ceils(void) {
+  TEST_ASSERT_EQUAL_FLOAT(0.1f, clampClimbRateThresholdMps(0.0f));
+  TEST_ASSERT_EQUAL_FLOAT(0.1f, clampClimbRateThresholdMps(-2.0f));
+  TEST_ASSERT_EQUAL_FLOAT(1.5f, clampClimbRateThresholdMps(1.5f));
+  TEST_ASSERT_EQUAL_FLOAT(50.0f, clampClimbRateThresholdMps(1000.0f));
+}
+
+static void test_sanitize_config_clamps_flight_phase_thresholds(void) {
+  Config cfg;
+  cfg.near_airport_km = -1.0f;
+  cfg.climb_rate_threshold_mps = 0.0f;
+  Config out = sanitizeConfig(cfg);
+  TEST_ASSERT_EQUAL_FLOAT(0.5f, out.near_airport_km);
+  TEST_ASSERT_EQUAL_FLOAT(0.1f, out.climb_rate_threshold_mps);
+
+  Config ok;
+  ok.near_airport_km = 20.0f;
+  ok.climb_rate_threshold_mps = 2.0f;
+  Config outOk = sanitizeConfig(ok);
+  TEST_ASSERT_EQUAL_FLOAT(20.0f, outOk.near_airport_km);
+  TEST_ASSERT_EQUAL_FLOAT(2.0f, outOk.climb_rate_threshold_mps);
 }
 
 static void test_sanitize_config_preserves_home_configured_flag(void) {
@@ -142,5 +175,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_clamp_auto_cycle_interval_enforces_minimum);
   RUN_TEST(test_sanitize_config_clamps_auto_cycle_interval);
   RUN_TEST(test_sanitize_config_preserves_auto_cycle_enabled);
+  RUN_TEST(test_clamp_near_airport_km_floors_and_ceils);
+  RUN_TEST(test_clamp_climb_rate_threshold_floors_and_ceils);
+  RUN_TEST(test_sanitize_config_clamps_flight_phase_thresholds);
   return UNITY_END();
 }

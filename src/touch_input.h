@@ -23,6 +23,16 @@ struct Rect {
 // Pure — no XPT2046/TFT dependency — tested under `pio test -e native`.
 bool hitTest(int16_t touchX, int16_t touchY, const Rect &bounds);
 
+// Maps one raw XPT2046 ADC reading onto a screen-pixel axis: clamps `raw`
+// to [inMin, inMax], then linearly rescales it to [outMin, outMax]. A
+// degenerate calibration range (inMin == inMax, e.g. never-tuned
+// placeholder values that ended up equal) returns `outMin` instead of
+// dividing by zero. Hoisted out of the XPT2046 adapter specifically so
+// the calibration arithmetic — the only non-trivial logic in this module
+// besides hitTest() — is covered by `pio test -e native` (see CLAUDE.md
+// "Testing": "if a function is pure enough to unit test, it needs one").
+int16_t mapTouchAxis(int32_t raw, int32_t inMin, int32_t inMax, int32_t outMin, int32_t outMax);
+
 // ---- Hardware adapter: reads the XPT2046 touchscreen (its own SPI bus,
 // separate from the display — see CLAUDE.md pinout) and maps its raw ADC
 // coordinates to TFT screen coordinates. Not covered by Unity (see

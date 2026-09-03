@@ -185,6 +185,18 @@ void sendConfigPage(const Config &cfg, const char *message, bool isError = false
   sendChunk(buf);
   sendChunk("\"></label>");
 
+  std::snprintf(buf, sizeof(buf), "%.1f", static_cast<double>(cfg.near_airport_km));
+  sendChunk("<label>Near-airport radius, km (takeoff/landing vs. overflight)"
+            "<input type=\"text\" name=\"near_airport_km\" value=\"");
+  sendChunk(buf);
+  sendChunk("\"></label>");
+
+  std::snprintf(buf, sizeof(buf), "%.1f", static_cast<double>(cfg.climb_rate_threshold_mps));
+  sendChunk("<label>Climb/descent threshold, m/s"
+            "<input type=\"text\" name=\"climb_rate_mps\" value=\"");
+  sendChunk(buf);
+  sendChunk("\"></label>");
+
   sendChunk("<label>OpenSky client ID<input type=\"text\" name=\"client_id\" value=\"");
   sendChunk(htmlEscape(cfg.opensky_client_id));
   sendChunk("\"></label>");
@@ -269,6 +281,22 @@ void handleSave() {
       cfg.auto_cycle_interval_s = static_cast<uint32_t>(std::strtoul(v.c_str(), nullptr, 10));
     } else {
       rejected += "auto_cycle_interval ";
+    }
+  }
+  if (server.hasArg("near_airport_km")) {
+    std::string v = server.arg("near_airport_km").c_str();
+    if (isValidFloatString(v)) {
+      cfg.near_airport_km = std::strtof(v.c_str(), nullptr);
+    } else {
+      rejected += "near_airport_km ";
+    }
+  }
+  if (server.hasArg("climb_rate_mps")) {
+    std::string v = server.arg("climb_rate_mps").c_str();
+    if (isValidFloatString(v)) {
+      cfg.climb_rate_threshold_mps = std::strtof(v.c_str(), nullptr);
+    } else {
+      rejected += "climb_rate_mps ";
     }
   }
 

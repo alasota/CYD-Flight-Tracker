@@ -30,6 +30,20 @@ std::string statusBarClock(std::time_t localEpoch, bool timeSynced) {
   return formatTime(localEpoch);
 }
 
+const char *statusBarHealthTag(OpenSkyHealth health) {
+  switch (health) {
+    case OpenSkyHealth::RateLimited:
+      return "RATE";
+    case OpenSkyHealth::AuthError:
+      return "AUTH";
+    case OpenSkyHealth::NetworkError:
+      return "NET";
+    case OpenSkyHealth::Ok:
+    default:
+      return "";
+  }
+}
+
 #ifdef ARDUINO
 
 #include "lcars_theme.h"
@@ -44,7 +58,7 @@ constexpr int16_t kRightMargin = 4;
 }  // namespace
 
 void drawStatusBar(LGFX &gfx, int screenIndex, std::time_t localEpoch, bool timeSynced,
-                   int16_t screenWidth) {
+                   OpenSkyHealth health, int16_t screenWidth) {
   // Own background — safe to repaint every frame without ghosting.
   gfx.fillRect(0, 0, screenWidth, LCARS_HEADER_HEIGHT, LCARS_BLACK);
 
@@ -62,9 +76,19 @@ void drawStatusBar(LGFX &gfx, int screenIndex, std::time_t localEpoch, bool time
   gfx.drawString(statusBarStardate(localEpoch, timeSynced).c_str(),
                  static_cast<int16_t>(kNameBlockWidth + kTextGap), midY);
 
+  std::string clock = statusBarClock(localEpoch, timeSynced);
   gfx.setTextDatum(middle_right);
-  gfx.drawString(statusBarClock(localEpoch, timeSynced).c_str(),
-                 static_cast<int16_t>(screenWidth - kRightMargin), midY);
+  gfx.drawString(clock.c_str(), static_cast<int16_t>(screenWidth - kRightMargin), midY);
+
+  // Data-feed health tag, just left of the clock, in orange so a stale
+  // aircraft list is visibly flagged (review notes 1.2/1.3/1.4).
+  const char *tag = statusBarHealthTag(health);
+  if (tag[0] != '\0') {
+    int16_t clockW = static_cast<int16_t>(gfx.textWidth(clock.c_str()));
+    gfx.setTextColor(LCARS_ORANGE, LCARS_BLACK);
+    gfx.drawString(tag, static_cast<int16_t>(screenWidth - kRightMargin - clockW - kTextGap), midY);
+    gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+  }
 }
 
 #endif  // ARDUINO
