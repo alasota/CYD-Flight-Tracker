@@ -165,7 +165,7 @@ static void applyRedraw(uint8_t mask) {
     tft.fillScreen(LCARS_BLACK);
     drawStatusBar(tft, nav.current(), timeSyncNowLocal(), isTimeSynced(), lastHealth, screenW);
     drawActiveContent();
-    drawBottomNav(tft, nav.current(), screenW, screenH);
+    drawBottomNav(tft, nav.current(), screenW, screenH, statusBarScreenName);
     return;
   }
 
@@ -340,6 +340,10 @@ void loop() {
           break;
       }
       if (lastHealth != previousHealth) pendingRedraw.healthChanged = true;
+
+      Serial.printf("[main] poll status=%d aircraft=%u home_configured=%d free_heap=%u\n",
+                    static_cast<int>(poll.status), static_cast<unsigned>(poll.aircraft.size()),
+                    cachedCfg.home_configured ? 1 : 0, static_cast<unsigned>(ESP.getFreeHeap()));
 
       // Only a clean poll updates the aircraft list — a failure keeps the
       // last good data on screen rather than blanking it (review notes 1.2).

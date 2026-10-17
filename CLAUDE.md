@@ -470,9 +470,12 @@ bottom nav bar), centered text.**
   from overlapping the bottom nav bar below — without that boundary, a tap in a bottom corner
   would be ambiguous between "edge swipe" and "nav bar segment."
 - **Bottom nav bar, y: 225 to 240px (`LCARS_BOTTOM_NAV_HEIGHT = 15px`, full 320px width)** — a
-  persistent strip, present on all three screens, showing three tappable dots/segments (one per
-  screen, each roughly a 320/3 ≈ 107px-wide tap zone), the active one highlighted (filled
-  `LCARS_ORANGE`, inactive ones dim/outline only). Tapping a segment jumps directly to that
+  persistent strip, present on all three screens, showing three tappable **labelled pill buttons**
+  (`FLIGHTS` / `FLIGHT` / `RADAR` in Font0, one per screen, each filling its ~107px-wide segment
+  and the bar's full height minus 1-3px insets), the active one filled `LCARS_ORANGE` with black
+  text, inactive ones dim fill + cyan outline + cyan text. Not tiny dots — the first
+  implementation drew 6px-tall pills and they were effectively invisible on the real board.
+  Tapping a segment jumps directly to that
   screen. **This is the fix for the bottom bar being invisible/unreachable** — earlier versions
   of this spec never actually reserved real height for it, which is why it rendered as a sliver.
   All three screens' content areas now stop at `y:225` specifically to make room for this.

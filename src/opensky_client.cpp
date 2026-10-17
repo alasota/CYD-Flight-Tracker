@@ -250,6 +250,11 @@ StatesAttempt requestStatesOnce(const BoundingBox &bbox, const std::string &bear
   client.setInsecure();
 
   HTTPClient http;
+  // HTTP/1.0 so the server can't answer with Transfer-Encoding: chunked —
+  // the body is parsed straight from getStream() below, which is the raw
+  // socket: with chunking, ArduinoJson reads the leading hex chunk size as
+  // a bare number, "succeeds", and every poll came back with 0 aircraft.
+  http.useHTTP10(true);
   http.setConnectTimeout(kHttpConnectTimeoutMs);
   http.setTimeout(kOpenSkyHttpTimeoutMs);
   if (!http.begin(client, url)) {
@@ -286,12 +291,18 @@ StatesAttempt requestStatesOnce(const BoundingBox &bbox, const std::string &bear
       // Filter: keep every element of each state vector, drop the rest of
       // the envelope. Parsed directly from the socket stream.
       JsonDocument filter;
+      filter["time"] = true;
       filter["states"][0] = true;
       JsonDocument doc;
       DeserializationError err =
           deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
       if (err) {
         Serial.printf("[opensky_client] /states/all parse error: %s\n", err.c_str());
+      } else if (doc["time"].isNull()) {
+        // A real response always carries "time" ("states" alone may be
+        // null when nothing is in range) — anything else is not the
+        // envelope we expect, so don't report it as "0 aircraft".
+        Serial.println("[opensky_client] /states/all response missing \"time\" - not a states body");
       } else {
         att.aircraft = extractAircraftFromStates(doc["states"].as<JsonArrayConst>());
         att.body_ok = true;

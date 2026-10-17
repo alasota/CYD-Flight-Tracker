@@ -198,10 +198,13 @@ void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int1
 // CLAUDE.md "Screen navigation"): `kScreenCount` equal-width segments, the
 // active one highlighted. Segment geometry comes straight from
 // screen_nav's bottomNavSegment(), so the drawn indicators line up exactly
-// with navHitTest()'s JumpTo hit zones. Each segment gets a centred pill:
-// the active screen a wide filled `LCARS_ORANGE` bar, the rest a short
-// `LCARS_CYAN` outline dot. Repaints its own strip first, so it's safe to
-// call every frame.
-void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t screenHeight);
+// with navHitTest()'s JumpTo hit zones. Each segment is a labelled pill
+// button filling the bar's height (label from `labelFor(index)`, in
+// LCARS_FONT_SMALL): the active screen filled `LCARS_ORANGE` with black
+// text, the others dim with a `LCARS_CYAN` outline and cyan text. (The
+// first version drew 6px-tall dots, which were too small to see on the
+// device.) Repaints its own strip first, so it's safe to call every frame.
+void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t screenHeight,
+                   std::string (*labelFor)(int screenIndex));
 
 #endif  // ARDUINO

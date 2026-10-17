@@ -175,31 +175,38 @@ void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int1
   gfx.drawString(label, static_cast<int16_t>(x + w / 2), static_cast<int16_t>(y + h / 2));
 }
 
-void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t screenHeight) {
+void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t screenHeight,
+                   std::string (*labelFor)(int screenIndex)) {
   // Repaint the whole strip first so a screen change doesn't leave the
-  // previous active bar behind.
+  // previous active button behind.
   Rect bar = bottomNavBounds(screenWidth, screenHeight);
   gfx.fillRect(bar.x, bar.y, bar.w, bar.h, LCARS_BLACK);
 
-  constexpr int16_t kPillHeight = 6;
+  constexpr int16_t kInsetX = 3;  // gap between neighbouring buttons
+  constexpr int16_t kInsetY = 1;
+
+  gfx.setFont(LCARS_FONT_SMALL);
+  gfx.setTextDatum(middle_center);
 
   for (int i = 0; i < kScreenCount; ++i) {
     Rect seg = bottomNavSegment(i, screenWidth, screenHeight);
     const bool active = (i == activeIndex);
 
-    // Active: a wide filled bar spanning ~60% of the segment. Inactive: a
-    // short outline dot. Both centred in the segment.
-    const int16_t pillW = active ? static_cast<int16_t>(seg.w * 3 / 5) : kPillHeight * 2;
-    const int16_t px = static_cast<int16_t>(seg.x + (seg.w - pillW) / 2);
-    const int16_t py = static_cast<int16_t>(seg.y + (seg.h - kPillHeight) / 2);
-    const int16_t r = kPillHeight / 2;
+    // A pill button filling the segment (minus small insets).
+    const int16_t px = static_cast<int16_t>(seg.x + kInsetX);
+    const int16_t py = static_cast<int16_t>(seg.y + kInsetY);
+    const int16_t pw = static_cast<int16_t>(seg.w - 2 * kInsetX);
+    const int16_t ph = static_cast<int16_t>(seg.h - 2 * kInsetY);
+    const int16_t r = static_cast<int16_t>(ph / 2);
 
-    if (active) {
-      gfx.fillRoundRect(px, py, pillW, kPillHeight, r, LCARS_ORANGE);
-    } else {
-      gfx.fillRoundRect(px, py, pillW, kPillHeight, r, LCARS_NAV_INACTIVE);
-      gfx.drawRoundRect(px, py, pillW, kPillHeight, r, LCARS_CYAN);
-    }
+    const uint16_t fill = active ? LCARS_ORANGE : LCARS_NAV_INACTIVE;
+    const uint16_t text = active ? LCARS_BLACK : LCARS_CYAN;
+    gfx.fillRoundRect(px, py, pw, ph, r, fill);
+    if (!active) gfx.drawRoundRect(px, py, pw, ph, r, LCARS_CYAN);
+
+    gfx.setTextColor(text, fill);
+    gfx.drawString(labelFor(i).c_str(), static_cast<int16_t>(px + pw / 2),
+                   static_cast<int16_t>(py + ph / 2));
   }
 }
 
