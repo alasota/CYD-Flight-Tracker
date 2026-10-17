@@ -22,6 +22,7 @@
 
 #include "aircraft_summary.h"  // RouteFormat + the identity/route formatters
 #include "cpa_predictor.h"     // CpaPrediction
+#include "i18n.h"              // Language, tr()
 #include "lcars_theme.h"       // palette constants (pure section)
 #include "route_lookup.h"      // AirportInfo
 
@@ -54,19 +55,18 @@ struct CountdownDisplay {
   bool colorCoded = true;       // false in the empty state ("no colour-coding")
 };
 
-// Classifies `cpa` per CLAUDE.md "Screen 2":
+// Classifies `cpa` per CLAUDE.md "Screen 2" (labels shown PL / EN, from i18n):
 //   not found, or t_cpa_seconds < -10  -> Empty
-//        "--" / "BRAK LOTOW W ZASIEGU" / white, not colour-coded
+//        "--" / "BRAK LOTOW W ZASIEGU" | "NO FLIGHTS IN RANGE" / white, not colour-coded
 //   t_cpa_seconds > 60                 -> Minutes
-//        "~<n>" + "MIN" / "SZACOWANY CZAS" / LCARS_MAGENTA
-//   10 < t_cpa_seconds <= 60           -> Seconds, LCARS_CYAN   / "ZBLIZA SIE"
-//   0 <= t_cpa_seconds <= 10           -> Seconds, LCARS_YELLOW / "NAD TOBA"
-//   -10 <= t_cpa_seconds < 0           -> Seconds, LCARS_ORANGE / "MINAL"
+//        "~<n>" + "MIN" / "SZACOWANY CZAS" | "ESTIMATED TIME" / LCARS_MAGENTA
+//   10 < t_cpa_seconds <= 60           -> Seconds, LCARS_CYAN   / "ZBLIZA SIE" | "APPROACHING"
+//   0 <= t_cpa_seconds <= 10           -> Seconds, LCARS_YELLOW / "NAD TOBA" | "OVERHEAD"
+//   -10 <= t_cpa_seconds < 0           -> Seconds, LCARS_ORANGE / "MINAL" | "PASSED"
 // The number is rounded to the nearest whole second (nearest whole minute
-// in Minutes mode). Polish labels are ASCII-folded (no ogonek/kreska) —
-// the bitmap fonts don't carry the diacritics, same rule as table_view's
-// column header.
-CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa);
+// in Minutes mode). Only the text depends on `lang` — mode, number and
+// colour don't.
+CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme +
 // aircraft_summary. Not covered by Unity (see CLAUDE.md "Testing").

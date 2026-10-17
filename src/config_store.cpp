@@ -60,6 +60,7 @@ Config sanitizeConfig(const Config &cfg) {
   out.auto_cycle_interval_s = clampAutoCycleIntervalS(out.auto_cycle_interval_s);
   out.near_airport_km = clampNearAirportKm(out.near_airport_km);
   out.climb_rate_threshold_mps = clampClimbRateThresholdMps(out.climb_rate_threshold_mps);
+  out.language = clampLanguage(static_cast<int>(out.language));
   return out;
 }
 
@@ -88,6 +89,7 @@ Config loadConfig() {
   cfg.near_airport_km = prefs.getFloat("near_km", cfg.near_airport_km);
   cfg.climb_rate_threshold_mps = prefs.getFloat("climb_mps", cfg.climb_rate_threshold_mps);
   cfg.home_configured = prefs.getBool("home_cfg", cfg.home_configured);
+  cfg.language = clampLanguage(prefs.getUChar("lang", static_cast<uint8_t>(cfg.language)));
 
   prefs.end();
   return sanitizeConfig(cfg);
@@ -111,6 +113,7 @@ void saveConfig(const Config &cfg) {
   prefs.putFloat("near_km", sanitized.near_airport_km);
   prefs.putFloat("climb_mps", sanitized.climb_rate_threshold_mps);
   prefs.putBool("home_cfg", sanitized.home_configured);
+  prefs.putUChar("lang", static_cast<uint8_t>(sanitized.language));
 
   prefs.end();
 }

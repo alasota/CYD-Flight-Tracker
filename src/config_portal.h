@@ -5,6 +5,7 @@
 // config_store (Milestone 2).
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 // Area (in square degrees) of the lat/lon bounding box implied by a
@@ -77,3 +78,9 @@ void configPortalLoop();
 
 // True once configPortalBegin() has run.
 bool configPortalIsActive();
+
+// Incremented every time the settings are saved (settings form or
+// credentials upload). main.cpp compares it against the value it last saw
+// to reload the config straight away — e.g. so a language change shows up
+// on screen immediately rather than at the next OpenSky poll.
+uint32_t configPortalSaveCount();

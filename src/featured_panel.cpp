@@ -72,7 +72,7 @@ void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth) {
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_center);
   gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
-  gfx.drawString("No aircraft in range", static_cast<int16_t>(screenWidth / 2),
+  gfx.drawString(tr(Str::NoFlightsInRange), static_cast<int16_t>(screenWidth / 2),
                  static_cast<int16_t>(kPanelTop + kPanelHeight / 2));
 }
 

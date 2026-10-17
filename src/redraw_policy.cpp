@@ -3,7 +3,7 @@
 #include "screen_nav.h"  // kScreenFlight
 
 uint8_t computeRedrawMask(const RedrawEvents &e, int currentScreen) {
-  if (e.firstDraw || e.screenChanged || e.pageChanged) {
+  if (e.firstDraw || e.screenChanged || e.pageChanged || e.languageChanged) {
     return kRedrawFull;
   }
 

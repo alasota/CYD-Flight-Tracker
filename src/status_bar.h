@@ -14,12 +14,15 @@
 #include <ctime>
 #include <string>
 
+#include "i18n.h"  // Language
+
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
 
-// Uppercase screen-name label for a screen_nav index (kScreenFlights=0 /
-// kScreenFlight=1 / kScreenRadar=2). Any out-of-range index yields "?".
-std::string statusBarScreenName(int screenIndex);
+// Uppercase screen-name label in `lang` for a screen_nav index (kScreenFlights=0 /
+// kScreenFlight=1, shown as NOW / TERAZ / kScreenRadar=2). Any out-of-range index yields "?".
+// Also the bottom-nav button labels.
+const char *statusBarScreenName(int screenIndex, Language lang);
 
 // "DD/MM/YYYY" from time_sync::formatDate(), or a same-width
 // "--/--/----" placeholder when the clock hasn't synced yet
@@ -44,8 +47,9 @@ enum class OpenSkyHealth {
 };
 
 // Short right-aligned header tag for `health` — "" when Ok, otherwise a
-// 3-4 char code ("RATE" / "AUTH" / "NET"). Pure — native-tested.
-const char *statusBarHealthTag(OpenSkyHealth health);
+// short code in `lang` (EN "RATE"/"AUTH"/"NET", PL "LIMIT"/"AUTH"/"SIEC").
+// Pure — native-tested.
+const char *statusBarHealthTag(OpenSkyHealth health, Language lang);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme. Not
 // covered by Unity (see CLAUDE.md "Testing"). Guarded here in the header

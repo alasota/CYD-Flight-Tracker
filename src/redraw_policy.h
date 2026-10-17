@@ -22,6 +22,7 @@ struct RedrawEvents {
   bool firstDraw = false;      // boot / leaving the setup prompt
   bool screenChanged = false;  // manual tap or auto-cycle
   bool pageChanged = false;    // Screen 1 table page flip
+  bool languageChanged = false;  // display language switched on the config page
   bool newPoll = false;        // fresh aircraft data
   bool minuteChanged = false;  // header "HH:MM" would read differently (incl. first NTP sync)
   bool healthChanged = false;  // OpenSky health tag changed
@@ -30,7 +31,8 @@ struct RedrawEvents {
 
 // Regions to repaint for `e` while `currentScreen` (screen_nav index) is
 // active:
-//   - firstDraw / screenChanged / pageChanged -> kRedrawFull, nothing else.
+//   - firstDraw / screenChanged / pageChanged / languageChanged
+//                                             -> kRedrawFull, nothing else.
 //   - newPoll                                 -> kRedrawContent.
 //   - minuteChanged / healthChanged           -> kRedrawHeaderText.
 //   - countdownTick on kScreenFlight          -> kRedrawCountdown, unless

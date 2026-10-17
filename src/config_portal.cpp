@@ -71,6 +71,7 @@ namespace {
 
 WebServer server(80);
 bool active = false;
+uint32_t saveCount = 0;  // see configPortalSaveCount()
 
 std::string htmlEscape(const std::string &in) {
   std::string out;
@@ -144,6 +145,14 @@ void sendConfigPage(const Config &cfg, const char *message, bool isError = false
             "</form>");
 
   sendChunk("<h2>Settings</h2><form method=\"POST\" action=\"/save\">");
+
+  // Display language (i18n) — option values are languageCode() ("pl"/"en").
+  sendChunk("<label>Display language / Jezyk wyswietlacza<select name=\"language\">");
+  sendChunk(cfg.language == Language::PL ? "<option value=\"pl\" selected>Polski</option>"
+                                         : "<option value=\"pl\">Polski</option>");
+  sendChunk(cfg.language == Language::EN ? "<option value=\"en\" selected>English</option>"
+                                         : "<option value=\"en\">English</option>");
+  sendChunk("</select></label>");
 
   char buf[64];
 
@@ -300,6 +309,10 @@ void handleSave() {
     }
   }
 
+  if (server.hasArg("language")) {
+    cfg.language = languageFromCode(server.arg("language").c_str());  // unknown -> default
+  }
+
   if (server.hasArg("client_id")) cfg.opensky_client_id = server.arg("client_id").c_str();
   if (server.hasArg("client_secret")) {
     cfg.opensky_client_secret = server.arg("client_secret").c_str();
@@ -311,6 +324,7 @@ void handleSave() {
   cfg.home_configured = true;
 
   saveConfig(cfg);  // sanitizes internally (see config_store)
+  ++saveCount;
 
   Config saved = loadConfig();
   if (!rejected.empty()) {
@@ -361,6 +375,7 @@ void handleCredentialsUpload() {
   cfg.opensky_client_id = creds.client_id;
   cfg.opensky_client_secret = creds.client_secret;
   saveConfig(cfg);  // sanitizes internally (see config_store)
+  ++saveCount;
 
   Config saved = loadConfig();
   sendConfigPage(saved, "OpenSky credentials loaded from file.");
@@ -390,5 +405,7 @@ void configPortalLoop() {
 }
 
 bool configPortalIsActive() { return active; }
+
+uint32_t configPortalSaveCount() { return saveCount; }
 
 #endif  // ARDUINO

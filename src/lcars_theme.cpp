@@ -176,7 +176,7 @@ void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int1
 }
 
 void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t screenHeight,
-                   std::string (*labelFor)(int screenIndex)) {
+                   const char *(*labelFor)(int screenIndex, Language lang)) {
   // Repaint the whole strip first so a screen change doesn't leave the
   // previous active button behind.
   Rect bar = bottomNavBounds(screenWidth, screenHeight);
@@ -205,7 +205,7 @@ void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t scre
     if (!active) gfx.drawRoundRect(px, py, pw, ph, r, LCARS_CYAN);
 
     gfx.setTextColor(text, fill);
-    gfx.drawString(labelFor(i).c_str(), static_cast<int16_t>(px + pw / 2),
+    gfx.drawString(labelFor(i, i18nLanguage()), static_cast<int16_t>(px + pw / 2),
                    static_cast<int16_t>(py + ph / 2));
   }
 }

@@ -114,7 +114,7 @@ FeaturedSplit splitFeaturedAndRest(const std::vector<AircraftRow> &rows) {
 namespace {
 // Fixed layout from CLAUDE.md "Screen 1" — absolute y on the 320x240
 // frame, below the 25px status_bar header.
-constexpr int16_t kSubHeaderY = 108;   // cyan "FLIGHTS" bar, y:108..118
+constexpr int16_t kSubHeaderY = 108;   // cyan LOTY/FLIGHTS bar, y:108..118
 constexpr int16_t kSubHeaderH = 10;    // thin label strip (CLAUDE.md "Screen 1")
 constexpr int16_t kColHeaderY = 119;   // orange "|"-separated column labels, y:119..134
 constexpr int16_t kColHeaderH = 15;    // text centered ~y:127
@@ -124,11 +124,11 @@ constexpr int16_t kRowStep = 17;       // tightened from 18 for the y:225 conten
 // Columns: flight, airline, origin, destination, aircraft type, phase icon
 // (see CLAUDE.md "Screen 1" — altitude/speed/distance moved to
 // featured_panel's pills, shown only for the one closest aircraft).
-// LOT is wide enough for an 8-char callsign in Font2; FAZA for its
-// "FAZA" label in Font0.
+// LOT is wide enough for an 8-char callsign in Font2; FAZA for the longest
+// phase label ("PHASE", 30px) in Font0.
 constexpr TableColumn kColumns[kTableColumnCount] = {
-    {"LOT", 2, 64},     {"LINIA", 66, 92}, {"SKAD", 158, 38},
-    {"DOKAD", 196, 38}, {"TYP", 234, 58},  {"FAZA", 292, 26},
+    {Str::ColFlight, 2, 64}, {Str::ColAirline, 66, 92}, {Str::ColFrom, 158, 38},
+    {Str::ColTo, 196, 38},   {Str::ColType, 234, 52},   {Str::ColPhase, 286, 32},
 };
 enum ColumnIndex { kColFlight, kColAirline, kColOrigin, kColDest, kColType, kColPhase };
 }  // namespace
@@ -222,7 +222,7 @@ void drawColumnHeader(LGFX &gfx, int16_t screenWidth) {
       gfx.drawFastVLine(col.x, static_cast<int16_t>(kColHeaderY + 2),
                         static_cast<int16_t>(kColHeaderH - 4), LCARS_BLACK);
     }
-    gfx.drawString(col.label, static_cast<int16_t>(col.x + kTableCellPadPx), textY);
+    gfx.drawString(tr(col.label), static_cast<int16_t>(col.x + kTableCellPadPx), textY);
   }
 }
 
@@ -247,7 +247,7 @@ void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, const Airpor
   gfx.setFont(LCARS_FONT_SMALL);
   gfx.setTextDatum(middle_left);
   gfx.setTextColor(LCARS_BLACK, LCARS_CYAN);
-  gfx.drawString("FLIGHTS", 4, static_cast<int16_t>(kSubHeaderY + kSubHeaderH / 2));
+  gfx.drawString(tr(Str::ScreenFlights), 4, static_cast<int16_t>(kSubHeaderY + kSubHeaderH / 2));
 
   // Orange column-header row at y:119..134, labels aligned to the data
   // columns (ASCII only: bitmap fonts don't carry the Polish diacritics —

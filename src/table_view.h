@@ -16,6 +16,7 @@
 #include "aircraft_lookup.h"
 #include "featured_panel.h"
 #include "flight_phase.h"
+#include "i18n.h"
 #include "lcars_theme.h"
 #include "opensky_client.h"
 #include "route_lookup.h"
@@ -124,7 +125,7 @@ int16_t tableFirstRowY();    // 138 — y of the first data row
 // table). `x`/`w` are absolute px on the 320px-wide frame; columns are
 // contiguous (each starts where the previous ends).
 struct TableColumn {
-  const char *label;  // ASCII header label (bitmap fonts have no Polish diacritics)
+  Str label;  // header label, translated via tr() (i18n)
   int16_t x;
   int16_t w;
 };
@@ -134,7 +135,8 @@ constexpr int kTableColumnCount = 6;
 // Inset of text from its column's left (and right) edge.
 constexpr int16_t kTableCellPadPx = 2;
 
-// The 6 columns, in order: LOT, LINIA, SKAD, DOKAD, TYP, FAZA.
+// The 6 columns, in order: LOT/FLIGHT, LINIA/AIRLINE, SKAD/FROM, DOKAD/TO,
+// TYP/TYPE, FAZA/PHASE.
 const TableColumn *tableColumns();
 
 // Pixel width available to a cell's text — what fitToWidth() cuts it to.

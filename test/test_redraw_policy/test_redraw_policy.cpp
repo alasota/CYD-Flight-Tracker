@@ -37,6 +37,13 @@ static void test_page_change_is_full(void) {
   TEST_ASSERT_EQUAL_UINT8(kRedrawFull, computeRedrawMask(e, kScreenFlights));
 }
 
+static void test_language_change_is_full(void) {
+  // Every label on every part of the screen changes.
+  RedrawEvents e;
+  e.languageChanged = true;
+  TEST_ASSERT_EQUAL_UINT8(kRedrawFull, computeRedrawMask(e, kScreenFlight));
+}
+
 static void test_full_swallows_everything_else(void) {
   RedrawEvents e;
   e.screenChanged = true;
@@ -116,6 +123,7 @@ int main(int, char **) {
   RUN_TEST(test_first_draw_is_full);
   RUN_TEST(test_screen_change_is_full);
   RUN_TEST(test_page_change_is_full);
+  RUN_TEST(test_language_change_is_full);
   RUN_TEST(test_full_swallows_everything_else);
 
   RUN_TEST(test_countdown_tick_on_flight_screen_redraws_countdown_only);

@@ -161,8 +161,31 @@ static void test_sanitize_config_preserves_auto_cycle_enabled(void) {
   TEST_ASSERT_FALSE(sanitizeConfig(off).auto_cycle_enabled);
 }
 
+static void test_default_language_is_polish(void) {
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::PL),
+                        static_cast<int>(defaultConfig().language));
+}
+
+static void test_sanitize_config_preserves_valid_language(void) {
+  Config en;
+  en.language = Language::EN;
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::EN),
+                        static_cast<int>(sanitizeConfig(en).language));
+}
+
+static void test_sanitize_config_resets_invalid_language(void) {
+  // e.g. a stale/corrupt NVS byte — must not index past the i18n tables.
+  Config bad;
+  bad.language = static_cast<Language>(7);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(kDefaultLanguage),
+                        static_cast<int>(sanitizeConfig(bad).language));
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
+  RUN_TEST(test_default_language_is_polish);
+  RUN_TEST(test_sanitize_config_preserves_valid_language);
+  RUN_TEST(test_sanitize_config_resets_invalid_language);
   RUN_TEST(test_default_config_has_sane_values);
   RUN_TEST(test_sanitize_config_preserves_home_configured_flag);
   RUN_TEST(test_clamp_radius_floors_and_ceils);

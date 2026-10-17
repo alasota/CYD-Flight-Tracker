@@ -3,14 +3,14 @@
 #include "screen_nav.h"  // kScreenFlights / kScreenFlight / kScreenRadar
 #include "time_sync.h"
 
-std::string statusBarScreenName(int screenIndex) {
+const char *statusBarScreenName(int screenIndex, Language lang) {
   switch (screenIndex) {
     case kScreenFlights:
-      return "FLIGHTS";
+      return tr(Str::ScreenFlights, lang);
     case kScreenFlight:
-      return "FLIGHT";
+      return tr(Str::ScreenNow, lang);  // Screen 2 is displayed as NOW / TERAZ
     case kScreenRadar:
-      return "RADAR";
+      return tr(Str::ScreenRadar, lang);
     default:
       return "?";
   }
@@ -30,14 +30,14 @@ std::string statusBarClock(std::time_t localEpoch, bool timeSynced) {
   return formatTime(localEpoch);
 }
 
-const char *statusBarHealthTag(OpenSkyHealth health) {
+const char *statusBarHealthTag(OpenSkyHealth health, Language lang) {
   switch (health) {
     case OpenSkyHealth::RateLimited:
-      return "RATE";
+      return tr(Str::HealthRateLimited, lang);
     case OpenSkyHealth::AuthError:
-      return "AUTH";
+      return tr(Str::HealthAuthError, lang);
     case OpenSkyHealth::NetworkError:
-      return "NET";
+      return tr(Str::HealthNetworkError, lang);
     case OpenSkyHealth::Ok:
     default:
       return "";
@@ -49,7 +49,7 @@ const char *statusBarHealthTag(OpenSkyHealth health) {
 #include "lcars_theme.h"
 
 namespace {
-// Wide enough for the longest name ("FLIGHTS", 7 chars) in LCARS_FONT_BODY
+// Wide enough for the longest name in any language ("FLIGHTS", 7 chars) in LCARS_FONT_BODY
 // at this height, per CLAUDE.md "Screen chrome".
 constexpr int16_t kNameBlockWidth = 78;
 constexpr int16_t kNameBlockRadius = 6;
@@ -63,7 +63,7 @@ void drawStatusBar(LGFX &gfx, int screenIndex, std::time_t localEpoch, bool time
   // corners don't keep stale pixels).
   gfx.fillRect(0, 0, kNameBlockWidth, LCARS_HEADER_HEIGHT, LCARS_BLACK);
   drawHeaderBlock(gfx, 0, 0, kNameBlockWidth, LCARS_HEADER_HEIGHT, kNameBlockRadius, LCARS_ORANGE,
-                  LCARS_BLACK, statusBarScreenName(screenIndex).c_str());
+                  LCARS_BLACK, statusBarScreenName(screenIndex, i18nLanguage()));
 
   drawStatusBarText(gfx, localEpoch, timeSynced, health, screenWidth);
 }
@@ -91,7 +91,7 @@ void drawStatusBarText(LGFX &gfx, std::time_t localEpoch, bool timeSynced, OpenS
 
   // Data-feed health tag, just left of the clock, in orange so a stale
   // aircraft list is visibly flagged (review notes 1.2/1.3/1.4).
-  const char *tag = statusBarHealthTag(health);
+  const char *tag = statusBarHealthTag(health, i18nLanguage());
   if (tag[0] != '\0') {
     int16_t clockW = static_cast<int16_t>(gfx.textWidth(clock.c_str()));
     gfx.setTextColor(LCARS_ORANGE, LCARS_BLACK);

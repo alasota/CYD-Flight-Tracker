@@ -117,7 +117,7 @@ void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, const Air
     gfx.setFont(LCARS_FONT_BODY);
     gfx.setTextDatum(middle_center);
     gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
-    gfx.drawString("BRAK LOTU", static_cast<int16_t>(kSummaryX + kSummaryW / 2),
+    gfx.drawString(tr(Str::NoFlight), static_cast<int16_t>(kSummaryX + kSummaryW / 2),
                    static_cast<int16_t>(kContentTop + kContentHeight / 2));
     gfx.clearClipRect();
     return;

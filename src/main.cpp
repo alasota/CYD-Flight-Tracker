@@ -61,6 +61,7 @@
 #include "config_store.h"
 #include "cpa_predictor.h"
 #include "flight_screen.h"
+#include "i18n.h"
 #include "lcars_theme.h"
 #include "lookup_budget.h"
 #include "opensky_client.h"
@@ -198,8 +199,25 @@ static void showSetupPrompt() {
   tft.setFont(LCARS_FONT_BODY);
   tft.setTextDatum(middle_center);
   tft.setTextColor(LCARS_AMBER, LCARS_BLACK);
-  tft.drawString("Set your home location at", screenW / 2, screenH / 2 - 10);
+  tft.drawString(tr(Str::SetupPrompt), screenW / 2, screenH / 2 - 10);
   tft.drawString("http://cyd-sky.local", screenW / 2, screenH / 2 + 10);
+}
+
+// Re-reads the config from NVS (after a config_portal save, or at a poll)
+// and applies what affects the display right away: the language and the
+// setup-prompt <-> real-screens switch both need a full repaint.
+static void reloadConfig() {
+  const bool wasHomeConfigured = cachedCfg.home_configured;
+  const Language previousLanguage = cachedCfg.language;
+
+  cachedCfg = loadConfig();
+  lastRadiusDeg = cachedCfg.radius_deg;
+
+  if (cachedCfg.home_configured != wasHomeConfigured) pendingRedraw.firstDraw = true;
+  if (cachedCfg.language != previousLanguage) {
+    i18nSetLanguage(cachedCfg.language);
+    pendingRedraw.languageChanged = true;
+  }
 }
 
 // Persist (debounced) + redraw after screen_nav reports the active screen
@@ -278,6 +296,7 @@ void setup() {
   touchInputBegin();
 
   cachedCfg = loadConfig();
+  i18nSetLanguage(cachedCfg.language);  // before anything is drawn
   nav.set(cachedCfg.last_screen);  // restore the last-active screen
   lastPersistedScreen = nav.current();
   lastRadiusDeg = cachedCfg.radius_deg;
@@ -302,6 +321,13 @@ void loop() {
   wifiManagerLoop();
   configPortalLoop();
 
+  // --- Settings saved on the config page: apply them now ---------------
+  static uint32_t lastSeenSaveCount = 0;
+  if (configPortalSaveCount() != lastSeenSaveCount) {
+    lastSeenSaveCount = configPortalSaveCount();
+    reloadConfig();
+  }
+
   // --- Touch: edge-detected, one handleTap() per press --------------------
   static bool wasTouchPressed = false;
   TouchPoint touch = touchInputRead();
@@ -315,14 +341,10 @@ void loop() {
     OpenSkyPollResult poll = openSkyClientPoll(millis(), cachedCfg);
 
     if (poll.status != OpenSkyPollStatus::NotDue) {
-      // A poll actually ran — refresh the cached config so config_portal
-      // edits (home, radius, credentials, thresholds) take effect, and
-      // update the header health tag.
-      const bool wasHomeConfigured = cachedCfg.home_configured;
-      cachedCfg = loadConfig();
-      lastRadiusDeg = cachedCfg.radius_deg;
-      // Setup prompt <-> real screens: a structural change, repaint all.
-      if (cachedCfg.home_configured != wasHomeConfigured) pendingRedraw.firstDraw = true;
+      // A poll actually ran — refresh the cached config (config_portal
+      // saves are also picked up immediately above; this is the backstop)
+      // and update the header health tag.
+      reloadConfig();
 
       const OpenSkyHealth previousHealth = lastHealth;
       switch (poll.status) {

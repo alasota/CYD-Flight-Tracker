@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <string>
 
+#include "i18n.h"  // Language
+
 // Clamps the auto-cycle interval (see CLAUDE.md "Auto screen cycling") to
 // a sane floor — a few seconds minimum, so the display can't be
 // configured to flip faster than the eye can follow, and never zero
@@ -51,6 +53,10 @@ struct Config {
   // ~15 km, and ~1.5 m/s for the climb/descent cutoff.
   float near_airport_km = 15.0f;
   float climb_rate_threshold_mps = 1.5f;
+  // On-screen language (CLAUDE.md "Language"), chosen on the config page.
+  // Stored in NVS as its numeric index; an out-of-range stored value is
+  // reset to kDefaultLanguage by sanitizeConfig().
+  Language language = kDefaultLanguage;
   // True once the user has saved the settings form at least once via
   // config_portal. (0, 0) is a real place (Gulf of Guinea) — without this
   // flag there's no way to tell "user hasn't configured their home

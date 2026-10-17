@@ -24,7 +24,7 @@ int16_t flightCountdownHeightPx() { return kCountdownHeight; }
 int16_t flightStatusTopPx() { return kStatusTop; }
 int16_t flightStatusHeightPx() { return kStatusHeight; }
 
-CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa) {
+CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang) {
   CountdownDisplay out;
 
   const float t = cpa.t_cpa_seconds;
@@ -33,7 +33,7 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa) {
     out.mode = CountdownDisplay::Mode::Empty;
     out.bigText = "--";
     out.suffixText = "";
-    out.statusLabel = "BRAK LOTOW W ZASIEGU";
+    out.statusLabel = tr(Str::NoFlightsInRange, lang);
     out.color = kEmptyColor;
     out.colorCoded = false;
     return out;
@@ -43,8 +43,8 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa) {
     out.mode = CountdownDisplay::Mode::Minutes;
     long minutes = std::lround(t / 60.0f);
     out.bigText = "~" + std::to_string(minutes);
-    out.suffixText = "MIN";
-    out.statusLabel = "SZACOWANY CZAS";
+    out.suffixText = tr(Str::UnitMinutes, lang);
+    out.statusLabel = tr(Str::StatusEstimated, lang);
     out.color = LCARS_MAGENTA;
     return out;
   }
@@ -56,13 +56,13 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa) {
 
   if (t > 10.0f) {
     out.color = LCARS_CYAN;
-    out.statusLabel = "ZBLIZA SIE";
+    out.statusLabel = tr(Str::StatusApproaching, lang);
   } else if (t >= 0.0f) {
     out.color = LCARS_YELLOW;
-    out.statusLabel = "NAD TOBA";
+    out.statusLabel = tr(Str::StatusOverhead, lang);
   } else {  // -10 <= t < 0
     out.color = LCARS_ORANGE;
-    out.statusLabel = "MINAL";
+    out.statusLabel = tr(Str::StatusPassed, lang);
   }
   return out;
 }
@@ -102,7 +102,7 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
     gfx.setFont(LCARS_FONT_BODY);
     gfx.setTextDatum(middle_center);
     gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
-    gfx.drawString("BRAK LOTU", cx, static_cast<int16_t>(kIdentityTop + kIdentityHeight / 2));
+    gfx.drawString(tr(Str::NoFlight), cx, static_cast<int16_t>(kIdentityTop + kIdentityHeight / 2));
   }
 
   drawFlightCountdown(gfx, hasNearest, cpa, screenWidth);
@@ -172,7 +172,8 @@ bool countdownSpriteTried = false;
 
 void drawFlightCountdown(LGFX &gfx, bool hasNearest, const CpaPrediction &cpa,
                          int16_t screenWidth) {
-  const CountdownDisplay cd = computeCountdownDisplay(hasNearest ? cpa : CpaPrediction{});
+  const CountdownDisplay cd =
+      computeCountdownDisplay(hasNearest ? cpa : CpaPrediction{}, i18nLanguage());
   const int16_t zoneH = static_cast<int16_t>(kStatusTop + kStatusHeight - kCountdownTop);
 
   if (!countdownSpriteTried) {

@@ -320,12 +320,19 @@ static void test_table_row_step_is_17px_from_y138(void) {
 static void test_columns_count_and_order(void) {
   TEST_ASSERT_EQUAL_INT(6, kTableColumnCount);
   const TableColumn *cols = tableColumns();
-  TEST_ASSERT_EQUAL_STRING("LOT", cols[0].label);
-  TEST_ASSERT_EQUAL_STRING("LINIA", cols[1].label);
-  TEST_ASSERT_EQUAL_STRING("SKAD", cols[2].label);
-  TEST_ASSERT_EQUAL_STRING("DOKAD", cols[3].label);
-  TEST_ASSERT_EQUAL_STRING("TYP", cols[4].label);
-  TEST_ASSERT_EQUAL_STRING("FAZA", cols[5].label);
+  TEST_ASSERT_EQUAL_STRING("LOT", tr(cols[0].label, Language::PL));
+  TEST_ASSERT_EQUAL_STRING("LINIA", tr(cols[1].label, Language::PL));
+  TEST_ASSERT_EQUAL_STRING("SKAD", tr(cols[2].label, Language::PL));
+  TEST_ASSERT_EQUAL_STRING("DOKAD", tr(cols[3].label, Language::PL));
+  TEST_ASSERT_EQUAL_STRING("TYP", tr(cols[4].label, Language::PL));
+  TEST_ASSERT_EQUAL_STRING("FAZA", tr(cols[5].label, Language::PL));
+
+  TEST_ASSERT_EQUAL_STRING("FLIGHT", tr(cols[0].label, Language::EN));
+  TEST_ASSERT_EQUAL_STRING("AIRLINE", tr(cols[1].label, Language::EN));
+  TEST_ASSERT_EQUAL_STRING("FROM", tr(cols[2].label, Language::EN));
+  TEST_ASSERT_EQUAL_STRING("TO", tr(cols[3].label, Language::EN));
+  TEST_ASSERT_EQUAL_STRING("TYPE", tr(cols[4].label, Language::EN));
+  TEST_ASSERT_EQUAL_STRING("PHASE", tr(cols[5].label, Language::EN));
 }
 
 static void test_columns_are_contiguous_and_never_overlap(void) {
@@ -348,11 +355,15 @@ static void test_columns_fit_the_320px_screen(void) {
 
 static void test_column_labels_fit_their_columns_in_small_font(void) {
   // Labels are drawn in LCARS_FONT_SMALL (Font0, 6px advance) at
-  // x + kTableCellPadPx; they must not reach the next column.
+  // x + kTableCellPadPx; they must not reach the next column — in every
+  // language.
   const TableColumn *cols = tableColumns();
-  for (int i = 0; i < kTableColumnCount; ++i) {
-    int labelPx = static_cast<int>(std::string(cols[i].label).size()) * 6;
-    TEST_ASSERT_TRUE_MESSAGE(kTableCellPadPx + labelPx <= cols[i].w, cols[i].label);
+  for (Language lang : {Language::PL, Language::EN}) {
+    for (int i = 0; i < kTableColumnCount; ++i) {
+      const char *label = tr(cols[i].label, lang);
+      int labelPx = static_cast<int>(std::string(label).size()) * 6;
+      TEST_ASSERT_TRUE_MESSAGE(kTableCellPadPx + labelPx <= cols[i].w, label);
+    }
   }
 }
 

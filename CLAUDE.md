@@ -244,8 +244,8 @@ switching feels like changing a mode on one console, not jumping between apps.
 
 **Exact pixel spec, y: 0 to 25px, full width (320px):**
 - LCARS block on the left: filled rounded rectangle (`fillRoundRect`), color `LCARS_ORANGE`
-  (`0xFC00`). Label the screen name inside it in small bold text (`FLIGHTS` / `FLIGHT` /
-  `RADAR`) — this is how each screen stays identifiable now that the header's main text is
+  (`0xFC00`). Label the screen name inside it in small bold text, in the selected language
+  (EN `FLIGHTS` / `NOW` / `RADAR`, PL `LOTY` / `TERAZ` / `RADAR` — see "Language") — this is how each screen stays identifiable now that the header's main text is
   date/time rather than a screen-name label; keep the block wide enough for the longest
   name (`FLIGHTS`, 7 characters) at whatever font size fits 25px tall comfortably.
 - To the right of that block: the current date `DD/MM/YYYY` (left-aligned, right after the
@@ -333,8 +333,9 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   position** (same constants as the data rows below), with the `|` separator drawn at each
   column boundary — *not* as one pre-joined string starting at x=4, which drifts out of
   alignment with the data (the first implementation put `SKAD` at ~x:100 over a column starting
-  at x:160). Labels: `LOT`, `LINIA`, `SKAD`, `DOKAD`, `TYP`, `FAZA` (ASCII — built-in bitmap
-  fonts don't carry Polish diacritics).
+  at x:160). Labels per language: PL `LOT`, `LINIA`, `SKAD`, `DOKAD`, `TYP`, `FAZA` / EN
+  `FLIGHT`, `AIRLINE`, `FROM`, `TO`, `TYPE`, `PHASE` (ASCII — built-in bitmap fonts don't carry
+  Polish diacritics). Every label in every language must fit its column (native-tested).
 - **Column layout — single source of truth**, shared by the column header and the data rows
   (define once in `table_view`, expose via a pure function so tests can check that columns
   don't overlap and sum to ≤ 320px):
@@ -345,8 +346,8 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   | LINIA   | 66     | 92         | airline (truncated)         |
   | SKAD    | 158    | 38         | origin airport code         |
   | DOKAD   | 196    | 38         | destination airport code    |
-  | TYP     | 234    | 58         | aircraft type (truncated)   |
-  | FAZA    | 292    | 26         | phase icon (label "FAZA" needs 24px in Font0) |
+  | TYP     | 234    | 52         | aircraft type (truncated)   |
+  | FAZA    | 286    | 32         | phase icon (EN label "PHASE" needs 30px in Font0) |
 
 - **Every cell is truncated to its column width** before drawing — text must never spill into
   the next column (with a background color set, it overwrites its neighbour; without one, the
@@ -372,6 +373,10 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
 - This is the priority screen — get it solid before spending time on the other two.
 
 ### Screen 2 — "Flight" (single nearest aircraft + overhead countdown)
+
+**Displayed as `NOW` (EN) / `TERAZ` (PL)** in the header block and bottom nav — renamed from
+"FLIGHT" on request. In code it's still `kScreenFlight` / `flight_screen`; only the on-screen
+name changed.
 
 Deliberately minimal — one aircraft, one number that matters: when will it actually be
 overhead. **Exact pixel spec**, below the 25px header, no scrolling:
@@ -467,7 +472,7 @@ bottom nav bar), centered text.**
   would be ambiguous between "edge swipe" and "nav bar segment."
 - **Bottom nav bar, y: 225 to 240px (`LCARS_BOTTOM_NAV_HEIGHT = 15px`, full 320px width)** — a
   persistent strip, present on all three screens, showing three tappable **labelled pill buttons**
-  (`FLIGHTS` / `FLIGHT` / `RADAR` in Font0, one per screen, each filling its ~107px-wide segment
+  (the screen names — `LOTY`/`TERAZ`/`RADAR` or `FLIGHTS`/`NOW`/`RADAR` — in Font0, one per screen, each filling its ~107px-wide segment
   and the bar's full height minus 1-3px insets), the active one filled `LCARS_ORANGE` with black
   text, inactive ones dim fill + cyan outline + cyan text. Not tiny dots — the first
   implementation drew 6px-tall pills and they were effectively invisible on the real board.
@@ -525,6 +530,36 @@ however long that took.
   imminent right as the previous hold clears, the hold condition will naturally re-trigger for
   it on the next check — that's expected behavior, not a bug to fix.
 
+
+## Language — Polish / English
+
+Every on-screen string is shown in Polish or English, chosen on the config page ("Display
+language / Jezyk wyswietlacza" select, values `pl` / `en`). Default: Polish.
+
+- **One table, `i18n` module.** All displayed text lives in the `I18N_STRINGS` X-macro list in
+  `src/i18n.h` — one line per string with its PL and EN text side by side. The `Str` enum and
+  both translation tables are generated from that list, so a string can't be added without both
+  translations (it won't compile) and the tables can't drift out of step with the enum. This is
+  the usual small-firmware approach on Arduino/ESP32: no gettext, no files on SPIFFS/LittleFS,
+  no runtime parsing.
+- **Flash, not RAM.** The tables are `static const char *const` arrays of literals — on the
+  ESP32 they stay in flash (.rodata). Don't add `PROGMEM` / `F()`; they're AVR-era and no-ops
+  here.
+- **Never hardcode display text** in a view module — add a `Str` entry and use `tr(Str::X)`.
+  Draw code uses the current language (`tr(id)`, set by `i18nSetLanguage()`); pure functions
+  that return text take an explicit `Language` (e.g. `computeCountdownDisplay(cpa, lang)`,
+  `statusBarScreenName(i, lang)`) so tests can check both languages.
+- **ASCII only** — Polish is ASCII-folded (`ZBLIZA SIE`, `NAD TOBA`) because the built-in bitmap
+  fonts only cover 0x20-0x7E. `test_i18n` enforces it. Real diacritics would need a custom
+  font (e.g. a generated VLW/u8g2 font with Latin Extended-A) — not done yet.
+- **Length limits** that tests enforce: screen names ≤ 7 chars (header block), table column
+  labels must fit their column in Font0.
+- **Persistence & apply.** `config_store` keeps it as `language` (NVS key `lang`, numeric index;
+  out-of-range → default). After a config-page save, `main.cpp` reloads the config immediately
+  (`configPortalSaveCount()`), calls `i18nSetLanguage()` and does a full redraw
+  (`RedrawEvents::languageChanged`).
+- Not translated: units (`m`, `km`, `m/s`, `MIN`), `--` placeholders, airline/aircraft names
+  from hexdb.io, and the config web page itself (English).
 
 ## Design language — LCARS-inspired (Star Trek console aesthetic)
 
@@ -601,6 +636,8 @@ each with a single responsibility:
   `hitTest` pattern from Milestone 9), and the auto-cycle timer + `shouldDeferAutoSwitch()` (see
   "Auto screen cycling") — takes `t_cpa_seconds` as a parameter, doesn't call `cpa_predictor`
   itself. No TFT drawing, no OpenSky/hexdb.io calls.
+- `i18n` — PL/EN string table (X-macro), `tr()`, current language, `pl`/`en` codes. See
+  "Language". Pure, no I/O.
 - `redraw_policy` — pure `computeRedrawMask(events, currentScreen)`: turns "what happened"
   (first draw, screen/page change, new poll, minute rollover, health change, countdown tick)
   into which regions to repaint (full / content / header text / countdown). See "Redraw policy".
