@@ -5,12 +5,12 @@
 #include "table_view.h"  // full AircraftRow definition
 
 namespace {
-constexpr int16_t kIdentityTop = 28;
-constexpr int16_t kIdentityHeight = 50;   // y:28..78
-constexpr int16_t kCountdownTop = 82;
-constexpr int16_t kCountdownHeight = 113;  // y:82..195
-constexpr int16_t kStatusTop = 200;
-constexpr int16_t kStatusHeight = 25;      // y:200..225 (was 238 — bottom nav reserves 225..240)
+constexpr int16_t kIdentityTop = LCARS_CONTENT_TOP;  // 18
+constexpr int16_t kIdentityHeight = 50;   // y:18..68
+constexpr int16_t kCountdownTop = kIdentityTop + kIdentityHeight + 4;  // 72
+constexpr int16_t kCountdownHeight = 113;  // y:72..185
+constexpr int16_t kStatusTop = LCARS_CONTENT_BOTTOM - 25;  // 190
+constexpr int16_t kStatusHeight = 25;      // y:190..215 (bottom nav: 215..240)
 
 // Empty-state colour — deliberately outside the urgency palette
 // ("no colour-coding" in CLAUDE.md).

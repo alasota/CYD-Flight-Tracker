@@ -121,14 +121,12 @@ bool shouldPersistScreenChange(bool userInitiated, uint32_t msSinceLastPersist,
 // alone for screen-specific interactions (e.g. Screen 1's table
 // pagination).
 //
-// The bottom nav bar only *draws* LCARS_BOTTOM_NAV_HEIGHT (15) px tall
-// (y:225..240 on the 240px panel), but 15px is a cramped finger target,
-// so navHitTest() treats a tap anywhere in the taller band y:215..240 as
-// a nav-bar tap (CLAUDE.md "Screen navigation" — "treat y > 215 as bottom
-// nav for touch purposes even though the bar only draws from y:225"). The
-// edge strips stop at the visual bar top (y:225); the nav bar's priority
-// in navHitTest() resolves the 215..225 overlap.
-constexpr int16_t kBottomNavTouchExtra = 10;
+// The bottom nav bar draws LCARS_BOTTOM_NAV_HEIGHT (25) px tall
+// (y:215..240 on the 240px panel); navHitTest() accepts taps in a slightly
+// taller band, y:210..240, for an imprecise finger. The edge strips stop
+// at the visual bar top (y:215); the nav bar's priority in navHitTest()
+// resolves the 210..215 overlap.
+constexpr int16_t kBottomNavTouchExtra = 5;
 // Edge strip width as a percentage of screen width, per side.
 constexpr int16_t kEdgeStripPercent = 18;
 
@@ -137,7 +135,7 @@ Rect leftEdgeZone(int16_t screenWidth, int16_t screenHeight, int16_t headerHeigh
 // Right edge strip: tapping it goes to the next screen.
 Rect rightEdgeZone(int16_t screenWidth, int16_t screenHeight, int16_t headerHeight);
 
-// The bottom nav bar as it is *drawn* (y:225..240, LCARS_BOTTOM_NAV_HEIGHT
+// The bottom nav bar as it is *drawn* (y:215..240, LCARS_BOTTOM_NAV_HEIGHT
 // tall), and the bounds of one of its `kScreenCount` equal-width segments
 // (segment i jumps directly to screen i). navHitTest() accepts taps in a
 // taller band than this — see kBottomNavTouchExtra.
@@ -156,7 +154,7 @@ struct NavHit {
   int target = -1;  // valid screen index only when action == JumpTo
 };
 
-// Classifies a tap. The bottom nav bar (touch band y:215..240) takes
-// priority over the edge strips (y:headerHeight..225) where they overlap.
+// Classifies a tap. The bottom nav bar (touch band y:210..240) takes
+// priority over the edge strips (y:headerHeight..215) where they overlap.
 NavHit navHitTest(int16_t x, int16_t y, int16_t screenWidth, int16_t screenHeight,
                   int16_t headerHeight);

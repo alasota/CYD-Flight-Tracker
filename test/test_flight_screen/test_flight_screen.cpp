@@ -16,20 +16,20 @@ static CpaPrediction cpaAt(float t) {
 // ---- fixed zone geometry (CLAUDE.md "Screen 2") --------------------------
 
 static void test_zone_geometry_matches_spec(void) {
-  TEST_ASSERT_EQUAL_INT(28, flightIdentityTopPx());
+  TEST_ASSERT_EQUAL_INT(18, flightIdentityTopPx());
   TEST_ASSERT_EQUAL_INT(50, flightIdentityHeightPx());
-  TEST_ASSERT_EQUAL_INT(82, flightCountdownTopPx());
+  TEST_ASSERT_EQUAL_INT(72, flightCountdownTopPx());
   TEST_ASSERT_EQUAL_INT(113, flightCountdownHeightPx());
-  TEST_ASSERT_EQUAL_INT(200, flightStatusTopPx());
-  TEST_ASSERT_EQUAL_INT(25, flightStatusHeightPx());  // y:200..225
+  TEST_ASSERT_EQUAL_INT(190, flightStatusTopPx());
+  TEST_ASSERT_EQUAL_INT(25, flightStatusHeightPx());  // y:190..215
 }
 
 static void test_zones_do_not_overlap_and_fit_on_screen(void) {
   TEST_ASSERT_TRUE(flightIdentityTopPx() + flightIdentityHeightPx() <= flightCountdownTopPx());
   TEST_ASSERT_TRUE(flightCountdownTopPx() + flightCountdownHeightPx() <= flightStatusTopPx());
-  // Status strip ends at the content boundary (240 - 15px bottom nav).
-  TEST_ASSERT_TRUE(flightStatusTopPx() + flightStatusHeightPx() <= 225);
-  TEST_ASSERT_TRUE(flightIdentityTopPx() >= 25);  // clears the status_bar header
+  // Status strip ends at the content boundary (240 - 25px bottom nav).
+  TEST_ASSERT_TRUE(flightStatusTopPx() + flightStatusHeightPx() <= 215);
+  TEST_ASSERT_TRUE(flightIdentityTopPx() >= 15);  // clears the status_bar header
 }
 
 // ---- computeCountdownDisplay: mode + colour + label per zone ------------

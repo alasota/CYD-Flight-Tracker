@@ -74,6 +74,8 @@ TouchPoint touchInputRead() {
   // real hardware and adjust if X/Y come out swapped or mirrored.
   p.x = mapTouchAxis(raw.x, kRawXMin, kRawXMax, 0, kScreenWidth - 1);
   p.y = mapTouchAxis(raw.y, kRawYMin, kRawYMax, 0, kScreenHeight - 1);
+  p.raw_x = raw.x;
+  p.raw_y = raw.y;
   p.pressed = true;
   return p;
 }

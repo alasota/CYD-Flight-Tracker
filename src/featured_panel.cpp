@@ -3,8 +3,8 @@
 #include "table_view.h"  // full AircraftRow definition
 
 namespace {
-constexpr int16_t kPanelTop = 28;
-constexpr int16_t kPanelHeight = 77;  // y:28..105 per CLAUDE.md "Screen 1"
+constexpr int16_t kPanelTop = LCARS_CONTENT_TOP;  // 18
+constexpr int16_t kPanelHeight = 77;  // y:18..95 per CLAUDE.md "Screen 1"
 }  // namespace
 
 int16_t featuredPanelTopPx() { return kPanelTop; }
@@ -17,9 +17,9 @@ int16_t featuredPanelHeightPx() { return kPanelHeight; }
 namespace {
 constexpr int16_t kSideMargin = 4;     // panel inset from the screen edges
 constexpr int16_t kContentInset = 3;   // extra text inset inside the panel area
-constexpr int16_t kIdentityY = 34;     // identity line
-constexpr int16_t kRouteY = 56;        // "WAW (PL) -> FCO (IT)" line
-constexpr int16_t kPillY = 78;         // altitude / speed / distance chips
+constexpr int16_t kIdentityY = kPanelTop + 6;   // identity line
+constexpr int16_t kRouteY = kPanelTop + 28;     // "WAW (PL) -> FCO (IT)" line
+constexpr int16_t kPillY = kPanelTop + 50;      // altitude / speed / distance chips
 constexpr int16_t kPillHeight = 22;
 constexpr int16_t kPillGap = 4;
 }  // namespace

@@ -16,13 +16,13 @@ int16_t edgeStripWidth(int16_t screenWidth) {
 }
 
 // Bottom of the content area — where the edge strips stop (also the top
-// of the *visually drawn* nav bar): y:225 on a 240px panel.
+// of the *visually drawn* nav bar): y:215 on a 240px panel.
 int16_t contentBottom(int16_t screenHeight) {
   return static_cast<int16_t>(screenHeight - LCARS_BOTTOM_NAV_HEIGHT);
 }
 
 // Top of the nav bar's touch band — kBottomNavTouchExtra px above where
-// the bar draws, so a 15px bar isn't a painful tap target (y:215).
+// the bar draws, for an imprecise finger (y:210).
 int16_t navTouchTop(int16_t screenHeight) {
   return static_cast<int16_t>(screenHeight - LCARS_BOTTOM_NAV_HEIGHT - kBottomNavTouchExtra);
 }
@@ -51,9 +51,9 @@ Rect rightEdgeZone(int16_t screenWidth, int16_t screenHeight, int16_t headerHeig
 Rect bottomNavBounds(int16_t screenWidth, int16_t screenHeight) {
   Rect r;
   r.x = 0;
-  r.y = static_cast<int16_t>(screenHeight - LCARS_BOTTOM_NAV_HEIGHT);  // y:225
+  r.y = static_cast<int16_t>(screenHeight - LCARS_BOTTOM_NAV_HEIGHT);  // y:215
   r.w = screenWidth;
-  r.h = LCARS_BOTTOM_NAV_HEIGHT;  // draws 15px; navHitTest() accepts a taller band
+  r.h = LCARS_BOTTOM_NAV_HEIGHT;  // draws 25px; navHitTest() accepts a taller band
   return r;
 }
 
@@ -75,8 +75,8 @@ NavHit navHitTest(int16_t x, int16_t y, int16_t screenWidth, int16_t screenHeigh
                   int16_t headerHeight) {
   NavHit hit;
 
-  // Bottom nav bar first — its touch band (y:215..240) is taller than the
-  // 15px it draws, and it wins the y:215..225 overlap with the edge
+  // Bottom nav bar first — its touch band (y:210..240) is taller than the
+  // 25px it draws, and it wins the y:210..215 overlap with the edge
   // strips. Segment is picked by x only (the whole band is the bar).
   if (y >= navTouchTop(screenHeight) && y < screenHeight && x >= 0 && x < screenWidth) {
     for (int i = 0; i < kScreenCount; ++i) {

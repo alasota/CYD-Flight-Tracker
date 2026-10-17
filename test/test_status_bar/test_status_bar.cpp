@@ -102,7 +102,7 @@ static void test_block_label_caps_large_counts(void) {
 }
 
 static void test_block_label_never_longer_than_11_chars(void) {
-  // kNameBlockWidth is sized for 11 chars of Font2 ("99+ FLIGHTS").
+  // kNameBlockWidth is sized for 11 chars of Font0 ("99+ FLIGHTS").
   for (Language lang : {Language::PL, Language::EN}) {
     for (int n = 0; n <= 1000; ++n) {
       TEST_ASSERT_TRUE(statusBarBlockLabel(n, true, lang).size() <= 11);

@@ -6,14 +6,14 @@ void setUp(void) {}
 void tearDown(void) {}
 
 // The physical CYD panel in landscape (see CLAUDE.md) and the shared
-// header height (LCARS_HEADER_HEIGHT == 25).
+// header height (LCARS_HEADER_HEIGHT == 15).
 static constexpr int16_t kW = 320;
 static constexpr int16_t kH = 240;
-static constexpr int16_t kHeader = 25;
+static constexpr int16_t kHeader = 15;
 // Content area bottom / visual nav-bar top (240 - LCARS_BOTTOM_NAV_HEIGHT).
-static constexpr int16_t kContentBottom = 225;
-// Nav-bar touch band top — 10px above the visual bar (kBottomNavTouchExtra).
-static constexpr int16_t kNavTouchTop = 215;
+static constexpr int16_t kContentBottom = 215;
+// Nav-bar touch band top — 5px above the visual bar (kBottomNavTouchExtra).
+static constexpr int16_t kNavTouchTop = 210;
 
 // ---- wraparound: forward ------------------------------------------------
 
@@ -118,11 +118,11 @@ static void test_left_edge_strip_is_prev(void) {
 }
 
 static void test_edge_strip_bottom_is_content_boundary_not_240(void) {
-  // The edge strip runs headerHeight..225 (the visual nav-bar top), not to
+  // The edge strip runs headerHeight..215 (the visual nav-bar top), not to
   // the frame bottom — CLAUDE.md "Screen navigation".
   Rect left = leftEdgeZone(kW, kH, kHeader);
   TEST_ASSERT_EQUAL_INT(kHeader, left.y);
-  TEST_ASSERT_EQUAL_INT(kContentBottom - kHeader, left.h);  // 200px tall
+  TEST_ASSERT_EQUAL_INT(kContentBottom - kHeader, left.h);  // 200px tall (15..215)
   // A tap just above the touch band is still an edge swipe.
   TEST_ASSERT_TRUE(navHitTest(5, kNavTouchTop - 1, kW, kH, kHeader).action == NavAction::Prev);
 }
@@ -152,17 +152,17 @@ static void test_edge_strip_is_roughly_18_percent_wide(void) {
 }
 
 static void test_edge_strips_stop_above_the_nav_bar(void) {
-  // y within the *visually drawn* bottom nav bar (>=225) but x in the left
+  // y within the *visually drawn* bottom nav bar (>=215) but x in the left
   // strip range -> the nav bar wins (JumpTo), not Prev.
-  int16_t navY = static_cast<int16_t>(kContentBottom + 2);  // 227
+  int16_t navY = static_cast<int16_t>(kContentBottom + 2);  // 217
   NavHit h = navHitTest(5, navY, kW, kH, kHeader);
   TEST_ASSERT_TRUE(h.action == NavAction::JumpTo);
   TEST_ASSERT_EQUAL_INT(0, h.target);
 }
 
 static void test_nav_bar_touch_band_extends_above_the_visual_bar(void) {
-  // CLAUDE.md: the bar only *draws* from y:225 but taps from y:215 count
-  // as the nav bar (15px is a cramped target). A tap at y in 215..225 is
+  // CLAUDE.md: the bar only *draws* from y:215 but taps from y:210 count
+  // as the nav bar (a little slack for an imprecise finger). A tap at y in 210..215 is
   // visually still the content area above the bar, yet hits a nav segment.
   for (int16_t y = kNavTouchTop; y < kContentBottom; ++y) {
     NavHit mid = navHitTest(160, y, kW, kH, kHeader);
@@ -195,10 +195,10 @@ static void test_bottom_nav_segments_jump_to_each_screen(void) {
   TEST_ASSERT_EQUAL_INT(2, s2.target);
 }
 
-static void test_bottom_nav_bar_draws_at_225_to_240(void) {
+static void test_bottom_nav_bar_draws_at_215_to_240(void) {
   Rect bar = bottomNavBounds(kW, kH);
-  TEST_ASSERT_EQUAL_INT(kContentBottom, bar.y);          // 225
-  TEST_ASSERT_EQUAL_INT(LCARS_BOTTOM_NAV_HEIGHT, bar.h);  // 15
+  TEST_ASSERT_EQUAL_INT(kContentBottom, bar.y);          // 215
+  TEST_ASSERT_EQUAL_INT(LCARS_BOTTOM_NAV_HEIGHT, bar.h);  // 25
   TEST_ASSERT_EQUAL_INT(kH, bar.y + bar.h);               // reaches the frame bottom
 }
 
@@ -349,7 +349,7 @@ int main(int, char **) {
   RUN_TEST(test_nav_bar_touch_band_extends_above_the_visual_bar);
 
   RUN_TEST(test_bottom_nav_segments_jump_to_each_screen);
-  RUN_TEST(test_bottom_nav_bar_draws_at_225_to_240);
+  RUN_TEST(test_bottom_nav_bar_draws_at_215_to_240);
   RUN_TEST(test_bottom_nav_segments_tile_the_bar_without_gaps);
   RUN_TEST(test_bottom_nav_segment_out_of_range_is_empty);
 

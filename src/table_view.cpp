@@ -112,14 +112,15 @@ FeaturedSplit splitFeaturedAndRest(const std::vector<AircraftRow> &rows) {
 }
 
 namespace {
-// Fixed layout from CLAUDE.md "Screen 1" — absolute y on the 320x240
-// frame, below the 25px status_bar header.
-constexpr int16_t kSubHeaderY = 108;   // cyan LOTY/FLIGHTS bar, y:108..118
-constexpr int16_t kSubHeaderH = 10;    // thin label strip (CLAUDE.md "Screen 1")
-constexpr int16_t kColHeaderY = 119;   // orange "|"-separated column labels, y:119..134
-constexpr int16_t kColHeaderH = 15;    // text centered ~y:127
-constexpr int16_t kFirstRowY = 138;    // rows at 138,155,172,189,206 (last text ends ~y:222)
-constexpr int16_t kRowStep = 17;       // tightened from 18 for the y:225 content bound
+// Fixed layout from CLAUDE.md "Screen 1", below the featured panel
+// (y:18..95). The cyan LOTY/FLIGHTS sub-header strip was removed on request;
+// the space went to roomier rows.
+constexpr int16_t kColHeaderY = 98;    // orange column labels, y:98..113
+constexpr int16_t kColHeaderH = 15;
+constexpr int16_t kFirstRowY = 116;    // rows at 116,135,154,173,192 (last ends y:211)
+constexpr int16_t kRowStep = 19;       // must end by LCARS_CONTENT_BOTTOM (215)
+static_assert(kFirstRowY + kTableRowsPerPage * kRowStep <= LCARS_CONTENT_BOTTOM,
+              "table rows must end above the bottom nav");
 
 // Columns: flight, airline, origin, destination, aircraft type, phase icon
 // (see CLAUDE.md "Screen 1" — altitude/speed/distance moved to
@@ -238,23 +239,12 @@ void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, const Airpor
     drawFeaturedPanelEmpty(gfx, screenWidth);
   }
 
-  // Cyan "FLIGHTS" sub-header bar (black text) — CLAUDE.md notes the
-  // repeated label is intentional LCARS style, not a bug. Font0 (8px) so
-  // the text and its background stay inside the 10px strip — Font2 (16px)
-  // spilled cyan over the featured frame's bottom edge and the column
-  // header.
-  gfx.fillRect(0, kSubHeaderY, screenWidth, kSubHeaderH, LCARS_CYAN);
-  gfx.setFont(LCARS_FONT_SMALL);
-  gfx.setTextDatum(middle_left);
-  gfx.setTextColor(LCARS_BLACK, LCARS_CYAN);
-  gfx.drawString(tr(Str::ScreenFlights), 4, static_cast<int16_t>(kSubHeaderY + kSubHeaderH / 2));
-
-  // Orange column-header row at y:119..134, labels aligned to the data
+  // Orange column-header row at y:98..113, labels aligned to the data
   // columns (ASCII only: bitmap fonts don't carry the Polish diacritics —
   // so "SKAD"/"DOKAD", not "SKĄD"/"DOKĄD").
   drawColumnHeader(gfx, screenWidth);
 
-  // Exactly 5 data rows from y:138 (17px step), over the list *without* the featured
+  // Exactly 5 data rows from y:116 (19px step), over the list *without* the featured
   // aircraft; paging swaps which 5 (not scrolling).
   std::vector<AircraftRow> pageRows = getPageSlice(split.rest, page, kTableRowsPerPage);
   drawTableRows(gfx, pageRows, screenWidth);

@@ -62,10 +62,10 @@ uint16_t statusBarBlockColor(OpenSkyHealth health) {
 #ifdef ARDUINO
 
 namespace {
-// Wide enough for the longest block label ("99+ FLIGHTS", 11 chars) in
-// LCARS_FONT_BODY at this height, per CLAUDE.md "Screen chrome".
-constexpr int16_t kNameBlockWidth = 104;
-constexpr int16_t kNameBlockRadius = 6;
+// Wide enough for the longest block label ("99+ FLIGHTS", 11 chars x 6px)
+// in LCARS_FONT_SMALL plus padding, per CLAUDE.md "Screen chrome".
+constexpr int16_t kNameBlockWidth = 80;
+constexpr int16_t kNameBlockRadius = LCARS_HEADER_HEIGHT / 2;  // pill ends
 constexpr int16_t kTextGap = 6;
 constexpr int16_t kRightMargin = 4;
 }  // namespace
@@ -82,7 +82,7 @@ void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, OpenSkyHealth hea
                   statusBarBlockLabel(aircraftCount, hasData, i18nLanguage()).c_str());
 
   // Date (left-aligned, right after the block) + clock (right-aligned), cyan.
-  gfx.setFont(LCARS_FONT_BODY);
+  gfx.setFont(LCARS_FONT_SMALL);  // slim 15px header
   gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
 
   int16_t midY = LCARS_HEADER_HEIGHT / 2;

@@ -45,6 +45,8 @@ struct TouchPoint {
   int16_t x = 0;
   int16_t y = 0;
   bool pressed = false;
+  int16_t raw_x = 0;  // unmapped XPT2046 readings — for calibration logging
+  int16_t raw_y = 0;
 };
 
 // Initializes the XPT2046 touch controller on its own SPI bus (pins per

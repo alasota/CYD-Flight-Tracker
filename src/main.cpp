@@ -342,6 +342,14 @@ void loop() {
   static bool wasTouchPressed = false;
   TouchPoint touch = touchInputRead();
   if (touch.pressed && !wasTouchPressed) {
+    // One line per tap: raw XPT2046 values + where they mapped to — what
+    // touch calibration is tuned from (touch_input's kRaw* constants).
+    Serial.printf("[touch] raw=(%d,%d) -> screen=(%d,%d) nav=%d\n", touch.raw_x, touch.raw_y,
+                  touch.x, touch.y,
+                  static_cast<int>(navHitTest(touch.x, touch.y, static_cast<int16_t>(tft.width()),
+                                              static_cast<int16_t>(tft.height()),
+                                              LCARS_HEADER_HEIGHT)
+                                       .action));
     handleTap(touch.x, touch.y);
   }
   wasTouchPressed = touch.pressed;

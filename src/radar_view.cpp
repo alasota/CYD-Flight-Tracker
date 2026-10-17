@@ -36,25 +36,23 @@ float radiusDegToKm(float radius_deg) { return radius_deg * kKmPerDegree; }
 
 namespace {
 
-// Fixed content-area layout, absolute coords on the 320x240 frame, below
-// the 25px status_bar header — CLAUDE.md "Screen 3".
-constexpr int16_t kContentTop = 28;
-constexpr int16_t kContentHeight = 197;  // y:28..225 (bottom nav reserves 225..240)
+// Fixed content-area layout on the 320x240 frame — CLAUDE.md "Screen 3".
+constexpr int16_t kContentTop = LCARS_CONTENT_TOP;                          // 18
+constexpr int16_t kContentHeight = LCARS_CONTENT_BOTTOM - LCARS_CONTENT_TOP;  // 197 (y:18..215)
 
 constexpr int16_t kRadarZoneX = 0;
 constexpr int16_t kRadarZoneW = 190;
-constexpr int16_t kRadarMargin = 10;  // -> center (95,127), radius 85
+constexpr int16_t kRadarMargin = 10;  // -> center (95,117), radius 85
 
-constexpr int16_t kDividerX = 192;
-constexpr int16_t kDividerW = 8;  // x:192..200
-
+// No divider between radar and summary any more (removed on request) —
+// the summary text just starts a little right of the radar zone.
 constexpr int16_t kSummaryX = 200;
 constexpr int16_t kSummaryW = 120;  // x:200..320
 constexpr int16_t kSummaryInset = 3;
-constexpr int16_t kSummaryTextX = 208;   // text starts 8px right of the divider
-constexpr int16_t kSummaryFlightY = 92;  // three-row baselines from CLAUDE.md
-constexpr int16_t kSummaryAirlineY = 127;  // (shifted up for the y:28..225 zone)
-constexpr int16_t kSummaryRouteY = 162;
+constexpr int16_t kSummaryTextX = 208;
+constexpr int16_t kSummaryFlightY = kContentTop + 64;    // 82  — three rows centred
+constexpr int16_t kSummaryAirlineY = kContentTop + 99;   // 117   in the content area
+constexpr int16_t kSummaryRouteY = kContentTop + 134;    // 152
 // Text width between kSummaryTextX and the panel's right edge (less kSummaryInset),
 // minus a 2px breathing gap — what fitToWidth() cuts rows 2/3 down to.
 constexpr int kSummaryTextMaxPx = kSummaryX + kSummaryW - kSummaryInset - 2 - kSummaryTextX;
@@ -157,9 +155,6 @@ void drawRadarView(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius
   (void)screenWidth;  // fixed 320px layout — parameter kept for signature symmetry
 
   drawRadar(gfx, rows, radius_deg);
-
-  drawVerticalDivider(gfx, kDividerX, kContentTop, kContentHeight, kDividerW, LCARS_ORANGE);
-
   drawSummaryPanel(gfx, rows, nearestOrigin, nearestDest);
 }
 

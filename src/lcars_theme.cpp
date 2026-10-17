@@ -169,7 +169,7 @@ void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int1
                      uint16_t fillColor, uint16_t textColor, const char *label) {
   gfx.fillRoundRect(x, y, w, h, cornerRadius, fillColor);
 
-  gfx.setFont(LCARS_FONT_BODY);
+  gfx.setFont(LCARS_FONT_SMALL);  // slim 15px header
   gfx.setTextDatum(middle_center);
   gfx.setTextColor(textColor, fillColor);
   gfx.drawString(label, static_cast<int16_t>(x + w / 2), static_cast<int16_t>(y + h / 2));
@@ -183,9 +183,9 @@ void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t scre
   gfx.fillRect(bar.x, bar.y, bar.w, bar.h, LCARS_BLACK);
 
   constexpr int16_t kInsetX = 3;  // gap between neighbouring buttons
-  constexpr int16_t kInsetY = 1;
+  constexpr int16_t kInsetY = 2;
 
-  gfx.setFont(LCARS_FONT_SMALL);
+  gfx.setFont(LCARS_FONT_BODY);  // big, readable labels on the 25px buttons
   gfx.setTextDatum(middle_center);
 
   for (int i = 0; i < kScreenCount; ++i) {

@@ -39,13 +39,16 @@ static void test_canonical_palette_values(void) {
 }
 
 static void test_lcars_header_height(void) {
-  TEST_ASSERT_EQUAL_INT(25, LCARS_HEADER_HEIGHT);
+  // Slim header (same height the bottom nav used to have).
+  TEST_ASSERT_EQUAL_INT(15, LCARS_HEADER_HEIGHT);
+  TEST_ASSERT_EQUAL_INT(18, LCARS_CONTENT_TOP);  // 3px gap below the header
 }
 
 static void test_lcars_bottom_nav_height(void) {
-  TEST_ASSERT_EQUAL_INT(15, LCARS_BOTTOM_NAV_HEIGHT);
-  // Content area is header..(240 - bottom nav) = 28..225.
-  TEST_ASSERT_EQUAL_INT(225, 240 - LCARS_BOTTOM_NAV_HEIGHT);
+  TEST_ASSERT_EQUAL_INT(25, LCARS_BOTTOM_NAV_HEIGHT);  // big, tappable buttons
+  // Content area is 18..(240 - bottom nav) = 18..215 — still 197px tall.
+  TEST_ASSERT_EQUAL_INT(215, LCARS_CONTENT_BOTTOM);
+  TEST_ASSERT_EQUAL_INT(197, LCARS_CONTENT_BOTTOM - LCARS_CONTENT_TOP);
 }
 
 // ---- elbowArcPoint ---------------------------------------------------------
@@ -234,10 +237,11 @@ static void test_fit_ascii_ellipsis_only(void) {
 
 // ---- small font vs. thin strips --------------------------------------------
 
-static void test_small_font_fits_flights_subheader_strip(void) {
-  // CLAUDE.md "Screen 1": the cyan sub-header strip is 10px tall; the
-  // label font drawn into it (with a background colour) must not be taller.
-  TEST_ASSERT_TRUE(LCARS_FONT_SMALL_HEIGHT_PX <= 10);
+static void test_fonts_fit_header_and_nav(void) {
+  // Header text (Font0, drawn with a background colour) must fit the 15px
+  // header; nav button labels (Font2) must fit the 25px buttons.
+  TEST_ASSERT_TRUE(LCARS_FONT_SMALL_HEIGHT_PX + 4 <= LCARS_HEADER_HEIGHT);
+  TEST_ASSERT_TRUE(LCARS_FONT_BODY_HEIGHT_PX + 4 <= LCARS_BOTTOM_NAV_HEIGHT);
 }
 
 int main(int argc, char **argv) {
@@ -252,7 +256,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_fit_nonpositive_width_is_empty);
   RUN_TEST(test_fit_uses_pixel_width_not_char_count);
   RUN_TEST(test_fit_ascii_ellipsis_only);
-  RUN_TEST(test_small_font_fits_flights_subheader_strip);
+  RUN_TEST(test_fonts_fit_header_and_nav);
 
   RUN_TEST(test_rgb565_primary_colors);
   RUN_TEST(test_rgb565_black_and_white);

@@ -33,16 +33,22 @@ constexpr uint16_t LCARS_CYAN = 0x07FF;     // sub-headers, date/time text, rada
 constexpr uint16_t LCARS_YELLOW = 0xFFE0;   // radar home crosshair, "imminent" countdown
 
 // Shared header-bar height (see CLAUDE.md "Screen chrome"): status_bar
-// draws y:0..LCARS_HEADER_HEIGHT, every screen's content starts at
-// y = LCARS_HEADER_HEIGHT so all three stay visually aligned.
-constexpr int16_t LCARS_HEADER_HEIGHT = 25;
+// draws y:0..LCARS_HEADER_HEIGHT — a slim 15px strip (Font0 text).
+constexpr int16_t LCARS_HEADER_HEIGHT = 15;
 
-// Height of the persistent bottom nav bar (CLAUDE.md "Screen navigation").
-// Every screen's content area is bounded below by this: it runs from
-// y = LCARS_HEADER_HEIGHT (28) to y = 240 - LCARS_BOTTOM_NAV_HEIGHT (225),
-// NOT all the way to 240 — the bar draws in y:225..240. (screen_nav gives
-// its touch hit-zone a bit more vertical slack than these 15px.)
-constexpr int16_t LCARS_BOTTOM_NAV_HEIGHT = 15;
+// Height of the persistent bottom nav bar (CLAUDE.md "Screen navigation"):
+// big 25px buttons (Font2 labels), drawn at y:215..240. (screen_nav gives
+// its touch hit-zone a little more vertical slack than that.)
+constexpr int16_t LCARS_BOTTOM_NAV_HEIGHT = 25;
+
+constexpr int16_t LCARS_SCREEN_HEIGHT = 240;  // landscape panel height
+
+// The content area every screen draws into: y:18..215 (197px). All screen
+// layouts are expressed relative to these two, so resizing the header or
+// the nav bar moves every screen with it instead of leaving stale
+// hardcoded y values behind.
+constexpr int16_t LCARS_CONTENT_TOP = LCARS_HEADER_HEIGHT + 3;  // 3px gap below the header
+constexpr int16_t LCARS_CONTENT_BOTTOM = LCARS_SCREEN_HEIGHT - LCARS_BOTTOM_NAV_HEIGHT;
 
 // Bottom-nav inactive-segment fill - a dim slate so unselected segments
 // read as recessed against LCARS_BLACK while the active one (LCARS_ORANGE)
@@ -106,8 +112,12 @@ using TextMeasure = std::function<int(const std::string &)>;
 std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &measure);
 
 // Glyph height of LCARS_FONT_SMALL (fonts::Font0, the 6x8 GLCD font) —
-// exposed for the native test that it fits the 10px FLIGHTS strip.
+// exposed for the native test that it fits the 15px header.
 constexpr int16_t LCARS_FONT_SMALL_HEIGHT_PX = 8;
+
+// Glyph height of LCARS_FONT_BODY (fonts::Font2) — for the native test
+// that bottom-nav labels fit the 25px buttons.
+constexpr int16_t LCARS_FONT_BODY_HEIGHT_PX = 16;
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX. Not covered by
 // Unity (see CLAUDE.md "Testing") — this module is almost entirely draw
@@ -187,11 +197,10 @@ void drawRadarRing(LGFX &gfx, int16_t centerX, int16_t centerY, int16_t radiusPx
                    int distanceKm, uint16_t color);
 
 // Header-bar name block: a filled rounded rectangle (`fillRoundRect`,
-// corner radius `cornerRadius`) with `label` centered inside in small
-// bold text. Screen chrome uses this on the left of the header in
-// `LCARS_ORANGE` with the active screen name (`FLIGHTS` / `FLIGHT` /
-// `RADAR`) — see CLAUDE.md "Screen chrome". Also serves the bottom-nav
-// segment pills.
+// corner radius `cornerRadius`) with `label` centered inside in
+// LCARS_FONT_SMALL (8px — the header is only 15px tall). Screen chrome uses
+// this on the left of the header for the aircraft count, coloured by feed
+// health — see CLAUDE.md "Screen chrome".
 void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int16_t cornerRadius,
                      uint16_t fillColor, uint16_t textColor, const char *label);
 
@@ -201,7 +210,7 @@ void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int1
 // screen_nav's bottomNavSegment(), so the drawn indicators line up exactly
 // with navHitTest()'s JumpTo hit zones. Each segment is a labelled pill
 // button filling the bar's height (label from `labelFor(index, i18nLanguage())`, in
-// LCARS_FONT_SMALL): the active screen filled `LCARS_ORANGE` with black
+// LCARS_FONT_BODY on 25px buttons): the active screen filled `LCARS_ORANGE` with black
 // text, the others dim with a `LCARS_CYAN` outline and cyan text. (The
 // first version drew 6px-tall dots, which were too small to see on the
 // device.) Repaints its own strip first, so it's safe to call every frame.

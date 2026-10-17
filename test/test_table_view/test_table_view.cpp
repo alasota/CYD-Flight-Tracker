@@ -304,15 +304,15 @@ static void test_table_shows_exactly_five_rows_per_page(void) {
   TEST_ASSERT_EQUAL_INT(5, tableRowsPerPage());
 }
 
-static void test_table_row_step_is_17px_from_y138(void) {
-  // Rows at y = 138, 155, 172, 189, 206 — a 17px step from y:138 (CLAUDE.md
-  // "Screen 1", tightened from 18px/y:140 for the y:225 content bound).
-  TEST_ASSERT_EQUAL_INT(17, tableRowHeightPx());
-  TEST_ASSERT_EQUAL_INT(138, tableFirstRowY());
+static void test_table_row_step_is_19px_from_y116(void) {
+  // Rows at y = 116, 135, 154, 173, 192 — a 19px step from y:116 (CLAUDE.md
+  // "Screen 1": no FLIGHTS sub-header strip any more, so rows got roomier).
+  TEST_ASSERT_EQUAL_INT(19, tableRowHeightPx());
+  TEST_ASSERT_EQUAL_INT(116, tableFirstRowY());
   int16_t lastRowY = static_cast<int16_t>(tableFirstRowY() + (kTableRowsPerPage - 1) * tableRowHeightPx());
-  TEST_ASSERT_EQUAL_INT(206, lastRowY);
-  // The 5th row's ~15px of text ends inside the 225px content boundary.
-  TEST_ASSERT_TRUE(lastRowY + tableRowHeightPx() <= 225);
+  TEST_ASSERT_EQUAL_INT(192, lastRowY);
+  // The 5th row ends inside the 215px content boundary (25px bottom nav).
+  TEST_ASSERT_TRUE(lastRowY + tableRowHeightPx() <= 215);
 }
 
 // ---- column layout (CLAUDE.md "Screen 1" column table) ----------------------
@@ -473,7 +473,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_split_featured_and_rest_empty);
 
   RUN_TEST(test_table_shows_exactly_five_rows_per_page);
-  RUN_TEST(test_table_row_step_is_17px_from_y138);
+  RUN_TEST(test_table_row_step_is_19px_from_y116);
   RUN_TEST(test_page_count_uses_fixed_five_row_pages);
 
   RUN_TEST(test_columns_count_and_order);
