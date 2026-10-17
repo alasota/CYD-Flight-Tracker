@@ -50,15 +50,14 @@ constexpr int16_t kDividerW = 8;  // x:192..200
 
 constexpr int16_t kSummaryX = 200;
 constexpr int16_t kSummaryW = 120;  // x:200..320
-constexpr int16_t kSummaryCorner = 12;
-constexpr int16_t kSummaryThickness = 3;
-constexpr int16_t kSummaryTextX = 208;   // inside the frame, clear of the swept corner
+constexpr int16_t kSummaryInset = 3;
+constexpr int16_t kSummaryTextX = 208;   // text starts 8px right of the divider
 constexpr int16_t kSummaryFlightY = 92;  // three-row baselines from CLAUDE.md
 constexpr int16_t kSummaryAirlineY = 127;  // (shifted up for the y:28..225 zone)
 constexpr int16_t kSummaryRouteY = 162;
-// Text width between kSummaryTextX and the frame's inner right edge,
+// Text width between kSummaryTextX and the panel's right edge (less kSummaryInset),
 // minus a 2px breathing gap — what fitToWidth() cuts rows 2/3 down to.
-constexpr int kSummaryTextMaxPx = kSummaryX + kSummaryW - kSummaryThickness - 2 - kSummaryTextX;
+constexpr int kSummaryTextMaxPx = kSummaryX + kSummaryW - kSummaryInset - 2 - kSummaryTextX;
 
 constexpr int kRingCount = 3;
 constexpr int16_t kBlipRadius = 5;
@@ -109,12 +108,10 @@ void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg
 
 void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, const AirportInfo &origin,
                       const AirportInfo &dest) {
-  drawElbowFrame(gfx, kSummaryX, kContentTop, kSummaryW, kContentHeight, kSummaryCorner,
-                 kSummaryThickness, LCARS_MAGENTA);
-
-  // Keep any long airline name from spilling past the frame into the radar.
-  gfx.setClipRect(static_cast<int16_t>(kSummaryX + kSummaryThickness), kContentTop,
-                  static_cast<int16_t>(kSummaryW - 2 * kSummaryThickness), kContentHeight);
+  // No frame (dropped by request) — the orange divider alone separates the
+  // panel from the radar. Keep any long text from spilling past the panel.
+  gfx.setClipRect(static_cast<int16_t>(kSummaryX + kSummaryInset), kContentTop,
+                  static_cast<int16_t>(kSummaryW - 2 * kSummaryInset), kContentHeight);
 
   if (rows.empty()) {
     gfx.setFont(LCARS_FONT_BODY);

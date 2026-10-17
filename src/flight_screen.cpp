@@ -72,9 +72,7 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa) {
 #include <Arduino.h>  // Serial, ESP.getFreeHeap()
 
 namespace {
-constexpr int16_t kSideMargin = 10;   // identity frame x:10..(w-10), per CLAUDE.md
-constexpr int16_t kFrameCorner = 12;
-constexpr int16_t kFrameThickness = 3;
+constexpr int16_t kSideMargin = 10;   // identity panel x:10..(w-10), per CLAUDE.md
 constexpr int16_t kSuffixGap = 6;
 
 // Big-glyph font per countdown mode. Font8 is the ~75px 7-seg-style
@@ -94,10 +92,8 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
                       int16_t screenWidth) {
   const int16_t cx = static_cast<int16_t>(screenWidth / 2);
 
-  // ---- Identity panel, y:28..78 — same magenta elbow frame as Screen 1.
+  // ---- Identity panel, y:28..78 — text only, no frame (same as Screen 1).
   const int16_t frameW = static_cast<int16_t>(screenWidth - 2 * kSideMargin);
-  drawElbowFrame(gfx, kSideMargin, kIdentityTop, frameW, kIdentityHeight, kFrameCorner,
-                 kFrameThickness, LCARS_MAGENTA);
 
   if (hasNearest) {
     drawAircraftSummary(gfx, nearest, origin, dest, RouteFormat::WithCountry, kSideMargin,

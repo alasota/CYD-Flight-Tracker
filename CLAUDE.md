@@ -297,12 +297,10 @@ the whole screen — frame, header, nav bar — blinked every second. Rules:
 coordinates to fit the 320x240 frame, consistent with "Design language" below:
 
 **Featured flight section, y: 28 to 105px (~77px tall).**
-- Frame: an LCARS-style bordered panel in `LCARS_MAGENTA` (`0xF81F`), with the classic LCARS
-  swept/cut corner — one corner (top-left) cut at an angle or arc rather than a plain rounded
-  rect. LovyanGFX has arc primitives (`fillArc`/`drawArc`) — verify the exact method names
-  against the installed LovyanGFX version when implementing, don't assume from memory. This is
-  the same "elbow" shape already described in "Design language" — just now with a specific
-  color and bounds.
+- **No frame.** The magenta swept-corner "elbow" border that used to surround this panel was
+  removed on request — text and stat chips sit directly on black, left-aligned. Same for
+  Screen 2's identity panel and Screen 3's summary panel. (`drawElbowFrame()` stays in
+  `lcars_theme` as an unused primitive; don't reintroduce the frame without being asked.)
 - Highlighted text (top of the frame): flight (callsign), airline, aircraft type, phase icon —
   what's currently Line 1 of the featured panel, unchanged in content. **The line must never
   overflow the frame**: the phase icon is drawn at a fixed position, right-aligned just inside
@@ -379,8 +377,7 @@ Deliberately minimal — one aircraft, one number that matters: when will it act
 overhead. **Exact pixel spec**, below the 25px header, no scrolling:
 
 **Identity panel, y: 28 to 78px (50px tall, x: 10 to 310).**
-- Same LCARS elbow frame as Screen 1's featured panel — `LCARS_MAGENTA` (`0xF81F`) border,
-  top-left corner swept/cut, not a plain rounded rect.
+- No frame (same as Screen 1's featured panel) — text only, on black.
 - Line 1 (~y:40): flight (callsign), airline, aircraft type, phase icon — via
   `aircraft_summary`, same content as Screen 1's featured panel Line 1.
 - Line 2 (~y:62, smaller font, 8px / LovyanGFX's Font-2 equivalent): origin → destination as
@@ -444,8 +441,7 @@ bottom nav bar), centered text.**
 - Static plot, no sweep animation, consistent with the earlier radar_view spec.
 
 **Summary panel, x: 200 to 320px (120px wide), y: 28 to 225px.**
-- Same LCARS elbow frame convention as Screen 1/2 — `LCARS_MAGENTA` (`0xF81F`) border, top-left
-  corner (the one facing the divider) swept/cut.
+- No frame (same as Screens 1/2) — the orange divider alone separates it from the radar.
 - Three rows, via `aircraft_summary`, vertically spaced within the shorter panel (row positions
   shifted up slightly from the original 95/130/165 to re-center in the 28-225 zone):
   - Row 1 (~y:92): flight (callsign), bold/emphasized.

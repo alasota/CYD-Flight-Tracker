@@ -15,10 +15,9 @@ int16_t featuredPanelHeightPx() { return kPanelHeight; }
 #include <cstdio>
 
 namespace {
-constexpr int16_t kSideMargin = 4;     // frame inset from the screen edges
-constexpr int16_t kFrameCorner = 14;   // swept top-left corner radius
-constexpr int16_t kFrameThickness = 3;
-constexpr int16_t kIdentityY = 34;     // identity line, clears the swept corner
+constexpr int16_t kSideMargin = 4;     // panel inset from the screen edges
+constexpr int16_t kContentInset = 3;   // extra text inset inside the panel area
+constexpr int16_t kIdentityY = 34;     // identity line
 constexpr int16_t kRouteY = 56;        // "WAW (PL) -> FCO (IT)" line
 constexpr int16_t kPillY = 78;         // altitude / speed / distance chips
 constexpr int16_t kPillHeight = 22;
@@ -29,20 +28,18 @@ void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, const AirportInfo &ori
                        const AirportInfo &destAirport, int16_t screenWidth) {
   int16_t w = static_cast<int16_t>(screenWidth - 2 * kSideMargin);
 
-  drawElbowFrame(gfx, kSideMargin, kPanelTop, w, kPanelHeight, kFrameCorner, kFrameThickness,
-                 LCARS_MAGENTA);
-
-  // Identity line — indented past the swept corner, phase icon pinned just
-  // inside the frame's right edge, airline/type cut so nothing overflows.
-  const int16_t textRightX = static_cast<int16_t>(kSideMargin + w - kFrameThickness - 4);
-  drawIdentityLine(gfx, row, static_cast<int16_t>(kSideMargin + kFrameCorner + 4), kIdentityY,
-                   textRightX);
+  // No frame (dropped by request) — just text and pills on black.
+  // Identity line — phase icon pinned at the panel's right edge,
+  // airline/type cut so nothing overflows.
+  const int16_t textX = static_cast<int16_t>(kSideMargin + kContentInset + 4);
+  const int16_t textRightX = static_cast<int16_t>(kSideMargin + w - kContentInset - 4);
+  drawIdentityLine(gfx, row, textX, kIdentityY, textRightX);
 
   // Route line, with country codes (Screen 1 detail level).
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
   gfx.setTextDatum(top_left);
-  const int16_t routeX = static_cast<int16_t>(kSideMargin + kFrameThickness + 4);
+  const int16_t routeX = textX;
   gfx.drawString(
       fitToWidth(formatSummaryRoute(row.route, originAirport, destAirport, RouteFormat::WithCountry),
                  textRightX - routeX, gfxTextMeasure(gfx))
@@ -50,8 +47,8 @@ void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, const AirportInfo &ori
       routeX, kRouteY);
 
   // Altitude / speed / distance pills along the bottom of the frame.
-  int16_t pillAreaX = static_cast<int16_t>(kSideMargin + kFrameThickness + 2);
-  int16_t pillAreaW = static_cast<int16_t>(w - 2 * (kFrameThickness + 2));
+  int16_t pillAreaX = static_cast<int16_t>(kSideMargin + kContentInset + 2);
+  int16_t pillAreaW = static_cast<int16_t>(w - 2 * (kContentInset + 2));
   int16_t pillW = static_cast<int16_t>((pillAreaW - 2 * kPillGap) / 3);
 
   char buf[16];
@@ -72,11 +69,6 @@ void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, const AirportInfo &ori
 }
 
 void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth) {
-  int16_t w = static_cast<int16_t>(screenWidth - 2 * kSideMargin);
-
-  drawElbowFrame(gfx, kSideMargin, kPanelTop, w, kPanelHeight, kFrameCorner, kFrameThickness,
-                 LCARS_MAGENTA);
-
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_center);
   gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
