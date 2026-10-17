@@ -86,6 +86,23 @@ Once it's on your network, open its local config page (mDNS hostname is in `CLAU
 - Poll interval
 - Your OpenSky `client_id` / `client_secret`, if you made an account
 
+> [!WARNING]
+> **The config page hands your OpenSky `client_secret` to anyone who asks.**
+> The page has no login and is served over plain HTTP. When it loads, the saved secret is written
+> straight into the page's HTML as the `value` of the password field. The dots only hide it on
+> screen: *View source*, browser dev tools or a single `curl http://<board-ip>/` show it in plain
+> text, and it crosses your network unencrypted.
+>
+> Anyone on the same WiFi can read it, and so can anyone who can sniff that network. The secret
+> is also stored unencrypted in the board's flash (NVS), so whoever gets hold of the board can
+> dump it.
+>
+> Until this is fixed in the firmware:
+> - Run the board only on a network you trust. No guest or shared networks.
+> - Create a separate OpenSky API client just for this board. Don't reuse credentials you need
+>   for anything else.
+> - If you think the secret leaked, revoke or regenerate it on your OpenSky account page.
+
 ## How it works, briefly
 
 ```
