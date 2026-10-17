@@ -1,5 +1,7 @@
 #include <unity.h>
 
+#include <initializer_list>
+
 #include "touch_input.h"
 
 void setUp(void) {}
@@ -85,8 +87,70 @@ static void test_map_touch_axis_supports_inverted_output(void) {
   TEST_ASSERT_EQUAL_INT16(0, mapTouchAxis(3900, 200, 3900, 319, 0));
 }
 
+// ---- mapRawTouch: calibration against real taps on this board ---------------
+//
+// Raw readings logged on the device (2026-10-17) while tapping the three
+// bottom-nav buttons (drawn y:215..240, segments x:0..106 / 106..213 /
+// 213..320) and the left edge mid-height. The first calibration mapped the
+// buttons to y~20 — the vertical axis is inverted on this digitizer.
+//
+// The samples were logged with the old XPT2046_Touchscreen library
+// (rotation 1), which reports the controller's channels the other way round
+// from LovyanGFX: LovyanGFX raw X = old raw y, LovyanGFX raw Y = old raw x.
+// The helpers take the samples exactly as logged and swap them.
+
+static TouchXY mapLoggedSample(int32_t oldRawX, int32_t oldRawY) {
+  return mapRawTouch(/*rawX=*/oldRawY, /*rawY=*/oldRawX);
+}
+
+static void assertInNavSegment(int32_t rawX, int32_t rawY, int16_t segMinX, int16_t segMaxX) {
+  TouchXY p = mapLoggedSample(rawX, rawY);
+  TEST_ASSERT_TRUE_MESSAGE(p.y >= 210, "bottom-nav tap must land in the nav touch band");
+  TEST_ASSERT_TRUE(p.y <= 239);
+  TEST_ASSERT_TRUE(p.x >= segMinX && p.x < segMaxX);
+}
+
+static void test_logged_left_button_taps(void) {
+  assertInNavSegment(976, 660, 0, 106);
+  assertInNavSegment(885, 537, 0, 106);
+  assertInNavSegment(746, 545, 0, 106);
+}
+
+static void test_logged_middle_button_taps(void) {
+  assertInNavSegment(1980, 554, 106, 213);
+  assertInNavSegment(2131, 589, 106, 213);
+  assertInNavSegment(1899, 459, 106, 213);
+}
+
+static void test_logged_right_button_taps(void) {
+  assertInNavSegment(3287, 618, 213, 320);
+  assertInNavSegment(3012, 405, 213, 320);
+  assertInNavSegment(2949, 528, 213, 320);
+}
+
+static void test_logged_left_edge_mid_height_taps(void) {
+  // Near the left edge (x < 57), somewhere mid-height in the content area.
+  TouchXY p = mapLoggedSample(550, 2100);
+  TEST_ASSERT_TRUE(p.x < 57);
+  TEST_ASSERT_TRUE(p.y > 60 && p.y < 180);
+}
+
+static void test_map_raw_touch_stays_on_screen(void) {
+  for (int32_t r : {0, 200, 2000, 3900, 4095}) {
+    TouchXY p = mapRawTouch(r, r);
+    TEST_ASSERT_TRUE(p.x >= 0 && p.x <= 319);
+    TEST_ASSERT_TRUE(p.y >= 0 && p.y <= 239);
+  }
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
+
+  RUN_TEST(test_logged_left_button_taps);
+  RUN_TEST(test_logged_middle_button_taps);
+  RUN_TEST(test_logged_right_button_taps);
+  RUN_TEST(test_logged_left_edge_mid_height_taps);
+  RUN_TEST(test_map_raw_touch_stays_on_screen);
 
   RUN_TEST(test_hit_inside_bounds);
   RUN_TEST(test_miss_clearly_outside_bounds);

@@ -4,34 +4,31 @@
 // TFT_eSPI) because LovyanGFX is configured through a C++ LGFX_Device
 // subclass, not preprocessor defines.
 //
-// Touch (XPT2046) is intentionally NOT wired up here — it stays on the
-// separate XPT2046_Touchscreen library on its own SPI bus, per CLAUDE.md.
-//
-// The display bus below is deliberately pinned to HSPI_HOST, not VSPI_HOST
-// — XPT2046_Touchscreen::begin() (see touch_input.cpp) hardcodes use of
-// the Arduino core's global `SPI` object, which is itself hardcoded to
-// VSPI on classic ESP32 (see SPI.cpp: `SPIClass SPI(VSPI);`). Putting the
-// display on VSPI too would silently fight the touch controller for the
-// same physical SPI peripheral (different pins, same hardware unit) —
-// symptom: touch input flaky or dead, e.g. the view-toggle button not
-// responding. Both peripherals are free to use arbitrary GPIOs via the
-// ESP32's GPIO matrix regardless of which SPI unit they're bound to, so
-// this doesn't require changing any pin numbers below.
+// Touch (XPT2046) is handled by LovyanGFX itself (lgfx::Touch_XPT2046) —
+// no separate touch library. On the CYD the touch controller sits on its
+// own SPI wiring (CLK 25, MOSI 32, MISO 39, CS 33, IRQ 36), so it gets its
+// own SPI host: the display uses HSPI, touch uses VSPI, and the two never
+// share a peripheral (bus_shared = false). Calibration lives in
+// touch_calibration.h. Read it with tft.getTouch() / tft.getTouchRaw();
+// coordinates already follow tft.setRotation().
 #pragma once
 
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
 
+#include "touch_calibration.h"
+
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ILI9341 _panel_instance;
   lgfx::Bus_SPI _bus_instance;
   lgfx::Light_PWM _light_instance;
+  lgfx::Touch_XPT2046 _touch_instance;
 
  public:
   LGFX(void) {
     {  // Display SPI bus
       auto cfg = _bus_instance.config();
-      cfg.spi_host = HSPI_HOST;  // VSPI is claimed by touch's global SPI object — see note above
+      cfg.spi_host = HSPI_HOST;  // touch has VSPI to itself — see note above
       cfg.spi_mode = 0;
       cfg.freq_write = 40000000;
       cfg.freq_read = 16000000;
@@ -72,6 +69,25 @@ class LGFX : public lgfx::LGFX_Device {
       cfg.pwm_channel = 7;
       _light_instance.config(cfg);
       _panel_instance.setLight(&_light_instance);
+    }
+
+    {  // Touch: XPT2046 on its own SPI bus (see note at the top)
+      auto cfg = _touch_instance.config();
+      cfg.x_min = kTouchRawXMin;
+      cfg.x_max = kTouchRawXMax;
+      cfg.y_min = kTouchRawYMin;
+      cfg.y_max = kTouchRawYMax;
+      cfg.offset_rotation = kTouchOffsetRotation;
+      cfg.pin_int = 36;        // Touch IRQ
+      cfg.bus_shared = false;  // separate wiring from the display
+      cfg.spi_host = VSPI_HOST;
+      cfg.freq = 1000000;
+      cfg.pin_sclk = 25;  // Touch CLK
+      cfg.pin_mosi = 32;  // Touch MOSI
+      cfg.pin_miso = 39;  // Touch MISO
+      cfg.pin_cs = 33;    // Touch CS
+      _touch_instance.config(cfg);
+      _panel_instance.setTouch(&_touch_instance);
     }
 
     setPanel(&_panel_instance);

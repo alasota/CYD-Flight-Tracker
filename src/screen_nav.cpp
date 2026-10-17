@@ -11,16 +11,6 @@ int prevScreen(int current) { return wrapScreen(current - 1); }
 
 namespace {
 
-int16_t edgeStripWidth(int16_t screenWidth) {
-  return static_cast<int16_t>(static_cast<int>(screenWidth) * kEdgeStripPercent / 100);
-}
-
-// Bottom of the content area — where the edge strips stop (also the top
-// of the *visually drawn* nav bar): y:215 on a 240px panel.
-int16_t contentBottom(int16_t screenHeight) {
-  return static_cast<int16_t>(screenHeight - LCARS_BOTTOM_NAV_HEIGHT);
-}
-
 // Top of the nav bar's touch band — kBottomNavTouchExtra px above where
 // the bar draws, for an imprecise finger (y:210).
 int16_t navTouchTop(int16_t screenHeight) {
@@ -28,25 +18,6 @@ int16_t navTouchTop(int16_t screenHeight) {
 }
 
 }  // namespace
-
-Rect leftEdgeZone(int16_t screenWidth, int16_t screenHeight, int16_t headerHeight) {
-  Rect r;
-  r.x = 0;
-  r.y = headerHeight;
-  r.w = edgeStripWidth(screenWidth);
-  r.h = static_cast<int16_t>(contentBottom(screenHeight) - headerHeight);
-  return r;
-}
-
-Rect rightEdgeZone(int16_t screenWidth, int16_t screenHeight, int16_t headerHeight) {
-  Rect r;
-  int16_t w = edgeStripWidth(screenWidth);
-  r.x = static_cast<int16_t>(screenWidth - w);
-  r.y = headerHeight;
-  r.w = w;
-  r.h = static_cast<int16_t>(contentBottom(screenHeight) - headerHeight);
-  return r;
-}
 
 Rect bottomNavBounds(int16_t screenWidth, int16_t screenHeight) {
   Rect r;
@@ -71,13 +42,12 @@ Rect bottomNavSegment(int index, int16_t screenWidth, int16_t screenHeight) {
   return r;
 }
 
-NavHit navHitTest(int16_t x, int16_t y, int16_t screenWidth, int16_t screenHeight,
-                  int16_t headerHeight) {
+NavHit navHitTest(int16_t x, int16_t y, int16_t screenWidth, int16_t screenHeight) {
   NavHit hit;
 
-  // Bottom nav bar first — its touch band (y:210..240) is taller than the
-  // 25px it draws, and it wins the y:210..215 overlap with the edge
-  // strips. Segment is picked by x only (the whole band is the bar).
+  // Only the bottom nav bar navigates — its touch band (y:210..240) is a
+  // little taller than the 25px it draws. Segment is picked by x only (the
+  // whole band is the bar).
   if (y >= navTouchTop(screenHeight) && y < screenHeight && x >= 0 && x < screenWidth) {
     for (int i = 0; i < kScreenCount; ++i) {
       Rect seg = bottomNavSegment(i, screenWidth, screenHeight);
@@ -89,16 +59,6 @@ NavHit navHitTest(int16_t x, int16_t y, int16_t screenWidth, int16_t screenHeigh
     }
     return hit;  // in the band but between segments (shouldn't happen) — no-op
   }
-
-  if (hitTest(x, y, leftEdgeZone(screenWidth, screenHeight, headerHeight))) {
-    hit.action = NavAction::Prev;
-    return hit;
-  }
-  if (hitTest(x, y, rightEdgeZone(screenWidth, screenHeight, headerHeight))) {
-    hit.action = NavAction::Next;
-    return hit;
-  }
-
   return hit;  // NavAction::None
 }
 

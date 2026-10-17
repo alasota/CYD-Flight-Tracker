@@ -1,7 +1,7 @@
 // CYD Sky Tracker — main orchestration.
 //
 // setup(): initializes LovyanGFX (configured via include/LGFX_CYD.hpp) and
-// the XPT2046 touch controller (touch_input), loads the persisted config
+// its built-in XPT2046 touch driver (read via touch_input), loads the persisted config
 // (config_store) — restoring which of the three screens was last active
 // (last_screen 0/1/2) into screen_nav — connects WiFi (wifi_manager —
 // falls back to its own captive portal if no saved network works), starts
@@ -10,8 +10,8 @@
 //
 // loop(): non-blocking, millis()-based.
 //   - Touch (edge-detected, one action per press): screen_nav::navHitTest
-//     classifies the tap — a left/right edge strip is prev/next screen, a
-//     bottom-nav segment jumps straight to that screen; every screen
+//     classifies the tap — only a bottom-nav button switches screens (it
+//     jumps straight to that screen; no edge-strip swiping); every screen
 //     change persists to config_store (last_screen) and forces a redraw.
 //     Otherwise, on the Flights screen, a tap in the top/bottom row strip
 //     pages the table (swap which 5 rows show — never scroll).
@@ -254,22 +254,14 @@ static void handleTap(int16_t x, int16_t y) {
   int16_t screenW = static_cast<int16_t>(tft.width());
   int16_t screenH = static_cast<int16_t>(tft.height());
 
-  NavHit hit = navHitTest(x, y, screenW, screenH, LCARS_HEADER_HEIGHT);
-  switch (hit.action) {
-    case NavAction::Prev:
-      if (nav.prev()) onScreenChanged(/*userInitiated=*/true);
-      return;
-    case NavAction::Next:
-      if (nav.next()) onScreenChanged(/*userInitiated=*/true);
-      return;
-    case NavAction::JumpTo:
-      if (nav.set(hit.target)) onScreenChanged(/*userInitiated=*/true);
-      return;
-    case NavAction::None:
-      break;
+  // Screens switch only via the bottom nav buttons.
+  NavHit hit = navHitTest(x, y, screenW, screenH);
+  if (hit.action == NavAction::JumpTo) {
+    if (nav.set(hit.target)) onScreenChanged(/*userInitiated=*/true);
+    return;
   }
 
-  // Middle of the screen: only the Flights table reacts (page the rows).
+  // Anywhere else: only the Flights table reacts (page the rows).
   if (nav.current() != kScreenFlights) return;
 
   FeaturedSplit split = splitFeaturedAndRest(lastRows);
@@ -299,11 +291,9 @@ static void handleTap(int16_t x, int16_t y) {
 void setup() {
   Serial.begin(115200);
 
-  tft.init();
+  tft.init();  // also brings up the XPT2046 touch controller (LGFX_CYD.hpp)
   tft.setRotation(1);  // landscape, 320x240
   tft.fillScreen(LCARS_BLACK);
-
-  touchInputBegin();
 
   cachedCfg = loadConfig();
   i18nSetLanguage(cachedCfg.language);  // before anything is drawn
@@ -340,15 +330,14 @@ void loop() {
 
   // --- Touch: edge-detected, one handleTap() per press --------------------
   static bool wasTouchPressed = false;
-  TouchPoint touch = touchInputRead();
+  TouchPoint touch = touchInputRead(tft);
   if (touch.pressed && !wasTouchPressed) {
     // One line per tap: raw XPT2046 values + where they mapped to — what
-    // touch calibration is tuned from (touch_input's kRaw* constants).
+    // touch calibration is tuned from (include/touch_calibration.h).
     Serial.printf("[touch] raw=(%d,%d) -> screen=(%d,%d) nav=%d\n", touch.raw_x, touch.raw_y,
                   touch.x, touch.y,
                   static_cast<int>(navHitTest(touch.x, touch.y, static_cast<int16_t>(tft.width()),
-                                              static_cast<int16_t>(tft.height()),
-                                              LCARS_HEADER_HEIGHT)
+                                              static_cast<int16_t>(tft.height()))
                                        .action));
     handleTap(touch.x, touch.y);
   }

@@ -1,5 +1,7 @@
 #include "touch_input.h"
 
+#include "touch_calibration.h"
+
 bool hitTest(int16_t touchX, int16_t touchY, const Rect &bounds) {
   return touchX >= bounds.x && touchX <= bounds.x + bounds.w && touchY >= bounds.y &&
          touchY <= bounds.y + bounds.h;
@@ -14,68 +16,39 @@ int16_t mapTouchAxis(int32_t raw, int32_t inMin, int32_t inMax, int32_t outMin, 
   return static_cast<int16_t>(outMin + (raw - inMin) * (outMax - outMin) / (inMax - inMin));
 }
 
-#ifdef ARDUINO
-
-#include <Arduino.h>
-#include <SPI.h>
-#include <XPT2046_Touchscreen.h>
-
 namespace {
-
-// Touch pins per CLAUDE.md's pinout table (separate SPI bus from the
-// display's own LovyanGFX bus).
-constexpr int kTouchCsPin = 33;
-constexpr int kTouchIrqPin = 36;
-constexpr int kTouchMosiPin = 32;
-constexpr int kTouchMisoPin = 39;
-constexpr int kTouchClkPin = 25;
-
-XPT2046_Touchscreen touch(kTouchCsPin, kTouchIrqPin);
-
-// Raw XPT2046 ADC range -> screen pixel range. These are placeholder
-// calibration values (typical ballpark for this panel, not measured) —
-// touch response WILL be off until they're tuned against real hardware,
-// per CLAUDE.md: TFT/touch setups are notoriously fiddly, don't assume.
-constexpr int32_t kRawXMin = 200;
-constexpr int32_t kRawXMax = 3900;
-constexpr int32_t kRawYMin = 200;
-constexpr int32_t kRawYMax = 3900;
-
-constexpr int16_t kScreenWidth = 320;
+constexpr int16_t kScreenWidth = 320;   // landscape
 constexpr int16_t kScreenHeight = 240;
-
 }  // namespace
 
-void touchInputBegin() {
-  // XPT2046_Touchscreen::begin() calls the global SPI.begin() internally
-  // with no arguments (default hardware pins) — it hardcodes the Arduino
-  // core's global `SPI` object (bound to VSPI on classic ESP32), there's
-  // no way to hand it a different SPIClass instance. Pre-configuring that
-  // global bus here with the touch controller's actual pins first makes
-  // the internal no-arg call a no-op on the pins we actually want. This
-  // is also *why* LGFX_CYD.hpp deliberately puts the display on HSPI
-  // instead of VSPI — otherwise the two peripherals would fight over the
-  // same physical SPI unit with different pins, and touch would be flaky
-  // or dead (see that header's comment).
-  SPI.begin(kTouchClkPin, kTouchMisoPin, kTouchMosiPin, -1);
-  touch.begin();
-  touch.setRotation(1);  // match tft.setRotation(1) in main.cpp
+TouchXY mapRawTouch(int32_t rawX, int32_t rawY) {
+  // Mirrors Panel_Device::convertRawXY for rotation 1: the calibration
+  // maps raw X onto the panel's short side and raw Y onto its long side,
+  // then rotation 1 swaps them and flips the vertical.
+  TouchXY p;
+  p.x = mapTouchAxis(rawY, kTouchRawYMin, kTouchRawYMax, 0, kScreenWidth - 1);
+  p.y = mapTouchAxis(rawX, kTouchRawXMin, kTouchRawXMax, kScreenHeight - 1, 0);
+  return p;
 }
 
-TouchPoint touchInputRead() {
+#ifdef ARDUINO
+
+TouchPoint touchInputRead(LGFX &gfx) {
   TouchPoint p;
-  if (!touch.touched()) {
+  lgfx::touch_point_t raw;
+  if (gfx.getTouchRaw(&raw, 1) == 0) {
     return p;
   }
 
-  TS_Point raw = touch.getPoint();
-  // Which raw axis maps to which screen axis (and whether either needs
-  // inverting) depends on the physical digitizer's wiring — verify on
-  // real hardware and adjust if X/Y come out swapped or mirrored.
-  p.x = mapTouchAxis(raw.x, kRawXMin, kRawXMax, 0, kScreenWidth - 1);
-  p.y = mapTouchAxis(raw.y, kRawYMin, kRawYMax, 0, kScreenHeight - 1);
-  p.raw_x = raw.x;
-  p.raw_y = raw.y;
+  int32_t x = 0;
+  int32_t y = 0;
+  if (!gfx.getTouch(&x, &y)) {
+    return p;  // released between the two reads
+  }
+  p.x = static_cast<int16_t>(x);
+  p.y = static_cast<int16_t>(y);
+  p.raw_x = static_cast<int16_t>(raw.x);
+  p.raw_y = static_cast<int16_t>(raw.y);
   p.pressed = true;
   return p;
 }

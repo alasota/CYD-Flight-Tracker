@@ -39,9 +39,14 @@ radar-scope. See "Visualization concept" and "Design language" below.
   (`include/LGFX_CYD.hpp`) rather than editing library internals — keeps the repo reproducible
   and avoids "works on my machine" pin mismatches. Unlike TFT_eSPI, LovyanGFX is configured in
   C++ (bus/panel/light structs), not via preprocessor `build_flags`.
-- Touch: **XPT2046_Touchscreen** (PaulStoffregen) — used for the table/radar view toggle button
-  and table paging/scrolling (see Visualization concept). Stays on its own library/SPI bus,
-  independent of the LovyanGFX display bus.
+- Touch: **LovyanGFX's built-in XPT2046 driver** (`lgfx::Touch_XPT2046`), configured in
+  `include/LGFX_CYD.hpp` — **no separate touch library** (XPT2046_Touchscreen was dropped: it
+  forced a hack on the Arduino global `SPI` object and needed its rotation kept in sync by
+  hand). The touch controller has its own SPI wiring, so it gets its own SPI host: display on
+  `HSPI_HOST`, touch on `VSPI_HOST`, `bus_shared = false`. Read it with `tft.getTouch()` (screen
+  coordinates, already following `tft.setRotation()`) / `tft.getTouchRaw()`. Calibration
+  constants live in `include/touch_calibration.h`. Used for the bottom-nav buttons and table
+  paging.
 - `platformio.ini` board id: `esp32dev` — there is no distinct PlatformIO board entry for the
   CYD; all display config comes from the `LGFX_CYD.hpp` device class, not from the `board=`
   field.
@@ -243,7 +248,8 @@ switching feels like changing a mode on one console, not jumping between apps.
 ### Screen chrome — header bar (identical on all three screens)
 
 **Exact pixel spec, y: 0 to 25px, full width (320px):**
-- LCARS block on the left (x:0..104): filled rounded rectangle (`fillRoundRect`) showing the
+- LCARS block on the left (x:0..80, pill-shaped, Font0 text — the whole header is a slim 15px
+  strip, Font0 for the date/time too): filled rounded rectangle (`fillRoundRect`) showing the
   **number of aircraft in range**, black text, in the selected language with the correct plural
   (PL `1 LOT` / `3 LOTY` / `7 LOTOW`, EN `1 FLIGHT` / `7 FLIGHTS`; `99+` above 99; `--` until the
   first successful poll). It used to show the screen name, but that duplicated the active
@@ -261,12 +267,12 @@ switching feels like changing a mode on one console, not jumping between apps.
   (date/time left, name center, WiFi right) is superseded by this spec. Say if you want signal
   strength back somewhere; there's no slot for it here right now.
 
-Define `LCARS_HEADER_HEIGHT = 25` and `LCARS_BOTTOM_NAV_HEIGHT = 15` as shared constants in
+Define `LCARS_HEADER_HEIGHT = 15` and `LCARS_BOTTOM_NAV_HEIGHT = 25` as shared constants in
 `lcars_theme`. Every screen's content is bounded by both: `y = LCARS_HEADER_HEIGHT` (28,
-leaving a 3px gap) to `y = 240 - LCARS_BOTTOM_NAV_HEIGHT` (225) — **not** all the way to 240.
+leaving a 3px gap, `LCARS_CONTENT_TOP` = 18) to `y = 240 - LCARS_BOTTOM_NAV_HEIGHT` (`LCARS_CONTENT_BOTTOM` = 215) — **not** all the way to 240.
 Getting this wrong (leaving no real space for the bottom nav bar) is exactly what happened in
 the first pass of this spec — every screen's content area has since been corrected from a
-`y:238` bottom bound to `y:225`, see each screen's section above. Drawn by a dedicated
+`y:238` bottom bound to `y:225`, and later (slim header / big nav buttons) to 18..215, see each screen's section above. Drawn by a dedicated
 `status_bar` module, called once per frame from `main.cpp` before dispatching to whichever
 screen is active — screens themselves don't need to know `status_bar` exists, they just draw
 their content within these fixed bounds.
@@ -279,13 +285,13 @@ the whole screen — frame, header, nav bar — blinked every second. Rules:
 
 - **`fillScreen()` only on a screen change** (manual, auto-cycle, or table page change) and on
   the first draw after boot/setup. Never on a timer tick.
-- **New poll data** → redraw only the active screen's content area (y:28..225), clearing it with
+- **New poll data** → redraw only the active screen's content area (y:18..215), clearing it with
   one `fillRect` of that region. Header and bottom nav are left alone unless their own content
   changed (screen index, health tag).
 - **Header clock** → `status_bar` redraws only its date/time text area (not the orange block),
   when the displayed minute or the health tag changes, on every screen — not only on poll.
 - **Screen 2 countdown tick (1 Hz)** → redraw only the countdown zone (y:82..195) and the status
-  strip (y:200..225). The identity panel, header and nav bar are not touched. Draw the countdown
+  strip (y:190..215). The identity panel, header and nav bar are not touched. Draw the countdown
   zone into an `LGFX_Sprite` and `pushSprite()` it in one go so the digits don't flicker either.
   A full-width 16-bit sprite of that zone is ~70 KB; if free heap is tight once TLS is up, use an
   8-bit sprite (`setColorDepth(8)`) or a sprite sized to just the digits' bounding box — check
@@ -299,7 +305,7 @@ the whole screen — frame, header, nav bar — blinked every second. Rules:
 **Exact pixel spec** (below the 25px header), no scrolling — everything drawn at fixed
 coordinates to fit the 320x240 frame, consistent with "Design language" below:
 
-**Featured flight section, y: 28 to 105px (~77px tall).**
+**Featured flight section, y: 18 to 95px (~77px tall).**
 - **No frame.** The magenta swept-corner "elbow" border that used to surround this panel was
   removed on request — text and stat chips sit directly on black, left-aligned. Same for
   Screen 2's identity panel and Screen 3's summary panel. (`drawElbowFrame()` stays in
@@ -321,16 +327,12 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
 - Empty state ("no aircraft in range") still applies here, same as before — just now within
   these exact bounds.
 
-**Flights table section, y: 108 to 225px (~117px tall) — was 238, corrected, see below.**
-- Sub-header bar: `LCARS_CYAN` (`0x07FF`) background, black text, label `FLIGHTS`, y: 108 to
-  118px (10px tall — thin label strip). (Yes, this repeats the word already shown in the
-  header's orange block — that's fine, LCARS designs repeat short labels as a matter of style,
-  not a bug to fix.) **The label font must fit inside the 10px strip**: use `fonts::Font0`
-  (LovyanGFX's 6x8 GLCD font, 8px tall), vertically centered. Font2 (16px) does *not* fit — its
-  glyph background spills to ~y:105..121, painting cyan over the featured panel's bottom frame
-  edge and into the column header row. General rule: no text may be taller than the strip/row
-  it sits in when drawn with a background color.
-- Column header row at **y: 119 to 134px** (text centered ~y:127): `LCARS_ORANGE` (`0xFC00`)
+**Flights table section, y: 98 to 215px.**
+- **No sub-header strip.** The thin cyan `LOTY`/`FLIGHTS` label bar that used to sit above the
+  column header was removed on request; its space went to roomier table rows. General rule that
+  came out of it and still applies: no text may be taller than the strip/row it sits in when
+  drawn with a background color.
+- Column header row at **y: 98 to 113px**: `LCARS_ORANGE` (`0xFC00`)
   background, black text, labels separated by `|` (not per-column shaded cells), in
   `fonts::Font0` so the longest label fits its column. **Each label is drawn at its column's x
   position** (same constants as the data rows below), with the `|` separator drawn at each
@@ -359,10 +361,9 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   `fitToWidth(text, maxPx, charWidthPx)` — reuse/generalize radar_view's `truncateAirline()`
   rather than writing a second one), and/or clip each cell with `setClipRect` as a pixel-level
   backstop. Callsign and phase icon always fit their columns and are never truncated.
-- **5 data rows**, starting at **y: 138px**, **17px step** (rows at y = 138, 155, 172, 189,
-  206) — tightened from the original 18px/y:140 start to fit within the corrected boundary; the
-  last row's text (top y:206, ~14-16px tall) ends around y:221-222, inside the 225px boundary
-  with a few px to spare. If more than 5 aircraft are in range, page via touch (Milestone 9's
+- **5 data rows**, starting at **y: 116px**, **19px step** (rows at y = 116, 135, 154, 173,
+  192) — the last row ends at y:211, inside the 215px content boundary (a `static_assert` in
+  `table_view.cpp` enforces it). If more than 5 aircraft are in range, page via touch (Milestone 9's
   mechanism) rather than trying to fit more — pagination swaps which 5 are shown, it is not
   scrolling.
 - Columns per row: **flight (callsign), airline, from (IATA code), to (IATA code), aircraft
@@ -384,14 +385,14 @@ name changed.
 Deliberately minimal — one aircraft, one number that matters: when will it actually be
 overhead. **Exact pixel spec**, below the 25px header, no scrolling:
 
-**Identity panel, y: 28 to 78px (50px tall, x: 10 to 310).**
+**Identity panel, y: 18 to 68px (50px tall, x: 10 to 310).**
 - No frame (same as Screen 1's featured panel) — text only, on black.
 - Line 1 (~y:40): flight (callsign), airline, aircraft type, phase icon — via
   `aircraft_summary`, same content as Screen 1's featured panel Line 1.
 - Line 2 (~y:62, smaller font, 8px / LovyanGFX's Font-2 equivalent): origin → destination as
   IATA + country code, e.g. `WAW (PL) → FCO (IT)` — same as Screen 1's Line 2.
 
-**Countdown zone, y: 82 to 195px (113px tall), horizontally centered.**
+**Countdown zone, y: 72 to 185px (113px tall), horizontally centered.**
 - The dominant visual element on this screen — large digits, roughly 70-90px tall glyphs
   (scale a built-in font or use a larger LovyanGFX font; verify against what's actually
   available rather than assuming a specific font name).
@@ -406,7 +407,7 @@ overhead. **Exact pixel spec**, below the 25px header, no scrolling:
 - **Empty/no-prediction state** (no aircraft in range, or CPA not found): centered em-dash `—`,
   no color-coding.
 
-**Status strip, y: 200 to 225px (25px tall, was 238 — corrected, see Screen 1's note on the
+**Status strip, y: 190 to 215px (25px tall — see Screen 1's note on the
 bottom nav bar), centered text.**
 - Label matching the countdown state: `ZBLIŻA SIĘ` (approaching, cyan zone) / `NAD TOBĄ`
   (imminent, yellow zone) / `MINĄŁ` (passed, orange zone) / `SZACOWANY CZAS` (minutes mode) /
@@ -428,17 +429,16 @@ bottom nav bar), centered text.**
 
 ### Screen 3 — "Radar" (left: radar, right: nearest-aircraft summary)
 
-**Exact pixel spec**, below the 25px header, content area y: 28 to 225px (197px tall — was
 238, corrected: see the bottom-nav-bar fix noted in Screen 1):
 
-**Divider, x: 192 to 200px (8px wide), full content height (y: 28 to 225px).**
-- A thin vertical `LCARS_ORANGE` (`0xFC00`) accent bar — the same "elbow sidebar" motif from
-  "Design language", here doing double duty as the visual split between radar and summary.
+**No divider.** The orange vertical bar (x:192..200) between radar and summary was removed on
+request — the summary text simply starts at x:208. (`drawVerticalDivider()` stays in
+`lcars_theme` unused.)
 
-**Radar, x: 0 to 190px, y: 28 to 225px.**
-- Center at `(95, 127)`, radius `85px` (center moved up from `133` to `127` to re-center in the
+**Radar, x: 0 to 190px, y: 18 to 215px.**
+- Center at `(95, 117)`, radius `85px` (centred in the y:18..215 content area —
   shorter content area; radius unchanged, still fits with margin: top `127-85=42`, bottom
-  `127+85=212`, both within `28..225`).
+  `117+85=202`, both within `18..215`).
 - 3 concentric rings at radius `28px` / `57px` / `85px` (thirds of max radius), each labeled
   in small text near the top of the ring with its corresponding distance in km (derived from
   `max_distance_km / 3`, `2/3`, full — see `computeRingDistances` from the radar geometry work).
@@ -448,14 +448,14 @@ bottom nav bar), centered text.**
   radar geometry step).
 - Static plot, no sweep animation, consistent with the earlier radar_view spec.
 
-**Summary panel, x: 200 to 320px (120px wide), y: 28 to 225px.**
-- No frame (same as Screens 1/2) — the orange divider alone separates it from the radar.
+**Summary panel, x: 200 to 320px (120px wide), y: 18 to 215px.**
+- No frame and no divider (same as Screens 1/2) — just text, starting at x:208.
 - Three rows, via `aircraft_summary`, vertically spaced within the shorter panel (row positions
-  shifted up slightly from the original 95/130/165 to re-center in the 28-225 zone):
-  - Row 1 (~y:92): flight (callsign), bold/emphasized.
-  - Row 2 (~y:127): airline — truncate or abbreviate if it doesn't fit the 120px width, don't
+  shifted up slightly from the original 95/130/165 to re-center in the 18-215 zone):
+  - Row 1 (~y:82): flight (callsign), bold/emphasized.
+  - Row 2 (~y:117): airline — truncate or abbreviate if it doesn't fit the 120px width, don't
     let it overflow into the radar zone.
-  - Row 3 (~y:162): origin → destination as IATA codes, e.g. `WAW → FCO` (no country codes
+  - Row 3 (~y:152): origin → destination as IATA codes, e.g. `WAW → FCO` (no country codes
     here — this panel is narrower than Screen 1's featured panel, keep it to what fits).
 - **Empty state**: if no aircraft in range, radar still draws its (empty) rings and home
   marker; this panel shows a centered `BRAK LOTU` / em-dash instead of the three rows.
@@ -465,15 +465,11 @@ bottom nav bar), centered text.**
 - **Order**: Flights (0) → Flight (1) → Radar (2) → wraps back to Flights. Managed by a new
   `screen_nav` module (current index + `nextScreen()`/`prevScreen()` with wraparound — small,
   but worth testing, off-by-one bugs in wraparound logic are easy to introduce).
-- **Touch zones, y: 28 to 225px (content area only, not the header or bottom nav bar)**: narrow
-  strips at the **left and right edges** (roughly the outer 15-20% of width each) switch
-  screens — left edge = previous, right edge = next. The **middle majority of the screen is
-  deliberately left alone** for screen-specific interactions — this matters concretely on
-  Screen 1, where the table already uses touch for pagination (Milestone 9); a full-width
-  left/right split would fight with that. Confining these strips to `y < 225` also keeps them
-  from overlapping the bottom nav bar below — without that boundary, a tap in a bottom corner
-  would be ambiguous between "edge swipe" and "nav bar segment."
-- **Bottom nav bar, y: 225 to 240px (`LCARS_BOTTOM_NAV_HEIGHT = 15px`, full 320px width)** — a
+- **Screens are switched only by the bottom nav buttons.** Left/right edge strips that also
+  switched screens (prev/next) were removed on request — taps anywhere above the nav band are
+  left to the active screen (Screen 1's table paging taps on its first/last row). Don't
+  reintroduce edge swiping without being asked.
+- **Bottom nav bar, y: 215 to 240px (`LCARS_BOTTOM_NAV_HEIGHT = 25px`, full 320px width)** — a
   persistent strip, present on all three screens, showing three tappable **labelled pill buttons**
   (the screen names — `LOTY`/`TERAZ`/`RADAR` or `FLIGHTS`/`NOW`/`RADAR` — in Font0, one per screen, each filling its ~107px-wide segment
   and the bar's full height minus 1-3px insets), the active one filled `LCARS_ORANGE` with black
@@ -482,12 +478,20 @@ bottom nav bar), centered text.**
   Tapping a segment jumps directly to that
   screen. **This is the fix for the bottom bar being invisible/unreachable** — earlier versions
   of this spec never actually reserved real height for it, which is why it rendered as a sliver.
-  All three screens' content areas now stop at `y:225` specifically to make room for this.
-  15px is tight for a touch target — consider giving the touch **hit-test** zone a bit more
-  vertical margin than the visual bar itself (e.g. treat `y > 215` as "bottom nav" for touch
-  purposes even though the bar only *draws* from `y:225`), so it's not painful to tap precisely.
-  This was a proposed default, not something explicitly specified originally — a single cyclic
-  "next" button would also work if three segments still feel cramped at this height.
+  All three screens' content areas now stop at `y:215` specifically to make room for this.
+  The bar is 25px tall with Font2 labels (it was 15px with tiny labels and nobody could see or
+  hit it); `navHitTest()` accepts taps from y:210, 5px above where it draws.
+- **Touch calibration** (`include/touch_calibration.h`, handed to LovyanGFX's
+  `Touch_XPT2046` config): in LovyanGFX raw terms, **raw X is the vertical axis** (~340 at the
+  bottom edge .. ~3900 at the top) and **raw Y the horizontal one** (~200 left .. ~3900 right);
+  with `offset_rotation = 0` and `setRotation(1)` LovyanGFX swaps and flips them itself.
+  `touch_input::mapRawTouch()` is a pure copy of that conversion, so native tests check the
+  constants against raw taps logged on the real board (logged with the old library, whose raw
+  x/y are swapped relative to LovyanGFX's — the test helper accounts for that). Before this was
+  measured, every bottom-button tap landed in the header and the buttons never responded. Each
+  tap logs `[touch] raw=(x,y) -> screen=(x,y) nav=<action>` to Serial — use that to re-tune if
+  taps near an edge feel off (corners were not measured yet). LovyanGFX's `calibrateTouch()`
+  is available if a proper 4-corner calibration is ever wanted.
 - **Persistence**: current screen index saved to `config_store` as `last_screen` (0/1/2),
   restored on boot. This replaces the old boolean-ish `last_view` field from when there were
   only two screens (table/radar) — rename it, don't keep both fields around.
@@ -701,7 +705,7 @@ Test-first is the default here, not a cleanup pass bolted on at the end:
   `opensky_client`, `aircraft_lookup`, `route_lookup`, `flight_phase`, `time_sync`,
   `cpa_predictor`, `screen_nav`, `table_view`, `flight_screen`, `radar_view`, `featured_panel`,
   `aircraft_summary`, and `lcars_theme` all keep their actual logic separate from LovyanGFX /
-  WiFiClientSecure / HTTPClient / XPT2046 calls specifically so that logic can run in
+  WiFiClientSecure / HTTPClient / touch-read calls specifically so that logic can run in
   PlatformIO's `native` environment — no ESP32, no display, no network required, just
   `pio test -e native`.
 - Only the thin adapter code that directly calls hardware/SDK APIs (the actual TFT draw calls,
@@ -724,7 +728,6 @@ framework = arduino
 monitor_speed = 115200
 lib_deps =
     lovyan03/LovyanGFX
-    paulstoffregen/XPT2046_Touchscreen
     tzapu/WiFiManager
     bblanchon/ArduinoJson
 ```
@@ -739,11 +742,12 @@ class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ILI9341 _panel_instance;
   lgfx::Bus_SPI _bus_instance;
   lgfx::Light_PWM _light_instance;
+  lgfx::Touch_XPT2046 _touch_instance;
 
  public:
   LGFX(void) {
     { auto cfg = _bus_instance.config();
-      cfg.spi_host = VSPI_HOST; cfg.spi_mode = 0;
+      cfg.spi_host = HSPI_HOST; cfg.spi_mode = 0;  // VSPI is the touch controller's
       cfg.freq_write = 40000000; cfg.freq_read = 16000000;
       cfg.pin_sclk = 14; cfg.pin_mosi = 13; cfg.pin_miso = 12; cfg.pin_dc = 2;
       _bus_instance.config(cfg); _panel_instance.setBus(&_bus_instance); }
@@ -754,6 +758,11 @@ class LGFX : public lgfx::LGFX_Device {
     { auto cfg = _light_instance.config();
       cfg.pin_bl = 21; cfg.pwm_channel = 7;
       _light_instance.config(cfg); _panel_instance.setLight(&_light_instance); }
+    { auto cfg = _touch_instance.config();   // lgfx::Touch_XPT2046 member, own SPI bus
+      cfg.spi_host = VSPI_HOST; cfg.bus_shared = false; cfg.freq = 1000000;
+      cfg.pin_sclk = 25; cfg.pin_mosi = 32; cfg.pin_miso = 39; cfg.pin_cs = 33; cfg.pin_int = 36;
+      cfg.x_min = kTouchRawXMin; /* ...see touch_calibration.h */ cfg.offset_rotation = 0;
+      _touch_instance.config(cfg); _panel_instance.setTouch(&_touch_instance); }
     setPanel(&_panel_instance);
   }
 };
