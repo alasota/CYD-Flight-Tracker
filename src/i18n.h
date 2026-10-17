@@ -50,10 +50,10 @@ constexpr Language kDefaultLanguage = Language::PL;
   X(StatusPassed, "MINAL", "PASSED")                                        \
   X(StatusEstimated, "SZACOWANY CZAS", "ESTIMATED TIME")                    \
   X(UnitMinutes, "MIN", "MIN")                                              \
-  /* header OpenSky health tag (<= 5 chars) */                              \
-  X(HealthRateLimited, "LIMIT", "RATE")                                     \
-  X(HealthAuthError, "AUTH", "AUTH")                                        \
-  X(HealthNetworkError, "SIEC", "NET")                                      \
+  /* header block "<n> flights" — plural forms, see pluralForm() */         \
+  X(FlightsOne, "LOT", "FLIGHT")                                            \
+  X(FlightsFew, "LOTY", "FLIGHTS")                                          \
+  X(FlightsMany, "LOTOW", "FLIGHTS")                                        \
   /* first-boot setup prompt */                                             \
   X(SetupPrompt, "Ustaw lokalizacje domu na", "Set your home location at")
 
@@ -90,3 +90,11 @@ Language languageFromCode(const char *code);
 // A raw stored index (NVS) -> a valid Language; out of range ->
 // kDefaultLanguage.
 Language clampLanguage(int raw);
+
+// Grammatical number for a count `n` (n >= 0):
+//   EN: 1 -> One, everything else -> Many.
+//   PL: 1 -> One ("1 LOT"); last digit 2-4 except 12-14 -> Few ("3 LOTY",
+//       "22 LOTY"); everything else, incl. 0 and 12-14 -> Many ("5 LOTOW",
+//       "12 LOTOW").
+enum class PluralForm { One, Few, Many };
+PluralForm pluralForm(int n, Language lang);

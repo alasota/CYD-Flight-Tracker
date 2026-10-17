@@ -94,8 +94,40 @@ static void test_clamp_language_index(void) {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(kDefaultLanguage), static_cast<int>(clampLanguage(-1)));
 }
 
+// ---- plural forms -------------------------------------------------------------
+
+static int form(int n, Language lang) { return static_cast<int>(pluralForm(n, lang)); }
+static const int kOne = static_cast<int>(PluralForm::One);
+static const int kFew = static_cast<int>(PluralForm::Few);
+static const int kMany = static_cast<int>(PluralForm::Many);
+
+static void test_plural_polish(void) {
+  TEST_ASSERT_EQUAL_INT(kMany, form(0, Language::PL));   // 0 LOTOW
+  TEST_ASSERT_EQUAL_INT(kOne, form(1, Language::PL));    // 1 LOT
+  TEST_ASSERT_EQUAL_INT(kFew, form(2, Language::PL));    // 2 LOTY
+  TEST_ASSERT_EQUAL_INT(kFew, form(4, Language::PL));
+  TEST_ASSERT_EQUAL_INT(kMany, form(5, Language::PL));   // 5 LOTOW
+  TEST_ASSERT_EQUAL_INT(kMany, form(11, Language::PL));
+  TEST_ASSERT_EQUAL_INT(kMany, form(12, Language::PL));  // 12-14 are "many"
+  TEST_ASSERT_EQUAL_INT(kMany, form(14, Language::PL));
+  TEST_ASSERT_EQUAL_INT(kMany, form(21, Language::PL));  // 21 LOTOW (not "one")
+  TEST_ASSERT_EQUAL_INT(kFew, form(22, Language::PL));   // 22 LOTY
+  TEST_ASSERT_EQUAL_INT(kFew, form(104, Language::PL));
+  TEST_ASSERT_EQUAL_INT(kMany, form(112, Language::PL));
+}
+
+static void test_plural_english(void) {
+  TEST_ASSERT_EQUAL_INT(kMany, form(0, Language::EN));
+  TEST_ASSERT_EQUAL_INT(kOne, form(1, Language::EN));
+  TEST_ASSERT_EQUAL_INT(kMany, form(2, Language::EN));
+  TEST_ASSERT_EQUAL_INT(kMany, form(22, Language::EN));
+}
+
 int main(int, char **) {
   UNITY_BEGIN();
+
+  RUN_TEST(test_plural_polish);
+  RUN_TEST(test_plural_english);
 
   RUN_TEST(test_every_string_non_empty_in_every_language);
   RUN_TEST(test_every_string_is_printable_ascii);

@@ -46,6 +46,18 @@ Language languageFromCode(const char *code) {
   return kDefaultLanguage;
 }
 
+PluralForm pluralForm(int n, Language lang) {
+  if (n == 1) return PluralForm::One;
+  if (lang == Language::PL) {
+    const int lastDigit = n % 10;
+    const int lastTwo = n % 100;
+    if (lastDigit >= 2 && lastDigit <= 4 && !(lastTwo >= 12 && lastTwo <= 14)) {
+      return PluralForm::Few;
+    }
+  }
+  return PluralForm::Many;
+}
+
 Language clampLanguage(int raw) {
   return (raw >= 0 && raw < kLanguageCount) ? static_cast<Language>(raw) : kDefaultLanguage;
 }

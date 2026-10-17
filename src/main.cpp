@@ -18,7 +18,7 @@
 //   - Once per config_store's poll_interval_s (opensky_client's own
 //     scheduler): fetch Aircraft[] from OpenSky. A failed poll (auth /
 //     rate-limit / network) keeps the last good list on screen and shows a
-//     header health tag rather than blanking (review notes 1.2-1.4); if
+//     header block in a warning colour rather than blanking (review notes 1.2-1.4); if
 //     home isn't configured yet a setup prompt is shown instead. On a
 //     clean poll: rank aircraft nearest-first, then enrich only as many as
 //     lookup_budget's planLookups() allows new HTTP calls for this cycle
@@ -111,10 +111,14 @@ static RedrawEvents pendingRedraw;
 static int lastPersistedScreen = 0;
 static uint32_t lastScreenPersistMs = 0;
 
-// OpenSky feed health from the most recent poll — drives the header tag
+// OpenSky feed health from the most recent poll — drives the header block colour
 // and whether a failed poll is allowed to blank the aircraft list (it
 // isn't — review notes 1.2).
 static OpenSkyHealth lastHealth = OpenSkyHealth::Ok;
+
+// True once at least one poll succeeded — until then the header block shows
+// "--" rather than claiming "0 flights".
+static bool hasAircraftData = false;
 
 // Closest-point-of-approach for the nearest aircraft, as computed at the
 // last poll, plus the millis() timestamp of that poll — currentCpa()
@@ -156,6 +160,12 @@ static void drawActiveContent() {
   }
 }
 
+// Header bar: aircraft-count block (coloured by feed health) + date/time.
+static void drawHeader() {
+  drawStatusBar(tft, static_cast<int>(lastRows.size()), hasAircraftData, lastHealth,
+                timeSyncNowLocal(), isTimeSynced(), static_cast<int16_t>(tft.width()));
+}
+
 // Repaints exactly the regions in `mask` (redraw_policy bits).
 static void applyRedraw(uint8_t mask) {
   int16_t screenW = static_cast<int16_t>(tft.width());
@@ -164,7 +174,7 @@ static void applyRedraw(uint8_t mask) {
   if (mask & kRedrawFull) {
     // Structural change: clear everything, then header, content, nav bar.
     tft.fillScreen(LCARS_BLACK);
-    drawStatusBar(tft, nav.current(), timeSyncNowLocal(), isTimeSynced(), lastHealth, screenW);
+    drawHeader();
     drawActiveContent();
     drawBottomNav(tft, nav.current(), screenW, screenH, statusBarScreenName);
     return;
@@ -178,8 +188,8 @@ static void applyRedraw(uint8_t mask) {
     drawActiveContent();
   }
 
-  if (mask & kRedrawHeaderText) {
-    drawStatusBarText(tft, timeSyncNowLocal(), isTimeSynced(), lastHealth, screenW);
+  if (mask & kRedrawHeader) {
+    drawHeader();
   }
 
   if (mask & kRedrawCountdown) {
@@ -343,7 +353,7 @@ void loop() {
     if (poll.status != OpenSkyPollStatus::NotDue) {
       // A poll actually ran — refresh the cached config (config_portal
       // saves are also picked up immediately above; this is the backstop)
-      // and update the header health tag.
+      // and update the feed health (header block colour).
       reloadConfig();
 
       const OpenSkyHealth previousHealth = lastHealth;
@@ -430,7 +440,8 @@ void loop() {
           currentPage = pageCount > 0 ? pageCount - 1 : 0;
         }
 
-        pendingRedraw.newPoll = true;  // content area only — chrome is untouched
+        hasAircraftData = true;
+        pendingRedraw.newPoll = true;  // content + header count; bottom nav untouched
       }
     }
   }

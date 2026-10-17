@@ -1,5 +1,6 @@
 #include "status_bar.h"
 
+#include "lcars_theme.h"  // palette (pure section) + drawing helpers
 #include "screen_nav.h"  // kScreenFlights / kScreenFlight / kScreenRadar
 #include "time_sync.h"
 
@@ -30,50 +31,55 @@ std::string statusBarClock(std::time_t localEpoch, bool timeSynced) {
   return formatTime(localEpoch);
 }
 
-const char *statusBarHealthTag(OpenSkyHealth health, Language lang) {
+std::string statusBarBlockLabel(int aircraftCount, bool hasData, Language lang) {
+  if (!hasData) return "--";
+
+  constexpr int kMaxShown = 99;
+  const int n = aircraftCount < 0 ? 0 : aircraftCount;
+  std::string number = (n > kMaxShown) ? std::to_string(kMaxShown) + "+" : std::to_string(n);
+
+  // "99+" reads as "many" in both languages.
+  const PluralForm form = (n > kMaxShown) ? PluralForm::Many : pluralForm(n, lang);
+  const Str word = (form == PluralForm::One)   ? Str::FlightsOne
+                   : (form == PluralForm::Few) ? Str::FlightsFew
+                                               : Str::FlightsMany;
+  return number + " " + tr(word, lang);
+}
+
+uint16_t statusBarBlockColor(OpenSkyHealth health) {
   switch (health) {
     case OpenSkyHealth::RateLimited:
-      return tr(Str::HealthRateLimited, lang);
+      return LCARS_YELLOW;
     case OpenSkyHealth::AuthError:
-      return tr(Str::HealthAuthError, lang);
     case OpenSkyHealth::NetworkError:
-      return tr(Str::HealthNetworkError, lang);
+      return LCARS_MAGENTA;
     case OpenSkyHealth::Ok:
     default:
-      return "";
+      return LCARS_ORANGE;
   }
 }
 
 #ifdef ARDUINO
 
-#include "lcars_theme.h"
-
 namespace {
-// Wide enough for the longest name in any language ("FLIGHTS", 7 chars) in LCARS_FONT_BODY
-// at this height, per CLAUDE.md "Screen chrome".
-constexpr int16_t kNameBlockWidth = 78;
+// Wide enough for the longest block label ("99+ FLIGHTS", 11 chars) in
+// LCARS_FONT_BODY at this height, per CLAUDE.md "Screen chrome".
+constexpr int16_t kNameBlockWidth = 104;
 constexpr int16_t kNameBlockRadius = 6;
 constexpr int16_t kTextGap = 6;
 constexpr int16_t kRightMargin = 4;
 }  // namespace
 
-void drawStatusBar(LGFX &gfx, int screenIndex, std::time_t localEpoch, bool timeSynced,
-                   OpenSkyHealth health, int16_t screenWidth) {
-  // Left: orange name block (on its own black backing, so the rounded
-  // corners don't keep stale pixels).
-  gfx.fillRect(0, 0, kNameBlockWidth, LCARS_HEADER_HEIGHT, LCARS_BLACK);
-  drawHeaderBlock(gfx, 0, 0, kNameBlockWidth, LCARS_HEADER_HEIGHT, kNameBlockRadius, LCARS_ORANGE,
-                  LCARS_BLACK, statusBarScreenName(screenIndex, i18nLanguage()));
+void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, OpenSkyHealth health,
+                   std::time_t localEpoch, bool timeSynced, int16_t screenWidth) {
+  // Own background — repaints the whole header without ghosting (also
+  // behind the block's rounded corners).
+  gfx.fillRect(0, 0, screenWidth, LCARS_HEADER_HEIGHT, LCARS_BLACK);
 
-  drawStatusBarText(gfx, localEpoch, timeSynced, health, screenWidth);
-}
-
-void drawStatusBarText(LGFX &gfx, std::time_t localEpoch, bool timeSynced, OpenSkyHealth health,
-                       int16_t screenWidth) {
-  // Own background (text area only) — safe to repaint without ghosting
-  // and without touching the name block.
-  gfx.fillRect(kNameBlockWidth, 0, static_cast<int16_t>(screenWidth - kNameBlockWidth),
-               LCARS_HEADER_HEIGHT, LCARS_BLACK);
+  // Left: aircraft-count block, coloured by data health.
+  drawHeaderBlock(gfx, 0, 0, kNameBlockWidth, LCARS_HEADER_HEIGHT, kNameBlockRadius,
+                  statusBarBlockColor(health), LCARS_BLACK,
+                  statusBarBlockLabel(aircraftCount, hasData, i18nLanguage()).c_str());
 
   // Date (left-aligned, right after the block) + clock (right-aligned), cyan.
   gfx.setFont(LCARS_FONT_BODY);
@@ -88,16 +94,6 @@ void drawStatusBarText(LGFX &gfx, std::time_t localEpoch, bool timeSynced, OpenS
   std::string clock = statusBarClock(localEpoch, timeSynced);
   gfx.setTextDatum(middle_right);
   gfx.drawString(clock.c_str(), static_cast<int16_t>(screenWidth - kRightMargin), midY);
-
-  // Data-feed health tag, just left of the clock, in orange so a stale
-  // aircraft list is visibly flagged (review notes 1.2/1.3/1.4).
-  const char *tag = statusBarHealthTag(health, i18nLanguage());
-  if (tag[0] != '\0') {
-    int16_t clockW = static_cast<int16_t>(gfx.textWidth(clock.c_str()));
-    gfx.setTextColor(LCARS_ORANGE, LCARS_BLACK);
-    gfx.drawString(tag, static_cast<int16_t>(screenWidth - kRightMargin - clockW - kTextGap), midY);
-    gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
-  }
 }
 
 #endif  // ARDUINO

@@ -1,10 +1,11 @@
 // status_bar — draws the header bar shared by all three screens, per
-// CLAUDE.md "Screen chrome": an LCARS_ORANGE rounded block on the left
-// labelled with the active screen name (FLIGHTS / FLIGHT / RADAR), then
-// the date (DD/MM/YYYY) + the real wall-clock time (from time_sync) to its right in
-// LCARS_CYAN. Occupies y:0..LCARS_HEADER_HEIGHT, full width. **No WiFi
-// signal bars** — that three-zone design is explicitly superseded (see
-// CLAUDE.md; rssiToBars() has no home in this layout).
+// CLAUDE.md "Screen chrome": a rounded block on the left showing how many
+// aircraft are in range ("7 LOTOW" / "7 FLIGHTS"), coloured by OpenSky data
+// health (orange OK / yellow rate-limited / magenta error), then the date
+// (DD/MM/YYYY) + the real wall-clock time (from time_sync) to its right in
+// LCARS_CYAN. The screen name is no longer in the header — it's on the
+// bottom-nav buttons. Occupies y:0..LCARS_HEADER_HEIGHT, full width. **No
+// WiFi signal bars** (CLAUDE.md; rssiToBars() has no home in this layout).
 //
 // Called once per frame from main.cpp *before* it dispatches to whichever
 // screen is active — screens draw their content starting at
@@ -12,6 +13,7 @@
 #pragma once
 
 #include <ctime>
+#include <cstdint>
 #include <string>
 
 #include "i18n.h"  // Language
@@ -46,10 +48,18 @@ enum class OpenSkyHealth {
   NetworkError,  // transport / other HTTP failure
 };
 
-// Short right-aligned header tag for `health` — "" when Ok, otherwise a
-// short code in `lang` (EN "RATE"/"AUTH"/"NET", PL "LIMIT"/"AUTH"/"SIEC").
-// Pure — native-tested.
-const char *statusBarHealthTag(OpenSkyHealth health, Language lang);
+// Header block text: "<n> <flights>" in `lang` with the right plural form
+// (PL "1 LOT" / "3 LOTY" / "7 LOTOW", EN "1 FLIGHT" / "7 FLIGHTS"); counts
+// over 99 show as "99+". "--" until the first successful poll
+// (`hasData == false`) — "0 LOTOW" would claim the sky is empty when we
+// simply don't know yet. Never longer than 11 chars. Pure — native-tested.
+std::string statusBarBlockLabel(int aircraftCount, bool hasData, Language lang);
+
+// Header block fill colour for the data feed's health — replaces the old
+// "RATE/AUTH/NET" text tag: LCARS_ORANGE when Ok, LCARS_YELLOW while
+// rate-limited (429), LCARS_MAGENTA for auth or network errors (the
+// aircraft shown may be stale). Pure — native-tested.
+uint16_t statusBarBlockColor(OpenSkyHealth health);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme. Not
 // covered by Unity (see CLAUDE.md "Testing"). Guarded here in the header
@@ -60,19 +70,14 @@ const char *statusBarHealthTag(OpenSkyHealth health, Language lang);
 #include "LGFX_CYD.hpp"
 
 // Draws the full header bar into y:0..LCARS_HEADER_HEIGHT across
-// `screenWidth` px. `screenIndex` picks the name-block label;
-// `localEpoch` is a time_sync::timeSyncNowLocal() value and `timeSynced`
-// is time_sync::isTimeSynced() — together they decide real text vs.
-// placeholder. Repaints its own black background first, so it's safe to
-// call every frame.
-void drawStatusBar(LGFX &gfx, int screenIndex, std::time_t localEpoch, bool timeSynced,
-                   OpenSkyHealth health, int16_t screenWidth);
-
-// Repaints only the header's text area (date, health tag, clock) — right
-// of the orange name block, which is left untouched. For the once-a-minute
-// clock update and health-tag changes (CLAUDE.md "Redraw policy"), so they
-// don't need a full-screen redraw.
-void drawStatusBarText(LGFX &gfx, std::time_t localEpoch, bool timeSynced, OpenSkyHealth health,
-                       int16_t screenWidth);
+// `screenWidth` px: the count block (statusBarBlockLabel() on
+// statusBarBlockColor()), then date + clock. `localEpoch` is a
+// time_sync::timeSyncNowLocal() value and `timeSynced` is
+// time_sync::isTimeSynced() — together they decide real text vs.
+// placeholder. Repaints its own black background first and touches nothing
+// below the header, so it's safe to call on its own (CLAUDE.md "Redraw
+// policy": minute rollover, health change, new poll).
+void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, OpenSkyHealth health,
+                   std::time_t localEpoch, bool timeSynced, int16_t screenWidth);
 
 #endif  // ARDUINO

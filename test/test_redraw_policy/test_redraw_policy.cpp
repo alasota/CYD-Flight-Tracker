@@ -74,14 +74,14 @@ static void test_countdown_tick_ignored_off_flight_screen(void) {
 
 // ---- new data: content area only -------------------------------------------
 
-static void test_new_poll_redraws_content_not_full(void) {
+static void test_new_poll_redraws_content_and_header_not_full(void) {
   RedrawEvents e;
   e.newPoll = true;
   for (int screen = 0; screen < kScreenCount; ++screen) {
     uint8_t mask = computeRedrawMask(e, screen);
     TEST_ASSERT_TRUE(has(mask, kRedrawContent));
     TEST_ASSERT_FALSE(has(mask, kRedrawFull));
-    TEST_ASSERT_FALSE(has(mask, kRedrawHeaderText));
+    TEST_ASSERT_TRUE(has(mask, kRedrawHeader));  // aircraft count in the header block
   }
 }
 
@@ -90,28 +90,28 @@ static void test_new_poll_plus_tick_on_flight_needs_no_separate_countdown(void) 
   RedrawEvents e;
   e.newPoll = true;
   e.countdownTick = true;
-  TEST_ASSERT_EQUAL_UINT8(kRedrawContent, computeRedrawMask(e, kScreenFlight));
+  TEST_ASSERT_EQUAL_UINT8(kRedrawContent | kRedrawHeader, computeRedrawMask(e, kScreenFlight));
 }
 
-// ---- header text: minute rollover / health tag ------------------------------
+// ---- header: minute rollover / health (block colour) ------------------------
 
 static void test_minute_change_redraws_header_text_only(void) {
   RedrawEvents e;
   e.minuteChanged = true;
-  TEST_ASSERT_EQUAL_UINT8(kRedrawHeaderText, computeRedrawMask(e, kScreenRadar));
+  TEST_ASSERT_EQUAL_UINT8(kRedrawHeader, computeRedrawMask(e, kScreenRadar));
 }
 
 static void test_health_change_redraws_header_text_only(void) {
   RedrawEvents e;
   e.healthChanged = true;
-  TEST_ASSERT_EQUAL_UINT8(kRedrawHeaderText, computeRedrawMask(e, kScreenFlights));
+  TEST_ASSERT_EQUAL_UINT8(kRedrawHeader, computeRedrawMask(e, kScreenFlights));
 }
 
 static void test_independent_regions_combine(void) {
   RedrawEvents e;
   e.minuteChanged = true;
   e.countdownTick = true;
-  TEST_ASSERT_EQUAL_UINT8(kRedrawHeaderText | kRedrawCountdown,
+  TEST_ASSERT_EQUAL_UINT8(kRedrawHeader | kRedrawCountdown,
                           computeRedrawMask(e, kScreenFlight));
 }
 
@@ -129,7 +129,7 @@ int main(int, char **) {
   RUN_TEST(test_countdown_tick_on_flight_screen_redraws_countdown_only);
   RUN_TEST(test_countdown_tick_ignored_off_flight_screen);
 
-  RUN_TEST(test_new_poll_redraws_content_not_full);
+  RUN_TEST(test_new_poll_redraws_content_and_header_not_full);
   RUN_TEST(test_new_poll_plus_tick_on_flight_needs_no_separate_countdown);
 
   RUN_TEST(test_minute_change_redraws_header_text_only);

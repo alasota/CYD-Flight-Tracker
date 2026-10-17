@@ -243,17 +243,20 @@ switching feels like changing a mode on one console, not jumping between apps.
 ### Screen chrome — header bar (identical on all three screens)
 
 **Exact pixel spec, y: 0 to 25px, full width (320px):**
-- LCARS block on the left: filled rounded rectangle (`fillRoundRect`), color `LCARS_ORANGE`
-  (`0xFC00`). Label the screen name inside it in small bold text, in the selected language
-  (EN `FLIGHTS` / `NOW` / `RADAR`, PL `LOTY` / `TERAZ` / `RADAR` — see "Language") — this is how each screen stays identifiable now that the header's main text is
-  date/time rather than a screen-name label; keep the block wide enough for the longest
-  name (`FLIGHTS`, 7 characters) at whatever font size fits 25px tall comfortably.
+- LCARS block on the left (x:0..104): filled rounded rectangle (`fillRoundRect`) showing the
+  **number of aircraft in range**, black text, in the selected language with the correct plural
+  (PL `1 LOT` / `3 LOTY` / `7 LOTOW`, EN `1 FLIGHT` / `7 FLIGHTS`; `99+` above 99; `--` until the
+  first successful poll). It used to show the screen name, but that duplicated the active
+  bottom-nav button on every screen, so the name now lives only in the bottom nav.
+- **The block's colour is the OpenSky feed health** — this replaces the old `RATE`/`AUTH`/`NET`
+  text tag next to the clock: `LCARS_ORANGE` = data OK, `LCARS_YELLOW` = rate-limited (429,
+  backing off), `LCARS_MAGENTA` = auth or network error (the aircraft shown may be stale).
 - To the right of that block: the current date `DD/MM/YYYY` (left-aligned, right after the
   block) and the real time `HH:MM` (right-aligned at the screen edge), built-in font, color
   `LCARS_CYAN` (`0x07FF`) or white. No seconds — the header is redrawn once per minute (see
   "Redraw policy" below), so `HH:MM:SS` would sit frozen and look broken.
-- The OpenSky health tag (`RATE` / `AUTH` / `NET`, orange) stays where it is, just left of the
-  clock.
+- The header is repainted (on its own, `kRedrawHeader`) on every new poll (count), health
+  change (colour) and minute rollover (clock).
 - **WiFi bars are dropped from this header** in this revision — the earlier three-zone design
   (date/time left, name center, WiFi right) is superseded by this spec. Say if you want signal
   strength back somewhere; there's no slot for it here right now.
