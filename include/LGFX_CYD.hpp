@@ -53,7 +53,7 @@ class LGFX : public lgfx::LGFX_Device {
       cfg.offset_x = 0;
       cfg.offset_y = 0;
       cfg.offset_rotation = 0;
-      cfg.readable = false;
+      cfg.readable = true;  // pixel read-back for /screenshot.bmp (readRect)
       cfg.invert = false;
       cfg.rgb_order = false;
       cfg.dlen_16bit = false;

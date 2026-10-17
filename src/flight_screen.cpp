@@ -14,7 +14,7 @@ constexpr int16_t kStatusHeight = 25;      // y:190..215 (bottom nav: 215..240)
 
 // Empty-state colour — deliberately outside the urgency palette
 // ("no colour-coding" in CLAUDE.md).
-constexpr uint16_t kEmptyColor = 0xFFFF;  // white
+constexpr uint16_t kEmptyColor = THEME_CONTENT_PRIMARY;  // white
 }  // namespace
 
 int16_t flightIdentityTopPx() { return kIdentityTop; }
@@ -45,7 +45,7 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang
     out.bigText = "~" + std::to_string(minutes);
     out.suffixText = tr(Str::UnitMinutes, lang);
     out.statusLabel = tr(Str::StatusEstimated, lang);
-    out.color = LCARS_MAGENTA;
+    out.color = LCARS_LILAC;
     return out;
   }
 
@@ -55,13 +55,13 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang
   out.suffixText = "s";
 
   if (t > 10.0f) {
-    out.color = LCARS_CYAN;
+    out.color = LCARS_SKY;
     out.statusLabel = tr(Str::StatusApproaching, lang);
   } else if (t >= 0.0f) {
     out.color = LCARS_YELLOW;
     out.statusLabel = tr(Str::StatusOverhead, lang);
   } else {  // -10 <= t < 0
-    out.color = LCARS_ORANGE;
+    out.color = LCARS_PEACH;
     out.statusLabel = tr(Str::StatusPassed, lang);
   }
   return out;
@@ -101,7 +101,7 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
   } else {
     gfx.setFont(LCARS_FONT_BODY);
     gfx.setTextDatum(middle_center);
-    gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+    gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
     gfx.drawString(tr(Str::NoFlight), cx, static_cast<int16_t>(kIdentityTop + kIdentityHeight / 2));
   }
 

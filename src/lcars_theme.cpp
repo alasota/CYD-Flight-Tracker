@@ -44,6 +44,24 @@ char phaseIcon(Phase phase) {
   }
 }
 
+uint16_t phaseColor(Phase phase) {
+  switch (phase) {
+    case Phase::TAKEOFF:
+      return LCARS_GREEN;
+    case Phase::LANDING:
+      return LCARS_PEACH;
+    case Phase::OVERFLIGHT:
+      return LCARS_SKY;
+    case Phase::NONE:
+    default:
+      return THEME_CONTENT_MUTED;
+  }
+}
+
+uint16_t tableRowTextColor(int rowIndex) {
+  return (rowIndex % 2 == 0) ? THEME_CONTENT_PRIMARY : THEME_CONTENT_SECONDARY;
+}
+
 std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &measure) {
   if (maxPx <= 0) return std::string();
   if (measure(text) <= maxPx) return text;
@@ -199,10 +217,9 @@ void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t scre
     const int16_t ph = static_cast<int16_t>(seg.h - 2 * kInsetY);
     const int16_t r = static_cast<int16_t>(ph / 2);
 
-    const uint16_t fill = active ? LCARS_ORANGE : LCARS_NAV_INACTIVE;
-    const uint16_t text = active ? LCARS_BLACK : LCARS_CYAN;
+    const uint16_t fill = active ? THEME_CHROME_ACCENT : THEME_CHROME_INACTIVE;
+    const uint16_t text = THEME_ON_FILL;
     gfx.fillRoundRect(px, py, pw, ph, r, fill);
-    if (!active) gfx.drawRoundRect(px, py, pw, ph, r, LCARS_CYAN);
 
     gfx.setTextColor(text, fill);
     gfx.drawString(labelFor(i, i18nLanguage()), static_cast<int16_t>(px + pw / 2),

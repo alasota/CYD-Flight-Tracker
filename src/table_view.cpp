@@ -181,7 +181,6 @@ void drawCell(LGFX &gfx, const TableColumn &col, const std::string &text, int16_
 void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t screenWidth) {
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_left);
-  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
   const TextMeasure measure = gfxTextMeasure(gfx);
 
   // Exactly kTableRowsPerPage slots; clear all of them so a short page
@@ -194,6 +193,7 @@ void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t 
     const AircraftRow &row = pageRows[static_cast<size_t>(i)];
     int16_t textY = static_cast<int16_t>(rowY + kRowStep / 2);
 
+    gfx.setTextColor(tableRowTextColor(i), LCARS_BLACK);  // white / sky, alternating
     drawCell(gfx, kColumns[kColFlight], orDash(row.aircraft.callsign), rowY, textY, measure);
     drawCell(gfx, kColumns[kColAirline], orDash(row.info.airline), rowY, textY, measure);
     drawCell(gfx, kColumns[kColOrigin], row.route.found ? row.route.origin_icao : "--", rowY,
@@ -201,20 +201,21 @@ void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t 
     drawCell(gfx, kColumns[kColDest], row.route.found ? row.route.dest_icao : "--", rowY, textY,
              measure);
     drawCell(gfx, kColumns[kColType], orDash(row.info.aircraft_type), rowY, textY, measure);
+    gfx.setTextColor(phaseColor(row.phase), LCARS_BLACK);  // takeoff/landing stand out
     drawCell(gfx, kColumns[kColPhase], std::string(1, phaseIcon(row.phase)), rowY, textY,
              measure);
   }
 }
 
-// Orange column-header row: each label at its own column's x (same
+// Lilac column-header row: each label at its own column's x (same
 // kColumns as the data rows), with a 1px black "|" divider at every
 // column boundary. Font0 (8px) — Font2 is taller than the 15px strip
 // allows with padding, and too wide for SKAD/DOKAD/FAZA.
 void drawColumnHeader(LGFX &gfx, int16_t screenWidth) {
-  gfx.fillRect(0, kColHeaderY, screenWidth, kColHeaderH, LCARS_ORANGE);
+  gfx.fillRect(0, kColHeaderY, screenWidth, kColHeaderH, THEME_TABLE_HEADER);
   gfx.setFont(LCARS_FONT_SMALL);
   gfx.setTextDatum(middle_left);
-  gfx.setTextColor(LCARS_BLACK, LCARS_ORANGE);
+  gfx.setTextColor(THEME_ON_FILL, THEME_TABLE_HEADER);
 
   const int16_t textY = static_cast<int16_t>(kColHeaderY + kColHeaderH / 2);
   for (int i = 0; i < kTableColumnCount; ++i) {
@@ -239,7 +240,7 @@ void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, const Airpor
     drawFeaturedPanelEmpty(gfx, screenWidth);
   }
 
-  // Orange column-header row at y:98..113, labels aligned to the data
+  // Lilac column-header row at y:98..113, labels aligned to the data
   // columns (ASCII only: bitmap fonts don't carry the Polish diacritics —
   // so "SKAD"/"DOKAD", not "SKĄD"/"DOKĄD").
   drawColumnHeader(gfx, screenWidth);

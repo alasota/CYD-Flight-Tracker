@@ -37,7 +37,7 @@ void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, const AirportInfo &ori
 
   // Route line, with country codes (Screen 1 detail level).
   gfx.setFont(LCARS_FONT_BODY);
-  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+  gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
   gfx.setTextDatum(top_left);
   const int16_t routeX = textX;
   gfx.drawString(
@@ -55,23 +55,23 @@ void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, const AirportInfo &ori
 
   std::snprintf(buf, sizeof(buf), "%.0fm",
                 row.aircraft.has_position ? static_cast<double>(row.aircraft.baro_altitude) : 0.0);
-  drawPillButton(gfx, pillAreaX, kPillY, pillW, kPillHeight, LCARS_BLUE_VIOLET, LCARS_BLACK, buf);
+  drawPillButton(gfx, pillAreaX, kPillY, pillW, kPillHeight, THEME_PILL_FILL, THEME_CONTENT_SECONDARY, buf);
 
   std::snprintf(buf, sizeof(buf), "%.0fm/s",
                 row.aircraft.has_position ? static_cast<double>(row.aircraft.velocity) : 0.0);
   drawPillButton(gfx, static_cast<int16_t>(pillAreaX + pillW + kPillGap), kPillY, pillW, kPillHeight,
-                 LCARS_BLUE_VIOLET, LCARS_BLACK, buf);
+                 THEME_PILL_FILL, THEME_CONTENT_SECONDARY, buf);
 
   std::snprintf(buf, sizeof(buf), "%.0fkm",
                 row.has_distance ? static_cast<double>(row.distance_km) : 0.0);
   drawPillButton(gfx, static_cast<int16_t>(pillAreaX + 2 * (pillW + kPillGap)), kPillY, pillW,
-                 kPillHeight, LCARS_BLUE_VIOLET, LCARS_BLACK, buf);
+                 kPillHeight, THEME_PILL_FILL, THEME_CONTENT_SECONDARY, buf);
 }
 
 void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth) {
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_center);
-  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+  gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
   gfx.drawString(tr(Str::NoFlightsInRange), static_cast<int16_t>(screenWidth / 2),
                  static_cast<int16_t>(kPanelTop + kPanelHeight / 2));
 }

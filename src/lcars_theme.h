@@ -27,10 +27,38 @@ constexpr uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b) {
 // (Screen 1/2/3) refers to these names, so they are the canonical set;
 // define colors once here rather than scattering raw hex literals.
 constexpr uint16_t LCARS_BLACK = 0x0000;    // background
-constexpr uint16_t LCARS_ORANGE = 0xFC00;   // header block, column headers, divider, home marker
-constexpr uint16_t LCARS_MAGENTA = 0xF81F;  // elbow-frame borders (featured / identity / summary panels)
-constexpr uint16_t LCARS_CYAN = 0x07FF;     // sub-headers, date/time text, radar blips
-constexpr uint16_t LCARS_YELLOW = 0xFFE0;   // radar home crosshair, "imminent" countdown
+constexpr uint16_t LCARS_ORANGE = 0xFC00;   // (original palette — no longer used on screen)
+constexpr uint16_t LCARS_MAGENTA = 0xF81F;  // (original palette — no longer used on screen)
+constexpr uint16_t LCARS_CYAN = 0x07FF;     // (original palette — no longer used on screen)
+constexpr uint16_t LCARS_YELLOW = 0xFFE0;   // radar home crosshair, "imminent" countdown, rate-limit
+
+// Colour scheme "variant A" (CLAUDE.md "Design language"): warm chrome
+// (header + bottom-nav buttons) vs. cool content (flight data, tables,
+// radar), so navigation and data never look alike.
+constexpr uint16_t LCARS_PEACH = rgb565(0xFF, 0x99, 0x66);        // 0xFCCC
+constexpr uint16_t LCARS_PEACH_LIGHT = rgb565(0xFF, 0xCC, 0x99);  // 0xFE73
+constexpr uint16_t LCARS_LAVENDER = rgb565(0x99, 0x77, 0xAA);     // 0x9BB5
+constexpr uint16_t LCARS_LILAC = rgb565(0xCC, 0x99, 0xCC);        // 0xCCD9
+constexpr uint16_t LCARS_SKY = rgb565(0x99, 0xCC, 0xFF);          // 0x9E7F
+constexpr uint16_t LCARS_NAVY = rgb565(0x10, 0x20, 0x40);         // 0x1108
+constexpr uint16_t LCARS_GREEN = rgb565(0x66, 0xCC, 0x66);        // 0x666C
+constexpr uint16_t LCARS_RED = rgb565(0xFF, 0x33, 0x33);          // 0xF986
+constexpr uint16_t LCARS_WHITE = 0xFFFF;
+
+// Roles — what the view modules actually use, so a future re-colour is an
+// edit here, not a hunt through every screen.
+// Chrome (header bar + bottom nav):
+constexpr uint16_t THEME_CHROME_ACCENT = LCARS_PEACH;        // header block (data OK), active button
+constexpr uint16_t THEME_CHROME_TEXT = LCARS_PEACH_LIGHT;    // header date / time
+constexpr uint16_t THEME_CHROME_INACTIVE = LCARS_LAVENDER;   // inactive nav buttons
+constexpr uint16_t THEME_ON_FILL = LCARS_BLACK;              // text on any filled chrome/table bar
+constexpr uint16_t THEME_ALERT = LCARS_RED;                  // header block: auth/network error
+// Content (flight data):
+constexpr uint16_t THEME_CONTENT_PRIMARY = LCARS_WHITE;      // callsigns, odd table rows
+constexpr uint16_t THEME_CONTENT_SECONDARY = LCARS_SKY;      // airline / type / route, even rows
+constexpr uint16_t THEME_CONTENT_MUTED = LCARS_LAVENDER;     // radar rings & labels, "no phase"
+constexpr uint16_t THEME_PILL_FILL = LCARS_NAVY;             // altitude/speed/distance chips
+constexpr uint16_t THEME_TABLE_HEADER = LCARS_LILAC;         // table column-header bar
 
 // Shared header-bar height (see CLAUDE.md "Screen chrome"): status_bar
 // draws y:0..LCARS_HEADER_HEIGHT — a slim 15px strip (Font0 text).
@@ -94,6 +122,15 @@ Rect viewToggleButtonBounds(int16_t screenWidth, int16_t screenHeight);
 // cover 0x20-0x7E — see table_view's orDash()) rather than a fancier
 // glyph. Pure — no TFT dependency — tested under `pio test -e native`.
 char phaseIcon(Phase phase);
+
+// Colour for a phase icon — takeoff green, landing peach, overflight sky,
+// no phase muted lavender — so takeoff/landing stand out from plain text.
+// Pure — native-tested.
+uint16_t phaseColor(Phase phase);
+
+// Text colour for table row `rowIndex` (0-based within the page): white /
+// sky alternating, so a row is easy to follow across the columns. Pure.
+uint16_t tableRowTextColor(int rowIndex);
 
 // Rendered pixel width of a string in whatever font is current. On the
 // device this wraps gfx.textWidth(); tests pass a fixed-pitch fake.

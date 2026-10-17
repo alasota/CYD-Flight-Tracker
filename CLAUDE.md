@@ -575,12 +575,30 @@ system — no ripped bitmap assets, no attempt to recreate the specific trademar
 The spirit (bold color blocks, rounded "elbow" panels, chunky sidebar) is what we're after; the
 execution should be original, built from LovyanGFX primitives.
 
-- **Palette — exact values, not vague color names**:
-  - Background: `LCARS_BLACK` = `0x0000`
-  - Orange: `LCARS_ORANGE` = `0xFC00`
-  - Magenta/pink: `LCARS_MAGENTA` = `0xF81F`
-  - Cyan/blue: `LCARS_CYAN` = `0x07FF`
-  - Yellow: `LCARS_YELLOW` = `0xFFE0`
+- **Colour scheme "variant A" — warm chrome, cool content** (chosen 2026-10-17; replaces the
+  original orange/magenta/cyan look on all three screens). Navigation (header + bottom buttons)
+  and data never share a colour family. View modules use the **role** constants (`THEME_*` in
+  `lcars_theme.h`), not palette names, so a future re-colour is one edit:
+
+  | Role | Colour | RGB565 |
+  |---|---|---|
+  | `THEME_CHROME_ACCENT` — header block (data OK), active nav button | peach `#FF9966` | `0xFCCC` |
+  | `THEME_CHROME_TEXT` — header date/time | light peach `#FFCC99` | `0xFE73` |
+  | `THEME_CHROME_INACTIVE` — inactive nav buttons | lavender `#9977AA` | `0x9BB5` |
+  | `THEME_ON_FILL` — text on any filled bar/button | black | `0x0000` |
+  | `THEME_ALERT` — header block on auth/network error | red `#FF3333` | `0xF986` |
+  | header block while rate-limited | `LCARS_YELLOW` | `0xFFE0` |
+  | `THEME_CONTENT_PRIMARY` — callsigns, odd table rows | white | `0xFFFF` |
+  | `THEME_CONTENT_SECONDARY` — airline/type/route, even rows, radar blips | sky `#99CCFF` | `0x9E7F` |
+  | `THEME_CONTENT_MUTED` — radar rings/labels, clamped blips, "no phase" | lavender | `0x9BB5` |
+  | `THEME_PILL_FILL` — altitude/speed/distance chips (sky text) | navy `#102040` | `0x1108` |
+  | `THEME_TABLE_HEADER` — table column-header bar | lilac `#CC99CC` | `0xCCD9` |
+
+  Phase icons are coloured (`phaseColor()`): takeoff green `#66CC66` (`0x666C`), landing peach,
+  overflight sky, none muted. Table rows alternate white / sky (`tableRowTextColor()`). Screen 2
+  countdown: approaching sky, imminent `LCARS_YELLOW`, passed peach, minutes mode lilac, empty
+  white. Radar home crosshair stays `LCARS_YELLOW`. Background `LCARS_BLACK`. The original
+  `LCARS_ORANGE`/`MAGENTA`/`CYAN` constants remain defined but are no longer drawn.
 
   These are standard RGB565 16-bit values (same encoding TFT_eSPI's predefined color constants
   use) — they work as raw pixel colors on LovyanGFX the same way, since the ILI9341 panel here
@@ -619,6 +637,10 @@ each with a single responsibility:
   client_id/secret, poll interval, and now `auto_cycle_enabled` / `auto_cycle_interval_s` (see
   "Auto screen cycling"). Reachable via mDNS (e.g. `cyd-sky.local`), same pattern as
   micro-radar's `microradar.local`.
+  Also serves `GET /screenshot.bmp[?screen=N]`: the panel read back (LovyanGFX `readRect`,
+  panel `readable = true`) and streamed as a 24-bit BMP row by row — for UX reviews without a
+  camera. Pixels come from `main.cpp` via `configPortalSetScreenshotSource()`; BMP header/row math
+  is the pure `screenshot` module (native-tested). `?screen=N` switches to that screen first.
 - `opensky_client` — token fetch/refresh + `/states/all` polling. Returns a plain struct/array
   of aircraft. **No TFT/drawing code in this module** — must be swappable/testable independently
   of the visualization.

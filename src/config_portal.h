@@ -84,3 +84,17 @@ bool configPortalIsActive();
 // to reload the config straight away — e.g. so a language change shows up
 // on screen immediately rather than at the next OpenSky poll.
 uint32_t configPortalSaveCount();
+
+// Where GET /screenshot.bmp gets its pixels — supplied by main.cpp, so this
+// module stays free of display code. `readRow(y, bgr)` fills `width * 3`
+// bytes (B,G,R per pixel) for screen row `y`; `prepare(screen)` is called
+// first when the request has ?screen=N (switch to that screen and redraw).
+// Until set, the endpoint answers 503.
+struct ScreenshotSource {
+  int width = 0;
+  int height = 0;
+  int screenCount = 0;
+  void (*prepare)(int screenIndex) = nullptr;
+  void (*readRow)(int y, uint8_t *bgr) = nullptr;
+};
+void configPortalSetScreenshotSource(const ScreenshotSource &source);

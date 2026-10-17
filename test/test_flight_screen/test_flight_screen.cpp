@@ -51,7 +51,7 @@ static void test_empty_when_more_than_10s_past(void) {
 static void test_passed_zone_orange(void) {
   CountdownDisplay cd = computeCountdownDisplay(cpaAt(-3.0f), Language::PL);
   TEST_ASSERT_TRUE(cd.mode == CountdownDisplay::Mode::Seconds);
-  TEST_ASSERT_EQUAL_HEX16(LCARS_ORANGE, cd.color);
+  TEST_ASSERT_EQUAL_HEX16(LCARS_PEACH, cd.color);
   TEST_ASSERT_EQUAL_STRING("-3", cd.bigText.c_str());
   TEST_ASSERT_EQUAL_STRING("s", cd.suffixText.c_str());
   TEST_ASSERT_EQUAL_STRING("MINAL", cd.statusLabel.c_str());
@@ -61,7 +61,7 @@ static void test_passed_zone_orange(void) {
 static void test_passed_zone_includes_exactly_minus_10(void) {
   CountdownDisplay cd = computeCountdownDisplay(cpaAt(-10.0f), Language::PL);
   TEST_ASSERT_TRUE(cd.mode == CountdownDisplay::Mode::Seconds);
-  TEST_ASSERT_EQUAL_HEX16(LCARS_ORANGE, cd.color);
+  TEST_ASSERT_EQUAL_HEX16(LCARS_PEACH, cd.color);
   TEST_ASSERT_EQUAL_STRING("-10", cd.bigText.c_str());
 }
 
@@ -77,8 +77,8 @@ static void test_imminent_zone_yellow(void) {
 static void test_approaching_zone_cyan(void) {
   CountdownDisplay just_over = computeCountdownDisplay(cpaAt(10.001f), Language::PL);
   CountdownDisplay at_60 = computeCountdownDisplay(cpaAt(60.0f), Language::PL);  // 60 is inclusive-cyan
-  TEST_ASSERT_EQUAL_HEX16(LCARS_CYAN, just_over.color);
-  TEST_ASSERT_EQUAL_HEX16(LCARS_CYAN, at_60.color);
+  TEST_ASSERT_EQUAL_HEX16(LCARS_SKY, just_over.color);
+  TEST_ASSERT_EQUAL_HEX16(LCARS_SKY, at_60.color);
   TEST_ASSERT_TRUE(at_60.mode == CountdownDisplay::Mode::Seconds);
   TEST_ASSERT_EQUAL_STRING("ZBLIZA SIE", just_over.statusLabel.c_str());
 }
@@ -86,7 +86,7 @@ static void test_approaching_zone_cyan(void) {
 static void test_minutes_mode_magenta_over_60(void) {
   CountdownDisplay cd = computeCountdownDisplay(cpaAt(60.001f), Language::PL);
   TEST_ASSERT_TRUE(cd.mode == CountdownDisplay::Mode::Minutes);
-  TEST_ASSERT_EQUAL_HEX16(LCARS_MAGENTA, cd.color);
+  TEST_ASSERT_EQUAL_HEX16(LCARS_LILAC, cd.color);
   TEST_ASSERT_EQUAL_STRING("MIN", cd.suffixText.c_str());
   TEST_ASSERT_EQUAL_STRING("SZACOWANY CZAS", cd.statusLabel.c_str());
 }
@@ -101,7 +101,7 @@ static void test_minutes_rounds_to_nearest_minute(void) {
 
 static void test_the_four_preview_values(void) {
   CountdownDisplay a = computeCountdownDisplay(cpaAt(45.0f), Language::PL);
-  TEST_ASSERT_EQUAL_HEX16(LCARS_CYAN, a.color);
+  TEST_ASSERT_EQUAL_HEX16(LCARS_SKY, a.color);
   TEST_ASSERT_EQUAL_STRING("45", a.bigText.c_str());
 
   CountdownDisplay b = computeCountdownDisplay(cpaAt(5.0f), Language::PL);
@@ -109,10 +109,10 @@ static void test_the_four_preview_values(void) {
   TEST_ASSERT_EQUAL_STRING("5", b.bigText.c_str());
 
   CountdownDisplay c = computeCountdownDisplay(cpaAt(-3.0f), Language::PL);
-  TEST_ASSERT_EQUAL_HEX16(LCARS_ORANGE, c.color);
+  TEST_ASSERT_EQUAL_HEX16(LCARS_PEACH, c.color);
 
   CountdownDisplay d = computeCountdownDisplay(cpaAt(240.0f), Language::PL);
-  TEST_ASSERT_EQUAL_HEX16(LCARS_MAGENTA, d.color);
+  TEST_ASSERT_EQUAL_HEX16(LCARS_LILAC, d.color);
   TEST_ASSERT_TRUE(d.mode == CountdownDisplay::Mode::Minutes);
 }
 

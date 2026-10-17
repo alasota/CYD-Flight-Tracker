@@ -66,12 +66,16 @@ bool isValidUnsignedIntString(const std::string &s) {
 #include <string>
 
 #include "config_store.h"
+#include "screenshot.h"
+
+#include <vector>
 
 namespace {
 
 WebServer server(80);
 bool active = false;
 uint32_t saveCount = 0;  // see configPortalSaveCount()
+ScreenshotSource screenshotSource;  // see configPortalSetScreenshotSource()
 
 std::string htmlEscape(const std::string &in) {
   std::string out;
@@ -335,6 +339,34 @@ void handleSave() {
   }
 }
 
+// GET /screenshot.bmp[?screen=N] — the current screen as a 24-bit BMP,
+// streamed row by row (bottom-up, as BMP stores it) so no full frame buffer
+// is needed: one 960-byte row at a time.
+void handleScreenshot() {
+  const ScreenshotSource &src = screenshotSource;
+  if (src.readRow == nullptr || src.width <= 0 || src.height <= 0) {
+    server.send(503, "text/plain", "Screenshot not available");
+    return;
+  }
+
+  const int screen = parseScreenshotScreenArg(server.arg("screen").c_str(), src.screenCount);
+  if (screen >= 0 && src.prepare != nullptr) src.prepare(screen);
+
+  uint8_t header[kBmpHeaderSize];
+  writeBmpHeader(header, src.width, src.height);
+
+  const uint32_t stride = bmpRowStride(src.width);
+  std::vector<uint8_t> row(stride, 0);  // trailing padding bytes stay 0
+
+  server.setContentLength(bmpFileSize(src.width, src.height));
+  server.send(200, "image/bmp", "");
+  server.sendContent(reinterpret_cast<const char *>(header), kBmpHeaderSize);
+  for (int y = src.height - 1; y >= 0; --y) {
+    src.readRow(y, row.data());
+    server.sendContent(reinterpret_cast<const char *>(row.data()), stride);
+  }
+}
+
 void handleNotFound() { server.send(404, "text/plain", "Not found"); }
 
 // State for the in-progress credentials-file upload, accumulated across the
@@ -390,6 +422,7 @@ void configPortalBegin() {
 
   server.on("/", HTTP_GET, handleRoot);
   server.on("/save", HTTP_POST, handleSave);
+  server.on("/screenshot.bmp", HTTP_GET, handleScreenshot);
   server.on("/upload_credentials", HTTP_POST, handleCredentialsUpload, handleCredentialsUploadChunk);
   server.onNotFound(handleNotFound);
   server.begin();
@@ -407,5 +440,7 @@ void configPortalLoop() {
 bool configPortalIsActive() { return active; }
 
 uint32_t configPortalSaveCount() { return saveCount; }
+
+void configPortalSetScreenshotSource(const ScreenshotSource &source) { screenshotSource = source; }
 
 #endif  // ARDUINO

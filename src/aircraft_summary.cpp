@@ -81,18 +81,24 @@ constexpr int16_t kIconGap = 6;  // min space between identity text and phase ic
 
 void drawIdentityLine(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, int16_t rightX) {
   gfx.setFont(LCARS_FONT_BODY);
-  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
 
-  // Phase icon first, pinned to the right edge.
+  // Phase icon first, pinned to the right edge, in its phase colour.
   const char icon[2] = {phaseIcon(row.phase), '\0'};
+  gfx.setTextColor(phaseColor(row.phase), LCARS_BLACK);
   gfx.setTextDatum(top_right);
   gfx.drawString(icon, rightX, y);
   const int iconW = static_cast<int>(gfx.textWidth(icon));
 
-  // Then the identity text, fitted into what's left.
+  // Then the identity text, fitted into what's left: airline/type in the
+  // secondary colour, then the callsign re-drawn over its own prefix in
+  // the primary colour (bitmap font, no kerning — the glyphs land on
+  // exactly the same pixels, so this just recolours it).
   const int maxPx = (rightX - iconW - kIconGap) - x;
   gfx.setTextDatum(top_left);
+  gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
   gfx.drawString(fitSummaryIdentity(row, maxPx, gfxTextMeasure(gfx)).c_str(), x, y);
+  gfx.setTextColor(THEME_CONTENT_PRIMARY, LCARS_BLACK);
+  gfx.drawString(summaryFlight(row).c_str(), x, y);
 }
 
 void drawAircraftSummary(LGFX &gfx, const AircraftRow &row, const AirportInfo &originAirport,
@@ -107,7 +113,7 @@ void drawAircraftSummary(LGFX &gfx, const AircraftRow &row, const AirportInfo &o
 
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(top_left);
-  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+  gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
   gfx.drawString(
       fitToWidth(formatSummaryRoute(row.route, originAirport, destAirport, fmt), rightX - textX,
                  gfxTextMeasure(gfx))

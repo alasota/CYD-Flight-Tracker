@@ -208,7 +208,7 @@ static void showSetupPrompt() {
   tft.fillScreen(LCARS_BLACK);
   tft.setFont(LCARS_FONT_BODY);
   tft.setTextDatum(middle_center);
-  tft.setTextColor(LCARS_AMBER, LCARS_BLACK);
+  tft.setTextColor(THEME_CHROME_ACCENT, LCARS_BLACK);
   tft.drawString(tr(Str::SetupPrompt), screenW / 2, screenH / 2 - 10);
   tft.drawString("http://cyd-sky.local", screenW / 2, screenH / 2 + 10);
 }
@@ -288,6 +288,30 @@ static void handleTap(int16_t x, int16_t y) {
   }
 }
 
+// --- /screenshot.bmp support (config_portal streams, we read pixels) ---
+
+// ?screen=N: switch to that screen and repaint it right now, so the
+// capture shows it (same path as a tap on its nav button).
+static void screenshotPrepare(int screenIndex) {
+  if (nav.set(screenIndex)) onScreenChanged(/*userInitiated=*/true);
+  if (cachedCfg.home_configured) {
+    applyRedraw(computeRedrawMask(pendingRedraw, nav.current()));
+  }
+  pendingRedraw = RedrawEvents{};
+}
+
+// One screen row read back from the panel (LovyanGFX readRect) as B,G,R.
+static void screenshotReadRow(int y, uint8_t *bgr) {
+  static lgfx::rgb888_t line[320];
+  const int w = static_cast<int>(tft.width());
+  tft.readRect(0, y, w, 1, line);
+  for (int x = 0; x < w; ++x) {
+    bgr[3 * x + 0] = line[x].b;
+    bgr[3 * x + 1] = line[x].g;
+    bgr[3 * x + 2] = line[x].r;
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -313,6 +337,14 @@ void setup() {
   // fallback case cyd-sky.local won't resolve until the device later joins
   // a real network — the captive portal covers initial setup then.
   configPortalBegin();
+
+  ScreenshotSource shot;
+  shot.width = static_cast<int>(tft.width());
+  shot.height = static_cast<int>(tft.height());
+  shot.screenCount = kScreenCount;
+  shot.prepare = screenshotPrepare;
+  shot.readRow = screenshotReadRow;
+  configPortalSetScreenshotSource(shot);
 
   pendingRedraw.firstDraw = true;  // paint the (empty) active screen + chrome immediately
 }

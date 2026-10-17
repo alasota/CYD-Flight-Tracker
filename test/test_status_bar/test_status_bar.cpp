@@ -113,10 +113,10 @@ static void test_block_label_never_longer_than_11_chars(void) {
 // ---- statusBarBlockColor (data health as the block colour) --------------
 
 static void test_block_color_per_health(void) {
-  TEST_ASSERT_EQUAL_HEX16(LCARS_ORANGE, statusBarBlockColor(OpenSkyHealth::Ok));
+  TEST_ASSERT_EQUAL_HEX16(THEME_CHROME_ACCENT, statusBarBlockColor(OpenSkyHealth::Ok));  // peach
   TEST_ASSERT_EQUAL_HEX16(LCARS_YELLOW, statusBarBlockColor(OpenSkyHealth::RateLimited));
-  TEST_ASSERT_EQUAL_HEX16(LCARS_MAGENTA, statusBarBlockColor(OpenSkyHealth::AuthError));
-  TEST_ASSERT_EQUAL_HEX16(LCARS_MAGENTA, statusBarBlockColor(OpenSkyHealth::NetworkError));
+  TEST_ASSERT_EQUAL_HEX16(THEME_ALERT, statusBarBlockColor(OpenSkyHealth::AuthError));  // red
+  TEST_ASSERT_EQUAL_HEX16(THEME_ALERT, statusBarBlockColor(OpenSkyHealth::NetworkError));
 }
 
 int main(int, char **) {

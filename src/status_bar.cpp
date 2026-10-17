@@ -52,10 +52,10 @@ uint16_t statusBarBlockColor(OpenSkyHealth health) {
       return LCARS_YELLOW;
     case OpenSkyHealth::AuthError:
     case OpenSkyHealth::NetworkError:
-      return LCARS_MAGENTA;
+      return THEME_ALERT;
     case OpenSkyHealth::Ok:
     default:
-      return LCARS_ORANGE;
+      return THEME_CHROME_ACCENT;
   }
 }
 
@@ -83,7 +83,7 @@ void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, OpenSkyHealth hea
 
   // Date (left-aligned, right after the block) + clock (right-aligned), cyan.
   gfx.setFont(LCARS_FONT_SMALL);  // slim 15px header
-  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+  gfx.setTextColor(THEME_CHROME_TEXT, LCARS_BLACK);
 
   int16_t midY = LCARS_HEADER_HEIGHT / 2;
 

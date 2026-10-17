@@ -150,6 +150,53 @@ static void test_view_toggle_button_bounds_stays_within_screen(void) {
 
 // ---- phaseIcon --------------------------------------------------------------
 
+// ---- colour scheme "variant A" (warm chrome, cool content) -----------------
+
+static void test_variant_a_palette_values(void) {
+  // rgb565() of the hex colours from the agreed scheme.
+  TEST_ASSERT_EQUAL_HEX16(rgb565(0xFF, 0x99, 0x66), LCARS_PEACH);
+  TEST_ASSERT_EQUAL_HEX16(rgb565(0xFF, 0xCC, 0x99), LCARS_PEACH_LIGHT);
+  TEST_ASSERT_EQUAL_HEX16(rgb565(0x99, 0x77, 0xAA), LCARS_LAVENDER);
+  TEST_ASSERT_EQUAL_HEX16(rgb565(0xCC, 0x99, 0xCC), LCARS_LILAC);
+  TEST_ASSERT_EQUAL_HEX16(rgb565(0x99, 0xCC, 0xFF), LCARS_SKY);
+  TEST_ASSERT_EQUAL_HEX16(rgb565(0x10, 0x20, 0x40), LCARS_NAVY);
+  TEST_ASSERT_EQUAL_HEX16(rgb565(0x66, 0xCC, 0x66), LCARS_GREEN);
+  TEST_ASSERT_EQUAL_HEX16(rgb565(0xFF, 0x33, 0x33), LCARS_RED);
+  TEST_ASSERT_EQUAL_HEX16(0xFFFF, LCARS_WHITE);
+}
+
+static void test_chrome_and_content_use_different_colour_families(void) {
+  // The whole point of the scheme: navigation (header + buttons) never
+  // shares a colour with the data it frames.
+  const uint16_t chrome[] = {THEME_CHROME_ACCENT, THEME_CHROME_TEXT, THEME_CHROME_INACTIVE};
+  const uint16_t content[] = {THEME_CONTENT_PRIMARY, THEME_CONTENT_SECONDARY, THEME_TABLE_HEADER,
+                              THEME_PILL_FILL};
+  for (uint16_t c : chrome) {
+    for (uint16_t d : content) TEST_ASSERT_NOT_EQUAL(c, d);
+  }
+  // Table header must not look like the header-bar block.
+  TEST_ASSERT_NOT_EQUAL(THEME_CHROME_ACCENT, THEME_TABLE_HEADER);
+}
+
+static void test_phase_colours(void) {
+  TEST_ASSERT_EQUAL_HEX16(LCARS_GREEN, phaseColor(Phase::TAKEOFF));
+  TEST_ASSERT_EQUAL_HEX16(LCARS_PEACH, phaseColor(Phase::LANDING));
+  TEST_ASSERT_EQUAL_HEX16(LCARS_SKY, phaseColor(Phase::OVERFLIGHT));
+  TEST_ASSERT_EQUAL_HEX16(THEME_CONTENT_MUTED, phaseColor(Phase::NONE));
+  // Takeoff and landing — the thing people want to see from across the
+  // garden — must differ from each other and from plain text.
+  TEST_ASSERT_NOT_EQUAL(phaseColor(Phase::TAKEOFF), phaseColor(Phase::LANDING));
+  TEST_ASSERT_NOT_EQUAL(THEME_CONTENT_PRIMARY, phaseColor(Phase::TAKEOFF));
+  TEST_ASSERT_NOT_EQUAL(THEME_CONTENT_PRIMARY, phaseColor(Phase::LANDING));
+}
+
+static void test_table_rows_alternate_text_colour(void) {
+  TEST_ASSERT_EQUAL_HEX16(THEME_CONTENT_PRIMARY, tableRowTextColor(0));
+  TEST_ASSERT_EQUAL_HEX16(THEME_CONTENT_SECONDARY, tableRowTextColor(1));
+  TEST_ASSERT_EQUAL_HEX16(THEME_CONTENT_PRIMARY, tableRowTextColor(2));
+  TEST_ASSERT_EQUAL_HEX16(THEME_CONTENT_SECONDARY, tableRowTextColor(3));
+}
+
 static void test_phase_icon_distinct_ascii_per_phase(void) {
   char none = phaseIcon(Phase::NONE);
   char takeoff = phaseIcon(Phase::TAKEOFF);
@@ -273,6 +320,11 @@ int main(int argc, char **argv) {
   RUN_TEST(test_view_toggle_button_bounds_stays_within_screen);
 
   RUN_TEST(test_phase_icon_distinct_ascii_per_phase);
+
+  RUN_TEST(test_variant_a_palette_values);
+  RUN_TEST(test_chrome_and_content_use_different_colour_families);
+  RUN_TEST(test_phase_colours);
+  RUN_TEST(test_table_rows_alternate_text_colour);
 
   return UNITY_END();
 }

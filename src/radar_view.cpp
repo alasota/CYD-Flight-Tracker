@@ -60,9 +60,9 @@ constexpr int kSummaryTextMaxPx = kSummaryX + kSummaryW - kSummaryInset - 2 - kS
 constexpr int kRingCount = 3;
 constexpr int16_t kBlipRadius = 5;
 constexpr int16_t kClampedBlipRadius = 3;
-// Dim teal for out-of-range (clamped) blips — deliberately not LCARS_CYAN
-// so "off the scale" reads distinct from an in-range aircraft.
-constexpr uint16_t kClampedBlipColor = 0x0410;
+// Muted lavender for out-of-range (clamped) blips — deliberately not the
+// sky of in-range blips, so "off the scale" reads distinct.
+constexpr uint16_t kClampedBlipColor = THEME_CONTENT_MUTED;
 constexpr int16_t kHomeCrosshair = 5;
 
 void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg) {
@@ -81,7 +81,7 @@ void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg
         (layout.radius_px * (i + 1) + kRingCount / 2) / kRingCount);
     if (ringR <= 0) continue;
     int km = static_cast<int>(std::lround(ringsKm[static_cast<size_t>(i)]));
-    drawRadarRing(gfx, layout.center_x, layout.center_y, ringR, km, LCARS_CYAN);
+    drawRadarRing(gfx, layout.center_x, layout.center_y, ringR, km, THEME_CONTENT_MUTED);
   }
 
   // Aircraft blips.
@@ -92,7 +92,7 @@ void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg
     if (p.clamped) {
       gfx.drawCircle(p.x, p.y, kClampedBlipRadius, kClampedBlipColor);
     } else {
-      gfx.fillCircle(p.x, p.y, kBlipRadius, LCARS_CYAN);
+      gfx.fillCircle(p.x, p.y, kBlipRadius, THEME_CONTENT_SECONDARY);
     }
   }
 
@@ -114,7 +114,7 @@ void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, const Air
   if (rows.empty()) {
     gfx.setFont(LCARS_FONT_BODY);
     gfx.setTextDatum(middle_center);
-    gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+    gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
     gfx.drawString(tr(Str::NoFlight), static_cast<int16_t>(kSummaryX + kSummaryW / 2),
                    static_cast<int16_t>(kContentTop + kContentHeight / 2));
     gfx.clearClipRect();
@@ -127,12 +127,13 @@ void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, const Air
 
   // Row 1: callsign, emphasized.
   gfx.setFont(LCARS_FONT_HEADING);
-  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+  gfx.setTextColor(THEME_CONTENT_PRIMARY, LCARS_BLACK);
   gfx.drawString(summaryFlight(nearest).c_str(), kSummaryTextX, kSummaryFlightY);
 
   // Row 2: airline, cut to the panel's text width (setClipRect above is
   // only the pixel-level backstop).
   gfx.setFont(LCARS_FONT_BODY);
+  gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
   const TextMeasure measure = gfxTextMeasure(gfx);
   gfx.drawString(fitToWidth(summaryAirline(nearest), kSummaryTextMaxPx, measure).c_str(),
                  kSummaryTextX, kSummaryAirlineY);
