@@ -121,18 +121,21 @@ constexpr int16_t kColHeaderH = 15;    // text centered ~y:127
 constexpr int16_t kFirstRowY = 138;    // rows at 138,155,172,189,206 (last text ends ~y:222)
 constexpr int16_t kRowStep = 17;       // tightened from 18 for the y:225 content bound
 
-// Column x-offsets, as fractions of the content width, for drawTableRows()
-// below — named rather than left as bare literals inline (review notes
-// 5.4). Columns: flight, airline, origin, destination, aircraft type,
-// phase icon (see CLAUDE.md "Screen 1" — altitude/speed/distance moved to
+// Columns: flight, airline, origin, destination, aircraft type, phase icon
+// (see CLAUDE.md "Screen 1" — altitude/speed/distance moved to
 // featured_panel's pills, shown only for the one closest aircraft).
-constexpr float kColFlightFrac = 0.00f;
-constexpr float kColAirlineFrac = 0.16f;
-constexpr float kColOriginFrac = 0.50f;
-constexpr float kColDestFrac = 0.62f;
-constexpr float kColTypeFrac = 0.74f;
-constexpr float kColPhaseFrac = 0.94f;
+// LOT is wide enough for an 8-char callsign in Font2; FAZA for its
+// "FAZA" label in Font0.
+constexpr TableColumn kColumns[kTableColumnCount] = {
+    {"LOT", 2, 64},     {"LINIA", 66, 92}, {"SKAD", 158, 38},
+    {"DOKAD", 196, 38}, {"TYP", 234, 58},  {"FAZA", 292, 26},
+};
+enum ColumnIndex { kColFlight, kColAirline, kColOrigin, kColDest, kColType, kColPhase };
 }  // namespace
+
+const TableColumn *tableColumns() { return kColumns; }
+
+int tableCellTextWidthPx(const TableColumn &col) { return col.w - 2 * kTableCellPadPx; }
 
 int tableRowsPerPage() { return kTableRowsPerPage; }
 int16_t tableRowHeightPx() { return kRowStep; }
@@ -163,37 +166,63 @@ namespace {
 
 std::string orDash(const std::string &s) { return s.empty() ? std::string("--") : s; }
 
+// One cell: text cut to the column's width (fitToWidth) and drawn at the
+// column's padded x, clipped to the column as a pixel-level backstop — so
+// nothing ever spills into the neighbouring column.
+void drawCell(LGFX &gfx, const TableColumn &col, const std::string &text, int16_t rowY,
+              int16_t textY, const TextMeasure &measure) {
+  gfx.setClipRect(col.x, rowY, col.w, kRowStep);
+  gfx.drawString(fitToWidth(text, tableCellTextWidthPx(col), measure).c_str(),
+                 static_cast<int16_t>(col.x + kTableCellPadPx), textY);
+  gfx.clearClipRect();
+}
+
 void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t screenWidth) {
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_left);
   gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
-
-  int16_t w = screenWidth;
-  int16_t colFlight = static_cast<int16_t>(w * kColFlightFrac);
-  int16_t colAirline = static_cast<int16_t>(w * kColAirlineFrac);
-  int16_t colOrigin = static_cast<int16_t>(w * kColOriginFrac);
-  int16_t colDest = static_cast<int16_t>(w * kColDestFrac);
-  int16_t colType = static_cast<int16_t>(w * kColTypeFrac);
-  int16_t colPhase = static_cast<int16_t>(w * kColPhaseFrac);
+  const TextMeasure measure = gfxTextMeasure(gfx);
 
   // Exactly kTableRowsPerPage slots; clear all of them so a short page
   // doesn't leave stale rows from a previous draw.
   for (int i = 0; i < kTableRowsPerPage; ++i) {
     int16_t rowY = static_cast<int16_t>(kFirstRowY + i * kRowStep);
-    gfx.fillRect(0, rowY, w, kRowStep, LCARS_BLACK);
+    gfx.fillRect(0, rowY, screenWidth, kRowStep, LCARS_BLACK);
 
     if (i >= static_cast<int>(pageRows.size())) continue;
     const AircraftRow &row = pageRows[static_cast<size_t>(i)];
     int16_t textY = static_cast<int16_t>(rowY + kRowStep / 2);
 
-    gfx.drawString(orDash(row.aircraft.callsign).c_str(), colFlight + 2, textY);
-    gfx.drawString(orDash(row.info.airline).c_str(), colAirline + 2, textY);
-    gfx.drawString(row.route.found ? row.route.origin_icao.c_str() : "--", colOrigin + 2, textY);
-    gfx.drawString(row.route.found ? row.route.dest_icao.c_str() : "--", colDest + 2, textY);
-    gfx.drawString(orDash(row.info.aircraft_type).c_str(), colType + 2, textY);
+    drawCell(gfx, kColumns[kColFlight], orDash(row.aircraft.callsign), rowY, textY, measure);
+    drawCell(gfx, kColumns[kColAirline], orDash(row.info.airline), rowY, textY, measure);
+    drawCell(gfx, kColumns[kColOrigin], row.route.found ? row.route.origin_icao : "--", rowY,
+             textY, measure);
+    drawCell(gfx, kColumns[kColDest], row.route.found ? row.route.dest_icao : "--", rowY, textY,
+             measure);
+    drawCell(gfx, kColumns[kColType], orDash(row.info.aircraft_type), rowY, textY, measure);
+    drawCell(gfx, kColumns[kColPhase], std::string(1, phaseIcon(row.phase)), rowY, textY,
+             measure);
+  }
+}
 
-    char phaseBuf[2] = {phaseIcon(row.phase), '\0'};
-    gfx.drawString(phaseBuf, colPhase + 2, textY);
+// Orange column-header row: each label at its own column's x (same
+// kColumns as the data rows), with a 1px black "|" divider at every
+// column boundary. Font0 (8px) — Font2 is taller than the 15px strip
+// allows with padding, and too wide for SKAD/DOKAD/FAZA.
+void drawColumnHeader(LGFX &gfx, int16_t screenWidth) {
+  gfx.fillRect(0, kColHeaderY, screenWidth, kColHeaderH, LCARS_ORANGE);
+  gfx.setFont(LCARS_FONT_SMALL);
+  gfx.setTextDatum(middle_left);
+  gfx.setTextColor(LCARS_BLACK, LCARS_ORANGE);
+
+  const int16_t textY = static_cast<int16_t>(kColHeaderY + kColHeaderH / 2);
+  for (int i = 0; i < kTableColumnCount; ++i) {
+    const TableColumn &col = kColumns[i];
+    if (i > 0) {
+      gfx.drawFastVLine(col.x, static_cast<int16_t>(kColHeaderY + 2),
+                        static_cast<int16_t>(kColHeaderH - 4), LCARS_BLACK);
+    }
+    gfx.drawString(col.label, static_cast<int16_t>(col.x + kTableCellPadPx), textY);
   }
 }
 
@@ -210,20 +239,20 @@ void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, const Airpor
   }
 
   // Cyan "FLIGHTS" sub-header bar (black text) — CLAUDE.md notes the
-  // repeated label is intentional LCARS style, not a bug.
+  // repeated label is intentional LCARS style, not a bug. Font0 (8px) so
+  // the text and its background stay inside the 10px strip — Font2 (16px)
+  // spilled cyan over the featured frame's bottom edge and the column
+  // header.
   gfx.fillRect(0, kSubHeaderY, screenWidth, kSubHeaderH, LCARS_CYAN);
-  gfx.setFont(LCARS_FONT_BODY);
+  gfx.setFont(LCARS_FONT_SMALL);
   gfx.setTextDatum(middle_left);
   gfx.setTextColor(LCARS_BLACK, LCARS_CYAN);
   gfx.drawString("FLIGHTS", 4, static_cast<int16_t>(kSubHeaderY + kSubHeaderH / 2));
 
-  // Orange column-header row at y:119..134 (text centred ~y:127) — one "|"-separated string, black
-  // text (ASCII only: bitmap fonts don't carry the Polish diacritics, per
-  // CLAUDE.md table_view note — so "SKAD"/"DOKAD", not "SKĄD"/"DOKĄD").
-  gfx.fillRect(0, kColHeaderY, screenWidth, kColHeaderH, LCARS_ORANGE);
-  gfx.setTextColor(LCARS_BLACK, LCARS_ORANGE);
-  gfx.drawString("LOT | LINIA | SKAD | DOKAD | TYP | FAZA", 4,
-                 static_cast<int16_t>(kColHeaderY + kColHeaderH / 2));
+  // Orange column-header row at y:119..134, labels aligned to the data
+  // columns (ASCII only: bitmap fonts don't carry the Polish diacritics —
+  // so "SKAD"/"DOKAD", not "SKĄD"/"DOKĄD").
+  drawColumnHeader(gfx, screenWidth);
 
   // Exactly 5 data rows from y:138 (17px step), over the list *without* the featured
   // aircraft; paging swaps which 5 (not scrolling).

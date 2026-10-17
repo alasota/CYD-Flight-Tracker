@@ -32,18 +32,22 @@ void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, const AirportInfo &ori
   drawElbowFrame(gfx, kSideMargin, kPanelTop, w, kPanelHeight, kFrameCorner, kFrameThickness,
                  LCARS_MAGENTA);
 
-  gfx.setFont(LCARS_FONT_BODY);
-  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
-
-  // Identity line — indented past the swept corner.
-  gfx.setTextDatum(top_left);
-  gfx.drawString(formatSummaryIdentity(row).c_str(),
-                 static_cast<int16_t>(kSideMargin + kFrameCorner + 4), kIdentityY);
+  // Identity line — indented past the swept corner, phase icon pinned just
+  // inside the frame's right edge, airline/type cut so nothing overflows.
+  const int16_t textRightX = static_cast<int16_t>(kSideMargin + w - kFrameThickness - 4);
+  drawIdentityLine(gfx, row, static_cast<int16_t>(kSideMargin + kFrameCorner + 4), kIdentityY,
+                   textRightX);
 
   // Route line, with country codes (Screen 1 detail level).
+  gfx.setFont(LCARS_FONT_BODY);
+  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+  gfx.setTextDatum(top_left);
+  const int16_t routeX = static_cast<int16_t>(kSideMargin + kFrameThickness + 4);
   gfx.drawString(
-      formatSummaryRoute(row.route, originAirport, destAirport, RouteFormat::WithCountry).c_str(),
-      static_cast<int16_t>(kSideMargin + kFrameThickness + 4), kRouteY);
+      fitToWidth(formatSummaryRoute(row.route, originAirport, destAirport, RouteFormat::WithCountry),
+                 textRightX - routeX, gfxTextMeasure(gfx))
+          .c_str(),
+      routeX, kRouteY);
 
   // Altitude / speed / distance pills along the bottom of the frame.
   int16_t pillAreaX = static_cast<int16_t>(kSideMargin + kFrameThickness + 2);

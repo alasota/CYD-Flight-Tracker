@@ -27,8 +27,9 @@
 //     and recompute its closest-point-of-approach time (cpa_predictor).
 //   - The Flight screen's countdown ticks locally every second between
 //     polls: currentCpa() extrapolates lastPolledCpa forward by the
-//     elapsed millis(), and the screen is flagged for redraw at 1 Hz
-//     while it's active (see CLAUDE.md "local ticking").
+//     elapsed millis(), and a 1 Hz countdown tick is raised while it's
+//     active (see CLAUDE.md "local ticking") — repainting only the
+//     countdown zone, never the whole screen.
 //   - Auto screen cycling (off unless config_store's auto_cycle_enabled):
 //     a millis() timer from the last screen change (manual or automatic);
 //     once it passes auto_cycle_interval_s, advance via nav.next() —
@@ -36,10 +37,13 @@
 //     is imminent on the Flight screen, in which case hold and re-check
 //     every loop until it clears. screen_nav::shouldAutoAdvance() is the
 //     pure decision; every screen change resets the timer.
-//   - Redraw (only when something changed): status_bar header, then the
-//     active screen's content (table_view / flight_screen / radar_view)
-//     dispatched on screen_nav::current(), then the persistent bottom nav
-//     bar.
+//   - Redraw (only what changed — CLAUDE.md "Redraw policy"): loop()
+//     collects RedrawEvents and redraw_policy::computeRedrawMask() picks
+//     the regions. A full clear (fillScreen + header + content + bottom
+//     nav) happens only on first draw / screen change / page change; new
+//     poll data repaints just the content area; a minute rollover or
+//     health change repaints just the header text; the Flight countdown
+//     tick repaints just its own zone (via a sprite).
 //
 // This file is deliberately thin: all actual logic lives in the modules
 // above — see CLAUDE.md "Testing" for why only this kind of orchestration
@@ -61,6 +65,7 @@
 #include "lookup_budget.h"
 #include "opensky_client.h"
 #include "radar_view.h"
+#include "redraw_policy.h"
 #include "route_lookup.h"
 #include "screen_nav.h"
 #include "status_bar.h"
@@ -94,7 +99,10 @@ static Config cachedCfg;
 // onScreenChanged() on every screen change — manual or auto.
 static uint32_t lastScreenChangeMs = 0;
 static int currentPage = 0;
-static bool screenNeedsRedraw = false;
+
+// Everything that happened since the last redraw — turned into a region
+// mask by computeRedrawMask() at the end of loop(), then cleared.
+static RedrawEvents pendingRedraw;
 
 // last_screen NVS-write debouncing (review notes 5.9): what we last wrote,
 // and when — so an auto-cycle firing every few seconds doesn't rewrite the
@@ -124,14 +132,10 @@ static CpaPrediction currentCpa() {
   return extrapolateCpa(lastPolledCpa, millis() - lastCpaPollMs);
 }
 
-static void redrawScreen() {
+// The active screen's content (y:28..225), drawn over whatever is there —
+// callers clear first.
+static void drawActiveContent() {
   int16_t screenW = static_cast<int16_t>(tft.width());
-  int16_t screenH = static_cast<int16_t>(tft.height());
-
-  tft.fillScreen(LCARS_BLACK);
-
-  // Shared header chrome, then the active screen's content, then the nav bar.
-  drawStatusBar(tft, nav.current(), timeSyncNowLocal(), isTimeSynced(), lastHealth, screenW);
 
   switch (nav.current()) {
     case kScreenFlight: {
@@ -149,14 +153,43 @@ static void redrawScreen() {
       drawTablePage(tft, lastRows, lastOriginAirport, lastDestAirport, screenW, currentPage);
       break;
   }
+}
 
-  drawBottomNav(tft, nav.current(), screenW, screenH);
+// Repaints exactly the regions in `mask` (redraw_policy bits).
+static void applyRedraw(uint8_t mask) {
+  int16_t screenW = static_cast<int16_t>(tft.width());
+  int16_t screenH = static_cast<int16_t>(tft.height());
+
+  if (mask & kRedrawFull) {
+    // Structural change: clear everything, then header, content, nav bar.
+    tft.fillScreen(LCARS_BLACK);
+    drawStatusBar(tft, nav.current(), timeSyncNowLocal(), isTimeSynced(), lastHealth, screenW);
+    drawActiveContent();
+    drawBottomNav(tft, nav.current(), screenW, screenH);
+    return;
+  }
+
+  if (mask & kRedrawContent) {
+    // Only the band between header and bottom nav; chrome is left alone.
+    const int16_t contentBottom = static_cast<int16_t>(screenH - LCARS_BOTTOM_NAV_HEIGHT);
+    tft.fillRect(0, LCARS_HEADER_HEIGHT, screenW,
+                 static_cast<int16_t>(contentBottom - LCARS_HEADER_HEIGHT), LCARS_BLACK);
+    drawActiveContent();
+  }
+
+  if (mask & kRedrawHeaderText) {
+    drawStatusBarText(tft, timeSyncNowLocal(), isTimeSynced(), lastHealth, screenW);
+  }
+
+  if (mask & kRedrawCountdown) {
+    drawFlightCountdown(tft, !lastRows.empty(), currentCpa(), screenW);
+  }
 }
 
 // Shown instead of a screen while config_store's home_configured is still
-// false (review notes 1.5/1.6). Redrawn whenever screenNeedsRedraw is set
-// (cheap: a fill + two strings), so a stray touch can't permanently
-// dismiss it the way the old draw-once guard let it.
+// false (review notes 1.5/1.6). Redrawn on every full-redraw event (cheap:
+// a fill + two strings), so a stray touch can't permanently dismiss it the
+// way the old draw-once guard let it.
 static void showSetupPrompt() {
   int16_t screenW = static_cast<int16_t>(tft.width());
   int16_t screenH = static_cast<int16_t>(tft.height());
@@ -185,7 +218,7 @@ static void onScreenChanged(bool userInitiated) {
     lastScreenPersistMs = millis();
   }
 
-  screenNeedsRedraw = true;
+  pendingRedraw.screenChanged = true;
 }
 
 // Dispatches one touch tap (edge-detected in loop(), once per press).
@@ -228,10 +261,10 @@ static void handleTap(int16_t x, int16_t y) {
 
   if (hitTest(x, y, prevZone) && currentPage > 0) {
     currentPage--;
-    screenNeedsRedraw = true;
+    pendingRedraw.pageChanged = true;
   } else if (hitTest(x, y, nextZone) && currentPage < pageCount - 1) {
     currentPage++;
-    screenNeedsRedraw = true;
+    pendingRedraw.pageChanged = true;
   }
 }
 
@@ -262,7 +295,7 @@ void setup() {
   // a real network — the captive portal covers initial setup then.
   configPortalBegin();
 
-  screenNeedsRedraw = true;  // paint the (empty) active screen + chrome immediately
+  pendingRedraw.firstDraw = true;  // paint the (empty) active screen + chrome immediately
 }
 
 void loop() {
@@ -285,9 +318,13 @@ void loop() {
       // A poll actually ran — refresh the cached config so config_portal
       // edits (home, radius, credentials, thresholds) take effect, and
       // update the header health tag.
+      const bool wasHomeConfigured = cachedCfg.home_configured;
       cachedCfg = loadConfig();
       lastRadiusDeg = cachedCfg.radius_deg;
+      // Setup prompt <-> real screens: a structural change, repaint all.
+      if (cachedCfg.home_configured != wasHomeConfigured) pendingRedraw.firstDraw = true;
 
+      const OpenSkyHealth previousHealth = lastHealth;
       switch (poll.status) {
         case OpenSkyPollStatus::Ok:
           lastHealth = OpenSkyHealth::Ok;
@@ -302,7 +339,7 @@ void loop() {
           lastHealth = OpenSkyHealth::NetworkError;
           break;
       }
-      screenNeedsRedraw = true;  // at least the header tag changed
+      if (lastHealth != previousHealth) pendingRedraw.healthChanged = true;
 
       // Only a clean poll updates the aircraft list — a failure keeps the
       // last good data on screen rather than blanking it (review notes 1.2).
@@ -366,6 +403,8 @@ void loop() {
         if (currentPage >= pageCount) {
           currentPage = pageCount > 0 ? pageCount - 1 : 0;
         }
+
+        pendingRedraw.newPoll = true;  // content area only — chrome is untouched
       }
     }
   }
@@ -374,14 +413,16 @@ void loop() {
   static uint32_t lastFlightTickMs = 0;
   if (nav.current() == kScreenFlight && (millis() - lastFlightTickMs) >= 1000) {
     lastFlightTickMs = millis();
-    screenNeedsRedraw = true;
+    pendingRedraw.countdownTick = true;
   }
 
-  // --- Redraw the header clock once the first NTP sync lands -------------
-  static bool clockAppeared = false;
-  if (!clockAppeared && isTimeSynced()) {
-    clockAppeared = true;
-    screenNeedsRedraw = true;
+  // --- Header clock: repaint its text when HH:MM rolls over -------------
+  // -1 while unsynced, so the first NTP sync also counts as a change.
+  static long lastDrawnMinute = -2;
+  const long minuteNow = isTimeSynced() ? minuteOf(timeSyncNowLocal()) : -1;
+  if (minuteNow != lastDrawnMinute) {
+    lastDrawnMinute = minuteNow;
+    pendingRedraw.minuteChanged = true;
   }
 
   // --- Auto screen cycling (CLAUDE.md "Auto screen cycling") ------------
@@ -395,13 +436,14 @@ void loop() {
     }
   }
 
-  // --- Redraw, if anything changed --------------------------------------
-  if (screenNeedsRedraw) {
+  // --- Redraw only what changed (CLAUDE.md "Redraw policy") -------------
+  const uint8_t mask = computeRedrawMask(pendingRedraw, nav.current());
+  if (mask != 0) {
     if (cachedCfg.home_configured) {
-      redrawScreen();
-    } else {
+      applyRedraw(mask);
+    } else if (mask & kRedrawFull) {
       showSetupPrompt();  // "set your home location" until config_portal is used
     }
-    screenNeedsRedraw = false;
   }
+  pendingRedraw = RedrawEvents{};
 }

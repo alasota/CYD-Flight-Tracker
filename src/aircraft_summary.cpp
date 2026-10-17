@@ -37,6 +37,29 @@ std::string formatSummaryIdentity(const AircraftRow &row) {
   return line;
 }
 
+std::string fitSummaryIdentity(const AircraftRow &row, int maxPx, const TextMeasure &measure) {
+  static const std::string kGap = "  ";
+  const std::string flight = summaryFlight(row);
+  const std::string airline = summaryAirline(row);
+  const std::string type = summaryType(row);
+
+  const std::string full = flight + kGap + airline + kGap + type;
+  if (measure(full) <= maxPx) return full;
+
+  // Airline cut to whatever's left — but only if at least "X..." fits.
+  const int airlineBudget = maxPx - measure(flight + kGap) - measure(kGap + type);
+  if (airlineBudget >= measure(airline.substr(0, 1) + "...")) {
+    return flight + kGap + fitToWidth(airline, airlineBudget, measure) + kGap + type;
+  }
+
+  // No room for the airline at all.
+  const std::string noAirline = flight + kGap + type;
+  if (measure(noAirline) <= maxPx) return noAirline;
+
+  const std::string cutType = fitToWidth(type, maxPx - measure(flight + kGap), measure);
+  return cutType.empty() ? flight : flight + kGap + cutType;
+}
+
 std::string formatSummaryRoute(const RouteInfo &route, const AirportInfo &originAirport,
                                const AirportInfo &destAirport, RouteFormat fmt) {
   if (!route.found) {
@@ -53,23 +76,43 @@ std::string formatSummaryRoute(const RouteInfo &route, const AirportInfo &origin
 namespace {
 constexpr int16_t kTextMargin = 6;
 constexpr int16_t kLineHeight = 20;
+constexpr int16_t kIconGap = 6;  // min space between identity text and phase icon
 }  // namespace
+
+void drawIdentityLine(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, int16_t rightX) {
+  gfx.setFont(LCARS_FONT_BODY);
+  gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
+
+  // Phase icon first, pinned to the right edge.
+  const char icon[2] = {phaseIcon(row.phase), '\0'};
+  gfx.setTextDatum(top_right);
+  gfx.drawString(icon, rightX, y);
+  const int iconW = static_cast<int>(gfx.textWidth(icon));
+
+  // Then the identity text, fitted into what's left.
+  const int maxPx = (rightX - iconW - kIconGap) - x;
+  gfx.setTextDatum(top_left);
+  gfx.drawString(fitSummaryIdentity(row, maxPx, gfxTextMeasure(gfx)).c_str(), x, y);
+}
 
 void drawAircraftSummary(LGFX &gfx, const AircraftRow &row, const AirportInfo &originAirport,
                          const AirportInfo &destAirport, RouteFormat fmt, int16_t x, int16_t y,
                          int16_t w, int16_t h) {
-  (void)w;
   (void)h;
+
+  const int16_t textX = static_cast<int16_t>(x + kTextMargin);
+  const int16_t rightX = static_cast<int16_t>(x + w - kTextMargin);
+
+  drawIdentityLine(gfx, row, textX, static_cast<int16_t>(y + kTextMargin), rightX);
 
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(top_left);
   gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
-
-  gfx.drawString(formatSummaryIdentity(row).c_str(), static_cast<int16_t>(x + kTextMargin),
-                 static_cast<int16_t>(y + kTextMargin));
-  gfx.drawString(formatSummaryRoute(row.route, originAirport, destAirport, fmt).c_str(),
-                 static_cast<int16_t>(x + kTextMargin),
-                 static_cast<int16_t>(y + kTextMargin + kLineHeight));
+  gfx.drawString(
+      fitToWidth(formatSummaryRoute(row.route, originAirport, destAirport, fmt), rightX - textX,
+                 gfxTextMeasure(gfx))
+          .c_str(),
+      textX, static_cast<int16_t>(y + kTextMargin + kLineHeight));
 }
 
 #endif  // ARDUINO

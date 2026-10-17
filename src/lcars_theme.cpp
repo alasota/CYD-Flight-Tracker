@@ -44,6 +44,27 @@ char phaseIcon(Phase phase) {
   }
 }
 
+std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &measure) {
+  if (maxPx <= 0) return std::string();
+  if (measure(text) <= maxPx) return text;
+
+  // Longest head + "..." that fits (head must keep at least one char).
+  for (size_t n = text.size() - 1; n >= 1; --n) {
+    std::string head = text.substr(0, n);
+    while (!head.empty() && head.back() == ' ') head.pop_back();
+    if (head.empty()) continue;
+    std::string candidate = head + "...";
+    if (measure(candidate) <= maxPx) return candidate;
+  }
+
+  // Too tight for an ellipsis — longest plain head that fits.
+  for (size_t n = text.size() - 1; n >= 1; --n) {
+    std::string head = text.substr(0, n);
+    if (measure(head) <= maxPx) return head;
+  }
+  return std::string();
+}
+
 #ifdef ARDUINO
 
 #include "screen_nav.h"  // kScreenCount, bottomNavBounds(), bottomNavSegment()
@@ -51,6 +72,11 @@ char phaseIcon(Phase phase) {
 const lgfx::IFont *const LCARS_FONT_HEADING = &fonts::Font4;
 const lgfx::IFont *const LCARS_FONT_BODY = &fonts::Font2;
 const lgfx::IFont *const LCARS_FONT_NUMERIC = &fonts::Font7;
+const lgfx::IFont *const LCARS_FONT_SMALL = &fonts::Font0;
+
+TextMeasure gfxTextMeasure(lgfx::LovyanGFX &gfx) {
+  return [&gfx](const std::string &s) { return static_cast<int>(gfx.textWidth(s.c_str())); };
+}
 
 namespace {
 constexpr int16_t kPanelCornerRadius = 8;

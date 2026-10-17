@@ -26,20 +26,6 @@ RadarLayout computeRadarLayout(int16_t x, int16_t y, int16_t w, int16_t h, int16
 
 float radiusDegToKm(float radius_deg) { return radius_deg * kKmPerDegree; }
 
-std::string truncateAirline(const std::string &s, int maxChars) {
-  if (maxChars <= 0) return std::string();
-  if (static_cast<int>(s.size()) <= maxChars) return s;
-
-  constexpr int kEllipsisLen = 3;  // "..."
-  if (maxChars < kEllipsisLen + 1) {
-    return s.substr(0, static_cast<size_t>(maxChars));  // too tight for an ellipsis
-  }
-
-  std::string head = s.substr(0, static_cast<size_t>(maxChars - kEllipsisLen));
-  while (!head.empty() && head.back() == ' ') head.pop_back();
-  return head + "...";
-}
-
 #ifdef ARDUINO
 
 #include <cmath>
@@ -70,10 +56,9 @@ constexpr int16_t kSummaryTextX = 208;   // inside the frame, clear of the swept
 constexpr int16_t kSummaryFlightY = 92;  // three-row baselines from CLAUDE.md
 constexpr int16_t kSummaryAirlineY = 127;  // (shifted up for the y:28..225 zone)
 constexpr int16_t kSummaryRouteY = 162;
-// Fits the ~110px of text width between kSummaryTextX and the frame's
-// right edge in LCARS_FONT_BODY (Font2, ~7px/char). setClipRect still
-// guards the pixels; this keeps the string itself sane.
-constexpr int kSummaryMaxAirlineChars = 15;
+// Text width between kSummaryTextX and the frame's inner right edge,
+// minus a 2px breathing gap — what fitToWidth() cuts rows 2/3 down to.
+constexpr int kSummaryTextMaxPx = kSummaryX + kSummaryW - kSummaryThickness - 2 - kSummaryTextX;
 
 constexpr int kRingCount = 3;
 constexpr int16_t kBlipRadius = 5;
@@ -150,14 +135,18 @@ void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, const Air
   gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
   gfx.drawString(summaryFlight(nearest).c_str(), kSummaryTextX, kSummaryFlightY);
 
-  // Row 2: airline (clipped to the panel by setClipRect above).
+  // Row 2: airline, cut to the panel's text width (setClipRect above is
+  // only the pixel-level backstop).
   gfx.setFont(LCARS_FONT_BODY);
-  gfx.drawString(truncateAirline(summaryAirline(nearest), kSummaryMaxAirlineChars).c_str(),
+  const TextMeasure measure = gfxTextMeasure(gfx);
+  gfx.drawString(fitToWidth(summaryAirline(nearest), kSummaryTextMaxPx, measure).c_str(),
                  kSummaryTextX, kSummaryAirlineY);
 
   // Row 3: route, IATA codes only (no country codes — narrow panel).
   gfx.drawString(
-      formatSummaryRoute(nearest.route, origin, dest, RouteFormat::CodesOnly).c_str(),
+      fitToWidth(formatSummaryRoute(nearest.route, origin, dest, RouteFormat::CodesOnly),
+                 kSummaryTextMaxPx, measure)
+          .c_str(),
       kSummaryTextX, kSummaryRouteY);
 
   gfx.clearClipRect();

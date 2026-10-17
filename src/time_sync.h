@@ -1,5 +1,5 @@
 // time_sync — NTP wall-clock sync (configTzTime for Europe/Warsaw) plus
-// pure, testable date/time/stardate formatting helpers. See CLAUDE.md
+// pure, testable date/time formatting helpers. See CLAUDE.md
 // "Time & WiFi status" and "Code conventions".
 //
 // Split per CLAUDE.md "Testing": the formatting functions below take a
@@ -21,7 +21,7 @@ constexpr const char *TZ_WARSAW = "CET-1CEST,M3.5.0,M10.5.0/3";
 // ---- Pure logic (no Arduino/network dependency) — tested under
 // `pio test -e native`.
 //
-// All three interpret the supplied `epoch` as "the wall-clock instant to
+// All of these interpret the supplied `epoch` as "the wall-clock instant to
 // render", broken down as UTC fields — i.e. the caller passes an epoch
 // that has already been shifted to the target timezone (on the device,
 // via timeSyncNowLocal() below). Keeping the breakdown UTC-based is what
@@ -29,19 +29,16 @@ constexpr const char *TZ_WARSAW = "CET-1CEST,M3.5.0,M10.5.0/3";
 // runs. Negative epochs (pre-1970) are not supported and clamp to the
 // epoch.
 
-// "DD.MM.YYYY", zero-padded (e.g. "09.09.2001").
+// "DD/MM/YYYY", zero-padded (e.g. "07/03/2026").
 std::string formatDate(std::time_t epoch);
 
 // "HH:MM", 24-hour, zero-padded (e.g. "01:46").
 std::string formatTime(std::time_t epoch);
 
-// Decorative Star Trek-style stardate as "XXXX.XX" (see CLAUDE.md — this
-// is fan flavor text, not canonical). Deterministic function of the date:
-//   stardate = (year - 2323) * 1000 + day_of_year * 2.7378
-// where day_of_year is 1 for January 1st. Always two decimal places; may
-// be negative for present-day dates (the formula's zero point is the
-// 24th century) — that's expected, it's flavor, not a real calendar.
-std::string computeStardate(std::time_t epoch);
+// Whole minutes since the epoch — changes exactly when formatTime()'s
+// "HH:MM" would. main.cpp compares successive values to know when the
+// header clock needs repainting (CLAUDE.md "Redraw policy").
+long minuteOf(std::time_t epoch);
 
 // ---- Hardware adapter: ESP32 SDK / lwIP SNTP. Not covered by Unity
 // (see CLAUDE.md "Testing").
@@ -59,8 +56,8 @@ void timeSyncBegin();
 bool isTimeSynced();
 
 // Current instant as an epoch already shifted into Europe/Warsaw local
-// time, ready to hand straight to formatDate()/formatTime()/
-// computeStardate(). Returns 0 if time isn't synced yet.
+// time, ready to hand straight to formatDate()/formatTime()/minuteOf().
+// Returns 0 if time isn't synced yet.
 std::time_t timeSyncNowLocal();
 
 #endif  // ARDUINO

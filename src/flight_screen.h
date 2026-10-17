@@ -83,4 +83,13 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
                       const AirportInfo &origin, const AirportInfo &dest, const CpaPrediction &cpa,
                       int16_t screenWidth);
 
+// Repaints only the countdown zone + status strip (y:82..225) — the 1 Hz
+// tick path (CLAUDE.md "Redraw policy"), leaving the identity panel,
+// header and bottom nav untouched. Renders into an off-screen 8-bit
+// LGFX_Sprite and pushes it in one go so the digits don't flicker; if the
+// sprite can't be allocated (low heap) it falls back to drawing straight
+// to `gfx`. drawFlightScreen() calls this for its lower two zones.
+void drawFlightCountdown(LGFX &gfx, bool hasNearest, const CpaPrediction &cpa,
+                         int16_t screenWidth);
+
 #endif  // ARDUINO

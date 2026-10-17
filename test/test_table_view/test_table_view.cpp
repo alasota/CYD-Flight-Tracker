@@ -315,6 +315,54 @@ static void test_table_row_step_is_17px_from_y138(void) {
   TEST_ASSERT_TRUE(lastRowY + tableRowHeightPx() <= 225);
 }
 
+// ---- column layout (CLAUDE.md "Screen 1" column table) ----------------------
+
+static void test_columns_count_and_order(void) {
+  TEST_ASSERT_EQUAL_INT(6, kTableColumnCount);
+  const TableColumn *cols = tableColumns();
+  TEST_ASSERT_EQUAL_STRING("LOT", cols[0].label);
+  TEST_ASSERT_EQUAL_STRING("LINIA", cols[1].label);
+  TEST_ASSERT_EQUAL_STRING("SKAD", cols[2].label);
+  TEST_ASSERT_EQUAL_STRING("DOKAD", cols[3].label);
+  TEST_ASSERT_EQUAL_STRING("TYP", cols[4].label);
+  TEST_ASSERT_EQUAL_STRING("FAZA", cols[5].label);
+}
+
+static void test_columns_are_contiguous_and_never_overlap(void) {
+  const TableColumn *cols = tableColumns();
+  for (int i = 0; i < kTableColumnCount; ++i) {
+    TEST_ASSERT_TRUE(cols[i].w > 0);
+    if (i > 0) {
+      // Each column starts exactly where the previous one ends.
+      TEST_ASSERT_EQUAL_INT(cols[i - 1].x + cols[i - 1].w, cols[i].x);
+    }
+  }
+}
+
+static void test_columns_fit_the_320px_screen(void) {
+  const TableColumn *cols = tableColumns();
+  TEST_ASSERT_TRUE(cols[0].x >= 0);
+  const TableColumn &last = cols[kTableColumnCount - 1];
+  TEST_ASSERT_TRUE(last.x + last.w <= 320);
+}
+
+static void test_column_labels_fit_their_columns_in_small_font(void) {
+  // Labels are drawn in LCARS_FONT_SMALL (Font0, 6px advance) at
+  // x + kTableCellPadPx; they must not reach the next column.
+  const TableColumn *cols = tableColumns();
+  for (int i = 0; i < kTableColumnCount; ++i) {
+    int labelPx = static_cast<int>(std::string(cols[i].label).size()) * 6;
+    TEST_ASSERT_TRUE_MESSAGE(kTableCellPadPx + labelPx <= cols[i].w, cols[i].label);
+  }
+}
+
+static void test_cell_text_width_excludes_padding(void) {
+  const TableColumn *cols = tableColumns();
+  for (int i = 0; i < kTableColumnCount; ++i) {
+    TEST_ASSERT_EQUAL_INT(cols[i].w - 2 * kTableCellPadPx, tableCellTextWidthPx(cols[i]));
+  }
+}
+
 static void test_page_count_uses_fixed_five_row_pages(void) {
   TEST_ASSERT_EQUAL_INT(0, getPageCount(0, tableRowsPerPage()));
   TEST_ASSERT_EQUAL_INT(1, getPageCount(5, tableRowsPerPage()));
@@ -416,6 +464,12 @@ int main(int argc, char **argv) {
   RUN_TEST(test_table_shows_exactly_five_rows_per_page);
   RUN_TEST(test_table_row_step_is_17px_from_y138);
   RUN_TEST(test_page_count_uses_fixed_five_row_pages);
+
+  RUN_TEST(test_columns_count_and_order);
+  RUN_TEST(test_columns_are_contiguous_and_never_overlap);
+  RUN_TEST(test_columns_fit_the_320px_screen);
+  RUN_TEST(test_column_labels_fit_their_columns_in_small_font);
+  RUN_TEST(test_cell_text_width_excludes_padding);
 
   RUN_TEST(test_page_count_zero_records);
   RUN_TEST(test_page_count_exact_multiple);

@@ -45,22 +45,8 @@ RadarLayout computeRadarLayout(int16_t x, int16_t y, int16_t w, int16_t h, int16
 // ring, not survey-grade.
 float radiusDegToKm(float radius_deg);
 
-// Truncates an airline name to fit Screen 3's narrow (120px) summary
-// panel — CLAUDE.md "Screen 3" Row 2 ("truncate or abbreviate if it
-// doesn't fit ... don't let it overflow into the radar zone"). Kept a
-// pure function (not inline in the draw code) so the cut logic is
-// unit-testable.
-//
-//   - `s` already <= `maxChars`  -> returned unchanged.
-//   - longer -> cut to `maxChars` total, last 3 chars replaced by "..."
-//     (ASCII, not "…" — the panel's bitmap font only covers 0x20-0x7E,
-//     same constraint as table_view's labels), trailing spaces trimmed
-//     off the head first so it reads "LOT Polish..." not "LOT Polish ...".
-//   - `maxChars` too small to fit even "X..." (< 4) -> a plain hard cut,
-//     no ellipsis. `maxChars` <= 0 -> empty string.
-//
-// The result is never longer than `maxChars`.
-std::string truncateAirline(const std::string &s, int maxChars);
+// (Airline truncation for the narrow summary panel uses lcars_theme's
+// fitToWidth(), measured in pixels — the shared helper all screens use.)
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme +
 // radar_geometry + aircraft_summary. Not covered by Unity (see CLAUDE.md

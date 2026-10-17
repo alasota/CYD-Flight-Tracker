@@ -1,6 +1,5 @@
 #include "time_sync.h"
 
-#include <cmath>
 #include <cstdio>
 
 namespace {
@@ -13,7 +12,6 @@ struct CivilDateTime {
   int hour = 0;         // 0..23
   int minute = 0;       // 0..59
   int second = 0;       // 0..59
-  int day_of_year = 1;  // 1 == January 1st
 };
 
 // days_from_epoch -> (year, month, day), after Howard Hinnant's
@@ -31,8 +29,6 @@ void civilFromDays(long z, int &year, int &month, int &day) {
   year = y + (month <= 2 ? 1 : 0);
 }
 
-bool isLeapYear(int y) { return (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0); }
-
 CivilDateTime breakdown(std::time_t epoch) {
   CivilDateTime out;
   long secs = static_cast<long>(epoch);
@@ -45,12 +41,6 @@ CivilDateTime breakdown(std::time_t epoch) {
   out.second = static_cast<int>(rem % 60);
 
   civilFromDays(days, out.year, out.month, out.day);
-
-  static const int kDaysBeforeMonth[12] = {0, 31, 59, 90, 120, 151,
-                                           181, 212, 243, 273, 304, 334};
-  int doy0 = kDaysBeforeMonth[out.month - 1] + (out.day - 1);
-  if (out.month > 2 && isLeapYear(out.year)) doy0 += 1;
-  out.day_of_year = doy0 + 1;  // 1 == Jan 1st
   return out;
 }
 
@@ -59,7 +49,7 @@ CivilDateTime breakdown(std::time_t epoch) {
 std::string formatDate(std::time_t epoch) {
   CivilDateTime t = breakdown(epoch);
   char buf[16];
-  std::snprintf(buf, sizeof(buf), "%02d.%02d.%04d", t.day, t.month, t.year);
+  std::snprintf(buf, sizeof(buf), "%02d/%02d/%04d", t.day, t.month, t.year);
   return std::string(buf);
 }
 
@@ -70,13 +60,10 @@ std::string formatTime(std::time_t epoch) {
   return std::string(buf);
 }
 
-std::string computeStardate(std::time_t epoch) {
-  CivilDateTime t = breakdown(epoch);
-  double stardate =
-      static_cast<double>(t.year - 2323) * 1000.0 + static_cast<double>(t.day_of_year) * 2.7378;
-  char buf[32];
-  std::snprintf(buf, sizeof(buf), "%.2f", stardate);
-  return std::string(buf);
+long minuteOf(std::time_t epoch) {
+  long secs = static_cast<long>(epoch);
+  if (secs < 0) secs = 0;  // same clamp as breakdown()
+  return secs / 60;
 }
 
 #ifdef ARDUINO

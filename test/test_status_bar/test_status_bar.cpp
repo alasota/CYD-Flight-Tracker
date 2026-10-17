@@ -7,8 +7,8 @@
 void setUp(void) {}
 void tearDown(void) {}
 
-// 1500000000 -> 2017-07-14 02:40:00 UTC (see test_time_sync); its stardate
-// is "-305466.13" and its "HH:MM" is "02:40".
+// 1500000000 -> 2017-07-14 02:40:00 UTC (see test_time_sync); its date
+// is "14/07/2017" and its "HH:MM" is "02:40".
 static constexpr std::time_t kEpoch = 1500000000;
 
 // ---- statusBarScreenName ------------------------------------------------
@@ -33,16 +33,21 @@ static void test_flights_is_the_longest_name(void) {
   TEST_ASSERT_EQUAL_size_t(7, longest);
 }
 
-// ---- statusBarStardate ------------------------------------------------
+// ---- statusBarDate ----------------------------------------------------
 
-static void test_stardate_placeholder_until_synced(void) {
-  TEST_ASSERT_EQUAL_STRING("STARDATE: ----.--", statusBarStardate(kEpoch, false).c_str());
+static void test_date_placeholder_until_synced(void) {
+  TEST_ASSERT_EQUAL_STRING("--/--/----", statusBarDate(kEpoch, false).c_str());
 }
 
-static void test_stardate_uses_time_sync_when_synced(void) {
-  std::string expected = "STARDATE: " + computeStardate(kEpoch);
-  TEST_ASSERT_EQUAL_STRING(expected.c_str(), statusBarStardate(kEpoch, true).c_str());
-  TEST_ASSERT_EQUAL_STRING("STARDATE: -305466.13", statusBarStardate(kEpoch, true).c_str());
+static void test_date_uses_time_sync_when_synced(void) {
+  TEST_ASSERT_EQUAL_STRING(formatDate(kEpoch).c_str(), statusBarDate(kEpoch, true).c_str());
+  TEST_ASSERT_EQUAL_STRING("14/07/2017", statusBarDate(kEpoch, true).c_str());
+}
+
+static void test_date_placeholder_same_length_as_date(void) {
+  // Same width in a monospace-ish font, so the header text doesn't jump
+  // when the first NTP sync lands.
+  TEST_ASSERT_EQUAL_size_t(statusBarDate(kEpoch, true).size(), statusBarDate(kEpoch, false).size());
 }
 
 // ---- statusBarClock -------------------------------------------------
@@ -75,8 +80,9 @@ int main(int, char **) {
   RUN_TEST(test_screen_name_out_of_range);
   RUN_TEST(test_flights_is_the_longest_name);
 
-  RUN_TEST(test_stardate_placeholder_until_synced);
-  RUN_TEST(test_stardate_uses_time_sync_when_synced);
+  RUN_TEST(test_date_placeholder_until_synced);
+  RUN_TEST(test_date_uses_time_sync_when_synced);
+  RUN_TEST(test_date_placeholder_same_length_as_date);
 
   RUN_TEST(test_clock_placeholder_until_synced);
   RUN_TEST(test_clock_uses_time_sync_when_synced);

@@ -1,7 +1,7 @@
 // status_bar — draws the header bar shared by all three screens, per
 // CLAUDE.md "Screen chrome": an LCARS_ORANGE rounded block on the left
 // labelled with the active screen name (FLIGHTS / FLIGHT / RADAR), then
-// STARDATE + the real wall-clock time (from time_sync) to its right in
+// the date (DD/MM/YYYY) + the real wall-clock time (from time_sync) to its right in
 // LCARS_CYAN. Occupies y:0..LCARS_HEADER_HEIGHT, full width. **No WiFi
 // signal bars** — that three-zone design is explicitly superseded (see
 // CLAUDE.md; rssiToBars() has no home in this layout).
@@ -21,11 +21,11 @@
 // kScreenFlight=1 / kScreenRadar=2). Any out-of-range index yields "?".
 std::string statusBarScreenName(int screenIndex);
 
-// "STARDATE: <n.nn>" from time_sync::computeStardate(), or a
-// "STARDATE: ----.--" placeholder when the clock hasn't synced yet
+// "DD/MM/YYYY" from time_sync::formatDate(), or a same-width
+// "--/--/----" placeholder when the clock hasn't synced yet
 // (time_sync::isTimeSynced() == false) — never the epoch-zero garbage the
 // ESP32 boots with.
-std::string statusBarStardate(std::time_t localEpoch, bool timeSynced);
+std::string statusBarDate(std::time_t localEpoch, bool timeSynced);
 
 // "HH:MM" from time_sync::formatTime(), or "--:--" until the first NTP
 // sync completes.
@@ -63,5 +63,12 @@ const char *statusBarHealthTag(OpenSkyHealth health);
 // call every frame.
 void drawStatusBar(LGFX &gfx, int screenIndex, std::time_t localEpoch, bool timeSynced,
                    OpenSkyHealth health, int16_t screenWidth);
+
+// Repaints only the header's text area (date, health tag, clock) — right
+// of the orange name block, which is left untouched. For the once-a-minute
+// clock update and health-tag changes (CLAUDE.md "Redraw policy"), so they
+// don't need a full-screen redraw.
+void drawStatusBarText(LGFX &gfx, std::time_t localEpoch, bool timeSynced, OpenSkyHealth health,
+                       int16_t screenWidth);
 
 #endif  // ARDUINO

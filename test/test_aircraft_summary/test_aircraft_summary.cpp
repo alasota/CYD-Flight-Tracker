@@ -103,8 +103,64 @@ static void test_route_falls_back_to_icao_when_airport_unresolved(void) {
   TEST_ASSERT_EQUAL_STRING("EPWA -> LIRF", s2.c_str());
 }
 
+// ---- fitSummaryIdentity -----------------------------------------------
+//
+// Measured with a fake 1px-per-char font, so widths == character counts.
+// "LOT281  LOT Polish Airlines  B738" is 33 chars.
+
+static int onePx(const std::string &s) { return static_cast<int>(s.size()); }
+static const TextMeasure kOnePx = onePx;
+
+static void test_fit_identity_unchanged_when_it_fits(void) {
+  TEST_ASSERT_EQUAL_STRING("LOT281  LOT Polish Airlines  B738",
+                           fitSummaryIdentity(makeRow(), 33, kOnePx).c_str());
+}
+
+static void test_fit_identity_excludes_phase_icon(void) {
+  // The icon is drawn separately at a fixed right-aligned spot.
+  std::string line = fitSummaryIdentity(makeRow(), 200, kOnePx);
+  TEST_ASSERT_TRUE(line.find(phaseIcon(Phase::TAKEOFF)) == std::string::npos);
+}
+
+static void test_fit_identity_truncates_airline_first(void) {
+  // 25px: callsign + "  " (8) and "  " + type (6) leave 11 for the airline.
+  std::string line = fitSummaryIdentity(makeRow(), 25, kOnePx);
+  TEST_ASSERT_EQUAL_STRING("LOT281  LOT Poli...  B738", line.c_str());
+}
+
+static void test_fit_identity_drops_airline_when_no_room_for_it(void) {
+  // 16px leaves 2px for the airline — not even "L..." fits, so it's dropped
+  // rather than shown as a meaningless 2-letter stub.
+  TEST_ASSERT_EQUAL_STRING("LOT281  B738", fitSummaryIdentity(makeRow(), 16, kOnePx).c_str());
+}
+
+static void test_fit_identity_then_truncates_type(void) {
+  TEST_ASSERT_EQUAL_STRING("LOT281  B7", fitSummaryIdentity(makeRow(), 10, kOnePx).c_str());
+}
+
+static void test_fit_identity_never_truncates_callsign(void) {
+  TEST_ASSERT_EQUAL_STRING("LOT281", fitSummaryIdentity(makeRow(), 3, kOnePx).c_str());
+}
+
+static void test_fit_identity_never_exceeds_width_once_callsign_fits(void) {
+  AircraftRow row = makeRow();
+  row.info.airline = "Scandinavian Airlines System Denmark Norway Sweden";
+  row.info.aircraft_type = "Embraer ERJ-190-200 LR";
+  for (int px = 6; px <= 80; ++px) {
+    TEST_ASSERT_TRUE(onePx(fitSummaryIdentity(row, px, kOnePx)) <= px);
+  }
+}
+
 int main(int, char **) {
   UNITY_BEGIN();
+
+  RUN_TEST(test_fit_identity_unchanged_when_it_fits);
+  RUN_TEST(test_fit_identity_excludes_phase_icon);
+  RUN_TEST(test_fit_identity_truncates_airline_first);
+  RUN_TEST(test_fit_identity_drops_airline_when_no_room_for_it);
+  RUN_TEST(test_fit_identity_then_truncates_type);
+  RUN_TEST(test_fit_identity_never_truncates_callsign);
+  RUN_TEST(test_fit_identity_never_exceeds_width_once_callsign_fits);
 
   RUN_TEST(test_fields_full_data);
   RUN_TEST(test_fields_fall_back_to_dashes);

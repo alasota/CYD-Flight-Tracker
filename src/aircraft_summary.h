@@ -17,6 +17,7 @@
 
 #include <string>
 
+#include "lcars_theme.h"   // TextMeasure, fitToWidth()
 #include "route_lookup.h"  // RouteInfo, AirportInfo
 
 // Forward-declared rather than #include "table_view.h" (which pulls in a
@@ -47,6 +48,18 @@ std::string summaryType(const AircraftRow &row);     // aircraft type
 // fields on separate rows and calls the field helpers above instead.
 std::string formatSummaryIdentity(const AircraftRow &row);
 
+// The identity line *without* the phase icon, cut to fit `maxPx` — the
+// icon is drawn separately at a fixed right-aligned spot so it can never be
+// pushed off-screen (CLAUDE.md "Screen 1" featured panel). Shrinks in this
+// order until it fits:
+//   1. "<flight>  <airline>  <type>"   unchanged if it fits;
+//   2. airline cut with "..." to the remaining width;
+//   3. airline dropped ("<flight>  <type>") if not even "X..." fits;
+//   4. type cut to the remaining width, or dropped;
+//   5. "<flight>" alone — the callsign is never truncated, even if it
+//      alone overflows.
+std::string fitSummaryIdentity(const AircraftRow &row, int maxPx, const TextMeasure &measure);
+
 // "<origin> -> <dest>", each end formatted per `fmt`:
 //   WithCountry: "<IATA> (<country>)", e.g. "WAW (PL)"
 //   CodesOnly:   "<IATA>",             e.g. "WAW"
@@ -71,5 +84,11 @@ std::string formatSummaryRoute(const RouteInfo &route, const AirportInfo &origin
 void drawAircraftSummary(LGFX &gfx, const AircraftRow &row, const AirportInfo &originAirport,
                          const AirportInfo &destAirport, RouteFormat fmt, int16_t x, int16_t y,
                          int16_t w, int16_t h);
+
+// The identity line alone, top-left at (x, y): fitSummaryIdentity() text
+// on the left, the phase icon right-aligned so its right edge sits at
+// `rightX`. Nothing is drawn past `rightX`. Shared by drawAircraftSummary()
+// and featured_panel so both obey the same overflow rule.
+void drawIdentityLine(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, int16_t rightX);
 
 #endif  // ARDUINO

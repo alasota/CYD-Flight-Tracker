@@ -186,11 +186,12 @@ requirement, the firmware didn't sync wall-clock time before.
   (correctly handles CEST DST switches). This is a stable, long-standing EU DST rule, but
   double-check it hasn't changed if clocks ever look off by an hour.
 - Until the first sync completes, `time_sync` must report "not synced yet" — the header bar
-  should show a placeholder (e.g. `--:--`) rather than the garbage epoch-zero date ESP32 starts
-  with.
+  should show placeholders (`--/--/----` for the date, `--:--` for the time) rather than the
+  garbage epoch-zero date ESP32 starts with.
 - `time_sync` module: `isTimeSynced()`, plus **pure, testable** formatting functions that take
-  a `time_t` as a parameter rather than calling `time(nullptr)` internally — e.g.
-  `formatDate(time_t) -> "DD.MM.YYYY"`, `formatTime(time_t) -> "HH:MM"`. Keeping the epoch as an
+  a `time_t` as a parameter rather than calling `time(nullptr)` internally —
+  `formatDate(time_t) -> "DD/MM/YYYY"` (zero-padded, slash-separated, e.g. `07/03/2026`) and
+  `formatTime(time_t) -> "HH:MM"` (24h, zero-padded). Keeping the epoch as an
   injected parameter (instead of reading the wall clock inside the function) is what makes this
   testable without depending on when the test happens to run.
 - **WiFi signal**: `rssiToBars(int rssi_dbm) -> 0..4`, pure function, from `WiFi.RSSI()`.
@@ -198,13 +199,9 @@ requirement, the firmware didn't sync wall-clock time before.
   -65..-75 → 2, -75..-85 → 1, below that → 0. Kept as a utility function even though the
   current header layout (see "Screen chrome" below) doesn't have a slot for it — say if you
   want it added back somewhere and I'll find room.
-- **Stardate (decorative, not canonical Star Trek lore)**: the header shows `STARDATE: XXXX.XX`
-  instead of a real calendar date. Compute it with a small deterministic formula from the real
-  date rather than hardcoding a static string — e.g. `stardate = (year - 2323) * 1000 +
-  day_of_year * 2.7378` (one of many fan approximations; there's no official formula, so this
-  is purely flavor text, tune the constants if you want a different "feel" to the numbers). Pure
-  function, same `time_t`-in / string-out pattern as `formatDate`/`formatTime`, lives in
-  `time_sync` alongside them.
+- **No stardate.** An earlier revision showed a decorative `STARDATE: XXXX.XX` in the header;
+  that's dropped — the header shows the real calendar date via `formatDate` instead. Remove
+  `computeStardate()` and its tests rather than leaving it around unused.
 
 ## Flight ETA — closest point of approach (for Screen 2, "Flight")
 
@@ -249,10 +246,14 @@ switching feels like changing a mode on one console, not jumping between apps.
 - LCARS block on the left: filled rounded rectangle (`fillRoundRect`), color `LCARS_ORANGE`
   (`0xFC00`). Label the screen name inside it in small bold text (`FLIGHTS` / `FLIGHT` /
   `RADAR`) — this is how each screen stays identifiable now that the header's main text is
-  stardate/time rather than a screen-name label; keep the block wide enough for the longest
+  date/time rather than a screen-name label; keep the block wide enough for the longest
   name (`FLIGHTS`, 7 characters) at whatever font size fits 25px tall comfortably.
-- To the right of that block: `STARDATE: XXXX.XX` and the real time `HH:MM:SS`, monospace /
-  built-in Adafruit-style font, color `LCARS_CYAN` (`0x07FF`) or white.
+- To the right of that block: the current date `DD/MM/YYYY` (left-aligned, right after the
+  block) and the real time `HH:MM` (right-aligned at the screen edge), built-in font, color
+  `LCARS_CYAN` (`0x07FF`) or white. No seconds — the header is redrawn once per minute (see
+  "Redraw policy" below), so `HH:MM:SS` would sit frozen and look broken.
+- The OpenSky health tag (`RATE` / `AUTH` / `NET`, orange) stays where it is, just left of the
+  clock.
 - **WiFi bars are dropped from this header** in this revision — the earlier three-zone design
   (date/time left, name center, WiFi right) is superseded by this spec. Say if you want signal
   strength back somewhere; there's no slot for it here right now.
@@ -267,6 +268,29 @@ the first pass of this spec — every screen's content area has since been corre
 screen is active — screens themselves don't need to know `status_bar` exists, they just draw
 their content within these fixed bounds.
 
+### Redraw policy — no full-screen clears except on screen change
+
+A full `fillScreen()` + redraw of everything is visible as a flash on the ILI9341 over SPI. The
+first implementation did exactly that once per second on Screen 2 (to tick the countdown), and
+the whole screen — frame, header, nav bar — blinked every second. Rules:
+
+- **`fillScreen()` only on a screen change** (manual, auto-cycle, or table page change) and on
+  the first draw after boot/setup. Never on a timer tick.
+- **New poll data** → redraw only the active screen's content area (y:28..225), clearing it with
+  one `fillRect` of that region. Header and bottom nav are left alone unless their own content
+  changed (screen index, health tag).
+- **Header clock** → `status_bar` redraws only its date/time text area (not the orange block),
+  when the displayed minute or the health tag changes, on every screen — not only on poll.
+- **Screen 2 countdown tick (1 Hz)** → redraw only the countdown zone (y:82..195) and the status
+  strip (y:200..225). The identity panel, header and nav bar are not touched. Draw the countdown
+  zone into an `LGFX_Sprite` and `pushSprite()` it in one go so the digits don't flicker either.
+  A full-width 16-bit sprite of that zone is ~70 KB; if free heap is tight once TLS is up, use an
+  8-bit sprite (`setColorDepth(8)`) or a sprite sized to just the digits' bounding box — check
+  `ESP.getFreeHeap()` rather than guessing.
+- Keep the "what needs redrawing" decision as a small pure function (e.g. a dirty-region
+  bitmask from `{screenChanged, pageChanged, newPoll, minuteChanged, healthChanged,
+  countdownTick}`) so it's unit-testable under `native`; `main.cpp` just acts on the mask.
+
 ### Screen 1 — "Flights" (default view, prioritize this first)
 
 **Exact pixel spec** (below the 25px header), no scrolling — everything drawn at fixed
@@ -280,7 +304,14 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   the same "elbow" shape already described in "Design language" — just now with a specific
   color and bounds.
 - Highlighted text (top of the frame): flight (callsign), airline, aircraft type, phase icon —
-  what's currently Line 1 of the featured panel, unchanged in content.
+  what's currently Line 1 of the featured panel, unchanged in content. **The line must never
+  overflow the frame**: the phase icon is drawn at a fixed position, right-aligned just inside
+  the frame's right edge, so it can never be pushed off-screen (it's the "taking off or
+  landing?" answer — the most important glyph on the line). Callsign is never truncated; the
+  airline is truncated (with `...`) to fill whatever width remains between callsign + type and
+  the phase icon; type is truncated only if it alone still doesn't fit. Same rule wherever
+  `aircraft_summary`'s identity line is used (Screen 2's identity panel too) — implement it
+  once in `aircraft_summary` as a pure, tested layout function taking the available width.
 - Detail line below it (bottom of the frame): the rest — origin → destination with country
   codes, plus the altitude/speed/distance stat chips — what's currently Line 2 + stat chips,
   unchanged in content, rendered smaller (8px / LovyanGFX's equivalent of Adafruit "Font 2" —
@@ -293,11 +324,39 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
 - Sub-header bar: `LCARS_CYAN` (`0x07FF`) background, black text, label `FLIGHTS`, y: 108 to
   118px (10px tall — thin label strip). (Yes, this repeats the word already shown in the
   header's orange block — that's fine, LCARS designs repeat short labels as a matter of style,
-  not a bug to fix.)
+  not a bug to fix.) **The label font must fit inside the 10px strip**: use `fonts::Font0`
+  (LovyanGFX's 6x8 GLCD font, 8px tall), vertically centered. Font2 (16px) does *not* fit — its
+  glyph background spills to ~y:105..121, painting cyan over the featured panel's bottom frame
+  edge and into the column header row. General rule: no text may be taller than the strip/row
+  it sits in when drawn with a background color.
 - Column header row at **y: 119 to 134px** (text centered ~y:127): `LCARS_ORANGE` (`0xFC00`)
-  background, black text, one text string with column labels separated by `|` (not per-column
-  shaded cells) — e.g. `LOT | LINIA | SKĄD | DOKĄD | TYP | FAZA` matching the columns already
-  defined below.
+  background, black text, labels separated by `|` (not per-column shaded cells), in
+  `fonts::Font0` so the longest label fits its column. **Each label is drawn at its column's x
+  position** (same constants as the data rows below), with the `|` separator drawn at each
+  column boundary — *not* as one pre-joined string starting at x=4, which drifts out of
+  alignment with the data (the first implementation put `SKAD` at ~x:100 over a column starting
+  at x:160). Labels: `LOT`, `LINIA`, `SKAD`, `DOKAD`, `TYP`, `FAZA` (ASCII — built-in bitmap
+  fonts don't carry Polish diacritics).
+- **Column layout — single source of truth**, shared by the column header and the data rows
+  (define once in `table_view`, expose via a pure function so tests can check that columns
+  don't overlap and sum to ≤ 320px):
+
+  | Column  | x (px) | width (px) | Content                     |
+  |---------|--------|------------|-----------------------------|
+  | LOT     | 2      | 64         | callsign (8 chars in Font2) |
+  | LINIA   | 66     | 92         | airline (truncated)         |
+  | SKAD    | 158    | 38         | origin airport code         |
+  | DOKAD   | 196    | 38         | destination airport code    |
+  | TYP     | 234    | 58         | aircraft type (truncated)   |
+  | FAZA    | 292    | 26         | phase icon (label "FAZA" needs 24px in Font0) |
+
+- **Every cell is truncated to its column width** before drawing — text must never spill into
+  the next column (with a background color set, it overwrites its neighbour; without one, the
+  two strings overlap). Truncate with a trailing `.` / `...` when there's room, hard-cut
+  otherwise. Do this with a pure, tested helper (e.g.
+  `fitToWidth(text, maxPx, charWidthPx)` — reuse/generalize radar_view's `truncateAirline()`
+  rather than writing a second one), and/or clip each cell with `setClipRect` as a pixel-level
+  backstop. Callsign and phase icon always fit their columns and are never truncated.
 - **5 data rows**, starting at **y: 138px**, **17px step** (rows at y = 138, 155, 172, 189,
   206) — tightened from the original 18px/y:140 start to fit within the corrected boundary; the
   last row's text (top y:206, ~14-16px tall) ends around y:221-222, inside the 225px boundary
@@ -356,6 +415,8 @@ bottom nav bar), centered text.**
   independently.
 - Local countdown ticks every second via `millis()` between polls, re-synced to the
   freshly-computed `t_cpa_seconds` on each new poll (see "local ticking" in the CPA section).
+  Each tick redraws **only** the countdown zone + status strip, via a sprite — never the whole
+  screen (see "Redraw policy" under "Screen chrome").
 - When `t_cpa_seconds` drops below -10, don't hold onto a stale prediction — next poll
   recomputes "nearest aircraft" and its CPA as normal, so the screen naturally moves on to
   whatever is nearest now.
@@ -541,11 +602,15 @@ each with a single responsibility:
   `hitTest` pattern from Milestone 9), and the auto-cycle timer + `shouldDeferAutoSwitch()` (see
   "Auto screen cycling") — takes `t_cpa_seconds` as a parameter, doesn't call `cpa_predictor`
   itself. No TFT drawing, no OpenSky/hexdb.io calls.
+- `redraw_policy` — pure `computeRedrawMask(events, currentScreen)`: turns "what happened"
+  (first draw, screen/page change, new poll, minute rollover, health change, countdown tick)
+  into which regions to repaint (full / content / header text / countdown). See "Redraw policy".
+  No TFT code — `main.cpp` acts on the mask.
 - `lcars_theme` — shared color palette, panel/elbow/pill drawing helpers, fonts, plus the WiFi
   signal-bars and bottom-nav-segment primitives. All view/screen modules call into this rather
   than defining their own colors/shapes.
 - `status_bar` — draws the shared chrome: the header bar per "Screen chrome" (orange
-  `fillRoundRect` block on the left labeled with the active screen name, stardate + real time
+  `fillRoundRect` block on the left labeled with the active screen name, date `DD/MM/YYYY` + time
   from `time_sync` to its right), **and** the bottom nav bar's dot/segment indicators from
   "Screen navigation" (highlighting whichever index `screen_nav` reports as current). Both
   called once per frame from `main.cpp`, before/after dispatching to the active screen — kept

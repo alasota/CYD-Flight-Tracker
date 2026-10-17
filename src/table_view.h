@@ -118,6 +118,28 @@ int tableRowsPerPage();   // kTableRowsPerPage (5)
 int16_t tableRowHeightPx();  // the 17px row step
 int16_t tableFirstRowY();    // 138 — y of the first data row
 
+// One table column — the single source of truth shared by the orange
+// column-header row and the data rows, so header labels can never drift
+// out of alignment with the data under them (CLAUDE.md "Screen 1" column
+// table). `x`/`w` are absolute px on the 320px-wide frame; columns are
+// contiguous (each starts where the previous ends).
+struct TableColumn {
+  const char *label;  // ASCII header label (bitmap fonts have no Polish diacritics)
+  int16_t x;
+  int16_t w;
+};
+
+constexpr int kTableColumnCount = 6;
+
+// Inset of text from its column's left (and right) edge.
+constexpr int16_t kTableCellPadPx = 2;
+
+// The 6 columns, in order: LOT, LINIA, SKAD, DOKAD, TYP, FAZA.
+const TableColumn *tableColumns();
+
+// Pixel width available to a cell's text — what fitToWidth() cuts it to.
+int tableCellTextWidthPx(const TableColumn &col);
+
 // Number of pages needed to show `totalRows` records at `rowsPerPage` rows
 // per page (ceiling division) — 0 records or a non-positive rowsPerPage
 // both yield 0 pages, not 1. Pure — no TFT dependency.

@@ -6,6 +6,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <string>
 
 #include "flight_phase.h"  // Phase — for phaseIcon()
 #include "touch_input.h"   // Rect — shared tappable-region type
@@ -26,7 +28,7 @@ constexpr uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b) {
 constexpr uint16_t LCARS_BLACK = 0x0000;    // background
 constexpr uint16_t LCARS_ORANGE = 0xFC00;   // header block, column headers, divider, home marker
 constexpr uint16_t LCARS_MAGENTA = 0xF81F;  // elbow-frame borders (featured / identity / summary panels)
-constexpr uint16_t LCARS_CYAN = 0x07FF;     // sub-headers, stardate/time text, radar blips
+constexpr uint16_t LCARS_CYAN = 0x07FF;     // sub-headers, date/time text, radar blips
 constexpr uint16_t LCARS_YELLOW = 0xFFE0;   // radar home crosshair, "imminent" countdown
 
 // Shared header-bar height (see CLAUDE.md "Screen chrome"): status_bar
@@ -86,6 +88,26 @@ Rect viewToggleButtonBounds(int16_t screenWidth, int16_t screenHeight);
 // glyph. Pure — no TFT dependency — tested under `pio test -e native`.
 char phaseIcon(Phase phase);
 
+// Rendered pixel width of a string in whatever font is current. On the
+// device this wraps gfx.textWidth(); tests pass a fixed-pitch fake.
+using TextMeasure = std::function<int(const std::string &)>;
+
+// `text` cut down so that measure(result) <= maxPx — the one truncation
+// helper for every place a string must not spill out of its cell/panel
+// (CLAUDE.md "Screen 1": table cells, the identity line, Screen 3's
+// airline row):
+//   - already fits                -> returned unchanged.
+//   - otherwise                   -> longest head + "..." that fits, with
+//     trailing spaces trimmed off the head ("LOT..." not "LOT ...").
+//     ASCII "...", not "…" — bitmap fonts only cover 0x20-0x7E.
+//   - not even "X..." fits        -> longest plain head that fits.
+//   - maxPx <= 0 / nothing fits   -> "".
+std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &measure);
+
+// Glyph height of LCARS_FONT_SMALL (fonts::Font0, the 6x8 GLCD font) —
+// exposed for the native test that it fits the 10px FLIGHTS strip.
+constexpr int16_t LCARS_FONT_SMALL_HEIGHT_PX = 8;
+
 // ---- Hardware adapter: actual drawing, via LovyanGFX. Not covered by
 // Unity (see CLAUDE.md "Testing") — this module is almost entirely draw
 // calls, which is expected for a theme/chrome module. Requires the LGFX
@@ -101,6 +123,10 @@ char phaseIcon(Phase phase);
 extern const lgfx::IFont *const LCARS_FONT_HEADING;  // panel/header titles
 extern const lgfx::IFont *const LCARS_FONT_BODY;     // table rows, labels
 extern const lgfx::IFont *const LCARS_FONT_NUMERIC;  // altitude/speed readouts (7-seg style)
+extern const lgfx::IFont *const LCARS_FONT_SMALL;    // 8px labels for thin strips (sub-header, column header)
+
+// Adapter: a TextMeasure that measures with `gfx`'s *current* font/size.
+TextMeasure gfxTextMeasure(lgfx::LovyanGFX &gfx);
 
 // Rounded-rectangle panel — the basic content-block shape used throughout
 // both views.

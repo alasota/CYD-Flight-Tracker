@@ -69,6 +69,8 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa) {
 
 #ifdef ARDUINO
 
+#include <Arduino.h>  // Serial, ESP.getFreeHeap()
+
 namespace {
 constexpr int16_t kSideMargin = 10;   // identity frame x:10..(w-10), per CLAUDE.md
 constexpr int16_t kFrameCorner = 12;
@@ -107,11 +109,24 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
     gfx.drawString("BRAK LOTU", cx, static_cast<int16_t>(kIdentityTop + kIdentityHeight / 2));
   }
 
-  const CountdownDisplay cd =
-      computeCountdownDisplay(hasNearest ? cpa : CpaPrediction{});
+  drawFlightCountdown(gfx, hasNearest, cpa, screenWidth);
+}
+
+namespace {
+
+// Draws the countdown zone + status strip into `gfx` with its top edge at
+// local y = `originY` (0 for the sprite, kCountdownTop for direct drawing).
+// Clears its own background first.
+void renderCountdown(lgfx::LovyanGFX &gfx, const CountdownDisplay &cd, int16_t originY,
+                     int16_t screenWidth) {
+  const int16_t cx = static_cast<int16_t>(screenWidth / 2);
+  const int16_t yOff = static_cast<int16_t>(originY - kCountdownTop);
+
+  gfx.fillRect(0, originY, screenWidth, kStatusTop + kStatusHeight - kCountdownTop, LCARS_BLACK);
 
   // ---- Countdown zone, y:82..195 — big number, small suffix, centered.
-  const int16_t countdownCy = static_cast<int16_t>(kCountdownTop + kCountdownHeight / 2);
+  const int16_t countdownCy =
+      static_cast<int16_t>(kCountdownTop + kCountdownHeight / 2 + yOff);
 
   gfx.setFont(bigFont(cd.mode));
   gfx.setTextSize(bigTextSize(cd.mode));
@@ -145,7 +160,40 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_center);
   gfx.setTextColor(cd.color, LCARS_BLACK);
-  gfx.drawString(cd.statusLabel.c_str(), cx, static_cast<int16_t>(kStatusTop + kStatusHeight / 2));
+  gfx.drawString(cd.statusLabel.c_str(), cx,
+                 static_cast<int16_t>(kStatusTop + kStatusHeight / 2 + yOff));
+}
+
+// Off-screen buffer for the countdown zone + status strip (y:82..225),
+// created on first use and kept for the life of the program. 8-bit colour
+// (RGB332) halves it to ~45 KB at 320px wide — the palette colours are
+// quantized but stay recognisable on a black background — which matters
+// once WiFi + TLS have taken their share of the heap.
+LGFX_Sprite countdownSprite;
+bool countdownSpriteTried = false;
+
+}  // namespace
+
+void drawFlightCountdown(LGFX &gfx, bool hasNearest, const CpaPrediction &cpa,
+                         int16_t screenWidth) {
+  const CountdownDisplay cd = computeCountdownDisplay(hasNearest ? cpa : CpaPrediction{});
+  const int16_t zoneH = static_cast<int16_t>(kStatusTop + kStatusHeight - kCountdownTop);
+
+  if (!countdownSpriteTried) {
+    countdownSpriteTried = true;
+    countdownSprite.setColorDepth(8);
+    if (countdownSprite.createSprite(screenWidth, zoneH) == nullptr) {
+      Serial.printf("[flight_screen] countdown sprite alloc failed (free heap %u) - drawing direct\n",
+                    static_cast<unsigned>(ESP.getFreeHeap()));
+    }
+  }
+
+  if (countdownSprite.getBuffer() != nullptr) {
+    renderCountdown(countdownSprite, cd, 0, screenWidth);
+    countdownSprite.pushSprite(&gfx, 0, kCountdownTop);
+  } else {
+    renderCountdown(gfx, cd, kCountdownTop, screenWidth);
+  }
 }
 
 #endif  // ARDUINO

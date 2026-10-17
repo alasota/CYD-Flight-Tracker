@@ -16,11 +16,11 @@ std::string statusBarScreenName(int screenIndex) {
   }
 }
 
-std::string statusBarStardate(std::time_t localEpoch, bool timeSynced) {
+std::string statusBarDate(std::time_t localEpoch, bool timeSynced) {
   if (!timeSynced) {
-    return "STARDATE: ----.--";
+    return "--/--/----";
   }
-  return "STARDATE: " + computeStardate(localEpoch);
+  return formatDate(localEpoch);
 }
 
 std::string statusBarClock(std::time_t localEpoch, bool timeSynced) {
@@ -59,21 +59,30 @@ constexpr int16_t kRightMargin = 4;
 
 void drawStatusBar(LGFX &gfx, int screenIndex, std::time_t localEpoch, bool timeSynced,
                    OpenSkyHealth health, int16_t screenWidth) {
-  // Own background — safe to repaint every frame without ghosting.
-  gfx.fillRect(0, 0, screenWidth, LCARS_HEADER_HEIGHT, LCARS_BLACK);
-
-  // Left: orange name block.
+  // Left: orange name block (on its own black backing, so the rounded
+  // corners don't keep stale pixels).
+  gfx.fillRect(0, 0, kNameBlockWidth, LCARS_HEADER_HEIGHT, LCARS_BLACK);
   drawHeaderBlock(gfx, 0, 0, kNameBlockWidth, LCARS_HEADER_HEIGHT, kNameBlockRadius, LCARS_ORANGE,
                   LCARS_BLACK, statusBarScreenName(screenIndex).c_str());
 
-  // Right of it: STARDATE (left-aligned) + clock (right-aligned), cyan.
+  drawStatusBarText(gfx, localEpoch, timeSynced, health, screenWidth);
+}
+
+void drawStatusBarText(LGFX &gfx, std::time_t localEpoch, bool timeSynced, OpenSkyHealth health,
+                       int16_t screenWidth) {
+  // Own background (text area only) — safe to repaint without ghosting
+  // and without touching the name block.
+  gfx.fillRect(kNameBlockWidth, 0, static_cast<int16_t>(screenWidth - kNameBlockWidth),
+               LCARS_HEADER_HEIGHT, LCARS_BLACK);
+
+  // Date (left-aligned, right after the block) + clock (right-aligned), cyan.
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextColor(LCARS_CYAN, LCARS_BLACK);
 
   int16_t midY = LCARS_HEADER_HEIGHT / 2;
 
   gfx.setTextDatum(middle_left);
-  gfx.drawString(statusBarStardate(localEpoch, timeSynced).c_str(),
+  gfx.drawString(statusBarDate(localEpoch, timeSynced).c_str(),
                  static_cast<int16_t>(kNameBlockWidth + kTextGap), midY);
 
   std::string clock = statusBarClock(localEpoch, timeSynced);
