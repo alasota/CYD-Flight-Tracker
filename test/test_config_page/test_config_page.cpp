@@ -86,6 +86,13 @@ static void test_page_is_complete_and_never_emits_empty_chunks(void) {
   TEST_ASSERT_TRUE(contains(h, "</html>"));
 }
 
+static void test_page_has_the_project_favicon(void) {
+  const std::string h = render(baseModel());
+  TEST_ASSERT_TRUE(contains(h, "<link rel=\"icon\" type=\"image/svg+xml\" href=\"data:image/svg+xml,"));
+  TEST_ASSERT_TRUE(contains(h, "fill='%23ff9966'"));      // peach plane, '#' escaped
+  TEST_ASSERT_TRUE(h.find("<link rel=\"icon\"") < h.find("</head>"));
+}
+
 static void test_all_form_fields_present(void) {
   const std::string h = render(baseModel());
   const char *names[] = {"name=\"lat\"", "name=\"lon\"", "name=\"radius\"",
@@ -269,6 +276,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_credentials_need_both_fields);
   RUN_TEST(test_html_escape);
   RUN_TEST(test_page_is_complete_and_never_emits_empty_chunks);
+  RUN_TEST(test_page_has_the_project_favicon);
   RUN_TEST(test_all_form_fields_present);
   RUN_TEST(test_only_the_active_tab_is_visible);
   RUN_TEST(test_web_language_switches_the_page_text);

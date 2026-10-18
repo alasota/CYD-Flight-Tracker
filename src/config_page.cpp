@@ -95,6 +95,16 @@ std::string htmlEscape(const std::string &in) {
 
 namespace {
 
+// Same icon as the project page (site/favicon.svg), inlined as a data URI so
+// the browser doesn't ask the device for /favicon.ico. '#' is %23 in a URI;
+// single quotes keep it inside the double-quoted href.
+const char kFavicon[] =
+    "<link rel=\"icon\" type=\"image/svg+xml\" href=\"data:image/svg+xml,"
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>"
+    "<rect width='32' height='32' rx='8' fill='%231d1f24'/>"
+    "<path fill='%23ff9966' d='M5 18.5l2-1 5 1.5 4-7.5-2.5-6.5h2.5l6 6.5 5-.5c1.6 0 2.5.8 2.5 "
+    "1.6s-.9 1.6-2.5 1.6l-5-.5-4.5 7h-2.5l1.5-6-5 .5-2 2.5h-2l1-3.5z'/></svg>\">";
+
 // Colours follow the display (lcars_theme variant A): near-black
 // background, muted greys, peach (#ff9966, THEME_CHROME_ACCENT) as the only
 // accent — active tab, buttons, focus — with dark text on it, the way the
@@ -280,6 +290,7 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>");
   w.t(WebStr::PageTitle);
   w.raw("</title>");
+  w.raw(kFavicon);
   w.raw(kStyle);
   w.raw("</head><body><div class=\"wrap\"><header><div><h1>Sky Tracker</h1><div class=\"sub\">");
   w.t(WebStr::Subtitle);
