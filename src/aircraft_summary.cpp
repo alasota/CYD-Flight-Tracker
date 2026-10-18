@@ -1,7 +1,8 @@
 #include "aircraft_summary.h"
 
-#include "place_names.h"  // placeName()
-#include "table_view.h"   // full AircraftRow definition
+#include "aircraft_names.h"  // airlineForCallsign(), friendlyAircraftType()
+#include "place_names.h"     // placeName()
+#include "table_view.h"      // full AircraftRow definition
 
 namespace {
 
@@ -25,11 +26,18 @@ std::string endpointLabel(const std::string &icao, const AirportInfo &airport, R
 std::string summaryFlight(const AircraftRow &row) { return orDash(row.aircraft.callsign); }
 
 std::string summaryAirline(const AircraftRow &row) {
-  if (row.info.found) return orDash(row.info.airline);
+  // hexdb.io's registered owner first, then the airline the callsign's ICAO
+  // prefix names (works even when hexdb.io doesn't know the airframe).
+  if (row.info.found && !row.info.airline.empty()) return row.info.airline;
+  if (const char *fromCallsign = airlineForCallsign(row.aircraft.callsign)) return fromCallsign;
+  if (row.info.found) return kUnknownText;
   return row.info_pending ? kPendingText : kUnknownText;
 }
 
 std::string summaryType(const AircraftRow &row) {
+  // Short friendly name from the ICAO type code ("737 MAX 8"), else
+  // hexdb.io's longer "Type" string.
+  if (const char *friendly = friendlyAircraftType(row.info.icao_type)) return friendly;
   if (row.info.found) return orDash(row.info.aircraft_type);
   return row.info_pending ? kPendingText : kUnknownText;
 }

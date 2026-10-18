@@ -139,6 +139,12 @@ struct PhaseTriangle {
 };
 PhaseTriangle phaseTriangle(Phase phase, int16_t cx, int16_t cy, int16_t size);
 
+// "Where to look" arrow: a triangle in a `size` x `size` box centred on
+// (cx, cy) whose tip (x0, y0) points along `bearingDeg` from home — 0 =
+// up/north, 90 = right/east (screen top = north, same as the radar). Pure.
+PhaseTriangle directionArrow(float bearingDeg, int16_t cx, int16_t cy, int16_t size);
+
+
 // Text colour for table row `rowIndex` (0-based within the page): white /
 // sky alternating, so a row is easy to follow across the columns. Pure.
 uint16_t tableRowTextColor(int rowIndex);
@@ -158,14 +164,27 @@ using TextMeasure = std::function<int(const std::string &)>;
 //   - not even "X..." fits        -> longest plain head that fits.
 //   - maxPx <= 0 / nothing fits   -> "".
 std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &measure);
+// (Cuts only on UTF-8 character boundaries — a multi-byte Polish letter is
+// never split, see isFontSafeText().)
 
-// Glyph height of LCARS_FONT_SMALL (fonts::Font0, the 6x8 GLCD font) —
-// exposed for the native test that it fits the 15px header.
-constexpr int16_t LCARS_FONT_SMALL_HEIGHT_PX = 8;
+// Number of characters (UTF-8 code points) in `utf8`, not bytes — for
+// layout maths with the efont fonts (fixed advance per ASCII character).
+size_t utf8Length(const std::string &utf8);
 
-// Glyph height of LCARS_FONT_BODY (fonts::Font2) — for the native test
-// that bottom-nav labels fit the 25px buttons.
+// True if every character of `text` is printable ASCII or one of the 18
+// Polish letters (ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ), as well-formed UTF-8 — the set the
+// display fonts are guaranteed to render. On-screen strings (i18n table,
+// city names) are tested against it.
+bool isFontSafeText(const std::string &text);
+
+// Metrics of LCARS_FONT_SMALL (fonts::efontJA_10) and LCARS_FONT_BODY
+// (fonts::efontJA_16): glyph height, and the fixed advance of an ASCII /
+// Latin character (efont's "half-width" glyphs are exactly half the em).
+// Exposed for the native layout tests (labels fit their strips/columns).
+constexpr int16_t LCARS_FONT_SMALL_HEIGHT_PX = 10;
+constexpr int16_t LCARS_FONT_SMALL_CHAR_PX = 5;
 constexpr int16_t LCARS_FONT_BODY_HEIGHT_PX = 16;
+constexpr int16_t LCARS_FONT_BODY_CHAR_PX = 8;
 
 // Side of the drawn phase triangle (drawPhaseIcon()) — a bit smaller than
 // the 16px text line it sits next to.
@@ -186,7 +205,7 @@ constexpr int16_t kPhaseIconSize = 10;
 extern const lgfx::IFont *const LCARS_FONT_HEADING;  // panel/header titles
 extern const lgfx::IFont *const LCARS_FONT_BODY;     // table rows, labels
 extern const lgfx::IFont *const LCARS_FONT_NUMERIC;  // altitude/speed readouts (7-seg style)
-extern const lgfx::IFont *const LCARS_FONT_SMALL;    // 8px labels for thin strips (sub-header, column header)
+extern const lgfx::IFont *const LCARS_FONT_SMALL;    // 10px labels for thin strips (header, column header)
 
 // Adapter: a TextMeasure that measures with `gfx`'s *current* font/size.
 TextMeasure gfxTextMeasure(lgfx::LovyanGFX &gfx);
@@ -206,6 +225,11 @@ void drawElbow(LGFX &gfx, int16_t x, int16_t y, int16_t height, int16_t headerWi
 // Fills phaseTriangle(phase, cx, cy, size) in phaseColor(phase). Draws
 // nothing for Phase::NONE.
 void drawPhaseIcon(LGFX &gfx, Phase phase, int16_t cx, int16_t cy, int16_t size);
+
+// Fills directionArrow(bearingDeg, cx, cy, size) in `color` — the "where to
+// look" arrow next to distances (featured panel, Screen 2).
+void drawDirectionArrow(LGFX &gfx, float bearingDeg, int16_t cx, int16_t cy, int16_t size,
+                        uint16_t color);
 
 // Pill-shaped button/label: a fully rounded rectangle (corner radius =
 // h/2) with text centered inside. Used for the stat pills.

@@ -39,7 +39,7 @@ static void test_screen_names_fit_the_header_block(void) {
   // name in any language may be longer than 7 chars.
   for (Language lang : {Language::PL, Language::EN}) {
     for (int i = 0; i < kScreenCount; ++i) {
-      TEST_ASSERT_TRUE(std::strlen(statusBarScreenName(i, lang)) <= 7);
+      TEST_ASSERT_TRUE(utf8Length(statusBarScreenName(i, lang)) <= 7);
     }
   }
 }
@@ -80,11 +80,11 @@ static void test_block_label_placeholder_before_first_data(void) {
 }
 
 static void test_block_label_polish_plurals(void) {
-  TEST_ASSERT_EQUAL_STRING("0 LOTOW", statusBarBlockLabel(0, true, Language::PL).c_str());
+  TEST_ASSERT_EQUAL_STRING("0 LOTÓW", statusBarBlockLabel(0, true, Language::PL).c_str());
   TEST_ASSERT_EQUAL_STRING("1 LOT", statusBarBlockLabel(1, true, Language::PL).c_str());
   TEST_ASSERT_EQUAL_STRING("3 LOTY", statusBarBlockLabel(3, true, Language::PL).c_str());
-  TEST_ASSERT_EQUAL_STRING("7 LOTOW", statusBarBlockLabel(7, true, Language::PL).c_str());
-  TEST_ASSERT_EQUAL_STRING("12 LOTOW", statusBarBlockLabel(12, true, Language::PL).c_str());
+  TEST_ASSERT_EQUAL_STRING("7 LOTÓW", statusBarBlockLabel(7, true, Language::PL).c_str());
+  TEST_ASSERT_EQUAL_STRING("12 LOTÓW", statusBarBlockLabel(12, true, Language::PL).c_str());
   TEST_ASSERT_EQUAL_STRING("22 LOTY", statusBarBlockLabel(22, true, Language::PL).c_str());
 }
 
@@ -96,8 +96,8 @@ static void test_block_label_english(void) {
 
 static void test_block_label_caps_large_counts(void) {
   // "99+" keeps the label inside the block however big the scan radius.
-  TEST_ASSERT_EQUAL_STRING("99 LOTOW", statusBarBlockLabel(99, true, Language::PL).c_str());
-  TEST_ASSERT_EQUAL_STRING("99+ LOTOW", statusBarBlockLabel(100, true, Language::PL).c_str());
+  TEST_ASSERT_EQUAL_STRING("99 LOTÓW", statusBarBlockLabel(99, true, Language::PL).c_str());
+  TEST_ASSERT_EQUAL_STRING("99+ LOTÓW", statusBarBlockLabel(100, true, Language::PL).c_str());
   TEST_ASSERT_EQUAL_STRING("99+ FLIGHTS", statusBarBlockLabel(250, true, Language::EN).c_str());
 }
 
@@ -105,7 +105,7 @@ static void test_block_label_never_longer_than_11_chars(void) {
   // kNameBlockWidth is sized for 11 chars of Font0 ("99+ FLIGHTS").
   for (Language lang : {Language::PL, Language::EN}) {
     for (int n = 0; n <= 1000; ++n) {
-      TEST_ASSERT_TRUE(statusBarBlockLabel(n, true, lang).size() <= 11);
+      TEST_ASSERT_TRUE(utf8Length(statusBarBlockLabel(n, true, lang)) <= 11);
     }
   }
 }

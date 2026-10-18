@@ -64,6 +64,7 @@
 #include "i18n.h"
 #include "lcars_theme.h"
 #include "lookup_budget.h"
+#include "lookup_store.h"
 #include "opensky_client.h"
 #include "radar_view.h"
 #include "redraw_policy.h"
@@ -123,6 +124,8 @@ static bool hasAircraftData = false;
 // extrapolates between polls so the Flight screen's countdown ticks every
 // second (CLAUDE.md "local ticking between polls").
 static CpaPrediction lastPolledCpa;
+// Which of lastRows Screen 2 shows (pickNowAircraft()), -1 = none.
+static int nowRowIndex = -1;
 static uint32_t lastCpaPollMs = 0;
 
 // Height of the table's page-back / page-forward tap strips — table_view's
@@ -143,9 +146,9 @@ static void drawActiveContent() {
   switch (nav.current()) {
     case kScreenFlight: {
       static const AircraftRow kNoRow{};
-      bool hasNearest = !lastRows.empty();
-      drawFlightScreen(tft, hasNearest ? lastRows.front() : kNoRow, hasNearest, currentCpa(),
-                       screenW);
+      const bool hasNow = nowRowIndex >= 0 && nowRowIndex < static_cast<int>(lastRows.size());
+      drawFlightScreen(tft, hasNow ? lastRows[static_cast<size_t>(nowRowIndex)] : kNoRow, hasNow,
+                       currentCpa(), screenW);
       break;
     }
     case kScreenRadar:
@@ -420,8 +423,18 @@ void loop() {
         for (const AircraftRow &r : lastRows) {
           byPriority.push_back({r.aircraft.icao24, r.aircraft.callsign});
         }
-        LookupPlan plan = planLookups(byPriority, aircraftLookupIsCached, routeLookupIsCached,
-                                      kDefaultLookupBudget);
+        // "Cached" = in RAM or persisted in NVS (lookup_store) — neither costs
+        // a hexdb.io request, so neither should use up the per-poll budget.
+        auto aircraftKnown = [](const std::string &k) {
+          return aircraftLookupIsCached(k) || storeHasAircraft(k);
+        };
+        auto routeKnown = [](const std::string &k) {
+          return routeLookupIsCached(k) || storeHasRoute(k);
+        };
+        auto airportKnown = [](const std::string &k) {
+          return airportLookupIsCached(k) || storeHasAirport(k);
+        };
+        LookupPlan plan = planLookups(byPriority, aircraftKnown, routeKnown, kDefaultLookupBudget);
 
         std::map<std::string, AircraftInfo> infoByIcao24;
         for (const std::string &hex : plan.icao24) {
@@ -463,8 +476,8 @@ void loop() {
           airportKeys.push_back({r.route.origin_icao, ""});
           airportKeys.push_back({r.route.dest_icao, ""});
         }
-        LookupPlan airportPlan = planLookups(airportKeys, airportLookupIsCached,
-                                             routeLookupIsCached, kDefaultAirportLookupBudget);
+        LookupPlan airportPlan =
+            planLookups(airportKeys, airportKnown, routeKnown, kDefaultAirportLookupBudget);
         std::map<std::string, AirportInfo> airportByCode;
         for (const std::string &code : airportPlan.icao24) {
           airportByCode[code] = lookupAirportCountry(code);
@@ -479,14 +492,19 @@ void loop() {
           else r.dest_airport_pending = true;
         }
 
-        // Recompute the nearest aircraft's CPA time; currentCpa() ticks it
-        // forward between polls.
-        lastPolledCpa = CpaPrediction{};
-        if (!lastRows.empty() && lastRows.front().aircraft.has_position) {
-          const Aircraft &ac = lastRows.front().aircraft;
-          lastPolledCpa = predictCpa(cachedCfg.home_lat, cachedCfg.home_lon, ac.lat, ac.lon,
-                                     ac.velocity, ac.true_track);
+        // Screen 2 ("TERAZ" / "NOW"): predict every aircraft's closest point of
+        // approach and show the one that will be overhead soonest (not just
+        // the nearest). currentCpa() ticks its countdown between polls.
+        std::vector<CpaPrediction> cpas(lastRows.size());
+        for (size_t i = 0; i < lastRows.size(); ++i) {
+          const Aircraft &ac = lastRows[i].aircraft;
+          if (!ac.has_position) continue;
+          cpas[i] = predictCpa(cachedCfg.home_lat, cachedCfg.home_lon, ac.lat, ac.lon,
+                               ac.velocity, ac.true_track);
         }
+        const NowPick now = pickNowAircraft(lastRows, cpas, kOverheadRadiusKm);
+        nowRowIndex = now.index;
+        lastPolledCpa = now.cpa;
         lastCpaPollMs = millis();
 
         FeaturedSplit split = splitFeaturedAndRest(lastRows);

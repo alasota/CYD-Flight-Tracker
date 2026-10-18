@@ -236,6 +236,35 @@ static void test_overflight_triangle_points_right(void) {
   TEST_ASSERT_EQUAL_INT(50, t.y0);
 }
 
+// ---- directionArrow: "where to look" (bearing from home, north up) ----------
+
+static void test_arrow_points_along_the_bearing(void) {
+  const int16_t cx = 50, cy = 50, size = 12;
+  PhaseTriangle n = directionArrow(0.0f, cx, cy, size);
+  TEST_ASSERT_TRUE(n.visible);
+  TEST_ASSERT_EQUAL_INT(cx, n.x0);  // tip straight up
+  TEST_ASSERT_TRUE(n.y0 < cy);
+  PhaseTriangle e = directionArrow(90.0f, cx, cy, size);
+  TEST_ASSERT_TRUE(e.x0 > cx);      // tip to the right
+  TEST_ASSERT_EQUAL_INT(cy, e.y0);
+  PhaseTriangle s = directionArrow(180.0f, cx, cy, size);
+  TEST_ASSERT_TRUE(s.y0 > cy);
+  PhaseTriangle w = directionArrow(270.0f, cx, cy, size);
+  TEST_ASSERT_TRUE(w.x0 < cx);
+}
+
+static void test_arrow_stays_inside_its_box(void) {
+  for (float b = 0.0f; b < 360.0f; b += 15.0f) {
+    PhaseTriangle t = directionArrow(b, 50, 50, 12);
+    const int16_t xs[] = {t.x0, t.x1, t.x2};
+    const int16_t ys[] = {t.y0, t.y1, t.y2};
+    for (int i = 0; i < 3; ++i) {
+      TEST_ASSERT_TRUE(xs[i] >= 44 && xs[i] <= 56);
+      TEST_ASSERT_TRUE(ys[i] >= 44 && ys[i] <= 56);
+    }
+  }
+}
+
 static void test_no_phase_draws_nothing(void) {
   TEST_ASSERT_FALSE(phaseTriangle(Phase::NONE, 100, 50, 10).visible);
 }
@@ -325,11 +354,39 @@ static void test_fit_ascii_ellipsis_only(void) {
   }
 }
 
+// ---- UTF-8 aware text helpers (efont renders Polish letters) ----------------
+
+static void test_utf8_length_counts_characters_not_bytes(void) {
+  TEST_ASSERT_EQUAL_size_t(4, utf8Length("SKAD"));
+  TEST_ASSERT_EQUAL_size_t(4, utf8Length("SK\xC4\x84" "D"));        // SKĄD: 5 bytes, 4 chars
+  TEST_ASSERT_EQUAL_size_t(4, utf8Length("\xC5\x81\xC3\xB3" "d\xC5\xBA"));  // Łódź
+  TEST_ASSERT_EQUAL_size_t(0, utf8Length(""));
+}
+
+static void test_font_safe_accepts_ascii_and_polish_only(void) {
+  TEST_ASSERT_TRUE(isFontSafeText("ZBLI\xC5\xBB" "A SI\xC4\x98"));  // ZBLIŻA SIĘ
+  TEST_ASSERT_TRUE(isFontSafeText("Krak\xC3\xB3w"));                // Kraków
+  TEST_ASSERT_TRUE(isFontSafeText("plain ASCII 123"));
+  TEST_ASSERT_FALSE(isFontSafeText("Z\xC3\xBCrich"));               // ü — not guaranteed
+  TEST_ASSERT_FALSE(isFontSafeText("\xE2\x80\x93"));                // en dash
+  TEST_ASSERT_FALSE(isFontSafeText("tab\there"));                   // control char
+  TEST_ASSERT_FALSE(isFontSafeText("\xC5"));                        // truncated sequence
+}
+
+static void test_fit_never_splits_a_utf8_character(void) {
+  // "Łódź Łódź" with a 1px-per-byte measure: every cut must land on a
+  // character boundary, i.e. the result is still font-safe UTF-8.
+  const std::string s = "\xC5\x81\xC3\xB3" "d\xC5\xBA \xC5\x81\xC3\xB3" "d\xC5\xBA";
+  for (int px = 0; px <= static_cast<int>(s.size()); ++px) {
+    TEST_ASSERT_TRUE(isFontSafeText(fitToWidth(s, px, kOnePx)));
+  }
+}
+
 // ---- small font vs. thin strips --------------------------------------------
 
 static void test_fonts_fit_header_and_nav(void) {
-  // Header text (Font0, drawn with a background colour) must fit the 15px
-  // header; nav button labels (Font2) must fit the 25px buttons.
+  // Header text (efont 10px, drawn with a background colour) must fit the 15px
+  // header; nav button labels (efont 16px) must fit the 25px buttons.
   TEST_ASSERT_TRUE(LCARS_FONT_SMALL_HEIGHT_PX + 4 <= LCARS_HEADER_HEIGHT);
   TEST_ASSERT_TRUE(LCARS_FONT_BODY_HEIGHT_PX + 4 <= LCARS_BOTTOM_NAV_HEIGHT);
 }
@@ -346,6 +403,9 @@ int main(int argc, char **argv) {
   RUN_TEST(test_fit_nonpositive_width_is_empty);
   RUN_TEST(test_fit_uses_pixel_width_not_char_count);
   RUN_TEST(test_fit_ascii_ellipsis_only);
+  RUN_TEST(test_utf8_length_counts_characters_not_bytes);
+  RUN_TEST(test_font_safe_accepts_ascii_and_polish_only);
+  RUN_TEST(test_fit_never_splits_a_utf8_character);
   RUN_TEST(test_fonts_fit_header_and_nav);
 
   RUN_TEST(test_rgb565_primary_colors);
@@ -367,6 +427,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_landing_triangle_points_down);
   RUN_TEST(test_overflight_triangle_points_right);
   RUN_TEST(test_no_phase_draws_nothing);
+  RUN_TEST(test_arrow_points_along_the_bearing);
+  RUN_TEST(test_arrow_stays_inside_its_box);
 
   RUN_TEST(test_variant_a_palette_values);
   RUN_TEST(test_chrome_and_content_use_different_colour_families);

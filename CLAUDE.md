@@ -327,10 +327,11 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   unchanged in content, rendered smaller (8px / LovyanGFX's equivalent of Adafruit "Font 2" —
   again, verify the exact font reference name for LovyanGFX rather than assuming the TFT_eSPI
   name carries over).
-- **Stat chips** (`featured_panel::featuredPillTexts()`): airborne → altitude (m) / speed (m/s)
+- **Stat chips** (`featured_panel::featuredPillTexts()`): airborne → altitude (m) / speed (km/h)
   / distance (km). **On the ground** (`on_ground`, e.g. taxiing at the nearby airport) → one
   double-width `NA ZIEMI` / `ON GROUND` chip + distance — altitude and speed are meaningless
   there, and `0m` / `1m/s` looked like a bug. A missing value shows `--`, never a fake `0`.
+  The distance chip also carries the "where to look" arrow (bearing from home, top = north).
 - Empty state ("no aircraft in range") still applies here, same as before — just now within
   these exact bounds.
 
@@ -354,12 +355,12 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
 
   | Column  | x (px) | width (px) | Content                     |
   |---------|--------|------------|-----------------------------|
-  | LOT     | 2      | 64         | callsign (8 chars in Font2) |
-  | LINIA   | 66     | 88         | airline (truncated)         |
-  | SKAD    | 154    | 36         | origin airport IATA code    |
-  | DOKAD   | 190    | 36         | destination airport IATA code |
-  | TYP     | 226    | 58         | aircraft type (truncated)   |
-  | FAZA    | 284    | 34         | phase triangle (EN label "PHASE" 30px + 4px label inset) |
+  | LOT     | 2      | 70         | callsign (8 chars x 8px efont) |
+  | ODL.    | 72     | 46         | distance from home, "8km" (replaced the airline column — the callsign already names the airline; distance says where to look) |
+  | SKĄD    | 118    | 34         | origin airport IATA code    |
+  | DOKĄD   | 152    | 34         | destination airport IATA code |
+  | TYP     | 186    | 102        | friendly aircraft type, <= 12 chars ("737 MAX 8") |
+  | FAZA    | 288    | 30         | phase triangle (EN label "PHASE" 25px + 4px label inset) |
 
 - **Every cell is truncated to its column width** before drawing — text must never spill into
   the next column (with a background color set, it overwrites its neighbour; without one, the
@@ -400,6 +401,20 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
 **Displayed as `NOW` (EN) / `TERAZ` (PL)** in the header block and bottom nav — renamed from
 "FLIGHT" on request. In code it's still `kScreenFlight` / `flight_screen`; only the on-screen
 name changed.
+
+**Current behaviour (supersedes "nearest aircraft" below):**
+- **Which aircraft:** `pickNowAircraft()` predicts every aircraft's CPA (now including
+  `CpaPrediction::miss_distance_km`, how far from home the closest point is) and shows the
+  airborne one whose CPA is within `kOverheadRadiusKm` (5 km) and soonest (not more than 10 s in
+  the past) — the question is "when will one be overhead", not "which is nearest". Without such
+  a candidate it shows the nearest airborne aircraft with no countdown.
+- **Honest empty states:** aircraft around but none passing overhead -> `NIE PRZELECI NAD TOBĄ`
+  / `NOT PASSING OVERHEAD`; only with no aircraft at all -> `BRAK LOTÓW W ZASIĘGU`. (The first
+  version said "no flights in range" while a plane was landing 1 km away.)
+- **Identity panel has 3 lines** (y:18..88): identity, city route, and a stats line — a "where
+  to look" arrow (`directionArrow()`: bearing from home, screen top = north) + `nowStatsText()`
+  ("3km  236m  266km/h" / "6km  NA ZIEMI"). Countdown zone y:92..186, status strip y:190..215.
+- Speeds everywhere are km/h (OpenSky's m/s x 3.6).
 
 Deliberately minimal — one aircraft, one number that matters: when will it actually be
 overhead. **Exact pixel spec**, below the 25px header, no scrolling:
@@ -575,9 +590,16 @@ language / Jezyk wyswietlacza" select, values `pl` / `en`). Default: Polish.
   Draw code uses the current language (`tr(id)`, set by `i18nSetLanguage()`); pure functions
   that return text take an explicit `Language` (e.g. `computeCountdownDisplay(cpa, lang)`,
   `statusBarScreenName(i, lang)`) so tests can check both languages.
-- **ASCII only** — Polish is ASCII-folded (`ZBLIZA SIE`, `NAD TOBA`) because the built-in bitmap
-  fonts only cover 0x20-0x7E. `test_i18n` enforces it. Real diacritics would need a custom
-  font (e.g. a generated VLW/u8g2 font with Latin Extended-A) — not done yet.
+- **Real Polish letters** (`ZBLIŻA SIĘ`, `SKĄD`, `Kraków`): body/small text uses LovyanGFX's
+  **efont** fonts (`fonts::efontJA_16` replaces Font2, `fonts::efontJA_10` replaces Font0) —
+  U8g2-format, Unicode, verified to contain all 18 Polish letters. They cost ~700 KB of flash,
+  which is why the build uses the `huge_app.csv` partition table (3 MB app). Every on-screen
+  string must be `isFontSafeText()` (ASCII + ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ) — `test_i18n`, the city table
+  and the type/airline tables are checked against it. `fitToWidth()` cuts only on UTF-8
+  character boundaries; layout maths uses `utf8Length()` and the fonts' fixed advance
+  (`LCARS_FONT_BODY_CHAR_PX` = 8, `LCARS_FONT_SMALL_CHAR_PX` = 5). hexdb.io airport names are
+  still ASCII-folded (`asciiFold()`), as they can contain any accent. Headings (Font4) and the
+  countdown digits (Font8) are unchanged — they never show Polish text.
 - **Length limits** that tests enforce: screen names ≤ 7 chars (header block), table column
   labels must fit their column in Font0.
 - **Persistence & apply.** `config_store` keeps it as `language` (NVS key `lang`, numeric index;
@@ -684,6 +706,17 @@ each with a single responsibility:
   `hitTest` pattern from Milestone 9), and the auto-cycle timer + `shouldDeferAutoSwitch()` (see
   "Auto screen cycling") — takes `t_cpa_seconds` as a parameter, doesn't call `cpa_predictor`
   itself. No TFT drawing, no OpenSky/hexdb.io calls.
+- `aircraft_names` — built-in tables (pure): **airline from the callsign's ICAO prefix**
+  (`SXS6JZ` -> SunExpress; 3 letters + digit only, so registrations like `SPKAX` are left alone)
+  for when hexdb.io doesn't know the airframe; and **friendly aircraft types** from hexdb.io's
+  `ICAOTypeCode` (`B38M` -> "737 MAX 8", `E75L` -> "E175", <= 12 chars to fit the TYP column)
+  instead of its long, truncated `Type` strings. `aircraft_summary` uses hexdb.io first, then
+  these tables, then `...` / `--`.
+- `lookup_store` — persists the hexdb.io caches (aircraft / route / airport) in NVS
+  (namespaces `lk_ac`, `lk_rt`, `lk_ap`; record = version + fields joined by 0x1F; confirmed
+  misses stored too). Lookups check RAM, then NVS, then hexdb.io; NVS hits count as free in the
+  per-poll budget. When NVS is full that kind's namespace is wiped (settings live in their own
+  namespace, untouched). Encode/decode is pure and native-tested.
 - `place_names` — readable place names for the detail views (pure): built-in IATA -> city table
   (PL + EN, ~120 airports likely over Poland), else hexdb.io airport name minus "International
   Airport", else IATA / ICAO; plus `asciiFold()` (UTF-8 -> drawable ASCII; hexdb.io names contain
@@ -771,6 +804,7 @@ platform = espressif32
 board = esp32dev
 framework = arduino
 monitor_speed = 115200
+board_build.partitions = huge_app.csv  ; 3 MB app — efont fonts + tables outgrew the default 1.25 MB
 lib_deps =
     lovyan03/LovyanGFX
     tzapu/WiFiManager

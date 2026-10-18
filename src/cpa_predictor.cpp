@@ -28,7 +28,12 @@ CpaPrediction predictCpa(double home_lat, double home_lon, double ac_lat, double
   }
 
   result.found = true;
-  result.t_cpa_seconds = static_cast<float>(-(dx_km * vx + dy_km * vy) / v2);
+  const double t = -(dx_km * vx + dy_km * vy) / v2;
+  result.t_cpa_seconds = static_cast<float>(t);
+  // Position relative to home at the CPA instant -> how close it passes.
+  const double cx = dx_km + vx * t;
+  const double cy = dy_km + vy * t;
+  result.miss_distance_km = static_cast<float>(std::sqrt(cx * cx + cy * cy));
   return result;
 }
 

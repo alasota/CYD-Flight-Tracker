@@ -108,6 +108,14 @@ bool airportLookupIsCached(const std::string &airport_code) {
   return airportCache.find(airport_code) != airportCache.end();
 }
 
+void routeLookupSeedCache(const std::string &callsign, const RouteInfo &info) {
+  routeCache[callsign] = info;
+}
+
+void airportLookupSeedCache(const std::string &airport_code, const AirportInfo &info) {
+  airportCache[airport_code] = info;
+}
+
 void routeLookupClearCacheForTesting() { routeCache.clear(); }
 void airportLookupClearCacheForTesting() { airportCache.clear(); }
 
@@ -119,7 +127,8 @@ void airportLookupClearCacheForTesting() { airportCache.clear(); }
 
 #include <cstdio>
 
-#include "net_config.h"  // shared HTTP timeouts (review notes 5.1)
+#include "lookup_store.h"  // NVS-persisted cache (storeLoad*/storeSave*)
+#include "net_config.h"    // shared HTTP timeouts (review notes 5.1)
 
 namespace {
 
@@ -178,12 +187,28 @@ HexdbFetchResult httpFetchAirport(const std::string &icao_code) {
 
 }  // namespace
 
+// Both: RAM cache miss -> try NVS (lookup_store) before hexdb.io; persist a
+// fresh confirmed answer.
 RouteInfo lookupRoute(const std::string &callsign) {
-  return lookupRouteWithFetcher(callsign, httpFetchRoute);
+  if (!routeLookupIsCached(callsign)) {
+    RouteInfo stored;
+    if (storeLoadRoute(callsign, stored)) routeLookupSeedCache(callsign, stored);
+  }
+  bool wasCacheHit = false;
+  RouteInfo info = lookupRouteWithFetcher(callsign, httpFetchRoute, &wasCacheHit);
+  if (!wasCacheHit && routeLookupIsCached(callsign)) storeSaveRoute(callsign, info);
+  return info;
 }
 
 AirportInfo lookupAirportCountry(const std::string &icao_code) {
-  return lookupAirportWithFetcher(icao_code, httpFetchAirport);
+  if (!airportLookupIsCached(icao_code)) {
+    AirportInfo stored;
+    if (storeLoadAirport(icao_code, stored)) airportLookupSeedCache(icao_code, stored);
+  }
+  bool wasCacheHit = false;
+  AirportInfo info = lookupAirportWithFetcher(icao_code, httpFetchAirport, &wasCacheHit);
+  if (!wasCacheHit && airportLookupIsCached(icao_code)) storeSaveAirport(icao_code, info);
+  return info;
 }
 
 #endif  // ARDUINO

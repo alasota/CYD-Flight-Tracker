@@ -12,8 +12,9 @@
 //      ("Rome-Fiumicino International Airport" -> "Rome-Fiumicino");
 //   3. the IATA code, then the ICAO code.
 //
-// All output is printable ASCII — the built-in bitmap fonts only cover
-// 0x20-0x7E, so Polish/accented letters are folded (asciiFold()).
+// All output is font-safe text (lcars_theme::isFontSafeText(): ASCII + the
+// Polish letters). hexdb.io airport names are folded to ASCII (asciiFold()),
+// since they can contain any accent or dash the fonts may not have.
 //
 // Pure — tested under `pio test -e native`.
 #pragma once
@@ -36,7 +37,7 @@ std::string shortAirportName(const std::string &airportName);
 // One built-in table row.
 struct CityEntry {
   const char *iata;
-  const char *pl;  // ASCII-folded Polish exonym, e.g. "Monachium"
+  const char *pl;  // Polish exonym (UTF-8, font-safe), e.g. "Monachium", "Kraków"
   const char *en;  // English name, e.g. "Munich"
 };
 

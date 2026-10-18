@@ -11,7 +11,8 @@
 struct AircraftInfo {
   bool found = false;
   std::string airline;        // hexdb.io "RegisteredOwners"
-  std::string aircraft_type;  // hexdb.io "Type"
+  std::string aircraft_type;  // hexdb.io "Type", e.g. "A319 111" / "737MAX 8"
+  std::string icao_type;      // hexdb.io "ICAOTypeCode", e.g. "A319" / "B38M"
   std::string registration;   // hexdb.io "Registration"
 };
 
@@ -76,6 +77,10 @@ AircraftInfo lookupAircraftWithFetcher(const std::string &icao24, AircraftFetchF
 // skipping ones that are already free — see CLAUDE.md review notes 1.1,
 // and main.cpp's per-poll lookup budget. Pure — just a cache query.
 bool aircraftLookupIsCached(const std::string &icao24);
+
+// Puts an already-known result (e.g. loaded from NVS by lookup_store) into
+// the RAM cache, so it counts as cached and is never fetched again.
+void aircraftLookupSeedCache(const std::string &icao24, const AircraftInfo &info);
 
 // Clears the in-RAM cache. Exposed for tests; production code has no real
 // reason to call this (an icao24's airline/type/registration essentially

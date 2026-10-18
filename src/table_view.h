@@ -154,12 +154,16 @@ constexpr int16_t kTableCellPadPx = 2;
 // doesn't sit right against the line.
 constexpr int16_t kTableHeaderLabelPadPx = 4;
 
-// The 6 columns, in order: LOT/FLIGHT, LINIA/AIRLINE, SKAD/FROM, DOKAD/TO,
+// The 6 columns, in order: LOT/FLIGHT, ODL./DIST, SKĄD/FROM, DOKĄD/TO,
 // TYP/TYPE, FAZA/PHASE.
 const TableColumn *tableColumns();
 
 // Pixel width available to a cell's text — what fitToWidth() cuts it to.
 int tableCellTextWidthPx(const TableColumn &col);
+
+// The ODL./DIST cell: distance from home, whole km ("8km"), or "--" when the
+// aircraft has no position.
+std::string tableDistanceText(const AircraftRow &row);
 
 // Number of pages needed to show `totalRows` records at `rowsPerPage` rows
 // per page (ceiling division) — 0 records or a non-positive rowsPerPage

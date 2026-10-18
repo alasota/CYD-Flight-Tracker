@@ -131,6 +131,26 @@ static void test_extrapolate_not_found_stays_not_found(void) {
   TEST_ASSERT_EQUAL_FLOAT(999.0f, now.t_cpa_seconds);  // untouched
 }
 
+// ---- miss distance at CPA (how close it actually passes) -------------------
+
+static void test_miss_distance_direct_overflight_is_zero(void) {
+  // 10 km north, flying due south straight over home.
+  CpaPrediction p = predictCpa(kHomeLat, kHomeLon, kmNorth(10.0), kHomeLon, 100.0, 180.0);
+  TEST_ASSERT_TRUE(p.found);
+  TEST_ASSERT_FLOAT_WITHIN(0.05f, 0.0f, p.miss_distance_km);
+}
+
+static void test_miss_distance_crossing_track(void) {
+  // Passes 5 km north of home (see test_crossing_track_perpendicular).
+  CpaPrediction p = predictCpa(kHomeLat, kHomeLon, kmNorth(5.0), kmEast(-10.0), 100.0, 90.0);
+  TEST_ASSERT_FLOAT_WITHIN(0.05f, 5.0f, p.miss_distance_km);
+}
+
+static void test_extrapolate_keeps_miss_distance(void) {
+  CpaPrediction p = predictCpa(kHomeLat, kHomeLon, kmNorth(5.0), kmEast(-10.0), 100.0, 90.0);
+  TEST_ASSERT_FLOAT_WITHIN(0.05f, 5.0f, extrapolateCpa(p, 3000).miss_distance_km);
+}
+
 int main(int, char **) {
   UNITY_BEGIN();
 
@@ -151,5 +171,8 @@ int main(int, char **) {
   RUN_TEST(test_extrapolate_zero_elapsed_is_identity);
   RUN_TEST(test_extrapolate_not_found_stays_not_found);
 
+  RUN_TEST(test_miss_distance_direct_overflight_is_zero);
+  RUN_TEST(test_miss_distance_crossing_track);
+  RUN_TEST(test_extrapolate_keeps_miss_distance);
   return UNITY_END();
 }

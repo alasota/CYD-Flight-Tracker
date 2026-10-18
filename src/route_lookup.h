@@ -96,6 +96,11 @@ bool routeLookupIsCached(const std::string &callsign);
 // main.cpp can budget *new* airport lookups per poll (cache hits are free).
 bool airportLookupIsCached(const std::string &airport_code);
 
+// Put an already-known result (e.g. loaded from NVS by lookup_store) into
+// the RAM cache, so it counts as cached and is never fetched again.
+void routeLookupSeedCache(const std::string &callsign, const RouteInfo &info);
+void airportLookupSeedCache(const std::string &airport_code, const AirportInfo &info);
+
 // Same idea, keyed by (ICAO) airport code.
 AirportInfo lookupAirportWithFetcher(const std::string &airport_code, AirportFetchFn fetch,
                                       bool *wasCacheHit = nullptr);

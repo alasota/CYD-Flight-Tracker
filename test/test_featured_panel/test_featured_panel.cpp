@@ -42,7 +42,7 @@ static void test_pills_airborne_altitude_speed_distance(void) {
   std::vector<std::string> p = featuredPillTexts(airborneRow(), Language::PL);
   TEST_ASSERT_EQUAL_size_t(3, p.size());
   TEST_ASSERT_EQUAL_STRING("1250m", p[0].c_str());
-  TEST_ASSERT_EQUAL_STRING("104m/s", p[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("373km/h", p[1].c_str());  // 103.6 m/s * 3.6
   TEST_ASSERT_EQUAL_STRING("6km", p[2].c_str());
 }
 

@@ -13,6 +13,9 @@ int16_t featuredPanelTopPx() { return kPanelTop; }
 int16_t featuredPanelHeightPx() { return kPanelHeight; }
 
 namespace {
+// OpenSky reports ground speed in m/s; km/h reads far better on a display.
+constexpr float kMpsToKmh = 3.6f;
+
 // "<n><unit>" rounded to a whole number, or "--" when the value is unknown.
 std::string pillValue(bool known, float value, const char *unit) {
   if (!known) return kUnknownText;
@@ -29,7 +32,7 @@ std::vector<std::string> featuredPillTexts(const AircraftRow &row, Language lang
   }
   const bool pos = row.aircraft.has_position;
   return {pillValue(pos, row.aircraft.baro_altitude, "m"),
-          pillValue(pos, row.aircraft.velocity, "m/s"), distance};
+          pillValue(pos, row.aircraft.velocity * kMpsToKmh, "km/h"), distance};
 }
 
 #ifdef ARDUINO
@@ -42,6 +45,7 @@ constexpr int16_t kRouteY = kPanelTop + 28;     // "WAW (PL) -> FCO (IT)" line
 constexpr int16_t kPillY = kPanelTop + 50;      // altitude / speed / distance chips
 constexpr int16_t kPillHeight = 22;
 constexpr int16_t kPillGap = 4;
+constexpr int16_t kArrowSize = 12;  // "where to look" arrow in the distance pill
 }  // namespace
 
 void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, int16_t screenWidth) {
@@ -78,6 +82,13 @@ void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, int16_t screenWidth) {
     const int16_t pw = wide ? static_cast<int16_t>(2 * pillW + kPillGap) : pillW;
     drawPillButton(gfx, x, kPillY, pw, kPillHeight, THEME_PILL_FILL, THEME_CONTENT_SECONDARY,
                    pills[i].c_str());
+    // Last pill = distance: add the "where to look" arrow (bearing from
+    // home, screen top = north) at its left end.
+    if (i + 1 == pills.size() && row.has_distance) {
+      drawDirectionArrow(gfx, row.bearing_deg, static_cast<int16_t>(x + kPillHeight / 2 + 2),
+                         static_cast<int16_t>(kPillY + kPillHeight / 2), kArrowSize,
+                         THEME_CONTENT_PRIMARY);
+    }
     x = static_cast<int16_t>(x + pw + kPillGap);
   }
 }

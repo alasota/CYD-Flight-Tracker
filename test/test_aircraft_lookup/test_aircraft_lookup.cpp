@@ -22,6 +22,7 @@ static void test_parse_found_response(void) {
   TEST_ASSERT_TRUE(info.found);
   TEST_ASSERT_EQUAL_STRING("easyJet Airline", info.airline.c_str());
   TEST_ASSERT_EQUAL_STRING("A319 111", info.aircraft_type.c_str());
+  TEST_ASSERT_EQUAL_STRING("A319", info.icao_type.c_str());
   TEST_ASSERT_EQUAL_STRING("G-EZBZ", info.registration.c_str());
 }
 

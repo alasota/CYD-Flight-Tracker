@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "aircraft_summary.h"  // RouteFormat + the identity/route formatters
 #include "cpa_predictor.h"     // CpaPrediction
@@ -36,12 +37,35 @@ struct AircraftRow;
 
 // Fixed zone geometry from CLAUDE.md "Screen 2" — absolute y on the
 // 320x240 frame.
-int16_t flightIdentityTopPx();      // 28
-int16_t flightIdentityHeightPx();   // 50   (28..78)
-int16_t flightCountdownTopPx();     // 82
-int16_t flightCountdownHeightPx();  // 113  (82..195)
-int16_t flightStatusTopPx();        // 200
-int16_t flightStatusHeightPx();     // 25   (200..225)
+int16_t flightIdentityTopPx();      // 18
+int16_t flightIdentityHeightPx();   // 70  (18..88): identity, route, stats lines
+int16_t flightCountdownTopPx();     // 92
+int16_t flightCountdownHeightPx();  // 94  (92..186)
+int16_t flightStatusTopPx();        // 190
+int16_t flightStatusHeightPx();     // 25  (190..215)
+
+// "Will pass overhead" = the closest point of approach is within this many
+// km of home.
+constexpr float kOverheadRadiusKm = 5.0f;
+
+// Which aircraft Screen 2 shows, and its countdown.
+struct NowPick {
+  int index = -1;     // into the rows; -1 = no aircraft at all
+  CpaPrediction cpa;  // found == false -> nobody will pass overhead
+};
+
+// Screen 2's job is "when will it be overhead", so it picks — among
+// airborne aircraft whose CPA is at most `overheadKm` from home and not
+// more than 10 s in the past — the one with the *soonest* CPA (not simply
+// the nearest one). Without such a candidate it shows the nearest airborne
+// aircraft (rows are nearest-first) with no prediction, or row 0 if all are
+// on the ground. `cpas[i]` belongs to `rows[i]`. Pure — native-tested.
+NowPick pickNowAircraft(const std::vector<AircraftRow> &rows,
+                        const std::vector<CpaPrediction> &cpas, float overheadKm);
+
+// Screen 2's stats line under the route (after the direction arrow):
+// "3km  236m  266km/h", or "6km  NA ZIEMI" on the ground. Pure.
+std::string nowStatsText(const AircraftRow &row, Language lang);
 
 // How the countdown zone renders a given CpaPrediction.
 struct CountdownDisplay {
@@ -56,17 +80,19 @@ struct CountdownDisplay {
 };
 
 // Classifies `cpa` per CLAUDE.md "Screen 2" (labels shown PL / EN, from i18n):
-//   not found, or t_cpa_seconds < -10  -> Empty
-//        "--" / "BRAK LOTOW W ZASIEGU" | "NO FLIGHTS IN RANGE" / white, not colour-coded
+//   not found, or t_cpa_seconds < -10  -> Empty, "--", white, not colour-coded:
+//        `anyAircraft` ? "NIE PRZELECI NAD TOBĄ" | "NOT PASSING OVERHEAD"
+//                      : "BRAK LOTÓW W ZASIĘGU" | "NO FLIGHTS IN RANGE"
 //   t_cpa_seconds > 60                 -> Minutes
-//        "~<n>" + "MIN" / "SZACOWANY CZAS" | "ESTIMATED TIME" / LCARS_MAGENTA
-//   10 < t_cpa_seconds <= 60           -> Seconds, LCARS_CYAN   / "ZBLIZA SIE" | "APPROACHING"
-//   0 <= t_cpa_seconds <= 10           -> Seconds, LCARS_YELLOW / "NAD TOBA" | "OVERHEAD"
-//   -10 <= t_cpa_seconds < 0           -> Seconds, LCARS_ORANGE / "MINAL" | "PASSED"
+//        "~<n>" + "MIN" / "SZACOWANY CZAS" | "ESTIMATED TIME" / lilac
+//   10 < t_cpa_seconds <= 60           -> Seconds, sky    / "ZBLIŻA SIĘ" | "APPROACHING"
+//   0 <= t_cpa_seconds <= 10           -> Seconds, yellow / "NAD TOBĄ" | "OVERHEAD"
+//   -10 <= t_cpa_seconds < 0           -> Seconds, peach  / "MINĄŁ" | "PASSED"
 // The number is rounded to the nearest whole second (nearest whole minute
 // in Minutes mode). Only the text depends on `lang` — mode, number and
 // colour don't.
-CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang);
+CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang,
+                                         bool anyAircraft);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme +
 // aircraft_summary. Not covered by Unity (see CLAUDE.md "Testing").

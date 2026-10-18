@@ -3,6 +3,7 @@
 #include <cstring>
 #include <string>
 
+#include "lcars_theme.h"  // isFontSafeText()
 #include "place_names.h"
 
 void setUp(void) {}
@@ -59,6 +60,8 @@ static void test_short_name_never_empty_if_input_is_not(void) {
 // ---- cityForIata (built-in table) -----------------------------------------------
 
 static void test_city_table_polish_and_english(void) {
+  TEST_ASSERT_EQUAL_STRING("Kraków", cityForIata("KRK", Language::PL));  // Kraków
+  TEST_ASSERT_EQUAL_STRING("Krakow", cityForIata("KRK", Language::EN));
   TEST_ASSERT_EQUAL_STRING("Warszawa", cityForIata("WAW", Language::PL));
   TEST_ASSERT_EQUAL_STRING("Warsaw", cityForIata("WAW", Language::EN));
   TEST_ASSERT_EQUAL_STRING("Londyn", cityForIata("LHR", Language::PL));
@@ -74,8 +77,8 @@ static void test_city_table_unknown_is_null(void) {
   TEST_ASSERT_NULL(cityForIata("WA", Language::EN));
 }
 
-static void test_city_table_is_sorted_unique_ascii(void) {
-  // Binary search relies on strict IATA order; fonts need ASCII.
+static void test_city_table_is_sorted_unique_font_safe(void) {
+  // Binary search relies on strict IATA order; the fonts need font-safe text.
   const int n = cityTableSize();
   TEST_ASSERT_TRUE(n > 50);
   for (int i = 0; i < n; ++i) {
@@ -84,9 +87,7 @@ static void test_city_table_is_sorted_unique_ascii(void) {
     if (i > 0) TEST_ASSERT_TRUE(std::strcmp(cityTableEntry(i - 1).iata, e.iata) < 0);
     for (const char *s : {e.pl, e.en}) {
       TEST_ASSERT_TRUE(std::strlen(s) > 0);
-      for (const char *p = s; *p; ++p) {
-        TEST_ASSERT_TRUE(static_cast<unsigned char>(*p) >= 0x20 && static_cast<unsigned char>(*p) <= 0x7E);
-      }
+      TEST_ASSERT_TRUE_MESSAGE(isFontSafeText(s), s);  // ASCII + Polish letters
     }
   }
 }
@@ -132,7 +133,7 @@ int main(int, char **) {
 
   RUN_TEST(test_city_table_polish_and_english);
   RUN_TEST(test_city_table_unknown_is_null);
-  RUN_TEST(test_city_table_is_sorted_unique_ascii);
+  RUN_TEST(test_city_table_is_sorted_unique_font_safe);
 
   RUN_TEST(test_place_name_prefers_city_table);
   RUN_TEST(test_place_name_falls_back_to_short_airport_name);

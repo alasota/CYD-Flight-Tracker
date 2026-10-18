@@ -33,7 +33,7 @@ int16_t featuredPanelTopPx();     // 18
 int16_t featuredPanelHeightPx();  // 77 (18..95)
 
 // Texts for the stat pills under the featured aircraft: airborne ->
-// {"<alt>m", "<speed>m/s", "<dist>km"}; on the ground -> {"NA ZIEMI" /
+// {"<alt>m", "<speed>km/h", "<dist>km"}; on the ground -> {"NA ZIEMI" /
 // "ON GROUND", "<dist>km"} (altitude and speed mean nothing while taxiing,
 // and "0m" / "1m/s" read like a bug — the first pill is drawn double-width).
 // A missing value is "--", never a fake 0. Pure — native-tested.

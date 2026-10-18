@@ -22,6 +22,8 @@ AircraftInfo parseAircraftLookupResponse(const std::string &json) {
 
   info.airline = doc["RegisteredOwners"].as<std::string>();
   info.aircraft_type = doc["Type"].isNull() ? std::string() : doc["Type"].as<std::string>();
+  info.icao_type =
+      doc["ICAOTypeCode"].isNull() ? std::string() : doc["ICAOTypeCode"].as<std::string>();
   info.registration =
       doc["Registration"].isNull() ? std::string() : doc["Registration"].as<std::string>();
   info.found = true;
@@ -60,6 +62,10 @@ bool aircraftLookupIsCached(const std::string &icao24) {
   return cache.find(icao24) != cache.end();
 }
 
+void aircraftLookupSeedCache(const std::string &icao24, const AircraftInfo &info) {
+  cache[icao24] = info;
+}
+
 void aircraftLookupClearCacheForTesting() { cache.clear(); }
 
 #ifdef ARDUINO
@@ -70,7 +76,8 @@ void aircraftLookupClearCacheForTesting() { cache.clear(); }
 
 #include <cstdio>
 
-#include "net_config.h"  // shared HTTP timeouts (review notes 5.1)
+#include "lookup_store.h"  // NVS-persisted cache (storeLoad*/storeSave*)
+#include "net_config.h"    // shared HTTP timeouts (review notes 5.1)
 
 namespace {
 
@@ -120,8 +127,17 @@ FetchResult httpFetchAircraftJson(const std::string &icao24) {
 }  // namespace
 
 AircraftInfo lookupAircraft(const std::string &icao24) {
+  // RAM cache miss -> try the copy persisted in NVS before asking hexdb.io.
+  if (!aircraftLookupIsCached(icao24)) {
+    AircraftInfo stored;
+    if (storeLoadAircraft(icao24, stored)) aircraftLookupSeedCache(icao24, stored);
+  }
+
   bool wasCacheHit = false;
   AircraftInfo info = lookupAircraftWithFetcher(icao24, httpFetchAircraftJson, &wasCacheHit);
+
+  // A fresh, confirmed hexdb.io answer (hit or definite miss) -> persist it.
+  if (!wasCacheHit && aircraftLookupIsCached(icao24)) storeSaveAircraft(icao24, info);
 
   Serial.printf("[aircraft_lookup] %s: %s (found=%s, airline=%s, type=%s)\n", icao24.c_str(),
                 wasCacheHit ? "cache hit" : "HTTP request", info.found ? "true" : "false",

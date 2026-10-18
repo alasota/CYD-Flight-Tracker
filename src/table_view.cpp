@@ -1,6 +1,7 @@
 #include "table_view.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cmath>
 #include <limits>
 
@@ -125,18 +126,29 @@ static_assert(kFirstRowY + kTableRowsPerPage * kRowStep <= LCARS_CONTENT_BOTTOM,
 // Columns: flight, airline, origin, destination, aircraft type, phase icon
 // (see CLAUDE.md "Screen 1" — altitude/speed/distance moved to
 // featured_panel's pills, shown only for the one closest aircraft).
-// LOT is wide enough for an 8-char callsign in Font2; FAZA for the longest
-// phase label ("PHASE", 30px) in Font0.
+// Sized for the efont fonts (8px per character in the rows, 5px in the
+// header): LOT fits an 8-char callsign, ODL. "123km", SKĄD/DOKĄD a 3-letter
+// IATA code, TYP a ~12-char friendly type name ("777-300ER"), FAZA the
+// phase triangle and its "PHASE" label. The airline column was dropped:
+// the callsign already names the airline, and distance tells you where to
+// look.
 constexpr TableColumn kColumns[kTableColumnCount] = {
-    {Str::ColFlight, 2, 64}, {Str::ColAirline, 66, 88}, {Str::ColFrom, 154, 36},
-    {Str::ColTo, 190, 36},   {Str::ColType, 226, 58},   {Str::ColPhase, 284, 34},
+    {Str::ColFlight, 2, 70}, {Str::ColDistance, 72, 46}, {Str::ColFrom, 118, 34},
+    {Str::ColTo, 152, 34},   {Str::ColType, 186, 102},   {Str::ColPhase, 288, 30},
 };
-enum ColumnIndex { kColFlight, kColAirline, kColOrigin, kColDest, kColType, kColPhase };
+enum ColumnIndex { kColFlight, kColDistance, kColOrigin, kColDest, kColType, kColPhase };
 }  // namespace
 
 const TableColumn *tableColumns() { return kColumns; }
 
 int tableCellTextWidthPx(const TableColumn &col) { return col.w - 2 * kTableCellPadPx; }
+
+std::string tableDistanceText(const AircraftRow &row) {
+  if (!row.has_distance) return kUnknownText;
+  char buf[12];
+  std::snprintf(buf, sizeof(buf), "%.0fkm", static_cast<double>(row.distance_km));
+  return buf;
+}
 
 int tableRowsPerPage() { return kTableRowsPerPage; }
 int16_t tableRowHeightPx() { return kRowStep; }
@@ -194,7 +206,7 @@ void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t 
     gfx.setTextColor(tableRowTextColor(i), LCARS_BLACK);  // white / sky, alternating
     // "..." = still loading, "--" = unknown; airports as IATA codes.
     drawCell(gfx, kColumns[kColFlight], summaryFlight(row), rowY, textY, measure);
-    drawCell(gfx, kColumns[kColAirline], summaryAirline(row), rowY, textY, measure);
+    drawCell(gfx, kColumns[kColDistance], tableDistanceText(row), rowY, textY, measure);
     drawCell(gfx, kColumns[kColOrigin], rowAirportCode(row, /*origin=*/true), rowY, textY,
              measure);
     drawCell(gfx, kColumns[kColDest], rowAirportCode(row, /*origin=*/false), rowY, textY,

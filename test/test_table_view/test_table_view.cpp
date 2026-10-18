@@ -321,14 +321,14 @@ static void test_columns_count_and_order(void) {
   TEST_ASSERT_EQUAL_INT(6, kTableColumnCount);
   const TableColumn *cols = tableColumns();
   TEST_ASSERT_EQUAL_STRING("LOT", tr(cols[0].label, Language::PL));
-  TEST_ASSERT_EQUAL_STRING("LINIA", tr(cols[1].label, Language::PL));
-  TEST_ASSERT_EQUAL_STRING("SKAD", tr(cols[2].label, Language::PL));
-  TEST_ASSERT_EQUAL_STRING("DOKAD", tr(cols[3].label, Language::PL));
+  TEST_ASSERT_EQUAL_STRING("ODL.", tr(cols[1].label, Language::PL));
+  TEST_ASSERT_EQUAL_STRING("SKĄ" "D", tr(cols[2].label, Language::PL));
+  TEST_ASSERT_EQUAL_STRING("DOKĄ" "D", tr(cols[3].label, Language::PL));
   TEST_ASSERT_EQUAL_STRING("TYP", tr(cols[4].label, Language::PL));
   TEST_ASSERT_EQUAL_STRING("FAZA", tr(cols[5].label, Language::PL));
 
   TEST_ASSERT_EQUAL_STRING("FLIGHT", tr(cols[0].label, Language::EN));
-  TEST_ASSERT_EQUAL_STRING("AIRLINE", tr(cols[1].label, Language::EN));
+  TEST_ASSERT_EQUAL_STRING("DIST", tr(cols[1].label, Language::EN));
   TEST_ASSERT_EQUAL_STRING("FROM", tr(cols[2].label, Language::EN));
   TEST_ASSERT_EQUAL_STRING("TO", tr(cols[3].label, Language::EN));
   TEST_ASSERT_EQUAL_STRING("TYPE", tr(cols[4].label, Language::EN));
@@ -354,7 +354,7 @@ static void test_columns_fit_the_320px_screen(void) {
 }
 
 static void test_column_labels_fit_their_columns_in_small_font(void) {
-  // Labels are drawn in LCARS_FONT_SMALL (Font0, 6px advance) at
+  // Labels are drawn in LCARS_FONT_SMALL (efont 10px, 5px per character) at
   // x + kTableHeaderLabelPadPx (clear of the divider line); they must not
   // reach the next column — in every
   // language.
@@ -362,7 +362,7 @@ static void test_column_labels_fit_their_columns_in_small_font(void) {
   for (Language lang : {Language::PL, Language::EN}) {
     for (int i = 0; i < kTableColumnCount; ++i) {
       const char *label = tr(cols[i].label, lang);
-      int labelPx = static_cast<int>(std::string(label).size()) * 6;
+      int labelPx = static_cast<int>(utf8Length(label)) * LCARS_FONT_SMALL_CHAR_PX;
       TEST_ASSERT_TRUE_MESSAGE(kTableHeaderLabelPadPx + labelPx <= cols[i].w, label);
     }
   }
@@ -374,10 +374,32 @@ static void test_header_labels_keep_clear_of_the_divider(void) {
 }
 
 static void test_airport_columns_fit_an_iata_code(void) {
-  // 3 letters of Font2 (~9px each) plus padding.
+  // 3 letters of the body font (8px each).
   const TableColumn *cols = tableColumns();
-  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[2]) >= 30);
-  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[3]) >= 30);
+  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[2]) >= 3 * LCARS_FONT_BODY_CHAR_PX);
+  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[3]) >= 3 * LCARS_FONT_BODY_CHAR_PX);
+}
+
+static void test_callsign_and_distance_columns_never_truncate(void) {
+  const TableColumn *cols = tableColumns();
+  // An 8-character callsign ("WZZ1234A") and "123km".
+  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[0]) >= 8 * LCARS_FONT_BODY_CHAR_PX);
+  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[1]) >= 5 * LCARS_FONT_BODY_CHAR_PX);
+}
+
+static void test_type_column_fits_a_readable_type_name(void) {
+  // "777-300ER" / "Dash 8-400" — the friendly names from aircraft_types.
+  TEST_ASSERT_TRUE(tableCellTextWidthPx(tableColumns()[4]) >= 10 * LCARS_FONT_BODY_CHAR_PX);
+}
+
+static void test_distance_text(void) {
+  AircraftRow row;
+  TEST_ASSERT_EQUAL_STRING("--", tableDistanceText(row).c_str());  // no position
+  row.has_distance = true;
+  row.distance_km = 7.6f;
+  TEST_ASSERT_EQUAL_STRING("8km", tableDistanceText(row).c_str());
+  row.distance_km = 0.3f;
+  TEST_ASSERT_EQUAL_STRING("0km", tableDistanceText(row).c_str());
 }
 
 static void test_cell_text_width_excludes_padding(void) {
@@ -494,6 +516,9 @@ int main(int argc, char **argv) {
   RUN_TEST(test_columns_fit_the_320px_screen);
   RUN_TEST(test_column_labels_fit_their_columns_in_small_font);
   RUN_TEST(test_cell_text_width_excludes_padding);
+  RUN_TEST(test_callsign_and_distance_columns_never_truncate);
+  RUN_TEST(test_type_column_fits_a_readable_type_name);
+  RUN_TEST(test_distance_text);
   RUN_TEST(test_header_labels_keep_clear_of_the_divider);
   RUN_TEST(test_airport_columns_fit_an_iata_code);
 

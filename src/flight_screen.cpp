@@ -6,11 +6,11 @@
 
 namespace {
 constexpr int16_t kIdentityTop = LCARS_CONTENT_TOP;  // 18
-constexpr int16_t kIdentityHeight = 50;   // y:18..68
-constexpr int16_t kCountdownTop = kIdentityTop + kIdentityHeight + 4;  // 72
-constexpr int16_t kCountdownHeight = 113;  // y:72..185
+constexpr int16_t kIdentityHeight = 70;   // y:18..88 — identity, route, stats lines
+constexpr int16_t kCountdownTop = kIdentityTop + kIdentityHeight + 4;  // 92
 constexpr int16_t kStatusTop = LCARS_CONTENT_BOTTOM - 25;  // 190
 constexpr int16_t kStatusHeight = 25;      // y:190..215 (bottom nav: 215..240)
+constexpr int16_t kCountdownHeight = kStatusTop - 4 - kCountdownTop;  // 94 (y:92..186)
 
 // Empty-state colour — deliberately outside the urgency palette
 // ("no colour-coding" in CLAUDE.md).
@@ -24,7 +24,43 @@ int16_t flightCountdownHeightPx() { return kCountdownHeight; }
 int16_t flightStatusTopPx() { return kStatusTop; }
 int16_t flightStatusHeightPx() { return kStatusHeight; }
 
-CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang) {
+NowPick pickNowAircraft(const std::vector<AircraftRow> &rows,
+                        const std::vector<CpaPrediction> &cpas, float overheadKm) {
+  NowPick pick;
+  if (rows.empty()) return pick;
+
+  // Soonest CPA among airborne aircraft that will actually pass overhead.
+  for (size_t i = 0; i < rows.size() && i < cpas.size(); ++i) {
+    const CpaPrediction &c = cpas[i];
+    if (rows[i].aircraft.on_ground || !c.found) continue;
+    if (c.t_cpa_seconds < -10.0f || c.miss_distance_km > overheadKm) continue;
+    if (pick.index < 0 || c.t_cpa_seconds < pick.cpa.t_cpa_seconds) {
+      pick.index = static_cast<int>(i);
+      pick.cpa = c;
+    }
+  }
+  if (pick.index >= 0) return pick;
+
+  // Nobody passes overhead: show the nearest airborne aircraft, no countdown.
+  pick.index = 0;
+  for (size_t i = 0; i < rows.size(); ++i) {
+    if (!rows[i].aircraft.on_ground) {
+      pick.index = static_cast<int>(i);
+      break;
+    }
+  }
+  return pick;
+}
+
+std::string nowStatsText(const AircraftRow &row, Language lang) {
+  // Same values as the featured panel's pills, distance first.
+  const std::vector<std::string> p = featuredPillTexts(row, lang);
+  if (p.size() == 2) return p[1] + "  " + p[0];  // "6km  NA ZIEMI"
+  return p[2] + "  " + p[0] + "  " + p[1];       // "3km  236m  266km/h"
+}
+
+CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang,
+                                         bool anyAircraft) {
   CountdownDisplay out;
 
   const float t = cpa.t_cpa_seconds;
@@ -33,7 +69,7 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang
     out.mode = CountdownDisplay::Mode::Empty;
     out.bigText = "--";
     out.suffixText = "";
-    out.statusLabel = tr(Str::NoFlightsInRange, lang);
+    out.statusLabel = tr(anyAircraft ? Str::StatusNotOverhead : Str::NoFlightsInRange, lang);
     out.color = kEmptyColor;
     out.colorCoded = false;
     return out;
@@ -73,6 +109,9 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang
 
 namespace {
 constexpr int16_t kSideMargin = 10;   // identity panel x:10..(w-10), per CLAUDE.md
+constexpr int16_t kTextInset = 6;     // = aircraft_summary's text margin, so lines align
+constexpr int16_t kStatsLineOffset = 46;  // 3rd line (identity +6, route +26)
+constexpr int16_t kArrowSize = 12;
 constexpr int16_t kSuffixGap = 6;
 
 // Big-glyph font per countdown mode. Font8 is the ~75px 7-seg-style
@@ -95,8 +134,22 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
   const int16_t frameW = static_cast<int16_t>(screenWidth - 2 * kSideMargin);
 
   if (hasNearest) {
-    drawAircraftSummary(gfx, nearest, kSideMargin,
-                        kIdentityTop, frameW, kIdentityHeight);
+    drawAircraftSummary(gfx, nearest, kSideMargin, kIdentityTop, frameW, kIdentityHeight);
+
+    // Third line: "where to look" arrow + distance / altitude / speed.
+    const int16_t statsY = static_cast<int16_t>(kIdentityTop + kStatsLineOffset);
+    const int16_t textX = static_cast<int16_t>(kSideMargin + kTextInset);
+    int16_t statsX = textX;
+    if (nearest.has_distance) {
+      drawDirectionArrow(gfx, nearest.bearing_deg, static_cast<int16_t>(textX + kArrowSize / 2),
+                         static_cast<int16_t>(statsY + LCARS_FONT_BODY_HEIGHT_PX / 2), kArrowSize,
+                         THEME_CONTENT_PRIMARY);
+      statsX = static_cast<int16_t>(textX + kArrowSize + 6);
+    }
+    gfx.setFont(LCARS_FONT_BODY);
+    gfx.setTextDatum(top_left);
+    gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
+    gfx.drawString(nowStatsText(nearest, i18nLanguage()).c_str(), statsX, statsY);
   } else {
     gfx.setFont(LCARS_FONT_BODY);
     gfx.setTextDatum(middle_center);
@@ -172,7 +225,7 @@ bool countdownSpriteTried = false;
 void drawFlightCountdown(LGFX &gfx, bool hasNearest, const CpaPrediction &cpa,
                          int16_t screenWidth) {
   const CountdownDisplay cd =
-      computeCountdownDisplay(hasNearest ? cpa : CpaPrediction{}, i18nLanguage());
+      computeCountdownDisplay(hasNearest ? cpa : CpaPrediction{}, i18nLanguage(), hasNearest);
   const int16_t zoneH = static_cast<int16_t>(kStatusTop + kStatusHeight - kCountdownTop);
 
   if (!countdownSpriteTried) {

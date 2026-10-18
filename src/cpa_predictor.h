@@ -19,6 +19,10 @@ struct CpaPrediction {
   // future, negative = CPA already happened that many seconds ago. Only
   // meaningful when `found` is true.
   float t_cpa_seconds = 0.0f;
+  // How far from home the aircraft is at that closest point (km) — 0 for a
+  // track straight over home. Lets Screen 2 tell "will pass overhead" apart
+  // from "closest approach is still 20 km away". Valid when `found`.
+  float miss_distance_km = 0.0f;
 };
 
 // Computes time-to-CPA for an aircraft moving in a straight line at

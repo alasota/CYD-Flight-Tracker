@@ -4,6 +4,7 @@
 #include <string>
 
 #include "i18n.h"
+#include "lcars_theme.h"  // isFontSafeText()
 
 void setUp(void) { i18nSetLanguage(kDefaultLanguage); }
 void tearDown(void) {}
@@ -22,17 +23,21 @@ static void test_every_string_non_empty_in_every_language(void) {
   }
 }
 
-static void test_every_string_is_printable_ascii(void) {
-  // The built-in bitmap fonts only cover 0x20-0x7E — a Polish diacritic
-  // (UTF-8 multi-byte) would render as garbage, so they're ASCII-folded.
+static void test_every_string_is_font_safe(void) {
+  // The efont display fonts render ASCII + the Polish letters; anything
+  // else (or broken UTF-8) would show up as garbage on the panel.
   for (Language lang : kAllLanguages) {
     for (int i = 0; i < kStrCount; ++i) {
-      for (const char *p = tr(static_cast<Str>(i), lang); *p; ++p) {
-        unsigned char c = static_cast<unsigned char>(*p);
-        TEST_ASSERT_TRUE_MESSAGE(c >= 0x20 && c <= 0x7E, tr(static_cast<Str>(i), lang));
-      }
+      const char *s = tr(static_cast<Str>(i), lang);
+      TEST_ASSERT_TRUE_MESSAGE(isFontSafeText(s), s);
     }
   }
+}
+
+static void test_polish_uses_real_diacritics(void) {
+  TEST_ASSERT_EQUAL_STRING("ZBLI\xC5\xBB" "A SI\xC4\x98", tr(Str::StatusApproaching, Language::PL));
+  TEST_ASSERT_EQUAL_STRING("NAD TOB\xC4\x84", tr(Str::StatusOverhead, Language::PL));
+  TEST_ASSERT_EQUAL_STRING("SK\xC4\x84" "D", tr(Str::ColFrom, Language::PL));
 }
 
 static void test_out_of_range_id_does_not_crash(void) {
@@ -130,7 +135,8 @@ int main(int, char **) {
   RUN_TEST(test_plural_english);
 
   RUN_TEST(test_every_string_non_empty_in_every_language);
-  RUN_TEST(test_every_string_is_printable_ascii);
+  RUN_TEST(test_every_string_is_font_safe);
+  RUN_TEST(test_polish_uses_real_diacritics);
   RUN_TEST(test_out_of_range_id_does_not_crash);
 
   RUN_TEST(test_screen_names);

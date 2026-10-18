@@ -13,8 +13,9 @@
 //     no PROGMEM / F() needed (those are AVR-era and no-ops on ESP32).
 //   - Lookup is an array index: tr(id) costs nothing at draw time.
 //
-// Text is ASCII-folded Polish ("ZBLIZA SIE", not "ZBLIŻA SIĘ"): the built-in
-// LovyanGFX bitmap fonts only cover 0x20-0x7E. The native tests enforce it.
+// Text is real Polish in UTF-8 ("ZBLIŻA SIĘ"): the display fonts are efont
+// (lcars_theme), which have the Polish letters. Every string must still be
+// isFontSafeText() (ASCII + ąćęłńóśźż) — the native tests enforce it.
 //
 // Pure — no Arduino dependency — tested under `pio test -e native`.
 #pragma once
@@ -34,30 +35,31 @@ constexpr Language kDefaultLanguage = Language::PL;
   X(ScreenFlights, "LOTY", "FLIGHTS")                                       \
   X(ScreenNow, "TERAZ", "NOW")                                              \
   X(ScreenRadar, "RADAR", "RADAR")                                          \
-  /* Screen 1 table column header (Font0, must fit table_view columns) */  \
+  /* Screen 1 table column header (small font, must fit table_view cols) */ \
   X(ColFlight, "LOT", "FLIGHT")                                             \
-  X(ColAirline, "LINIA", "AIRLINE")                                         \
-  X(ColFrom, "SKAD", "FROM")                                                \
-  X(ColTo, "DOKAD", "TO")                                                   \
+  X(ColDistance, "ODL.", "DIST")                                            \
+  X(ColFrom, "SKĄD", "FROM")                                                \
+  X(ColTo, "DOKĄD", "TO")                                                   \
   X(ColType, "TYP", "TYPE")                                                 \
   X(ColPhase, "FAZA", "PHASE")                                              \
   /* empty states */                                                        \
-  X(NoFlightsInRange, "BRAK LOTOW W ZASIEGU", "NO FLIGHTS IN RANGE")        \
+  X(NoFlightsInRange, "BRAK LOTÓW W ZASIĘGU", "NO FLIGHTS IN RANGE")        \
   X(NoFlight, "BRAK LOTU", "NO FLIGHT")                                     \
   /* featured pill when the aircraft is taxiing / parked */                 \
   X(OnGround, "NA ZIEMI", "ON GROUND")                                      \
   /* Screen 2 countdown status strip */                                     \
-  X(StatusApproaching, "ZBLIZA SIE", "APPROACHING")                         \
-  X(StatusOverhead, "NAD TOBA", "OVERHEAD")                                 \
-  X(StatusPassed, "MINAL", "PASSED")                                        \
+  X(StatusApproaching, "ZBLIŻA SIĘ", "APPROACHING")                         \
+  X(StatusOverhead, "NAD TOBĄ", "OVERHEAD")                                 \
+  X(StatusPassed, "MINĄŁ", "PASSED")                                        \
   X(StatusEstimated, "SZACOWANY CZAS", "ESTIMATED TIME")                    \
+  X(StatusNotOverhead, "NIE PRZELECI NAD TOBĄ", "NOT PASSING OVERHEAD")     \
   X(UnitMinutes, "MIN", "MIN")                                              \
   /* header block "<n> flights" — plural forms, see pluralForm() */         \
   X(FlightsOne, "LOT", "FLIGHT")                                            \
   X(FlightsFew, "LOTY", "FLIGHTS")                                          \
-  X(FlightsMany, "LOTOW", "FLIGHTS")                                        \
+  X(FlightsMany, "LOTÓW", "FLIGHTS")                                        \
   /* first-boot setup prompt */                                             \
-  X(SetupPrompt, "Ustaw lokalizacje domu na", "Set your home location at")
+  X(SetupPrompt, "Ustaw lokalizację domu na", "Set your home location at")
 
 enum class Str : int {
 #define I18N_ENUM_ENTRY(id, pl, en) id,

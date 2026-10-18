@@ -46,7 +46,10 @@ static void test_fields_fall_back_to_dashes(void) {
 static void test_airline_dashes_when_lookup_found_but_string_empty(void) {
   AircraftRow row = makeRow();
   row.info.airline = "";
+  row.aircraft.callsign = "SPKAX";  // no airline prefix to fall back on
   TEST_ASSERT_EQUAL_STRING("--", summaryAirline(row).c_str());
+  row.aircraft.callsign = "LOT281";  // ...but an airline callsign fills the gap
+  TEST_ASSERT_EQUAL_STRING("LOT", summaryAirline(row).c_str());
 }
 
 // ---- formatSummaryIdentity ------------------------------------------
@@ -155,10 +158,33 @@ static void test_fit_identity_never_exceeds_width_once_callsign_fits(void) {
 
 static void test_airline_and_type_show_dots_while_lookup_pending(void) {
   AircraftRow row;
-  row.aircraft.callsign = "WZZ620U";
-  row.info_pending = true;  // not looked up yet (per-poll budget)
+  row.aircraft.callsign = "SPKAX";  // registration-style: no airline prefix
+  row.info_pending = true;          // not looked up yet (per-poll budget)
   TEST_ASSERT_EQUAL_STRING("...", summaryAirline(row).c_str());
   TEST_ASSERT_EQUAL_STRING("...", summaryType(row).c_str());
+}
+
+static void test_airline_from_callsign_when_hexdb_has_nothing(void) {
+  // SunExpress SXS6JZ: unknown to hexdb.io, but the callsign says who it is.
+  AircraftRow row;
+  row.aircraft.callsign = "SXS6JZ";
+  TEST_ASSERT_EQUAL_STRING("SunExpress", summaryAirline(row).c_str());
+  row.info_pending = true;  // even before the lookup runs
+  TEST_ASSERT_EQUAL_STRING("SunExpress", summaryAirline(row).c_str());
+}
+
+static void test_hexdb_airline_wins_over_callsign_table(void) {
+  AircraftRow row = makeRow();  // hexdb: "LOT Polish Airlines"
+  TEST_ASSERT_EQUAL_STRING("LOT Polish Airlines", summaryAirline(row).c_str());
+}
+
+static void test_type_prefers_friendly_name(void) {
+  AircraftRow row = makeRow();
+  row.info.aircraft_type = "737MAX 8";
+  row.info.icao_type = "B38M";
+  TEST_ASSERT_EQUAL_STRING("737 MAX 8", summaryType(row).c_str());
+  row.info.icao_type = "ZZZZ";  // not in the table -> hexdb.io's Type string
+  TEST_ASSERT_EQUAL_STRING("737MAX 8", summaryType(row).c_str());
 }
 
 static void test_airline_dashes_once_lookup_confirmed_missing(void) {
@@ -283,6 +309,9 @@ int main(int, char **) {
   RUN_TEST(test_row_place_name_per_endpoint);
 
   RUN_TEST(test_airline_and_type_show_dots_while_lookup_pending);
+  RUN_TEST(test_airline_from_callsign_when_hexdb_has_nothing);
+  RUN_TEST(test_hexdb_airline_wins_over_callsign_table);
+  RUN_TEST(test_type_prefers_friendly_name);
   RUN_TEST(test_airline_dashes_once_lookup_confirmed_missing);
   RUN_TEST(test_airport_code_prefers_iata);
   RUN_TEST(test_airport_code_dots_while_airport_pending);

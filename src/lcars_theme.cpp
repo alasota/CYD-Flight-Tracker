@@ -87,8 +87,63 @@ PhaseTriangle phaseTriangle(Phase phase, int16_t cx, int16_t cy, int16_t size) {
   }
 }
 
+PhaseTriangle directionArrow(float bearingDeg, int16_t cx, int16_t cy, int16_t size) {
+  // Tip on the bearing, tail corners 140 degrees either side of it, all on
+  // a circle of radius size/2 (so the shape always fits its box).
+  const float r = static_cast<float>(size / 2);
+  auto point = [&](float deg, int &x, int &y) {
+    const float rad = deg * 3.14159265f / 180.0f;
+    x = static_cast<int>(std::lround(cx + r * std::sin(rad)));
+    y = static_cast<int>(std::lround(cy - r * std::cos(rad)));  // screen y grows down
+  };
+  int x0, y0, x1, y1, x2, y2;
+  point(bearingDeg, x0, y0);
+  point(bearingDeg + 140.0f, x1, y1);
+  point(bearingDeg - 140.0f, x2, y2);
+  return makeTriangle(x0, y0, x1, y1, x2, y2);
+}
+
 uint16_t tableRowTextColor(int rowIndex) {
   return (rowIndex % 2 == 0) ? THEME_CONTENT_PRIMARY : THEME_CONTENT_SECONDARY;
+}
+
+namespace {
+// True if byte `i` of `s` starts a character (i.e. isn't a UTF-8
+// continuation byte 10xxxxxx) — the only places a string may be cut.
+bool isCharBoundary(const std::string &s, size_t i) {
+  return i >= s.size() || (static_cast<unsigned char>(s[i]) & 0xC0) != 0x80;
+}
+}  // namespace
+
+size_t utf8Length(const std::string &utf8) {
+  size_t n = 0;
+  for (size_t i = 0; i < utf8.size(); ++i) {
+    if (isCharBoundary(utf8, i)) ++n;
+  }
+  return n;
+}
+
+bool isFontSafeText(const std::string &text) {
+  // UTF-8 encodings of ą ć ę ł ń ó ś ź ż Ą Ć Ę Ł Ń Ó Ś Ź Ż.
+  static const char *const kPolish[] = {
+      "\xC4\x85", "\xC4\x87", "\xC4\x99", "\xC5\x82", "\xC5\x84", "\xC3\xB3",
+      "\xC5\x9B", "\xC5\xBA", "\xC5\xBC", "\xC4\x84", "\xC4\x86", "\xC4\x98",
+      "\xC5\x81", "\xC5\x83", "\xC3\x93", "\xC5\x9A", "\xC5\xB9", "\xC5\xBB"};
+  for (size_t i = 0; i < text.size();) {
+    const unsigned char c = static_cast<unsigned char>(text[i]);
+    if (c >= 0x20 && c <= 0x7E) {
+      ++i;
+      continue;
+    }
+    if (i + 1 >= text.size()) return false;
+    bool polish = false;
+    for (const char *p : kPolish) {
+      if (text[i] == p[0] && text[i + 1] == p[1]) polish = true;
+    }
+    if (!polish) return false;
+    i += 2;
+  }
+  return true;
 }
 
 std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &measure) {
@@ -97,6 +152,7 @@ std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &me
 
   // Longest head + "..." that fits (head must keep at least one char).
   for (size_t n = text.size() - 1; n >= 1; --n) {
+    if (!isCharBoundary(text, n)) continue;  // never split a UTF-8 letter
     std::string head = text.substr(0, n);
     while (!head.empty() && head.back() == ' ') head.pop_back();
     if (head.empty()) continue;
@@ -106,6 +162,7 @@ std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &me
 
   // Too tight for an ellipsis — longest plain head that fits.
   for (size_t n = text.size() - 1; n >= 1; --n) {
+    if (!isCharBoundary(text, n)) continue;
     std::string head = text.substr(0, n);
     if (measure(head) <= maxPx) return head;
   }
@@ -117,9 +174,13 @@ std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &me
 #include "screen_nav.h"  // kScreenCount, bottomNavBounds(), bottomNavSegment()
 
 const lgfx::IFont *const LCARS_FONT_HEADING = &fonts::Font4;
-const lgfx::IFont *const LCARS_FONT_BODY = &fonts::Font2;
+// efont (U8g2-format, Unicode) instead of the built-in Font2 / Font0: same
+// 16px / ~10px sizes, but it has the Polish letters (ąćęłńóśźż), so text
+// no longer has to be ASCII-folded. ~470 KB + ~225 KB of flash — fits only
+// with the huge_app partition table (platformio.ini).
+const lgfx::IFont *const LCARS_FONT_BODY = &fonts::efontJA_16;
 const lgfx::IFont *const LCARS_FONT_NUMERIC = &fonts::Font7;
-const lgfx::IFont *const LCARS_FONT_SMALL = &fonts::Font0;
+const lgfx::IFont *const LCARS_FONT_SMALL = &fonts::efontJA_10;
 
 TextMeasure gfxTextMeasure(lgfx::LovyanGFX &gfx) {
   return [&gfx](const std::string &s) { return static_cast<int>(gfx.textWidth(s.c_str())); };
@@ -162,6 +223,12 @@ void drawPhaseIcon(LGFX &gfx, Phase phase, int16_t cx, int16_t cy, int16_t size)
   if (!t.visible) return;
   gfx.fillTriangle(t.x0, t.y0, t.x1, t.y1, t.x2, t.y2, phaseColor(phase));
 }
+void drawDirectionArrow(LGFX &gfx, float bearingDeg, int16_t cx, int16_t cy, int16_t size,
+                        uint16_t color) {
+  const PhaseTriangle t = directionArrow(bearingDeg, cx, cy, size);
+  gfx.fillTriangle(t.x0, t.y0, t.x1, t.y1, t.x2, t.y2, color);
+}
+
 
 void drawPillButton(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t fillColor,
                      uint16_t textColor, const char *text) {
