@@ -137,9 +137,22 @@ ol.steps li::before {
 
 /* ---- roadmap */
 .intro { max-width: 620px; margin: -12px auto 28px; }
-.roadmap { max-width: 760px; margin: 0 auto 16px; display: grid; gap: 12px; }
-.roadmap ul.ticks { margin: 0; }
-.roadmap ul.ticks li:last-child { margin-bottom: 0; }
+.roadmap { max-width: 1000px; margin: 0 auto 16px; display: grid; gap: 12px; }
+.governance { max-width: 760px; margin: 0 auto 20px; border-left: 3px solid var(--accent); }
+.governance p { margin: 0; color: #c9cad1; }
+.table-scroll { overflow-x: auto; margin: 0 -8px; }
+.roadmap-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.roadmap-table th {
+  text-align: left; color: var(--muted); font-weight: 600; font-size: .75rem; letter-spacing: .06em;
+  text-transform: uppercase; padding: 8px; border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+.roadmap-table td { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; color: #c9cad1; }
+.roadmap-table tr:last-child td { border-bottom: 0; }
+.roadmap-table td.c-n { color: var(--accent); font-weight: 700; }
+.roadmap-table td.c-item { color: var(--text); font-weight: 500; min-width: 220px; }
+.roadmap-table td.c-value, .roadmap-table td.c-effort, .roadmap-table td.c-risk { white-space: nowrap; }
+.roadmap-table td.c-rating { white-space: nowrap; letter-spacing: -1px; }
+.roadmap-table td.c-verdict { min-width: 260px; font-size: .85rem; }
 
 /* ---- version badge + changelog */
 .version-badge {

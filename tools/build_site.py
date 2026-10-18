@@ -42,36 +42,78 @@ GITHUB = "https://github.com/alasota/CYD-Flight-Tracker"
 CHANGELOG_MAX_ITEMS = 15  # per version; longer lists end with a link to GitHub
 # Section headings in ROADMAP.md -> Polish.
 SECTION_PL = {"Planned": "Planowane", "In progress": "W trakcie", "Done": "Zrobione"}
+# Roadmap table: column headers, and the rating words per column (Polish
+# adjectives agree with the column's noun: wartość / wysiłek / ryzyko).
+COLUMN_PL = {"Item": "Pozycja", "Value": "Wartość", "Effort": "Wysiłek", "Risk": "Ryzyko",
+             "Rating": "Ocena", "Verdict": "Werdykt"}
+WORDS_PL = {
+    "Value": {"high": "wysoka", "medium": "średnia", "low": "niska"},
+    "Effort": {"small": "mały", "medium": "średni", "large": "duży"},
+    "Risk": {"low": "niskie", "medium": "średnie", "high": "wysokie"},
+}
+PL_COMMENT = re.compile(r"<!--\s*pl:\s*(.*?)\s*-->")
+
+
+def split_cell(cell):
+    """(english, polish) of a table cell: text + optional <!-- pl: ... --> comment."""
+    m = PL_COMMENT.search(cell)
+    en = PL_COMMENT.sub("", cell).strip()
+    return en, (m.group(1).strip() if m else en)
+
+
+def translate_words(column, text):
+    """'medium–large' -> 'średni–duży' for the rating columns; anything else as is."""
+    words = WORDS_PL.get(column, {})
+    return re.sub(r"[A-Za-z]+", lambda w: words.get(w.group(0).lower(), w.group(0)), text)
 
 
 def parse_roadmap(text):
-    """[(section, [(english, polish), ...]), ...] from ROADMAP.md."""
-    text = re.sub(r"^<!--\s*\n.*?-->\s*$", "", text, flags=re.S | re.M)  # format notes
+    """[(section, columns, [row, ...]), ...] from ROADMAP.md, rows in file order;
+    each row is a list of (english, polish) cells."""
+    # Drop the multi-line format notes (single-line pl: comments stay).
+    text = re.sub(r"^<!--\s*\n.*?-->\s*$", "", text, flags=re.S | re.M)
     sections = []
     for line in text.splitlines():
         heading = re.match(r"^##\s+(.+?)\s*$", line)
-        item = re.match(r"^\s*[-*]\s+(.+?)\s*$", line)
-        pl = re.match(r"^\s*<!--\s*pl:\s*(.+?)\s*-->\s*$", line)
         if heading:
-            sections.append((heading.group(1), []))
-        elif item and sections:
-            sections[-1][1].append([item.group(1), item.group(1)])
-        elif pl and sections and sections[-1][1]:
-            sections[-1][1][-1][1] = pl.group(1)
-    return [(name, items) for name, items in sections if items]
+            sections.append((heading.group(1), None, []))
+            continue
+        if not sections or not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if all(re.fullmatch(r":?-+:?", c) for c in cells):
+            continue  # |---|---| separator
+        name, columns, rows = sections[-1]
+        if columns is None:
+            sections[-1] = (name, cells, rows)
+            continue
+        row = []
+        for col, cell in zip(columns, cells):
+            en, pl = split_cell(cell)
+            row.append((en, translate_words(col, pl)))
+        rows.append(row)
+    return [s for s in sections if s[1] and s[2]]
 
 
 def roadmap_html(sections):
     def both(en, pl):
+        if en == pl:
+            return html.escape(en)
         return '<span class="en">%s</span><span class="pl">%s</span>' % (
             html.escape(en), html.escape(pl))
 
-    cards = []
-    for name, items in sections:
-        lis = "".join("<li>%s</li>" % both(en, pl) for en, pl in items)
-        cards.append('<div class="card"><h3>%s</h3><ul class="ticks">%s</ul></div>' % (
-            both(name, SECTION_PL.get(name, name)), lis))
-    return '<div class="roadmap">%s</div>' % "".join(cards)
+    blocks = []
+    for name, columns, rows in sections:
+        head = "".join('<th class="c-%s">%s</th>' % (
+            re.sub(r"\W", "", c.lower()) or "n", both(c, COLUMN_PL.get(c, c))) for c in columns)
+        body = "".join("<tr>%s</tr>" % "".join(
+            '<td class="c-%s">%s</td>' % (re.sub(r"\W", "", c.lower()) or "n", both(en, pl))
+            for c, (en, pl) in zip(columns, row)) for row in rows)
+        blocks.append('<div class="card"><h3>%s</h3><div class="table-scroll">'
+                      '<table class="roadmap-table"><thead><tr>%s</tr></thead>'
+                      '<tbody>%s</tbody></table></div></div>' % (
+                          both(name, SECTION_PL.get(name, name)), head, body))
+    return '<div class="roadmap">%s</div>' % "".join(blocks)
 
 
 def git(*args):
@@ -156,7 +198,7 @@ def fill_roadmap(out):
         sections = parse_roadmap(f.read())
     with open(index, "w", encoding="utf-8", newline="\n") as f:
         f.write(page.replace(ROADMAP_MARKER, roadmap_html(sections)))
-    print("roadmap: %d item(s)" % sum(len(items) for _, items in sections))
+    print("roadmap: %d item(s)" % sum(len(rows) for _, _, rows in sections))
 
 
 def copy_tree(src, dst):
