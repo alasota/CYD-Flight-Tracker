@@ -100,6 +100,20 @@ void sortRowsByDistance(std::vector<AircraftRow> &rows) {
   });
 }
 
+void sortRowsForDisplay(std::vector<AircraftRow> &rows) {
+  // Group: 0 = airborne with position, 1 = on the ground, 2 = no position.
+  auto group = [](const AircraftRow &r) {
+    if (!r.has_distance) return 2;
+    return r.aircraft.on_ground ? 1 : 0;
+  };
+  std::stable_sort(rows.begin(), rows.end(), [&](const AircraftRow &a, const AircraftRow &b) {
+    const int ga = group(a);
+    const int gb = group(b);
+    if (ga != gb) return ga < gb;
+    return a.distance_km < b.distance_km;  // equal for group 2 -> stable
+  });
+}
+
 FeaturedSplit splitFeaturedAndRest(const std::vector<AircraftRow> &rows) {
   FeaturedSplit split;
   if (rows.empty()) {
@@ -117,7 +131,7 @@ namespace {
 // (y:18..95). The cyan LOTY/FLIGHTS sub-header strip was removed on request;
 // the space went to roomier rows.
 constexpr int16_t kColHeaderY = 98;    // orange column labels, y:98..113
-constexpr int16_t kColHeaderH = 15;
+constexpr int16_t kColHeaderH = kTableHeaderHeightPx;
 constexpr int16_t kFirstRowY = 116;    // rows at 116,133,150,167,184 (last ends y:201)
 constexpr int16_t kRowStep = 17;       // 1px above the 16px Font2 text; must end by 215
 static_assert(kFirstRowY + kTableRowsPerPage * kRowStep <= LCARS_CONTENT_BOTTOM,
@@ -126,7 +140,7 @@ static_assert(kFirstRowY + kTableRowsPerPage * kRowStep <= LCARS_CONTENT_BOTTOM,
 // Columns: flight, airline, origin, destination, aircraft type, phase icon
 // (see CLAUDE.md "Screen 1" — altitude/speed/distance moved to
 // featured_panel's pills, shown only for the one closest aircraft).
-// Sized for the efont fonts (8px per character in the rows, 5px in the
+// Sized for the efont fonts (7px per character in the 14px rows, 5px in the
 // header): LOT fits an 8-char callsign, ODL. "123km", SKĄD/DOKĄD a 3-letter
 // IATA code, TYP a ~12-char friendly type name ("777-300ER"), FAZA the
 // phase triangle and its "PHASE" label. The airline column was dropped:
@@ -189,7 +203,7 @@ void drawCell(LGFX &gfx, const TableColumn &col, const std::string &text, int16_
 }
 
 void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t screenWidth) {
-  gfx.setFont(LCARS_FONT_BODY);
+  gfx.setFont(LCARS_FONT_TABLE);  // 14px: 1px under the 15px header strip
   gfx.setTextDatum(middle_left);
   const TextMeasure measure = gfxTextMeasure(gfx);
 

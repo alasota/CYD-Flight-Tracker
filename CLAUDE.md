@@ -194,11 +194,11 @@ requirement, the firmware didn't sync wall-clock time before.
   (correctly handles CEST DST switches). This is a stable, long-standing EU DST rule, but
   double-check it hasn't changed if clocks ever look off by an hour.
 - Until the first sync completes, `time_sync` must report "not synced yet" — the header bar
-  should show placeholders (`--/--/----` for the date, `--:--` for the time) rather than the
+  should show placeholders (`--.--.----` for the date, `--:--` for the time) rather than the
   garbage epoch-zero date ESP32 starts with.
 - `time_sync` module: `isTimeSynced()`, plus **pure, testable** formatting functions that take
   a `time_t` as a parameter rather than calling `time(nullptr)` internally —
-  `formatDate(time_t) -> "DD/MM/YYYY"` (zero-padded, slash-separated, e.g. `07/03/2026`) and
+  `formatDate(time_t) -> "DD.MM.YYYY"` (zero-padded, slash-separated, e.g. `07.03.2026`) and
   `formatTime(time_t) -> "HH:MM"` (24h, zero-padded). Keeping the epoch as an
   injected parameter (instead of reading the wall clock inside the function) is what makes this
   testable without depending on when the test happens to run.
@@ -253,14 +253,14 @@ switching feels like changing a mode on one console, not jumping between apps.
 **Exact pixel spec, y: 0 to 15px, full width (320px):**
 - **Layout "variant A" — three zones, nothing filled** (`statusBarZones()`, native-tested so the
   zones never overlap for the longest texts in either language):
-  `SKY TRACKER          ● 7 LOTÓW          18/10/2026 09:11`
+  `SKY TRACKER          ● 7 LOTÓW          18.10.2026 09:11`
   - **Left:** app name `kStatusBarAppName` ("SKY TRACKER"), small font, dim lavender
     (`THEME_CHROME_DIM`).
   - **Centre:** a **health dot** (`statusBarHealthColor()`: green = data OK, yellow =
     rate-limited / backing off, red = auth or network error, i.e. the list may be stale) and the
     **number of aircraft in range** in white, with the correct plural (PL `1 LOT` / `3 LOTY` /
     `7 LOTÓW`, EN `1 FLIGHT` / `7 FLIGHTS`; `99+` above 99; `--` until the first successful poll).
-  - **Right:** date `DD/MM/YYYY` (small font) and time `HH:MM` right next to it in the slightly
+  - **Right:** date `DD.MM.YYYY` (small font) and time `HH:MM` right next to it in the slightly
     larger `LCARS_FONT_CLOCK` (DejaVu12, 13px line), both light peach. No seconds — the header is
     redrawn once per minute (see "Redraw policy"), so `HH:MM:SS` would sit frozen.
   - A **1px lilac rule** along the header's bottom edge separates it from the content.
@@ -397,8 +397,20 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   nothing known. A wall of `--` while data was merely loading read like a failure.
 - Column-header labels sit `kTableHeaderLabelPadPx` (4px) right of the `|` divider line, so they
   don't touch it; cell text keeps the 2px `kTableCellPadPx`.
-- Sorted by distance ascending, **excluding** whichever aircraft is currently shown in the
-  featured panel above.
+- **Order (improvement #9, `sortRowsForDisplay()`):** aircraft in the air first, nearest first;
+  then aircraft on the ground (taxiing / parked at the nearby airport), nearest first; then rows
+  without a position. The featured panel (and Screen 3's summary) therefore shows the nearest
+  aircraft you can actually see in the sky, never a jet parked at the gate; the table lists the
+  rest in the same order, excluding the featured one. The per-poll lookup budget follows this
+  order too.
+- **"On the ground" is inferred, not just read** (`opensky_client::inferOnGround()`, folded into
+  `Aircraft::on_ground` at parse time): OpenSky's flag, OR speed below `kTaxiSpeedMps` (15 m/s),
+  OR neither altitude nor speed reported. Apron traffic near EPWA is often sent with
+  `on_ground=false` and null altitude/speed — trusting the flag put a parked LOT jet in the
+  featured slot as "0m 0km/h" with an overflight icon. Null altitude/speed are tracked
+  (`has_altitude` / `has_velocity`) and shown as `--`, never as a fake `0`.
+- **Row font: `LCARS_FONT_TABLE` = `fonts::efontJA_14`** — 1px smaller than the 15px lilac
+  header strip (`kTableHeaderHeightPx`), 7px per character; the rest of the UI keeps 16px.
 - This is the priority screen — get it solid before spending time on the other two.
 
 ### Screen 2 — "Flight" (single nearest aircraft + overhead countdown)
@@ -739,7 +751,7 @@ each with a single responsibility:
   signal-bars and bottom-nav-segment primitives. All view/screen modules call into this rather
   than defining their own colors/shapes.
 - `status_bar` — draws the shared chrome: the header bar per "Screen chrome" (orange
-  `fillRoundRect` block on the left labeled with the active screen name, date `DD/MM/YYYY` + time
+  `fillRoundRect` block on the left labeled with the active screen name, date `DD.MM.YYYY` + time
   from `time_sync` to its right), **and** the bottom nav bar's dot/segment indicators from
   "Screen navigation" (highlighting whichever index `screen_nav` reports as current). Both
   called once per frame from `main.cpp`, before/after dispatching to the active screen — kept

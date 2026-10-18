@@ -266,6 +266,68 @@ static void test_url_encode_escapes_special_chars(void) {
   TEST_ASSERT_EQUAL_STRING("a%26b%3Dc", urlEncode("a&b=c").c_str());
 }
 
+// ---- missing fields + inferred "on the ground" ---------------------------------
+//
+// Real state vectors seen near EPWA (2026-10-18). Aircraft on the apron are
+// sometimes reported with on_ground=false but no altitude and no/slow speed;
+// trusting the flag put a parked LOT jet in the featured slot as "0m 0km/h".
+
+static Aircraft parseOne(const char *vector) {
+  std::string json = std::string(R"({"time":1,"states":[)") + vector + "]}";
+  std::vector<Aircraft> a = parseStatesResponse(json);
+  TEST_ASSERT_EQUAL_size_t(1, a.size());
+  return a[0];
+}
+
+static void test_missing_altitude_and_speed_are_flagged(void) {
+  Aircraft a = parseOne(
+      R"(["48ad86","LOT4JD  ","Poland",1,1,20.9555,52.1689,null,false,null,205.31,null,null,null,"1000",false,0])");
+  TEST_ASSERT_FALSE(a.has_altitude);
+  TEST_ASSERT_FALSE(a.has_velocity);
+}
+
+static void test_flag_false_but_no_altitude_and_no_speed_is_on_ground(void) {
+  Aircraft a = parseOne(
+      R"(["48ad86","LOT4JD  ","Poland",1,1,20.9555,52.1689,null,false,null,205.31,null,null,null,"1000",false,0])");
+  TEST_ASSERT_TRUE(a.on_ground);
+}
+
+static void test_taxi_speed_without_altitude_is_on_ground(void) {
+  Aircraft a = parseOne(
+      R"(["48ad02","LOT5PG  ","Poland",1,1,20.9727,52.1652,null,false,9.77,84.38,null,null,null,"1000",false,0])");
+  TEST_ASSERT_TRUE(a.on_ground);
+}
+
+static void test_real_airborne_traffic_stays_airborne(void) {
+  Aircraft climbing = parseOne(
+      R"(["4892c4","ENT4YG  ","Poland",1,1,20.7656,52.2221,762,false,84.98,113.93,-3.58,null,876.3,"6112",false,0])");
+  TEST_ASSERT_FALSE(climbing.on_ground);
+  TEST_ASSERT_TRUE(climbing.has_altitude);
+  TEST_ASSERT_TRUE(climbing.has_velocity);
+  // No barometric altitude, but flying fast -> still airborne.
+  Aircraft geoOnly = parseOne(
+      R"(["4892c5","ENT7BS  ","Poland",1,1,20.9238,52.0242,null,false,145.78,248.69,11.05,null,2026.92,"1000",false,0])");
+  TEST_ASSERT_FALSE(geoOnly.on_ground);
+}
+
+static void test_reported_on_ground_stays_on_ground(void) {
+  Aircraft a = parseOne(
+      R"(["471e60","WZZ4NA  ","Hungary",1,1,20.9472,52.1714,null,true,3.34,73.12,null,null,null,"1761",false,0])");
+  TEST_ASSERT_TRUE(a.on_ground);
+}
+
+static void test_infer_on_ground_rules(void) {
+  Aircraft a;
+  a.on_ground = false;
+  a.has_altitude = true;
+  a.baro_altitude = 900.0f;
+  a.has_velocity = true;
+  a.velocity = 100.0f;
+  TEST_ASSERT_FALSE(inferOnGround(a));
+  a.velocity = 10.0f;  // altitude reported but crawling -> stale altitude at the gate
+  TEST_ASSERT_TRUE(inferOnGround(a));
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
 
@@ -304,5 +366,11 @@ int main(int argc, char **argv) {
   RUN_TEST(test_url_encode_leaves_unreserved_chars);
   RUN_TEST(test_url_encode_escapes_special_chars);
 
+  RUN_TEST(test_missing_altitude_and_speed_are_flagged);
+  RUN_TEST(test_flag_false_but_no_altitude_and_no_speed_is_on_ground);
+  RUN_TEST(test_taxi_speed_without_altitude_is_on_ground);
+  RUN_TEST(test_real_airborne_traffic_stays_airborne);
+  RUN_TEST(test_reported_on_ground_stays_on_ground);
+  RUN_TEST(test_infer_on_ground_rules);
   return UNITY_END();
 }

@@ -29,7 +29,7 @@ constexpr const char *TZ_WARSAW = "CET-1CEST,M3.5.0,M10.5.0/3";
 // runs. Negative epochs (pre-1970) are not supported and clamp to the
 // epoch.
 
-// "DD/MM/YYYY", zero-padded (e.g. "07/03/2026").
+// "DD.MM.YYYY", zero-padded (e.g. "07.03.2026") — the usual Polish date format.
 std::string formatDate(std::time_t epoch);
 
 // "HH:MM", 24-hour, zero-padded (e.g. "01:46").

@@ -105,6 +105,14 @@ void classifyPhases(std::vector<AircraftRow> &rows, float near_airport_km,
 // relative order).
 void sortRowsByDistance(std::vector<AircraftRow> &rows);
 
+// The order every screen shows (improvement #9): aircraft in the air first,
+// nearest first; then aircraft on the ground (taxiing / parked at the nearby
+// airport), nearest first; then rows without a position. So the featured
+// slot on Screen 1 and the Screen 3 summary show something you can actually
+// see in the sky, and the per-poll lookup budget is spent on it first.
+// Stable within each group.
+void sortRowsForDisplay(std::vector<AircraftRow> &rows);
+
 // Result of splitting a (sorted) AircraftRow list into "the one closest
 // aircraft, for featured_panel" and "everything else, for the table
 // below it".
@@ -153,6 +161,10 @@ constexpr int16_t kTableCellPadPx = 2;
 // "|" divider line is drawn) — wider than the cell padding so the label
 // doesn't sit right against the line.
 constexpr int16_t kTableHeaderLabelPadPx = 4;
+
+// Height of the lilac column-header strip; the row font is 1px smaller
+// (LCARS_FONT_TABLE_HEIGHT_PX).
+constexpr int16_t kTableHeaderHeightPx = 15;
 
 // The 6 columns, in order: LOT/FLIGHT, ODL./DIST, SKĄD/FROM, DOKĄD/TO,
 // TYP/TYPE, FAZA/PHASE.

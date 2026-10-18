@@ -19,7 +19,7 @@ const char *statusBarScreenName(int screenIndex, Language lang) {
 
 std::string statusBarDate(std::time_t localEpoch, bool timeSynced) {
   if (!timeSynced) {
-    return "--/--/----";
+    return "--.--.----";
   }
   return formatDate(localEpoch);
 }

@@ -11,7 +11,7 @@ void setUp(void) {}
 void tearDown(void) {}
 
 // 1500000000 -> 2017-07-14 02:40:00 UTC (see test_time_sync); its date
-// is "14/07/2017" and its "HH:MM" is "02:40".
+// is "14.07.2017" and its "HH:MM" is "02:40".
 static constexpr std::time_t kEpoch = 1500000000;
 
 // ---- statusBarScreenName ------------------------------------------------
@@ -47,12 +47,12 @@ static void test_screen_names_fit_the_header_block(void) {
 // ---- statusBarDate ----------------------------------------------------
 
 static void test_date_placeholder_until_synced(void) {
-  TEST_ASSERT_EQUAL_STRING("--/--/----", statusBarDate(kEpoch, false).c_str());
+  TEST_ASSERT_EQUAL_STRING("--.--.----", statusBarDate(kEpoch, false).c_str());
 }
 
 static void test_date_uses_time_sync_when_synced(void) {
   TEST_ASSERT_EQUAL_STRING(formatDate(kEpoch).c_str(), statusBarDate(kEpoch, true).c_str());
-  TEST_ASSERT_EQUAL_STRING("14/07/2017", statusBarDate(kEpoch, true).c_str());
+  TEST_ASSERT_EQUAL_STRING("14.07.2017", statusBarDate(kEpoch, true).c_str());
 }
 
 static void test_date_placeholder_same_length_as_date(void) {
@@ -133,7 +133,7 @@ static void test_zones_do_not_overlap_for_longest_texts(void) {
   // Longest possible centre label in either language, and the widest date.
   for (Language lang : {Language::PL, Language::EN}) {
     const std::string count = statusBarBlockLabel(250, true, lang);  // "99+ ..."
-    HeaderZones z = statusBarZones(320, kStatusBarAppName, count, "--/--/----", "00:00");
+    HeaderZones z = statusBarZones(320, kStatusBarAppName, count, "--.--.----", "00:00");
     TEST_ASSERT_TRUE_MESSAGE(z.name_end < z.count_start, count.c_str());
     TEST_ASSERT_TRUE_MESSAGE(z.count_end < z.right_start, count.c_str());
     TEST_ASSERT_TRUE(z.right_end <= 320);
@@ -142,7 +142,7 @@ static void test_zones_do_not_overlap_for_longest_texts(void) {
 }
 
 static void test_count_is_centred(void) {
-  HeaderZones z = statusBarZones(320, kStatusBarAppName, "7 LOT\xC3\x93W", "18/10/2026", "08:46");
+  HeaderZones z = statusBarZones(320, kStatusBarAppName, "7 LOT\xC3\x93W", "18.10.2026", "08:46");
   TEST_ASSERT_INT_WITHIN(1, 160, (z.count_start + z.count_end) / 2);
 }
 

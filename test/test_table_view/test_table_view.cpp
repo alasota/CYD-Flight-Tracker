@@ -297,6 +297,45 @@ static void test_sort_empty_array_does_not_crash(void) {
   TEST_ASSERT_TRUE(rows.empty());
 }
 
+// ---- sortRowsForDisplay: airborne first (improvement #9) -------------------
+
+static AircraftRow displayRow(const char *callsign, float km, bool onGround, bool hasPos = true) {
+  AircraftRow r;
+  r.aircraft.callsign = callsign;
+  r.aircraft.on_ground = onGround;
+  r.aircraft.has_position = hasPos;
+  r.has_distance = hasPos;
+  r.distance_km = km;
+  return r;
+}
+
+static void test_display_order_puts_airborne_before_ground_traffic(void) {
+  // The plane taxiing at the airport 3 km away must not take the featured
+  // slot from one flying 9 km away.
+  std::vector<AircraftRow> rows = {displayRow("TAXI1", 3.0f, true), displayRow("AIR2", 9.0f, false),
+                                   displayRow("AIR1", 5.0f, false), displayRow("TAXI2", 6.0f, true)};
+  sortRowsForDisplay(rows);
+  TEST_ASSERT_EQUAL_STRING("AIR1", rows[0].aircraft.callsign.c_str());
+  TEST_ASSERT_EQUAL_STRING("AIR2", rows[1].aircraft.callsign.c_str());
+  TEST_ASSERT_EQUAL_STRING("TAXI1", rows[2].aircraft.callsign.c_str());  // ground: nearest first
+  TEST_ASSERT_EQUAL_STRING("TAXI2", rows[3].aircraft.callsign.c_str());
+}
+
+static void test_display_order_puts_positionless_last(void) {
+  std::vector<AircraftRow> rows = {displayRow("NOPOS", 0.0f, false, false),
+                                   displayRow("TAXI", 2.0f, true), displayRow("AIR", 20.0f, false)};
+  sortRowsForDisplay(rows);
+  TEST_ASSERT_EQUAL_STRING("AIR", rows[0].aircraft.callsign.c_str());
+  TEST_ASSERT_EQUAL_STRING("TAXI", rows[1].aircraft.callsign.c_str());
+  TEST_ASSERT_EQUAL_STRING("NOPOS", rows[2].aircraft.callsign.c_str());
+}
+
+static void test_display_order_all_on_ground_still_nearest_first(void) {
+  std::vector<AircraftRow> rows = {displayRow("B", 4.0f, true), displayRow("A", 1.0f, true)};
+  sortRowsForDisplay(rows);
+  TEST_ASSERT_EQUAL_STRING("A", rows[0].aircraft.callsign.c_str());
+}
+
 // ---- fixed table geometry (CLAUDE.md "Screen 1") ----------------------------
 
 static void test_table_shows_exactly_five_rows_per_page(void) {
@@ -368,28 +407,35 @@ static void test_column_labels_fit_their_columns_in_small_font(void) {
   }
 }
 
+static void test_row_font_is_one_px_smaller_than_the_header_strip(void) {
+  // Rows use the 14px table font: 1px less than the 15px lilac header strip,
+  // and it still fits the 17px row with room to spare.
+  TEST_ASSERT_EQUAL_INT(kTableHeaderHeightPx - 1, LCARS_FONT_TABLE_HEIGHT_PX);
+  TEST_ASSERT_TRUE(LCARS_FONT_TABLE_HEIGHT_PX < tableRowHeightPx());
+}
+
 static void test_header_labels_keep_clear_of_the_divider(void) {
   // Review note 9: labels sat right against the "|" divider line.
   TEST_ASSERT_TRUE(kTableHeaderLabelPadPx >= 4);
 }
 
 static void test_airport_columns_fit_an_iata_code(void) {
-  // 3 letters of the body font (8px each).
+  // 3 letters of the table font (7px each).
   const TableColumn *cols = tableColumns();
-  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[2]) >= 3 * LCARS_FONT_BODY_CHAR_PX);
-  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[3]) >= 3 * LCARS_FONT_BODY_CHAR_PX);
+  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[2]) >= 3 * LCARS_FONT_TABLE_CHAR_PX);
+  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[3]) >= 3 * LCARS_FONT_TABLE_CHAR_PX);
 }
 
 static void test_callsign_and_distance_columns_never_truncate(void) {
   const TableColumn *cols = tableColumns();
   // An 8-character callsign ("WZZ1234A") and "123km".
-  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[0]) >= 8 * LCARS_FONT_BODY_CHAR_PX);
-  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[1]) >= 5 * LCARS_FONT_BODY_CHAR_PX);
+  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[0]) >= 8 * LCARS_FONT_TABLE_CHAR_PX);
+  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[1]) >= 5 * LCARS_FONT_TABLE_CHAR_PX);
 }
 
 static void test_type_column_fits_a_readable_type_name(void) {
   // "777-300ER" / "Dash 8-400" — the friendly names from aircraft_types.
-  TEST_ASSERT_TRUE(tableCellTextWidthPx(tableColumns()[4]) >= 10 * LCARS_FONT_BODY_CHAR_PX);
+  TEST_ASSERT_TRUE(tableCellTextWidthPx(tableColumns()[4]) >= 10 * LCARS_FONT_TABLE_CHAR_PX);
 }
 
 static void test_distance_text(void) {
@@ -502,6 +548,9 @@ int main(int argc, char **argv) {
   RUN_TEST(test_sort_is_stable_for_equal_distances);
   RUN_TEST(test_sort_puts_rows_without_distance_last);
   RUN_TEST(test_sort_empty_array_does_not_crash);
+  RUN_TEST(test_display_order_puts_airborne_before_ground_traffic);
+  RUN_TEST(test_display_order_puts_positionless_last);
+  RUN_TEST(test_display_order_all_on_ground_still_nearest_first);
 
   RUN_TEST(test_split_featured_and_rest_multiple_rows);
   RUN_TEST(test_split_featured_and_rest_single_row);
@@ -520,6 +569,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_type_column_fits_a_readable_type_name);
   RUN_TEST(test_distance_text);
   RUN_TEST(test_header_labels_keep_clear_of_the_divider);
+  RUN_TEST(test_row_font_is_one_px_smaller_than_the_header_strip);
   RUN_TEST(test_airport_columns_fit_an_iata_code);
 
   RUN_TEST(test_page_count_zero_records);

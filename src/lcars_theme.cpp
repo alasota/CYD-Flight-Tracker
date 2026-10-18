@@ -184,6 +184,7 @@ const lgfx::IFont *const LCARS_FONT_SMALL = &fonts::efontJA_10;
 // A touch larger than the 10px header text but still fits the 15px header
 // (13px line); a few KB, ASCII only — fine for "08:46".
 const lgfx::IFont *const LCARS_FONT_CLOCK = &fonts::DejaVu12;
+const lgfx::IFont *const LCARS_FONT_TABLE = &fonts::efontJA_14;
 
 TextMeasure gfxTextMeasure(lgfx::LovyanGFX &gfx) {
   return [&gfx](const std::string &s) { return static_cast<int>(gfx.textWidth(s.c_str())); };

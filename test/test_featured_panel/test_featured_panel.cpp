@@ -32,7 +32,9 @@ static AircraftRow airborneRow() {
   row.aircraft.has_position = true;
   row.aircraft.on_ground = false;
   row.aircraft.baro_altitude = 1250.4f;
+  row.aircraft.has_altitude = true;
   row.aircraft.velocity = 103.6f;
+  row.aircraft.has_velocity = true;
   row.has_distance = true;
   row.distance_km = 6.2f;
   return row;

@@ -228,7 +228,9 @@ static void test_now_stats_airborne(void) {
   r.has_distance = true;
   r.distance_km = 3.2f;
   r.aircraft.baro_altitude = 236.0f;
+  r.aircraft.has_altitude = true;
   r.aircraft.velocity = 74.0f;  // 266 km/h
+  r.aircraft.has_velocity = true;
   TEST_ASSERT_EQUAL_STRING("3km  236m  266km/h", nowStatsText(r, Language::PL).c_str());
 }
 

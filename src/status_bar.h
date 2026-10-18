@@ -2,7 +2,7 @@
 // CLAUDE.md "Screen chrome": a rounded block on the left showing how many
 // aircraft are in range ("7 LOTOW" / "7 FLIGHTS"), coloured by OpenSky data
 // health (orange OK / yellow rate-limited / magenta error), then the date
-// (DD/MM/YYYY) + the real wall-clock time (from time_sync) to its right in
+// (DD.MM.YYYY) + the real wall-clock time (from time_sync) to its right in
 // LCARS_CYAN. The screen name is no longer in the header — it's on the
 // bottom-nav buttons. Occupies y:0..LCARS_HEADER_HEIGHT, full width. **No
 // WiFi signal bars** (CLAUDE.md; rssiToBars() has no home in this layout).
@@ -26,8 +26,8 @@
 // Also the bottom-nav button labels.
 const char *statusBarScreenName(int screenIndex, Language lang);
 
-// "DD/MM/YYYY" from time_sync::formatDate(), or a same-width
-// "--/--/----" placeholder when the clock hasn't synced yet
+// "DD.MM.YYYY" from time_sync::formatDate(), or a same-width
+// "--.--.----" placeholder when the clock hasn't synced yet
 // (time_sync::isTimeSynced() == false) — never the epoch-zero garbage the
 // ESP32 boots with.
 std::string statusBarDate(std::time_t localEpoch, bool timeSynced);

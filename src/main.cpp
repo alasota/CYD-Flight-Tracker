@@ -412,11 +412,11 @@ void loop() {
       if (poll.status == OpenSkyPollStatus::Ok && cachedCfg.home_configured) {
         const std::vector<Aircraft> &aircraft = poll.aircraft;
 
-        // Rank aircraft nearest-home-first so the limited per-poll lookup
+        // Rank aircraft (airborne nearest-first, then ground) so the limited per-poll lookup
         // budget is spent on the ones the user actually sees first.
         lastRows = buildEnrichedRecords(aircraft, {}, {});
         annotateDistances(lastRows, cachedCfg.home_lat, cachedCfg.home_lon);
-        sortRowsByDistance(lastRows);
+        sortRowsForDisplay(lastRows);  // airborne first, then ground traffic (#9)
 
         std::vector<LookupKeys> byPriority;
         byPriority.reserve(lastRows.size());

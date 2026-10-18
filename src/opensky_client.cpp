@@ -77,17 +77,31 @@ std::vector<Aircraft> extractAircraftFromStates(JsonArrayConst states) {
       ac.lat = state[6].as<float>();
       ac.has_position = true;
     }
-    if (!state[7].isNull()) ac.baro_altitude = state[7].as<float>();
+    if (!state[7].isNull()) {
+      ac.baro_altitude = state[7].as<float>();
+      ac.has_altitude = true;
+    }
     if (!state[8].isNull()) ac.on_ground = state[8].as<bool>();
-    if (!state[9].isNull()) ac.velocity = state[9].as<float>();
+    if (!state[9].isNull()) {
+      ac.velocity = state[9].as<float>();
+      ac.has_velocity = true;
+    }
     if (!state[10].isNull()) ac.true_track = state[10].as<float>();
     if (!state[11].isNull()) ac.vertical_rate = state[11].as<float>();
 
+    ac.on_ground = inferOnGround(ac);  // apron traffic often lacks the flag
     result.push_back(ac);
   }
   return result;
 }
 }  // namespace
+
+bool inferOnGround(const Aircraft &ac) {
+  if (ac.on_ground) return true;
+  if (ac.has_velocity && ac.velocity < kTaxiSpeedMps) return true;  // taxiing / parked
+  if (!ac.has_altitude && !ac.has_velocity) return true;            // apron, no data
+  return false;
+}
 
 std::vector<Aircraft> parseStatesResponse(const std::string &json) {
   if (json.size() > kMaxStatesResponseBytes) {

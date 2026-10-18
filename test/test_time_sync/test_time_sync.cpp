@@ -16,24 +16,24 @@ void tearDown(void) {}
 // ---- formatDate -----------------------------------------------------------
 
 static void test_format_date_epoch_zero(void) {
-  TEST_ASSERT_EQUAL_STRING("01/01/1970", formatDate(0).c_str());
+  TEST_ASSERT_EQUAL_STRING("01.01.1970", formatDate(0).c_str());
 }
 
 static void test_format_date_known_values(void) {
-  TEST_ASSERT_EQUAL_STRING("09/09/2001", formatDate(1000000000).c_str());
-  TEST_ASSERT_EQUAL_STRING("14/07/2017", formatDate(1500000000).c_str());
+  TEST_ASSERT_EQUAL_STRING("09.09.2001", formatDate(1000000000).c_str());
+  TEST_ASSERT_EQUAL_STRING("14.07.2017", formatDate(1500000000).c_str());
 }
 
 static void test_format_date_pads_day_and_month(void) {
-  TEST_ASSERT_EQUAL_STRING("07/03/2026", formatDate(1772841600).c_str());
+  TEST_ASSERT_EQUAL_STRING("07.03.2026", formatDate(1772841600).c_str());
 }
 
 static void test_format_date_leap_year_after_feb29(void) {
-  TEST_ASSERT_EQUAL_STRING("01/03/2020", formatDate(1583020800).c_str());
+  TEST_ASSERT_EQUAL_STRING("01.03.2020", formatDate(1583020800).c_str());
 }
 
 static void test_format_date_negative_epoch_clamps(void) {
-  TEST_ASSERT_EQUAL_STRING("01/01/1970", formatDate(-12345).c_str());
+  TEST_ASSERT_EQUAL_STRING("01.01.1970", formatDate(-12345).c_str());
 }
 
 // ---- formatTime ---------------------------------------------------------

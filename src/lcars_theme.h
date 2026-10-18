@@ -186,6 +186,10 @@ constexpr int16_t LCARS_FONT_SMALL_HEIGHT_PX = 10;
 constexpr int16_t LCARS_FONT_SMALL_CHAR_PX = 5;
 constexpr int16_t LCARS_FONT_BODY_HEIGHT_PX = 16;
 constexpr int16_t LCARS_FONT_BODY_CHAR_PX = 8;
+// Table rows: fonts::efontJA_14 — 1px smaller than the 15px table header
+// strip, a bit lighter than the 16px body text.
+constexpr int16_t LCARS_FONT_TABLE_HEIGHT_PX = 14;
+constexpr int16_t LCARS_FONT_TABLE_CHAR_PX = 7;
 
 // Side of the drawn phase triangle (drawPhaseIcon()) — a bit smaller than
 // the 16px text line it sits next to.
@@ -207,6 +211,7 @@ extern const lgfx::IFont *const LCARS_FONT_HEADING;  // panel/header titles
 extern const lgfx::IFont *const LCARS_FONT_BODY;     // table rows, labels
 extern const lgfx::IFont *const LCARS_FONT_NUMERIC;  // altitude/speed readouts (7-seg style)
 extern const lgfx::IFont *const LCARS_FONT_SMALL;    // 10px labels for thin strips (header, column header)
+extern const lgfx::IFont *const LCARS_FONT_TABLE;    // table rows: efont 14px (Polish letters)
 extern const lgfx::IFont *const LCARS_FONT_CLOCK;    // header clock: DejaVu12 (13px line, ASCII digits only)
 
 // Adapter: a TextMeasure that measures with `gfx`'s *current* font/size.

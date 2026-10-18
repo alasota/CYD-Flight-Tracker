@@ -49,7 +49,7 @@ CivilDateTime breakdown(std::time_t epoch) {
 std::string formatDate(std::time_t epoch) {
   CivilDateTime t = breakdown(epoch);
   char buf[16];
-  std::snprintf(buf, sizeof(buf), "%02d/%02d/%04d", t.day, t.month, t.year);
+  std::snprintf(buf, sizeof(buf), "%02d.%02d.%04d", t.day, t.month, t.year);
   return std::string(buf);
 }
 

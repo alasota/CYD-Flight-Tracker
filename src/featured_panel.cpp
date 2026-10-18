@@ -30,9 +30,10 @@ std::vector<std::string> featuredPillTexts(const AircraftRow &row, Language lang
   if (row.aircraft.on_ground) {
     return {tr(Str::OnGround, lang), distance};
   }
-  const bool pos = row.aircraft.has_position;
-  return {pillValue(pos, row.aircraft.baro_altitude, "m"),
-          pillValue(pos, row.aircraft.velocity * kMpsToKmh, "km/h"), distance};
+  // "--" when OpenSky sent null — never a misleading "0m" / "0km/h".
+  return {pillValue(row.aircraft.has_altitude, row.aircraft.baro_altitude, "m"),
+          pillValue(row.aircraft.has_velocity, row.aircraft.velocity * kMpsToKmh, "km/h"),
+          distance};
 }
 
 #ifdef ARDUINO

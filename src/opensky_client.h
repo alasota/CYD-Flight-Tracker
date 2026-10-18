@@ -69,9 +69,11 @@ struct Aircraft {
   float lon = 0.0f;
   bool has_position = false;  // false if lat/lon were null in the response
   float baro_altitude = 0.0f;
+  bool has_altitude = false;  // false if baro_altitude was null (often on the apron)
   float velocity = 0.0f;
+  bool has_velocity = false;  // false if velocity was null
   float true_track = 0.0f;
-  bool on_ground = false;        // state vector index 8
+  bool on_ground = false;        // index 8, *or inferred* — see inferOnGround()
   float vertical_rate = 0.0f;    // state vector index 11, m/s, positive = climbing
 };
 
@@ -92,6 +94,19 @@ constexpr size_t kMaxStatesResponseBytes = 65536;  // 64 KB
 // kMaxStatesResponseBytes is rejected outright (-> empty result) without
 // being parsed. Pure — uses ArduinoJson but no HTTP dependency.
 std::vector<Aircraft> parseStatesResponse(const std::string &json);
+
+// Speed below which an aircraft is taxiing / parked rather than flying
+// (15 m/s = 54 km/h — airliners never fly that slowly; taxi speeds stay
+// under ~15 m/s).
+constexpr float kTaxiSpeedMps = 15.0f;
+
+// Whether `ac` is effectively on the ground. OpenSky's on_ground flag is
+// trusted when set, but aircraft on the apron are also often reported with
+// on_ground=false and no altitude / no or crawling speed — so: flagged, or
+// moving slower than kTaxiSpeedMps, or with neither altitude nor speed.
+// parseStatesResponse() folds this into Aircraft::on_ground, so every
+// screen (featured slot, phase, Screen 2 pick) agrees. Pure — native-tested.
+bool inferOnGround(const Aircraft &ac);
 
 // Backoff duration after a 429, per CLAUDE.md "Rate limits": the
 // X-Rate-Limit-Retry-After-Seconds header value if present and a valid
