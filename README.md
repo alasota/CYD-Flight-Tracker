@@ -18,6 +18,23 @@ starship that definitely does not belong to any copyright holder in particular.
 
 No soldering. No radar dish. No red shirts were harmed in the making of this firmware.
 
+## Screenshots
+
+Real captures straight off the device (via its `/screenshot.bmp` endpoint), Polish UI:
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/flights.png" width="320" alt="LOTY / FLIGHTS screen: featured nearest aircraft plus a table of flights in range"></td>
+    <td align="center"><img src="docs/screenshots/now.png" width="320" alt="TERAZ / NOW screen: nearest aircraft and the overhead countdown"></td>
+    <td align="center"><img src="docs/screenshots/radar.png" width="320" alt="RADAR screen: radar plot with range rings and the nearest-aircraft summary"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>LOTY / FLIGHTS</b><br>Nearest aircraft up top (flight, airline, type, route with cities, altitude, speed, direction), everything else in the table below.</td>
+    <td align="center"><b>TERAZ / NOW</b><br>"When will it be over my head?" — a big countdown to the closest point of approach, or an honest "not passing overhead".</td>
+    <td align="center"><b>RADAR</b><br>Your house in the middle, aircraft with heading ticks, range rings in km, and a summary of the nearest one.</td>
+  </tr>
+</table>
+
 ## What is this thing
 
 It polls live aircraft state vectors for a bounding box around your house (or your grill, same
@@ -31,13 +48,16 @@ answer to "what plane is that." Think of it as the away-team variant with better
 
 ## Features
 
-- 📋 **Table view** — a sortable, scannable list of every aircraft in range: **airline, flight,
-  aircraft type**, altitude, speed, distance. This is the bet-settling column, front and center.
-  Closest aircraft gets highlighted, because it's the one you can actually go outside and squint at.
-- 🎯 **Radar view** *(optional, secondary, still in space-dock)* — the classic circular sweep,
-  just wearing a much cooler uniform.
-- 🖖 **LCARS-inspired chrome** — black background, chunky color blocks, rounded "elbow" panels,
-  pill buttons. An homage, not a photocopy. All shapes hand-drawn in TFT_eSPI, zero ripped assets.
+- 📋 **Flights screen** — the closest aircraft featured up top (**flight, airline, aircraft
+  type**, route with city names, altitude, speed, direction), plus a paged table of everything
+  else in range: flight, distance, from/to (IATA), type and phase (takeoff / landing / overflight).
+  This is the bet-settling screen, front and center.
+- ⏱️ **Now screen** — a big countdown to the moment the next aircraft is actually over your head.
+- 🎯 **Radar screen** — a static radar plot with range rings, heading ticks and a nearest-aircraft
+  summary.
+- 🇵🇱/🇬🇧 **Polish or English UI**, switchable on the config web page.
+- 🖖 **LCARS-inspired chrome** — black background, chunky color blocks, pill buttons. An homage,
+  not a photocopy. All shapes hand-drawn with LovyanGFX, zero ripped assets.
 - 📡 Lives entirely on the ESP32 — no server, no phone app, no subscription, no away mission
   required.
 - 🔐 Speaks OpenSky's current OAuth2 `client_credentials` auth (their old Basic Auth was
