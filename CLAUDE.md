@@ -657,7 +657,12 @@ language / Jezyk wyswietlacza" select, values `pl` / `en`). Default: Polish.
   (`configPortalSaveCount()`), calls `i18nSetLanguage()` and does a full redraw
   (`RedrawEvents::languageChanged`).
 - Not translated: units (`m`, `km`, `m/s`, `MIN`), `--` placeholders, airline/aircraft names
-  from hexdb.io, and the config web page itself (English).
+  from hexdb.io.
+- **The config web page has its own language** (`Config::web_language`, NVS key `wlang`,
+  default PL), independent of the display's: PL/EN switch in the page header (`GET /lang?l=`)
+  and a select on the General tab. Its strings are a separate X-macro table, `web_i18n`
+  (`WEB_I18N_STRINGS`, `webTr()`); they go into HTML/JS raw, so `test_web_i18n` forbids
+  `" < > \ &` in them.
 
 ## Design language — LCARS-inspired (Star Trek console aesthetic)
 
@@ -728,6 +733,14 @@ each with a single responsibility:
   client_id/secret, poll interval, and now `auto_cycle_enabled` / `auto_cycle_interval_s` (see
   "Auto screen cycling"). Reachable via mDNS (e.g. `cyd-sky.local`), same pattern as
   micro-radar's `microradar.local`.
+  The page HTML is rendered by the pure **`config_page`** module (`renderConfigPage(model,
+  sink)`, streamed chunk by chunk, native-tested): three tabs — **Location** (lat/lon, radius +
+  credits per request), **OpenSky client** (account status, client id/secret, credentials-file
+  upload, poll interval + estimated credits per day vs. the 400/4000 limit), **General**
+  (display + web-panel language, auto-cycle, flight-phase thresholds); one Save for all tabs,
+  the active tab round-trips via `?tab=` / a hidden field. Look: dark (`#17181c`), muted greys,
+  thin borders, the display's peach `#ff9966` as the only accent (active tab, buttons, focus)
+  with dark text on it.
   Also serves `GET /screenshot.bmp[?screen=N]`: the panel read back (LovyanGFX `readRect`,
   panel `readable = true`) and streamed as a 24-bit BMP row by row — for UX reviews without a
   camera. Pixels come from `main.cpp` via `configPortalSetScreenshotSource()`; BMP header/row math

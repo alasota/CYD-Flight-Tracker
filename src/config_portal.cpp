@@ -65,6 +65,7 @@ bool isValidUnsignedIntString(const std::string &s) {
 #include <cstring>
 #include <string>
 
+#include "config_page.h"
 #include "config_store.h"
 #include "screenshot.h"
 
@@ -77,169 +78,48 @@ bool active = false;
 uint32_t saveCount = 0;  // see configPortalSaveCount()
 ScreenshotSource screenshotSource;  // see configPortalSetScreenshotSource()
 
-std::string htmlEscape(const std::string &in) {
-  std::string out;
-  out.reserve(in.size());
-  for (char c : in) {
-    switch (c) {
-      case '&':
-        out += "&amp;";
-        break;
-      case '<':
-        out += "&lt;";
-        break;
-      case '>':
-        out += "&gt;";
-        break;
-      case '"':
-        out += "&quot;";
-        break;
-      default:
-        out += c;
-    }
-  }
-  return out;
-}
-
-// Sends `s` as one chunk of the in-progress chunked response, skipping the
-// call entirely when `s` is empty — WebServer::sendContent() with a
-// zero-length payload prematurely ends the chunked stream, which would
-// silently truncate the page (e.g. whenever a credential field is blank).
-void sendChunk(const char *s) {
-  size_t len = std::strlen(s);
-  if (len > 0) {
-    server.sendContent(s, len);
-  }
-}
-void sendChunk(const std::string &s) { sendChunk(s.c_str()); }
-
-// Streams the config page directly to the client instead of building it up
-// as one large Arduino String (see CLAUDE.md review notes 4.1) — static
-// chunks are literals (no allocation at all), dynamic values are formatted
-// into small stack buffers via snprintf.
-void sendConfigPage(const Config &cfg, const char *message, bool isError = false) {
+// Streams the config page (config_page's renderer) straight to the client as
+// a chunked response instead of building one large String (see CLAUDE.md
+// review notes 4.1). renderConfigPage() never emits an empty chunk — a
+// zero-length sendContent() would end the chunked stream early.
+void sendPage(const ConfigPageModel &model) {
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  server.send(200, "text/html", "");
-
-  sendChunk("<!DOCTYPE html><html><head><meta charset=\"utf-8\">");
-  sendChunk("<title>CYD Sky Tracker Setup</title>");
-  sendChunk(
-      "<style>body{font-family:sans-serif;background:#111;color:#eee;padding:1.5em}"
-      "label{display:block;margin-top:1em}"
-      "input{width:100%;box-sizing:border-box;padding:.4em;font-size:1em}"
-      "input[type=checkbox]{width:auto;margin-left:.5em}"
-      "button{margin-top:1.5em;padding:.6em 1.2em;font-size:1em}"
-      "h2{margin-top:2em;border-top:1px solid #444;padding-top:1em}"
-      "#credit{color:#ffa500;font-weight:bold}</style>");
-  sendChunk("</head><body>");
-  sendChunk("<h1>CYD Sky Tracker</h1>");
-
-  if (message != nullptr) {
-    sendChunk(isError ? "<p style=\"color:#ff6f6f\">" : "<p style=\"color:#7fff7f\">");
-    sendChunk(message);
-    sendChunk("</p>");
-  }
-
-  sendChunk("<h2>Load OpenSky credentials from file</h2>"
-            "<form method=\"POST\" action=\"/upload_credentials\" enctype=\"multipart/form-data\">"
-            "<label>OpenSky client JSON (the file downloaded from your OpenSky account page)"
-            "<input type=\"file\" name=\"creds_file\" accept=\"application/json,.json\" required>"
-            "</label>"
-            "<button type=\"submit\">Upload</button>"
-            "</form>");
-
-  sendChunk("<h2>Settings</h2><form method=\"POST\" action=\"/save\">");
-
-  // Display language (i18n) — option values are languageCode() ("pl"/"en").
-  sendChunk("<label>Display language / Jezyk wyswietlacza<select name=\"language\">");
-  sendChunk(cfg.language == Language::PL ? "<option value=\"pl\" selected>Polski</option>"
-                                         : "<option value=\"pl\">Polski</option>");
-  sendChunk(cfg.language == Language::EN ? "<option value=\"en\" selected>English</option>"
-                                         : "<option value=\"en\">English</option>");
-  sendChunk("</select></label>");
-
-  char buf[64];
-
-  std::snprintf(buf, sizeof(buf), "%.6f", static_cast<double>(cfg.home_lat));
-  sendChunk("<label>Home latitude<input type=\"text\" name=\"lat\" value=\"");
-  sendChunk(buf);
-  sendChunk("\"></label>");
-
-  std::snprintf(buf, sizeof(buf), "%.6f", static_cast<double>(cfg.home_lon));
-  sendChunk("<label>Home longitude<input type=\"text\" name=\"lon\" value=\"");
-  sendChunk(buf);
-  sendChunk("\"></label>");
-
-  std::snprintf(buf, sizeof(buf), "%.2f", static_cast<double>(cfg.radius_deg));
-  sendChunk("<label>Scan radius, deg (bbox = 2x this on each side)"
-            "<input type=\"text\" id=\"radius\" name=\"radius\" value=\"");
-  sendChunk(buf);
-  sendChunk("\" oninput=\"updateCredit()\"></label>");
-
-  std::snprintf(buf, sizeof(buf), "%d", openSkyCreditCost(cfg.radius_deg));
-  sendChunk("<p>OpenSky credit cost per poll: <span id=\"credit\">");
-  sendChunk(buf);
-  sendChunk("</span></p>");
-
-  std::snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(cfg.poll_interval_s));
-  sendChunk("<label>Poll interval, seconds<input type=\"number\" name=\"poll_interval\" min=\"5\" "
-            "value=\"");
-  sendChunk(buf);
-  sendChunk("\"></label>");
-
-  sendChunk("<label>Auto-cycle through screens"
-            "<input type=\"checkbox\" name=\"auto_cycle\" value=\"1\"");
-  sendChunk(cfg.auto_cycle_enabled ? " checked" : "");
-  sendChunk("></label>");
-
-  std::snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(cfg.auto_cycle_interval_s));
-  sendChunk("<label>Auto-cycle interval, seconds"
-            "<input type=\"number\" name=\"auto_cycle_interval\" min=\"3\" value=\"");
-  sendChunk(buf);
-  sendChunk("\"></label>");
-
-  std::snprintf(buf, sizeof(buf), "%.1f", static_cast<double>(cfg.near_airport_km));
-  sendChunk("<label>Near-airport radius, km (takeoff/landing vs. overflight)"
-            "<input type=\"text\" name=\"near_airport_km\" value=\"");
-  sendChunk(buf);
-  sendChunk("\"></label>");
-
-  std::snprintf(buf, sizeof(buf), "%.1f", static_cast<double>(cfg.climb_rate_threshold_mps));
-  sendChunk("<label>Climb/descent threshold, m/s"
-            "<input type=\"text\" name=\"climb_rate_mps\" value=\"");
-  sendChunk(buf);
-  sendChunk("\"></label>");
-
-  sendChunk("<label>OpenSky client ID<input type=\"text\" name=\"client_id\" value=\"");
-  sendChunk(htmlEscape(cfg.opensky_client_id));
-  sendChunk("\"></label>");
-
-  sendChunk("<label>OpenSky client secret<input type=\"password\" name=\"client_secret\" value=\"");
-  sendChunk(htmlEscape(cfg.opensky_client_secret));
-  sendChunk("\"></label>");
-
-  sendChunk("<button type=\"submit\">Save</button></form>");
-
-  // Mirrors openSkyCreditCost() above so the credit readout updates as the
-  // user types, without a round trip to the device for every keystroke.
-  sendChunk("<script>"
-            "function creditCost(radius){"
-            "var side=2*radius,area=side*side;"
-            "if(area<=25)return 1;if(area<=100)return 2;if(area<=400)return 3;return 4;"
-            "}"
-            "function updateCredit(){"
-            "var r=parseFloat(document.getElementById('radius').value)||0;"
-            "document.getElementById('credit').textContent=creditCost(r);"
-            "}"
-            "</script>");
-  sendChunk("</body></html>");
-
+  server.send(200, "text/html; charset=utf-8", "");
+  renderConfigPage(model, [](const char *chunk) { server.sendContent(chunk, std::strlen(chunk)); });
   server.sendContent("");  // 0-length chunk closes the chunked response
 }
 
-void handleRoot() {
+void sendConfigPage(const Config &cfg, SettingsTab tab) {
+  ConfigPageModel model;
+  model.cfg = cfg;
+  model.tab = tab;
+  sendPage(model);
+}
+
+void sendConfigPage(const Config &cfg, SettingsTab tab, WebStr message, bool isError,
+                    const std::string &detail = std::string()) {
+  ConfigPageModel model;
+  model.cfg = cfg;
+  model.tab = tab;
+  model.hasMessage = true;
+  model.message = message;
+  model.isError = isError;
+  model.messageDetail = detail;
+  sendPage(model);
+}
+
+SettingsTab requestedTab() { return settingsTabFromArg(server.arg("tab").c_str()); }
+
+void handleRoot() { sendConfigPage(loadConfig(), requestedTab()); }
+
+// GET /lang?l=pl|en[&tab=...] — the PL/EN switch in the page header: saves
+// the web panel's language only and redirects back to the same tab.
+void handleLang() {
   Config cfg = loadConfig();
-  sendConfigPage(cfg, nullptr);
+  cfg.web_language = languageFromCode(server.arg("l").c_str());
+  saveConfig(cfg);
+  server.sendHeader("Location", String("/?tab=") + settingsTabId(requestedTab()));
+  server.send(303, "text/plain", "");
 }
 
 void handleSave() {
@@ -249,14 +129,15 @@ void handleSave() {
   // (which sanitizeConfig would then just clamp to a "valid-looking"
   // value with no feedback to the user) — see CLAUDE.md review notes 1.6.
   // Rejected fields keep their previous value.
-  std::string rejected;
+  // Labels of the rejected fields, shown in the page's own language.
+  std::vector<WebStr> rejected;
 
   if (server.hasArg("lat")) {
     std::string v = server.arg("lat").c_str();
     if (isValidFloatString(v)) {
       cfg.home_lat = std::strtof(v.c_str(), nullptr);
     } else {
-      rejected += "lat ";
+      rejected.push_back(WebStr::Latitude);
     }
   }
   if (server.hasArg("lon")) {
@@ -264,7 +145,7 @@ void handleSave() {
     if (isValidFloatString(v)) {
       cfg.home_lon = std::strtof(v.c_str(), nullptr);
     } else {
-      rejected += "lon ";
+      rejected.push_back(WebStr::Longitude);
     }
   }
   if (server.hasArg("radius")) {
@@ -272,7 +153,7 @@ void handleSave() {
     if (isValidFloatString(v)) {
       cfg.radius_deg = std::strtof(v.c_str(), nullptr);
     } else {
-      rejected += "radius ";
+      rejected.push_back(WebStr::Radius);
     }
   }
   if (server.hasArg("poll_interval")) {
@@ -280,7 +161,7 @@ void handleSave() {
     if (isValidUnsignedIntString(v)) {
       cfg.poll_interval_s = static_cast<uint32_t>(std::strtoul(v.c_str(), nullptr, 10));
     } else {
-      rejected += "poll_interval ";
+      rejected.push_back(WebStr::PollInterval);
     }
   }
   // Checkbox: the browser sends this arg only when it's ticked. handleSave
@@ -293,7 +174,7 @@ void handleSave() {
     if (isValidUnsignedIntString(v)) {
       cfg.auto_cycle_interval_s = static_cast<uint32_t>(std::strtoul(v.c_str(), nullptr, 10));
     } else {
-      rejected += "auto_cycle_interval ";
+      rejected.push_back(WebStr::AutoCycleInterval);
     }
   }
   if (server.hasArg("near_airport_km")) {
@@ -301,7 +182,7 @@ void handleSave() {
     if (isValidFloatString(v)) {
       cfg.near_airport_km = std::strtof(v.c_str(), nullptr);
     } else {
-      rejected += "near_airport_km ";
+      rejected.push_back(WebStr::NearAirport);
     }
   }
   if (server.hasArg("climb_rate_mps")) {
@@ -309,12 +190,15 @@ void handleSave() {
     if (isValidFloatString(v)) {
       cfg.climb_rate_threshold_mps = std::strtof(v.c_str(), nullptr);
     } else {
-      rejected += "climb_rate_mps ";
+      rejected.push_back(WebStr::ClimbRate);
     }
   }
 
   if (server.hasArg("language")) {
     cfg.language = languageFromCode(server.arg("language").c_str());  // unknown -> default
+  }
+  if (server.hasArg("web_language")) {
+    cfg.web_language = languageFromCode(server.arg("web_language").c_str());
   }
 
   if (server.hasArg("client_id")) cfg.opensky_client_id = server.arg("client_id").c_str();
@@ -331,11 +215,16 @@ void handleSave() {
   ++saveCount;
 
   Config saved = loadConfig();
+  const SettingsTab tab = requestedTab();
   if (!rejected.empty()) {
-    std::string msg = "Saved, but ignored invalid value(s) for: " + rejected + "(kept previous value).";
-    sendConfigPage(saved, msg.c_str(), true);
+    std::string fields;
+    for (WebStr f : rejected) {
+      if (!fields.empty()) fields += ", ";
+      fields += webTr(f, saved.web_language);
+    }
+    sendConfigPage(saved, tab, WebStr::SavedWithInvalid, true, fields);
   } else {
-    sendConfigPage(saved, "Saved.");
+    sendConfigPage(saved, tab, WebStr::Saved, false);
   }
 }
 
@@ -394,13 +283,13 @@ void handleCredentialsUpload() {
   Config cfg = loadConfig();
 
   if (uploadTooLarge) {
-    sendConfigPage(cfg, "Upload failed: file too large.", true);
+    sendConfigPage(cfg, SettingsTab::OpenSky, WebStr::UploadTooLarge, true);
     return;
   }
 
   OpenSkyCredentials creds = parseOpenSkyCredentialsJson(uploadBuffer);
   if (!creds.ok) {
-    sendConfigPage(cfg, "Upload failed: file did not contain a valid clientId/clientSecret.", true);
+    sendConfigPage(cfg, SettingsTab::OpenSky, WebStr::UploadInvalid, true);
     return;
   }
 
@@ -410,7 +299,7 @@ void handleCredentialsUpload() {
   ++saveCount;
 
   Config saved = loadConfig();
-  sendConfigPage(saved, "OpenSky credentials loaded from file.");
+  sendConfigPage(saved, SettingsTab::OpenSky, WebStr::UploadOk, false);
 }
 
 }  // namespace
@@ -422,6 +311,7 @@ void configPortalBegin() {
 
   server.on("/", HTTP_GET, handleRoot);
   server.on("/save", HTTP_POST, handleSave);
+  server.on("/lang", HTTP_GET, handleLang);
   server.on("/screenshot.bmp", HTTP_GET, handleScreenshot);
   server.on("/upload_credentials", HTTP_POST, handleCredentialsUpload, handleCredentialsUploadChunk);
   server.onNotFound(handleNotFound);

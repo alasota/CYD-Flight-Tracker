@@ -78,7 +78,9 @@ answer to "what plane is that." Think of it as the away-team variant with better
 - ⏱️ **Now screen** — a big countdown to the moment the next aircraft is actually over your head.
 - 🎯 **Radar screen** — a static radar plot with range rings, heading ticks and a nearest-aircraft
   summary.
-- 🇵🇱/🇬🇧 **Polish or English UI**, switchable on the config web page.
+- 🇵🇱/🇬🇧 **Polish or English UI** — on the display and, separately, on the config web page
+  (a dark, tabbed panel: Location / OpenSky client / General, with a live estimate of your
+  daily OpenSky credit use).
 - 🖖 **LCARS-inspired chrome** — black background, chunky color blocks, folder-tab navigation. An homage,
   not a photocopy. All shapes hand-drawn with LovyanGFX, zero ripped assets.
 - 📡 Lives entirely on the ESP32 — no server, no phone app, no subscription, no away mission
@@ -121,13 +123,40 @@ On first boot the board can't find a saved WiFi network, so it opens its own hot
 Connect to it from your phone, hand over your WiFi credentials, and the board will reboot onto
 your network like nothing happened.
 
-Once it's on your network, open its local config page (mDNS hostname is in `CLAUDE.md`) and set:
+### Configuring it from the browser
 
-- Home latitude/longitude (the center of your scan — i.e., where your desk is)
-- Scan radius (bigger radius = more planes = more API credits burned per request — choose your
-  engagement range wisely)
-- Poll interval
-- Your OpenSky `client_id` / `client_secret`, if you made an account
+Once it's on your network, open **http://cyd-sky.local** (or the board's IP address, which your
+router's list of connected devices will show if `.local` names don't work on your system). The settings page has three tabs and one **Save** button that
+saves all of them at once:
+
+1. **Location**: paste your home latitude and longitude (right-click a spot in Google Maps to
+   copy them) and pick a scan radius. The page shows how many OpenSky credits one request costs
+   at that radius. Bigger radius = more planes = more credits burned, so choose your engagement
+   range wisely.
+2. **OpenSky client**: optional. Paste your OpenSky `client_id` / `client_secret`, or upload
+   the `credentials.json` file from your OpenSky account page. Set how often to refresh. The
+   page estimates your daily credit use against the limit (400 anonymous, 4,000 with an
+   account) and turns red if you'd run out.
+3. **General**: display language, web panel language, automatic screen cycling and the
+   flight-phase thresholds.
+
+The **PL / EN** switch in the top-right corner changes the page's language. It doesn't affect
+the display, which has its own setting on the General tab.
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/web_location.png" width="260" alt="Settings page, Location tab: latitude, longitude, scan radius and credits per request"></td>
+    <td align="center"><img src="docs/screenshots/web_opensky.png" width="260" alt="Settings page, OpenSky client tab: account status, client ID and secret, credentials file upload, refresh interval and daily credit estimate"></td>
+    <td align="center"><img src="docs/screenshots/web_general.png" width="260" alt="Settings page, General tab: display and web panel language, screen cycling, flight-phase thresholds"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Location</b></td>
+    <td align="center"><b>OpenSky client</b></td>
+    <td align="center"><b>General</b></td>
+  </tr>
+</table>
+
+<sub>Screenshots show demo values (Warsaw city centre, a made-up API client).</sub>
 
 > [!WARNING]
 > **The config page hands your OpenSky `client_secret` to anyone who asks.**

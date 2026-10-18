@@ -181,8 +181,23 @@ static void test_sanitize_config_resets_invalid_language(void) {
                         static_cast<int>(sanitizeConfig(bad).language));
 }
 
+static void test_web_language_is_independent_and_sanitized(void) {
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::PL),
+                        static_cast<int>(defaultConfig().web_language));
+  Config c;
+  c.language = Language::PL;
+  c.web_language = Language::EN;
+  Config s = sanitizeConfig(c);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::PL), static_cast<int>(s.language));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::EN), static_cast<int>(s.web_language));
+  c.web_language = static_cast<Language>(9);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(kDefaultLanguage),
+                        static_cast<int>(sanitizeConfig(c).web_language));
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
+  RUN_TEST(test_web_language_is_independent_and_sanitized);
   RUN_TEST(test_default_language_is_polish);
   RUN_TEST(test_sanitize_config_preserves_valid_language);
   RUN_TEST(test_sanitize_config_resets_invalid_language);

@@ -57,6 +57,9 @@ struct Config {
   // Stored in NVS as its numeric index; an out-of-range stored value is
   // reset to kDefaultLanguage by sanitizeConfig().
   Language language = kDefaultLanguage;
+  // Language of the config web page itself (web_i18n), independent of the
+  // display's. NVS key `wlang`, same index/clamping as `language`.
+  Language web_language = kDefaultLanguage;
   // True once the user has saved the settings form at least once via
   // config_portal. (0, 0) is a real place (Gulf of Guinea) — without this
   // flag there's no way to tell "user hasn't configured their home
