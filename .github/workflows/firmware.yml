@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned, not ubuntu-latest (moving to 26.04): switch deliberately
     outputs:
       version: ${{ steps.collect.outputs.version }}
       artifact: ${{ steps.collect.outputs.artifact }}

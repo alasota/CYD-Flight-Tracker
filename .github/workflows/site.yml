@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned, not ubuntu-latest (moving to 26.04): switch deliberately
     steps:
       - name: Check out (full history + tags, for the changelog)
         uses: actions/checkout@v7
@@ -82,7 +82,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned, not ubuntu-latest (moving to 26.04): switch deliberately
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
