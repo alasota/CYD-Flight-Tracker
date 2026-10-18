@@ -650,8 +650,8 @@ language / Jezyk wyswietlacza" select, values `pl` / `en`). Default: Polish.
   match it, and `test_fonts` checks every allowed character has a glyph in all three fonts.
   A character outside the set simply isn't drawn, so every on-screen string must be
   `isFontSafeText()` — `test_i18n`, the city table and the type/airline tables are checked
-  against it. To add a character: extend both lists, rerun the script, run the tests. (The
-  build still uses `huge_app.csv` — the firmware is ~1.3 MB now, so two OTA slots would fit.) `fitToWidth()` cuts only on UTF-8
+  against it. To add a character: extend both lists, rerun the script, run the tests. This is
+  what lets the ~1.3 MB firmware fit two OTA slots (`min_spiffs.csv`). `fitToWidth()` cuts only on UTF-8
   character boundaries; layout maths uses `utf8Length()` and the fonts' fixed advance
   (`LCARS_FONT_BODY_CHAR_PX` = 8, `LCARS_FONT_SMALL_CHAR_PX` = 5). hexdb.io airport names are
   still ASCII-folded (`asciiFold()`), as they can contain any accent. Headings (Font4) and the
@@ -873,7 +873,7 @@ platform = espressif32
 board = esp32dev
 framework = arduino
 monitor_speed = 115200
-board_build.partitions = huge_app.csv  ; 3 MB app — efont fonts + tables outgrew the default 1.25 MB
+board_build.partitions = min_spiffs.csv  ; two 1.875 MB OTA slots; NVS at the same offset as before
 lib_deps =
     lovyan03/LovyanGFX
     tzapu/WiFiManager
