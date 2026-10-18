@@ -110,13 +110,40 @@ static void test_block_label_never_longer_than_11_chars(void) {
   }
 }
 
-// ---- statusBarBlockColor (data health as the block colour) --------------
+// ---- statusBarHealthColor (the status dot) --------------------------------
 
-static void test_block_color_per_health(void) {
-  TEST_ASSERT_EQUAL_HEX16(THEME_CHROME_ACCENT, statusBarBlockColor(OpenSkyHealth::Ok));  // peach
-  TEST_ASSERT_EQUAL_HEX16(LCARS_YELLOW, statusBarBlockColor(OpenSkyHealth::RateLimited));
-  TEST_ASSERT_EQUAL_HEX16(THEME_ALERT, statusBarBlockColor(OpenSkyHealth::AuthError));  // red
-  TEST_ASSERT_EQUAL_HEX16(THEME_ALERT, statusBarBlockColor(OpenSkyHealth::NetworkError));
+static void test_health_dot_colour(void) {
+  TEST_ASSERT_EQUAL_HEX16(LCARS_GREEN, statusBarHealthColor(OpenSkyHealth::Ok));
+  TEST_ASSERT_EQUAL_HEX16(LCARS_YELLOW, statusBarHealthColor(OpenSkyHealth::RateLimited));
+  TEST_ASSERT_EQUAL_HEX16(THEME_ALERT, statusBarHealthColor(OpenSkyHealth::AuthError));  // red
+  TEST_ASSERT_EQUAL_HEX16(THEME_ALERT, statusBarHealthColor(OpenSkyHealth::NetworkError));
+}
+
+static void test_header_uses_no_button_colour(void) {
+  // Variant A: nothing in the header may look like the active nav button.
+  for (OpenSkyHealth h : {OpenSkyHealth::Ok, OpenSkyHealth::RateLimited,
+                          OpenSkyHealth::AuthError, OpenSkyHealth::NetworkError}) {
+    TEST_ASSERT_NOT_EQUAL(THEME_CHROME_ACCENT, statusBarHealthColor(h));
+  }
+}
+
+// ---- statusBarZones: name | count | date+time never overlap -----------------
+
+static void test_zones_do_not_overlap_for_longest_texts(void) {
+  // Longest possible centre label in either language, and the widest date.
+  for (Language lang : {Language::PL, Language::EN}) {
+    const std::string count = statusBarBlockLabel(250, true, lang);  // "99+ ..."
+    HeaderZones z = statusBarZones(320, kStatusBarAppName, count, "--/--/----", "00:00");
+    TEST_ASSERT_TRUE_MESSAGE(z.name_end < z.count_start, count.c_str());
+    TEST_ASSERT_TRUE_MESSAGE(z.count_end < z.right_start, count.c_str());
+    TEST_ASSERT_TRUE(z.right_end <= 320);
+    TEST_ASSERT_TRUE(z.name_x >= 0);
+  }
+}
+
+static void test_count_is_centred(void) {
+  HeaderZones z = statusBarZones(320, kStatusBarAppName, "7 LOT\xC3\x93W", "18/10/2026", "08:46");
+  TEST_ASSERT_INT_WITHIN(1, 160, (z.count_start + z.count_end) / 2);
 }
 
 int main(int, char **) {
@@ -140,7 +167,10 @@ int main(int, char **) {
   RUN_TEST(test_block_label_caps_large_counts);
   RUN_TEST(test_block_label_never_longer_than_11_chars);
 
-  RUN_TEST(test_block_color_per_health);
+  RUN_TEST(test_health_dot_colour);
+  RUN_TEST(test_header_uses_no_button_colour);
+  RUN_TEST(test_zones_do_not_overlap_for_longest_texts);
+  RUN_TEST(test_count_is_centred);
 
   return UNITY_END();
 }

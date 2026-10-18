@@ -250,20 +250,25 @@ switching feels like changing a mode on one console, not jumping between apps.
 
 ### Screen chrome — header bar (identical on all three screens)
 
-**Exact pixel spec, y: 0 to 25px, full width (320px):**
-- LCARS block on the left (x:0..80, pill-shaped, Font0 text — the whole header is a slim 15px
-  strip, Font0 for the date/time too): filled rounded rectangle (`fillRoundRect`) showing the
-  **number of aircraft in range**, black text, in the selected language with the correct plural
-  (PL `1 LOT` / `3 LOTY` / `7 LOTOW`, EN `1 FLIGHT` / `7 FLIGHTS`; `99+` above 99; `--` until the
-  first successful poll). It used to show the screen name, but that duplicated the active
-  bottom-nav button on every screen, so the name now lives only in the bottom nav.
-- **The block's colour is the OpenSky feed health** — this replaces the old `RATE`/`AUTH`/`NET`
-  text tag next to the clock: `LCARS_ORANGE` = data OK, `LCARS_YELLOW` = rate-limited (429,
-  backing off), `LCARS_MAGENTA` = auth or network error (the aircraft shown may be stale).
-- To the right of that block: the current date `DD/MM/YYYY` (left-aligned, right after the
-  block) and the real time `HH:MM` (right-aligned at the screen edge), built-in font, color
-  `LCARS_CYAN` (`0x07FF`) or white. No seconds — the header is redrawn once per minute (see
-  "Redraw policy" below), so `HH:MM:SS` would sit frozen and look broken.
+**Exact pixel spec, y: 0 to 15px, full width (320px):**
+- **Layout "variant A" — three zones, nothing filled** (`statusBarZones()`, native-tested so the
+  zones never overlap for the longest texts in either language):
+  `SKY TRACKER          ● 7 LOTÓW          18/10/2026 09:11`
+  - **Left:** app name `kStatusBarAppName` ("SKY TRACKER"), small font, dim lavender
+    (`THEME_CHROME_DIM`).
+  - **Centre:** a **health dot** (`statusBarHealthColor()`: green = data OK, yellow =
+    rate-limited / backing off, red = auth or network error, i.e. the list may be stale) and the
+    **number of aircraft in range** in white, with the correct plural (PL `1 LOT` / `3 LOTY` /
+    `7 LOTÓW`, EN `1 FLIGHT` / `7 FLIGHTS`; `99+` above 99; `--` until the first successful poll).
+  - **Right:** date `DD/MM/YYYY` (small font) and time `HH:MM` right next to it in the slightly
+    larger `LCARS_FONT_CLOCK` (DejaVu12, 13px line), both light peach. No seconds — the header is
+    redrawn once per minute (see "Redraw policy"), so `HH:MM:SS` would sit frozen.
+  - A **1px lilac rule** along the header's bottom edge separates it from the content.
+- **Why:** the previous header had a filled peach pill (count, coloured by feed health) that
+  looked exactly like the active bottom-nav button, the count sat glued to the date with a big
+  gap before the time, and nobody could tell what the pill's colour meant. Peach fill is now
+  reserved for the active nav button; health is an explicit dot. (Earlier still, the block showed
+  the screen name, duplicating the active nav button.)
 - The header is repainted (on its own, `kRedrawHeader`) on every new poll (count), health
   change (colour) and minute rollover (clock).
 - **WiFi bars are dropped from this header** in this revision — the earlier three-zone design

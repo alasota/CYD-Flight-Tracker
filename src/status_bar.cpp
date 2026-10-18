@@ -46,7 +46,7 @@ std::string statusBarBlockLabel(int aircraftCount, bool hasData, Language lang) 
   return number + " " + tr(word, lang);
 }
 
-uint16_t statusBarBlockColor(OpenSkyHealth health) {
+uint16_t statusBarHealthColor(OpenSkyHealth health) {
   switch (health) {
     case OpenSkyHealth::RateLimited:
       return LCARS_YELLOW;
@@ -55,45 +55,74 @@ uint16_t statusBarBlockColor(OpenSkyHealth health) {
       return THEME_ALERT;
     case OpenSkyHealth::Ok:
     default:
-      return THEME_CHROME_ACCENT;
+      return LCARS_GREEN;
   }
+}
+
+namespace {
+constexpr int kMargin = 4;          // from the screen edges
+constexpr int kDotDiameter = 6;     // health dot
+constexpr int kDotGap = 4;          // dot -> count label
+constexpr int kDateClockGap = 8;    // date -> clock
+constexpr int kClockCharPx = 7;     // DejaVu12 digit advance (':' is narrower — safe upper bound)
+}  // namespace
+
+HeaderZones statusBarZones(int screenWidth, const std::string &appName,
+                           const std::string &countLabel, const std::string &date,
+                           const std::string &clock) {
+  HeaderZones z;
+  z.name_x = kMargin;
+  z.name_end = z.name_x + static_cast<int>(utf8Length(appName)) * LCARS_FONT_SMALL_CHAR_PX;
+
+  const int countW =
+      kDotDiameter + kDotGap + static_cast<int>(utf8Length(countLabel)) * LCARS_FONT_SMALL_CHAR_PX;
+  z.count_start = screenWidth / 2 - countW / 2;
+  z.count_end = z.count_start + countW;
+
+  z.right_end = screenWidth - kMargin;
+  const int clockW = static_cast<int>(clock.size()) * kClockCharPx;
+  const int dateW = static_cast<int>(utf8Length(date)) * LCARS_FONT_SMALL_CHAR_PX;
+  z.right_start = z.right_end - clockW - kDateClockGap - dateW;
+  z.date_x = z.right_start;
+  return z;
 }
 
 #ifdef ARDUINO
 
-namespace {
-// Wide enough for the longest block label ("99+ FLIGHTS", 11 chars x 6px)
-// in LCARS_FONT_SMALL plus padding, per CLAUDE.md "Screen chrome".
-constexpr int16_t kNameBlockWidth = 80;
-constexpr int16_t kNameBlockRadius = LCARS_HEADER_HEIGHT / 2;  // pill ends
-constexpr int16_t kTextGap = 6;
-constexpr int16_t kRightMargin = 4;
-}  // namespace
-
 void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, OpenSkyHealth health,
                    std::time_t localEpoch, bool timeSynced, int16_t screenWidth) {
-  // Own background — repaints the whole header without ghosting (also
-  // behind the block's rounded corners).
+  // Black strip + a 1px lilac rule along its bottom edge — no filled block,
+  // so nothing up here looks like the (peach) active nav button.
   gfx.fillRect(0, 0, screenWidth, LCARS_HEADER_HEIGHT, LCARS_BLACK);
+  gfx.drawFastHLine(0, static_cast<int16_t>(LCARS_HEADER_HEIGHT - 1), screenWidth,
+                    THEME_TABLE_HEADER);
 
-  // Left: aircraft-count block, coloured by data health.
-  drawHeaderBlock(gfx, 0, 0, kNameBlockWidth, LCARS_HEADER_HEIGHT, kNameBlockRadius,
-                  statusBarBlockColor(health), LCARS_BLACK,
-                  statusBarBlockLabel(aircraftCount, hasData, i18nLanguage()).c_str());
-
-  // Date (left-aligned, right after the block) + clock (right-aligned), cyan.
-  gfx.setFont(LCARS_FONT_SMALL);  // slim 15px header
-  gfx.setTextColor(THEME_CHROME_TEXT, LCARS_BLACK);
-
-  int16_t midY = LCARS_HEADER_HEIGHT / 2;
+  const std::string count = statusBarBlockLabel(aircraftCount, hasData, i18nLanguage());
+  const std::string date = statusBarDate(localEpoch, timeSynced);
+  const std::string clock = statusBarClock(localEpoch, timeSynced);
+  const HeaderZones z = statusBarZones(screenWidth, kStatusBarAppName, count, date, clock);
+  const int16_t midY = static_cast<int16_t>((LCARS_HEADER_HEIGHT - 1) / 2);  // above the rule
 
   gfx.setTextDatum(middle_left);
-  gfx.drawString(statusBarDate(localEpoch, timeSynced).c_str(),
-                 static_cast<int16_t>(kNameBlockWidth + kTextGap), midY);
 
-  std::string clock = statusBarClock(localEpoch, timeSynced);
+  // Left: app name, small and dim.
+  gfx.setFont(LCARS_FONT_SMALL);
+  gfx.setTextColor(THEME_CHROME_DIM, LCARS_BLACK);
+  gfx.drawString(kStatusBarAppName, static_cast<int16_t>(z.name_x), midY);
+
+  // Centre: health dot + flight count.
+  gfx.fillCircle(static_cast<int16_t>(z.count_start + kDotDiameter / 2), midY, kDotDiameter / 2,
+                 statusBarHealthColor(health));
+  gfx.setTextColor(THEME_CONTENT_PRIMARY, LCARS_BLACK);
+  gfx.drawString(count.c_str(), static_cast<int16_t>(z.count_start + kDotDiameter + kDotGap),
+                 midY);
+
+  // Right: date (small) + clock (larger), light peach.
+  gfx.setTextColor(THEME_CHROME_TEXT, LCARS_BLACK);
+  gfx.drawString(date.c_str(), static_cast<int16_t>(z.date_x), midY);
+  gfx.setFont(LCARS_FONT_CLOCK);
   gfx.setTextDatum(middle_right);
-  gfx.drawString(clock.c_str(), static_cast<int16_t>(screenWidth - kRightMargin), midY);
+  gfx.drawString(clock.c_str(), static_cast<int16_t>(z.right_end), midY);
 }
 
 #endif  // ARDUINO

@@ -55,11 +55,29 @@ enum class OpenSkyHealth {
 // simply don't know yet. Never longer than 11 chars. Pure — native-tested.
 std::string statusBarBlockLabel(int aircraftCount, bool hasData, Language lang);
 
-// Header block fill colour for the data feed's health — replaces the old
-// "RATE/AUTH/NET" text tag: LCARS_ORANGE when Ok, LCARS_YELLOW while
-// rate-limited (429), LCARS_MAGENTA for auth or network errors (the
-// aircraft shown may be stale). Pure — native-tested.
-uint16_t statusBarBlockColor(OpenSkyHealth health);
+// Colour of the status dot in front of the flight count — the OpenSky data
+// feed's health: green when Ok, yellow while rate-limited (429), red for
+// auth or network errors (the aircraft shown may be stale). Never the
+// peach of the active nav button. Pure — native-tested.
+uint16_t statusBarHealthColor(OpenSkyHealth health);
+
+// The app name shown at the left of the header.
+constexpr const char *kStatusBarAppName = "SKY TRACKER";
+
+// Header layout "variant A" — three zones on a 15px strip, nothing filled:
+//   [SKY TRACKER]        [● 7 LOTÓW]        [18/10/2026  08:46]
+//   left, small, dim     centred, white     right, light peach (clock larger)
+// x ranges (px) computed from the strings and the fonts' fixed advances, so
+// a test can prove the zones never overlap for the longest texts.
+struct HeaderZones {
+  int name_x = 0, name_end = 0;        // app name
+  int count_start = 0, count_end = 0;  // status dot + count label
+  int right_start = 0, right_end = 0;  // date + clock
+  int date_x = 0;                      // left edge of the date
+};
+HeaderZones statusBarZones(int screenWidth, const std::string &appName,
+                           const std::string &countLabel, const std::string &date,
+                           const std::string &clock);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme. Not
 // covered by Unity (see CLAUDE.md "Testing"). Guarded here in the header
@@ -70,8 +88,9 @@ uint16_t statusBarBlockColor(OpenSkyHealth health);
 #include "LGFX_CYD.hpp"
 
 // Draws the full header bar into y:0..LCARS_HEADER_HEIGHT across
-// `screenWidth` px: the count block (statusBarBlockLabel() on
-// statusBarBlockColor()), then date + clock. `localEpoch` is a
+// `screenWidth` px, laid out by statusBarZones(): app name, health dot
+// (statusBarHealthColor()) + count (statusBarBlockLabel()), date + clock, and
+// a 1px lilac rule along the bottom edge. `localEpoch` is a
 // time_sync::timeSyncNowLocal() value and `timeSynced` is
 // time_sync::isTimeSynced() — together they decide real text vs.
 // placeholder. Repaints its own black background first and touches nothing

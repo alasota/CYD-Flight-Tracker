@@ -51,6 +51,7 @@ constexpr uint16_t LCARS_WHITE = 0xFFFF;
 constexpr uint16_t THEME_CHROME_ACCENT = LCARS_PEACH;        // header block (data OK), active button
 constexpr uint16_t THEME_CHROME_TEXT = LCARS_PEACH_LIGHT;    // header date / time
 constexpr uint16_t THEME_CHROME_INACTIVE = LCARS_LAVENDER;   // inactive nav buttons
+constexpr uint16_t THEME_CHROME_DIM = LCARS_LAVENDER;        // header app name (quiet label)
 constexpr uint16_t THEME_ON_FILL = LCARS_BLACK;              // text on any filled chrome/table bar
 constexpr uint16_t THEME_ALERT = LCARS_RED;                  // header block: auth/network error
 // Content (flight data):
@@ -206,6 +207,7 @@ extern const lgfx::IFont *const LCARS_FONT_HEADING;  // panel/header titles
 extern const lgfx::IFont *const LCARS_FONT_BODY;     // table rows, labels
 extern const lgfx::IFont *const LCARS_FONT_NUMERIC;  // altitude/speed readouts (7-seg style)
 extern const lgfx::IFont *const LCARS_FONT_SMALL;    // 10px labels for thin strips (header, column header)
+extern const lgfx::IFont *const LCARS_FONT_CLOCK;    // header clock: DejaVu12 (13px line, ASCII digits only)
 
 // Adapter: a TextMeasure that measures with `gfx`'s *current* font/size.
 TextMeasure gfxTextMeasure(lgfx::LovyanGFX &gfx);
