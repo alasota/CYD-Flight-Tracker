@@ -157,6 +157,11 @@ const TableColumn *tableColumns() { return kColumns; }
 
 int tableCellTextWidthPx(const TableColumn &col) { return col.w - 2 * kTableCellPadPx; }
 
+std::string tablePageLabel(int page, int pageCount) {
+  if (pageCount <= 1) return std::string();
+  return std::to_string(page + 1) + "/" + std::to_string(pageCount);
+}
+
 std::string tableDistanceText(const AircraftRow &row) {
   if (!row.has_distance) return kUnknownText;
   char buf[12];
@@ -191,6 +196,8 @@ std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int 
 
 namespace {
 
+constexpr int16_t kGroundMarkerPx = 6;  // "on the ground" square in the FAZA column
+
 // One cell: text cut to the column's width (fitToWidth) and drawn at the
 // column's padded x, clipped to the column as a pixel-level backstop — so
 // nothing ever spills into the neighbouring column.
@@ -217,7 +224,8 @@ void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t 
     const AircraftRow &row = pageRows[static_cast<size_t>(i)];
     int16_t textY = static_cast<int16_t>(rowY + kRowStep / 2);
 
-    gfx.setTextColor(tableRowTextColor(i), LCARS_BLACK);  // white / sky, alternating
+    // White / sky alternating; aircraft on the ground dimmed (review #3).
+    gfx.setTextColor(tableRowColor(i, row.aircraft.on_ground), LCARS_BLACK);
     // "..." = still loading, "--" = unknown; airports as IATA codes.
     drawCell(gfx, kColumns[kColFlight], summaryFlight(row), rowY, textY, measure);
     drawCell(gfx, kColumns[kColDistance], tableDistanceText(row), rowY, textY, measure);
@@ -229,8 +237,15 @@ void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t 
     // Phase: a drawn, coloured triangle centred in its column (nothing for
     // "no phase") — far easier to read than the old ASCII ^ v >.
     const TableColumn &phaseCol = kColumns[kColPhase];
-    drawPhaseIcon(gfx, row.phase, static_cast<int16_t>(phaseCol.x + phaseCol.w / 2), textY,
-                  kPhaseIconSize);
+    if (row.aircraft.on_ground) {
+      // "Parked / taxiing" marker: a small muted square instead of a phase.
+      gfx.fillRect(static_cast<int16_t>(phaseCol.x + phaseCol.w / 2 - kGroundMarkerPx / 2),
+                   static_cast<int16_t>(textY - kGroundMarkerPx / 2), kGroundMarkerPx,
+                   kGroundMarkerPx, THEME_CONTENT_MUTED);
+    } else {
+      drawPhaseIcon(gfx, row.phase, static_cast<int16_t>(phaseCol.x + phaseCol.w / 2), textY,
+                    kPhaseIconSize);
+    }
   }
 }
 
@@ -238,7 +253,7 @@ void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t 
 // kColumns as the data rows), with a 1px black "|" divider at every
 // column boundary. Font0 (8px) — Font2 is taller than the 15px strip
 // allows with padding, and too wide for SKAD/DOKAD/FAZA.
-void drawColumnHeader(LGFX &gfx, int16_t screenWidth) {
+void drawColumnHeader(LGFX &gfx, int16_t screenWidth, const std::string &pageLabel) {
   gfx.fillRect(0, kColHeaderY, screenWidth, kColHeaderH, THEME_TABLE_HEADER);
   gfx.setFont(LCARS_FONT_SMALL);
   gfx.setTextDatum(middle_left);
@@ -252,6 +267,15 @@ void drawColumnHeader(LGFX &gfx, int16_t screenWidth) {
                         static_cast<int16_t>(kColHeaderH - 4), LCARS_BLACK);
     }
     gfx.drawString(tr(col.label), static_cast<int16_t>(col.x + kTableHeaderLabelPadPx), textY);
+  }
+
+  // Page indicator ("1/3", review #4) right-aligned in the TYP column header
+  // — only when there is more than one page.
+  if (!pageLabel.empty()) {
+    const TableColumn &typ = kColumns[kColType];
+    gfx.setTextDatum(middle_right);
+    gfx.drawString(pageLabel.c_str(), static_cast<int16_t>(typ.x + typ.w - kTableHeaderLabelPadPx),
+                   textY);
   }
 }
 
@@ -270,7 +294,8 @@ void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t scre
   // Lilac column-header row at y:98..113, labels aligned to the data
   // columns (ASCII only: bitmap fonts don't carry the Polish diacritics —
   // so "SKAD"/"DOKAD", not "SKĄD"/"DOKĄD").
-  drawColumnHeader(gfx, screenWidth);
+  const int pageCount = getPageCount(static_cast<int>(split.rest.size()), kTableRowsPerPage);
+  drawColumnHeader(gfx, screenWidth, tablePageLabel(page, pageCount));
 
   // Exactly 5 data rows from y:116 (19px step), over the list *without* the featured
   // aircraft; paging swaps which 5 (not scrolling).

@@ -55,8 +55,8 @@ NowPick pickNowAircraft(const std::vector<AircraftRow> &rows,
 std::string nowStatsText(const AircraftRow &row, Language lang) {
   // Same values as the featured panel's pills, distance first.
   const std::vector<std::string> p = featuredPillTexts(row, lang);
-  if (p.size() == 2) return p[1] + "  " + p[0];  // "6km  NA ZIEMI"
-  return p[2] + "  " + p[0] + "  " + p[1];       // "3km  236m  266km/h"
+  if (p.size() == 2) return p[1] + "  " + p[0];  // "S 6km  NA ZIEMI"
+  return p[2] + "  " + p[0] + "  " + p[1];       // "S 3km  236m  266km/h"
 }
 
 CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang,

@@ -37,6 +37,7 @@ static AircraftRow airborneRow() {
   row.aircraft.has_velocity = true;
   row.has_distance = true;
   row.distance_km = 6.2f;
+  row.bearing_deg = 185.0f;  // south of home
   return row;
 }
 
@@ -45,7 +46,7 @@ static void test_pills_airborne_altitude_speed_distance(void) {
   TEST_ASSERT_EQUAL_size_t(3, p.size());
   TEST_ASSERT_EQUAL_STRING("1250m", p[0].c_str());
   TEST_ASSERT_EQUAL_STRING("373km/h", p[1].c_str());  // 103.6 m/s * 3.6
-  TEST_ASSERT_EQUAL_STRING("6km", p[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("S 6km", p[2].c_str());  // compass point + distance
 }
 
 static void test_pills_on_ground_hide_altitude_and_speed(void) {
@@ -54,7 +55,7 @@ static void test_pills_on_ground_hide_altitude_and_speed(void) {
   std::vector<std::string> pl = featuredPillTexts(row, Language::PL);
   TEST_ASSERT_EQUAL_size_t(2, pl.size());  // wide "on ground" pill + distance
   TEST_ASSERT_EQUAL_STRING("NA ZIEMI", pl[0].c_str());
-  TEST_ASSERT_EQUAL_STRING("6km", pl[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("S 6km", pl[1].c_str());
   TEST_ASSERT_EQUAL_STRING("ON GROUND", featuredPillTexts(row, Language::EN)[0].c_str());
 }
 

@@ -438,6 +438,35 @@ static void test_type_column_fits_a_readable_type_name(void) {
   TEST_ASSERT_TRUE(tableCellTextWidthPx(tableColumns()[4]) >= 10 * LCARS_FONT_TABLE_CHAR_PX);
 }
 
+// ---- ground rows look different (review #3) ---------------------------------
+
+static void test_ground_rows_are_dimmed(void) {
+  // An aircraft on the ground listed after a 23 km airborne one looked like
+  // a sorting bug; dimming it says "this one is parked".
+  TEST_ASSERT_EQUAL_HEX16(THEME_CONTENT_MUTED, tableRowColor(0, /*onGround=*/true));
+  TEST_ASSERT_EQUAL_HEX16(THEME_CONTENT_MUTED, tableRowColor(1, true));
+  TEST_ASSERT_EQUAL_HEX16(tableRowTextColor(0), tableRowColor(0, false));
+  TEST_ASSERT_EQUAL_HEX16(tableRowTextColor(1), tableRowColor(1, false));
+}
+
+// ---- page indicator (review #4) ---------------------------------------------------
+
+static void test_page_label(void) {
+  TEST_ASSERT_EQUAL_STRING("", tablePageLabel(0, 0).c_str());   // nothing to page
+  TEST_ASSERT_EQUAL_STRING("", tablePageLabel(0, 1).c_str());   // single page: no clutter
+  TEST_ASSERT_EQUAL_STRING("1/2", tablePageLabel(0, 2).c_str());
+  TEST_ASSERT_EQUAL_STRING("3/3", tablePageLabel(2, 3).c_str());
+}
+
+static void test_page_label_fits_the_type_column_header(void) {
+  // Drawn right-aligned in the TYP column header, next to its "TYP"/"TYPE"
+  // label, in the small font — "10/10" plus the label must fit.
+  const TableColumn &typ = tableColumns()[4];
+  const int labels = static_cast<int>(utf8Length("TYPE") + utf8Length("10/10")) *
+                     LCARS_FONT_SMALL_CHAR_PX;
+  TEST_ASSERT_TRUE(kTableHeaderLabelPadPx + labels + 8 <= typ.w);
+}
+
 static void test_distance_text(void) {
   AircraftRow row;
   TEST_ASSERT_EQUAL_STRING("--", tableDistanceText(row).c_str());  // no position
@@ -568,6 +597,9 @@ int main(int argc, char **argv) {
   RUN_TEST(test_callsign_and_distance_columns_never_truncate);
   RUN_TEST(test_type_column_fits_a_readable_type_name);
   RUN_TEST(test_distance_text);
+  RUN_TEST(test_ground_rows_are_dimmed);
+  RUN_TEST(test_page_label);
+  RUN_TEST(test_page_label_fits_the_type_column_header);
   RUN_TEST(test_header_labels_keep_clear_of_the_divider);
   RUN_TEST(test_row_font_is_one_px_smaller_than_the_header_strip);
   RUN_TEST(test_airport_columns_fit_an_iata_code);

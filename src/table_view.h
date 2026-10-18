@@ -177,6 +177,11 @@ int tableCellTextWidthPx(const TableColumn &col);
 // aircraft has no position.
 std::string tableDistanceText(const AircraftRow &row);
 
+// Page indicator for the table header: "1/3" when there is more than one
+// page (`page` is 0-based), "" otherwise. Drawn right-aligned in the TYP
+// column header.
+std::string tablePageLabel(int page, int pageCount);
+
 // Number of pages needed to show `totalRows` records at `rowsPerPage` rows
 // per page (ceiling division) — 0 records or a non-positive rowsPerPage
 // both yield 0 pages, not 1. Pure — no TFT dependency.

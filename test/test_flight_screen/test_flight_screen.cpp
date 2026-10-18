@@ -231,7 +231,7 @@ static void test_now_stats_airborne(void) {
   r.aircraft.has_altitude = true;
   r.aircraft.velocity = 74.0f;  // 266 km/h
   r.aircraft.has_velocity = true;
-  TEST_ASSERT_EQUAL_STRING("3km  236m  266km/h", nowStatsText(r, Language::PL).c_str());
+  TEST_ASSERT_EQUAL_STRING("N 3km  236m  266km/h", nowStatsText(r, Language::PL).c_str());
 }
 
 static void test_now_stats_on_ground(void) {
@@ -239,7 +239,7 @@ static void test_now_stats_on_ground(void) {
   r.aircraft.on_ground = true;
   r.has_distance = true;
   r.distance_km = 6.0f;
-  TEST_ASSERT_EQUAL_STRING("6km  NA ZIEMI", nowStatsText(r, Language::PL).c_str());
+  TEST_ASSERT_EQUAL_STRING("N 6km  NA ZIEMI", nowStatsText(r, Language::PL).c_str());
 }
 
 int main(int, char **) {

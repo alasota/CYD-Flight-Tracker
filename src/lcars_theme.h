@@ -140,15 +140,34 @@ struct PhaseTriangle {
 };
 PhaseTriangle phaseTriangle(Phase phase, int16_t cx, int16_t cy, int16_t size);
 
-// "Where to look" arrow: a triangle in a `size` x `size` box centred on
-// (cx, cy) whose tip (x0, y0) points along `bearingDeg` from home — 0 =
-// up/north, 90 = right/east (screen top = north, same as the radar). Pure.
-PhaseTriangle directionArrow(float bearingDeg, int16_t cx, int16_t cy, int16_t size);
+// "Where to look" arrow in a `size` x `size` box centred on (cx, cy),
+// pointing along `bearingDeg` from home — 0 = up/north, 90 = right/east
+// (screen top = north, same as the radar). A real arrow — a stem from the
+// tail to a small head whose tip is (head.x0, head.y0) — so it can't be
+// mistaken for the solid phase triangles (▼ landing looked identical to the
+// first, head-only version). Pure — native-tested.
+struct ArrowShape {
+  PhaseTriangle head;
+  int16_t stem_x0 = 0, stem_y0 = 0;  // tail end
+  int16_t stem_x1 = 0, stem_y1 = 0;  // where the stem meets the head
+};
+ArrowShape directionArrow(float bearingDeg, int16_t cx, int16_t cy, int16_t size);
+
+// 8-point compass abbreviation for a bearing: "N", "NE", "E", "SE", "S",
+// "SW", "W", "NW" (each covers 45 degrees centred on its direction; any
+// angle, normalised to 0..360). International letters as on a compass rose
+// — Polish abbreviations ("PN-WSCH") don't fit the distance chip. Pure.
+const char *compassPoint(float bearingDeg);
 
 
 // Text colour for table row `rowIndex` (0-based within the page): white /
 // sky alternating, so a row is easy to follow across the columns. Pure.
 uint16_t tableRowTextColor(int rowIndex);
+
+// Row text colour including the ground state: aircraft on the ground are
+// drawn in the muted lavender (they sort below the airborne ones and would
+// otherwise look like a sorting mistake); airborne rows alternate as above.
+uint16_t tableRowColor(int rowIndex, bool onGround);
 
 // Rendered pixel width of a string in whatever font is current. On the
 // device this wraps gfx.textWidth(); tests pass a fixed-pitch fake.

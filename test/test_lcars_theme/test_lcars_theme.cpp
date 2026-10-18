@@ -240,29 +240,55 @@ static void test_overflight_triangle_points_right(void) {
 
 static void test_arrow_points_along_the_bearing(void) {
   const int16_t cx = 50, cy = 50, size = 12;
-  PhaseTriangle n = directionArrow(0.0f, cx, cy, size);
-  TEST_ASSERT_TRUE(n.visible);
-  TEST_ASSERT_EQUAL_INT(cx, n.x0);  // tip straight up
-  TEST_ASSERT_TRUE(n.y0 < cy);
-  PhaseTriangle e = directionArrow(90.0f, cx, cy, size);
-  TEST_ASSERT_TRUE(e.x0 > cx);      // tip to the right
-  TEST_ASSERT_EQUAL_INT(cy, e.y0);
-  PhaseTriangle s = directionArrow(180.0f, cx, cy, size);
-  TEST_ASSERT_TRUE(s.y0 > cy);
-  PhaseTriangle w = directionArrow(270.0f, cx, cy, size);
-  TEST_ASSERT_TRUE(w.x0 < cx);
+  ArrowShape n = directionArrow(0.0f, cx, cy, size);
+  TEST_ASSERT_TRUE(n.head.visible);
+  TEST_ASSERT_EQUAL_INT(cx, n.head.x0);  // tip straight up
+  TEST_ASSERT_TRUE(n.head.y0 < cy);
+  ArrowShape e = directionArrow(90.0f, cx, cy, size);
+  TEST_ASSERT_TRUE(e.head.x0 > cx);      // tip to the right
+  TEST_ASSERT_EQUAL_INT(cy, e.head.y0);
+  ArrowShape s = directionArrow(180.0f, cx, cy, size);
+  TEST_ASSERT_TRUE(s.head.y0 > cy);
+  ArrowShape w = directionArrow(270.0f, cx, cy, size);
+  TEST_ASSERT_TRUE(w.head.x0 < cx);
+}
+
+static void test_arrow_has_a_stem_so_it_is_not_a_phase_triangle(void) {
+  // Review: a bare ▼ "where to look" read exactly like the ▼ landing icon.
+  // The arrow now has a stem from the tail (opposite the tip) to the head.
+  ArrowShape s = directionArrow(180.0f, 50, 50, 12);  // pointing down / south
+  TEST_ASSERT_TRUE(s.stem_y0 < 50);                     // tail is up
+  TEST_ASSERT_TRUE(s.stem_y1 > s.stem_y0);              // stem runs towards the tip
+  TEST_ASSERT_TRUE(s.stem_y1 <= s.head.y0);
+  const int stemLen = s.stem_y1 - s.stem_y0;
+  TEST_ASSERT_TRUE(stemLen >= 4);
 }
 
 static void test_arrow_stays_inside_its_box(void) {
   for (float b = 0.0f; b < 360.0f; b += 15.0f) {
-    PhaseTriangle t = directionArrow(b, 50, 50, 12);
-    const int16_t xs[] = {t.x0, t.x1, t.x2};
-    const int16_t ys[] = {t.y0, t.y1, t.y2};
-    for (int i = 0; i < 3; ++i) {
+    ArrowShape a = directionArrow(b, 50, 50, 12);
+    const int16_t xs[] = {a.head.x0, a.head.x1, a.head.x2, a.stem_x0, a.stem_x1};
+    const int16_t ys[] = {a.head.y0, a.head.y1, a.head.y2, a.stem_y0, a.stem_y1};
+    for (int i = 0; i < 5; ++i) {
       TEST_ASSERT_TRUE(xs[i] >= 44 && xs[i] <= 56);
       TEST_ASSERT_TRUE(ys[i] >= 44 && ys[i] <= 56);
     }
   }
+}
+
+static void test_compass_points(void) {
+  TEST_ASSERT_EQUAL_STRING("N", compassPoint(0.0f));
+  TEST_ASSERT_EQUAL_STRING("N", compassPoint(22.0f));
+  TEST_ASSERT_EQUAL_STRING("NE", compassPoint(23.0f));
+  TEST_ASSERT_EQUAL_STRING("E", compassPoint(90.0f));
+  TEST_ASSERT_EQUAL_STRING("SE", compassPoint(135.0f));
+  TEST_ASSERT_EQUAL_STRING("S", compassPoint(180.0f));
+  TEST_ASSERT_EQUAL_STRING("SW", compassPoint(225.0f));
+  TEST_ASSERT_EQUAL_STRING("W", compassPoint(270.0f));
+  TEST_ASSERT_EQUAL_STRING("NW", compassPoint(315.0f));
+  TEST_ASSERT_EQUAL_STRING("N", compassPoint(350.0f));
+  TEST_ASSERT_EQUAL_STRING("N", compassPoint(360.0f));
+  TEST_ASSERT_EQUAL_STRING("W", compassPoint(-90.0f));
 }
 
 static void test_no_phase_draws_nothing(void) {
@@ -429,6 +455,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_no_phase_draws_nothing);
   RUN_TEST(test_arrow_points_along_the_bearing);
   RUN_TEST(test_arrow_stays_inside_its_box);
+  RUN_TEST(test_arrow_has_a_stem_so_it_is_not_a_phase_triangle);
+  RUN_TEST(test_compass_points);
 
   RUN_TEST(test_variant_a_palette_values);
   RUN_TEST(test_chrome_and_content_use_different_colour_families);

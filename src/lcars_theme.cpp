@@ -87,20 +87,42 @@ PhaseTriangle phaseTriangle(Phase phase, int16_t cx, int16_t cy, int16_t size) {
   }
 }
 
-PhaseTriangle directionArrow(float bearingDeg, int16_t cx, int16_t cy, int16_t size) {
-  // Tip on the bearing, tail corners 140 degrees either side of it, all on
-  // a circle of radius size/2 (so the shape always fits its box).
-  const float r = static_cast<float>(size / 2);
-  auto point = [&](float deg, int &x, int &y) {
-    const float rad = deg * 3.14159265f / 180.0f;
-    x = static_cast<int>(std::lround(cx + r * std::sin(rad)));
-    y = static_cast<int>(std::lround(cy - r * std::cos(rad)));  // screen y grows down
+ArrowShape directionArrow(float bearingDeg, int16_t cx, int16_t cy, int16_t size) {
+  // Unit vector along the bearing (screen y grows down) and its normal.
+  const float rad = bearingDeg * 3.14159265f / 180.0f;
+  const float dx = std::sin(rad);
+  const float dy = -std::cos(rad);
+  const float r = static_cast<float>(size / 2);  // tip and tail sit on this circle
+  const float headLen = 0.45f * static_cast<float>(size);
+  const float headHalf = 0.3f * static_cast<float>(size);
+  auto px = [&](float along, float across) {
+    return static_cast<int>(std::lround(cx + along * dx - across * dy));
   };
-  int x0, y0, x1, y1, x2, y2;
-  point(bearingDeg, x0, y0);
-  point(bearingDeg + 140.0f, x1, y1);
-  point(bearingDeg - 140.0f, x2, y2);
-  return makeTriangle(x0, y0, x1, y1, x2, y2);
+  auto py = [&](float along, float across) {
+    return static_cast<int>(std::lround(cy + along * dy + across * dx));
+  };
+
+  ArrowShape a;
+  const float base = r - headLen;  // where the head's flat side crosses the axis
+  a.head = makeTriangle(px(r, 0), py(r, 0), px(base, headHalf), py(base, headHalf),
+                        px(base, -headHalf), py(base, -headHalf));
+  a.stem_x0 = static_cast<int16_t>(px(-r, 0));
+  a.stem_y0 = static_cast<int16_t>(py(-r, 0));
+  a.stem_x1 = static_cast<int16_t>(px(base, 0));
+  a.stem_y1 = static_cast<int16_t>(py(base, 0));
+  return a;
+}
+
+const char *compassPoint(float bearingDeg) {
+  static const char *const kPoints[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
+  float b = std::fmod(bearingDeg, 360.0f);
+  if (b < 0.0f) b += 360.0f;
+  const int sector = static_cast<int>((b + 22.5f) / 45.0f) % 8;
+  return kPoints[sector];
+}
+
+uint16_t tableRowColor(int rowIndex, bool onGround) {
+  return onGround ? THEME_CONTENT_MUTED : tableRowTextColor(rowIndex);
 }
 
 uint16_t tableRowTextColor(int rowIndex) {
@@ -229,8 +251,9 @@ void drawPhaseIcon(LGFX &gfx, Phase phase, int16_t cx, int16_t cy, int16_t size)
 }
 void drawDirectionArrow(LGFX &gfx, float bearingDeg, int16_t cx, int16_t cy, int16_t size,
                         uint16_t color) {
-  const PhaseTriangle t = directionArrow(bearingDeg, cx, cy, size);
-  gfx.fillTriangle(t.x0, t.y0, t.x1, t.y1, t.x2, t.y2, color);
+  const ArrowShape a = directionArrow(bearingDeg, cx, cy, size);
+  gfx.drawWideLine(a.stem_x0, a.stem_y0, a.stem_x1, a.stem_y1, 1.0f, color);  // radius 1 = ~2px stem
+  gfx.fillTriangle(a.head.x0, a.head.y0, a.head.x1, a.head.y1, a.head.x2, a.head.y2, color);
 }
 
 

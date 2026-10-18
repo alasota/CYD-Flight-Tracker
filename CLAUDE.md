@@ -177,6 +177,8 @@ Answers "kierunek" for aircraft near the airport — pure logic, no I/O, lives i
   - else if `vertical_rate_mps > climb_rate_threshold_mps` → `TAKEOFF`.
   - else if `vertical_rate_mps < -climb_rate_threshold_mps` → `LANDING`.
   - else → `OVERFLIGHT` (near the airport but level — transiting through, not using it).
+  (The first implementation skipped the `NONE` step and returned `OVERFLIGHT` for every distant
+  aircraft, so the FAZA column showed ▶ almost everywhere — fixed and pinned by tests.)
 - Icons — **filled triangles drawn with `fillTriangle`** (`lcars_theme::phaseTriangle()` /
   `drawPhaseIcon()`, 10px, coloured by `phaseColor()`): ▲ = takeoff, ▼ = landing, ▶ =
   overflight, nothing at all = `NONE`. They replaced the ASCII `^ v > -` glyphs, which were too
@@ -336,7 +338,10 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   / distance (km). **On the ground** (`on_ground`, e.g. taxiing at the nearby airport) → one
   double-width `NA ZIEMI` / `ON GROUND` chip + distance — altitude and speed are meaningless
   there, and `0m` / `1m/s` looked like a bug. A missing value shows `--`, never a fake `0`.
-  The distance chip also carries the "where to look" arrow (bearing from home, top = north).
+  The distance chip shows the compass point too ("SE 6km", `compassPoint()`: N/NE/E/SE/S/SW/W/NW,
+  international letters as on a compass rose) next to a "where to look" arrow (bearing from home,
+  top = north). The arrow has a **stem** (`ArrowShape`: stem + small head) — the first, head-only
+  version was a solid ▼ indistinguishable from the landing icon.
 - Empty state ("no aircraft in range") still applies here, same as before — just now within
   these exact bounds.
 
@@ -409,6 +414,11 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   `on_ground=false` and null altitude/speed — trusting the flag put a parked LOT jet in the
   featured slot as "0m 0km/h" with an overflight icon. Null altitude/speed are tracked
   (`has_altitude` / `has_velocity`) and shown as `--`, never as a fake `0`.
+- **Ground rows are dimmed** (`tableRowColor(i, onGround)` -> muted lavender) and get a small
+  muted square in the FAZA column instead of a phase — otherwise "5km" listed after "23km" read
+  like a sorting bug.
+- **Page indicator:** "1/2" (`tablePageLabel()`) right-aligned in the TYP column header whenever
+  there is more than one page; nothing on a single page.
 - **Row font: `LCARS_FONT_TABLE` = `fonts::efontJA_14`** — 1px smaller than the 15px lilac
   header strip (`kTableHeaderHeightPx`), 7px per character; the rest of the UI keeps 16px.
 - This is the priority screen — get it solid before spending time on the other two.

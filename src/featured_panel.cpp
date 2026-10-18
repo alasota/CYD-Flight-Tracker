@@ -26,7 +26,12 @@ std::string pillValue(bool known, float value, const char *unit) {
 }  // namespace
 
 std::vector<std::string> featuredPillTexts(const AircraftRow &row, Language lang) {
-  const std::string distance = pillValue(row.has_distance, row.distance_km, "km");
+  // Distance with its compass direction ("S 4km") — the arrow drawn next to
+  // it shows the same thing graphically.
+  const std::string distance =
+      row.has_distance
+          ? std::string(compassPoint(row.bearing_deg)) + " " + pillValue(true, row.distance_km, "km")
+          : kUnknownText;
   if (row.aircraft.on_ground) {
     return {tr(Str::OnGround, lang), distance};
   }

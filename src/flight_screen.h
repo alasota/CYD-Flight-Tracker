@@ -64,7 +64,7 @@ NowPick pickNowAircraft(const std::vector<AircraftRow> &rows,
                         const std::vector<CpaPrediction> &cpas, float overheadKm);
 
 // Screen 2's stats line under the route (after the direction arrow):
-// "3km  236m  266km/h", or "6km  NA ZIEMI" on the ground. Pure.
+// "S 3km  236m  266km/h", or "S 6km  NA ZIEMI" on the ground. Pure.
 std::string nowStatsText(const AircraftRow &row, Language lang);
 
 // How the countdown zone renders a given CpaPrediction.
