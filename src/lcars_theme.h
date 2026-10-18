@@ -220,21 +220,30 @@ std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &me
 // layout maths with the efont fonts (fixed advance per ASCII character).
 size_t utf8Length(const std::string &utf8);
 
-// True if every character of `text` is printable ASCII or one of the 18
-// Polish letters (ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ), as well-formed UTF-8 — the set the
-// display fonts are guaranteed to render. On-screen strings (i18n table,
-// city names) are tested against it.
+// True if every character of `text` is printable ASCII, one of the 18
+// Polish letters (ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ) or one of ° ± × · – — … →, as
+// well-formed UTF-8 — the set the display fonts carry (src/fonts/
+// lcars_efont.c holds nothing else). On-screen strings (i18n table, city
+// names) are tested against it.
 bool isFontSafeText(const std::string &text);
 
-// Metrics of LCARS_FONT_SMALL (fonts::efontJA_10) and LCARS_FONT_BODY
-// (fonts::efontJA_16): glyph height, and the fixed advance of an ASCII /
+// The same set, per Unicode code point.
+bool isFontCodepoint(uint32_t cp);
+
+// True if the U8g2-format `font` has a glyph for `cp`, found the way
+// LovyanGFX's U8g2font::getGlyph() looks it up. Pure — test_fonts uses it
+// to check src/fonts/lcars_efont.c against isFontCodepoint().
+bool fontHasGlyph(const uint8_t *font, uint16_t cp);
+
+// Metrics of LCARS_FONT_SMALL (efont 10 px) and LCARS_FONT_BODY
+// (efont 16 px): glyph height, and the fixed advance of an ASCII /
 // Latin character (efont's "half-width" glyphs are exactly half the em).
 // Exposed for the native layout tests (labels fit their strips/columns).
 constexpr int16_t LCARS_FONT_SMALL_HEIGHT_PX = 10;
 constexpr int16_t LCARS_FONT_SMALL_CHAR_PX = 5;
 constexpr int16_t LCARS_FONT_BODY_HEIGHT_PX = 16;
 constexpr int16_t LCARS_FONT_BODY_CHAR_PX = 8;
-// Table rows: fonts::efontJA_14 — 1px smaller than the 15px table header
+// Table rows: efont 14 px — 1px smaller than the 15px table header
 // strip, a bit lighter than the 16px body text.
 constexpr int16_t LCARS_FONT_TABLE_HEIGHT_PX = 14;
 constexpr int16_t LCARS_FONT_TABLE_CHAR_PX = 7;

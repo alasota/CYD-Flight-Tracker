@@ -425,7 +425,7 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   like a sorting bug.
 - **Page indicator:** "1/2" (`tablePageLabel()`) right-aligned in the TYP column header whenever
   there is more than one page; nothing on a single page.
-- **Row font: `LCARS_FONT_TABLE` = `fonts::efontJA_14`** — 1px smaller than the 15px lilac
+- **Row font: `LCARS_FONT_TABLE` = efont 14 px (subset, `src/fonts/`)** — 1px smaller than the 15px lilac
   header strip (`kTableHeaderHeightPx`), 7px per character; the rest of the UI keeps 16px.
 - This is the priority screen — get it solid before spending time on the other two.
 
@@ -640,12 +640,18 @@ language / Jezyk wyswietlacza" select, values `pl` / `en`). Default: Polish.
   Draw code uses the current language (`tr(id)`, set by `i18nSetLanguage()`); pure functions
   that return text take an explicit `Language` (e.g. `computeCountdownDisplay(cpa, lang)`,
   `statusBarScreenName(i, lang)`) so tests can check both languages.
-- **Real Polish letters** (`ZBLIŻA SIĘ`, `SKĄD`, `Kraków`): body/small text uses LovyanGFX's
-  **efont** fonts (`fonts::efontJA_16` replaces Font2, `fonts::efontJA_10` replaces Font0) —
-  U8g2-format, Unicode, verified to contain all 18 Polish letters. They cost ~700 KB of flash,
-  which is why the build uses the `huge_app.csv` partition table (3 MB app). Every on-screen
-  string must be `isFontSafeText()` (ASCII + ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ) — `test_i18n`, the city table
-  and the type/airline tables are checked against it. `fitToWidth()` cuts only on UTF-8
+- **Real Polish letters** (`ZBLIŻA SIĘ`, `SKĄD`, `Kraków`): body/table/small text uses
+  **efont** 16 / 14 / 10 px (U8g2 format) — but not LovyanGFX's `fonts::efontJA_*` (10,800
+  glyphs each, ~1.05 MB of flash together, mostly kanji). `tools/subset_efont.py` copies only
+  the needed glyphs, byte for byte with the original metrics, into the generated
+  `src/fonts/lcars_efont.c` (~4.4 KB; keeps the efont BSD notice) — same pixels, same layout.
+  The set is printable ASCII + ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ + `° ± × · – — … →`, defined once in
+  `lcars_theme` (`isFontCodepoint()` / `isFontSafeText()`); the script's `CODEPOINTS` must
+  match it, and `test_fonts` checks every allowed character has a glyph in all three fonts.
+  A character outside the set simply isn't drawn, so every on-screen string must be
+  `isFontSafeText()` — `test_i18n`, the city table and the type/airline tables are checked
+  against it. To add a character: extend both lists, rerun the script, run the tests. (The
+  build still uses `huge_app.csv` — the firmware is ~1.3 MB now, so two OTA slots would fit.) `fitToWidth()` cuts only on UTF-8
   character boundaries; layout maths uses `utf8Length()` and the fonts' fixed advance
   (`LCARS_FONT_BODY_CHAR_PX` = 8, `LCARS_FONT_SMALL_CHAR_PX` = 5). hexdb.io airport names are
   still ASCII-folded (`asciiFold()`), as they can contain any accent. Headings (Font4) and the

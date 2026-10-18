@@ -265,27 +265,78 @@ size_t utf8Length(const std::string &utf8) {
   return n;
 }
 
+namespace {
+// Beyond printable ASCII: ą ć ę ł ń ó ś ź ż Ą Ć Ę Ł Ń Ó Ś Ź Ż and ° ± × · – — … →.
+// Keep in step with tools/subset_efont.py (test_fonts checks the fonts).
+const uint16_t kFontExtraCodepoints[] = {
+    0x0105, 0x0107, 0x0119, 0x0142, 0x0144, 0x00F3, 0x015B, 0x017A, 0x017C,
+    0x0104, 0x0106, 0x0118, 0x0141, 0x0143, 0x00D3, 0x015A, 0x0179, 0x017B,
+    0x00B0, 0x00B1, 0x00D7, 0x00B7, 0x2013, 0x2014, 0x2026, 0x2192};
+}  // namespace
+
+bool isFontCodepoint(uint32_t cp) {
+  if (cp >= 0x20 && cp <= 0x7E) return true;
+  for (uint16_t extra : kFontExtraCodepoints) {
+    if (cp == extra) return true;
+  }
+  return false;
+}
+
 bool isFontSafeText(const std::string &text) {
-  // UTF-8 encodings of ą ć ę ł ń ó ś ź ż Ą Ć Ę Ł Ń Ó Ś Ź Ż.
-  static const char *const kPolish[] = {
-      "\xC4\x85", "\xC4\x87", "\xC4\x99", "\xC5\x82", "\xC5\x84", "\xC3\xB3",
-      "\xC5\x9B", "\xC5\xBA", "\xC5\xBC", "\xC4\x84", "\xC4\x86", "\xC4\x98",
-      "\xC5\x81", "\xC5\x83", "\xC3\x93", "\xC5\x9A", "\xC5\xB9", "\xC5\xBB"};
   for (size_t i = 0; i < text.size();) {
     const unsigned char c = static_cast<unsigned char>(text[i]);
-    if (c >= 0x20 && c <= 0x7E) {
-      ++i;
-      continue;
+    uint32_t cp;
+    size_t len;
+    if (c < 0x80) {
+      cp = c;
+      len = 1;
+    } else if ((c & 0xE0) == 0xC0) {
+      cp = c & 0x1F;
+      len = 2;
+    } else if ((c & 0xF0) == 0xE0) {
+      cp = c & 0x0F;
+      len = 3;
+    } else {
+      return false;  // 4-byte sequences / stray continuation bytes: never in the fonts
     }
-    if (i + 1 >= text.size()) return false;
-    bool polish = false;
-    for (const char *p : kPolish) {
-      if (text[i] == p[0] && text[i + 1] == p[1]) polish = true;
+    if (i + len > text.size()) return false;
+    for (size_t k = 1; k < len; ++k) {
+      const unsigned char cc = static_cast<unsigned char>(text[i + k]);
+      if ((cc & 0xC0) != 0x80) return false;
+      cp = (cp << 6) | (cc & 0x3F);
     }
-    if (!polish) return false;
-    i += 2;
+    if (!isFontCodepoint(cp)) return false;
+    i += len;
   }
   return true;
+}
+
+bool fontHasGlyph(const uint8_t *font, uint16_t cp) {
+  // Same search as LovyanGFX's U8g2font::getGlyph().
+  const uint8_t *p = font + 23;
+  if (cp <= 255) {
+    if (cp >= 'a') {
+      p += (font[19] << 8) | font[20];
+    } else if (cp >= 'A') {
+      p += (font[17] << 8) | font[18];
+    }
+    for (; p[1] != 0; p += p[1]) {
+      if (p[0] == cp) return true;
+    }
+    return false;
+  }
+  p += (font[21] << 8) | font[22];
+  const uint8_t *lut = p;
+  uint16_t e;
+  do {
+    p += (lut[0] << 8) | lut[1];
+    e = static_cast<uint16_t>((lut[2] << 8) | lut[3]);
+    lut += 4;
+  } while (e < cp);
+  for (; (e = static_cast<uint16_t>((p[0] << 8) | p[1])) != 0; p += p[2]) {
+    if (e == cp) return true;
+  }
+  return false;
 }
 
 std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &measure) {
@@ -313,20 +364,28 @@ std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &me
 
 #ifdef ARDUINO
 
+#include "fonts/lcars_efont.h"  // subset efont 16 / 14 / 10
 #include "screen_nav.h"  // kScreenCount, bottomNavBounds(), bottomNavSegment()
 
 const lgfx::IFont *const LCARS_FONT_HEADING = &fonts::Font4;
 // efont (U8g2-format, Unicode) instead of the built-in Font2 / Font0: same
 // 16px / ~10px sizes, but it has the Polish letters (ąćęłńóśźż), so text
-// no longer has to be ASCII-folded. ~470 KB + ~225 KB of flash — fits only
-// with the huge_app partition table (platformio.ini).
-const lgfx::IFont *const LCARS_FONT_BODY = &fonts::efontJA_16;
+// no longer has to be ASCII-folded. Not LovyanGFX's fonts::efontJA_* (~1 MB
+// of kanji together) but subsets of them with only the characters
+// isFontSafeText() allows — same pixels and metrics, ~4 KB (src/fonts/,
+// tools/subset_efont.py).
+namespace {
+const lgfx::U8g2font kEfont16(lcars_efont_16);
+const lgfx::U8g2font kEfont14(lcars_efont_14);
+const lgfx::U8g2font kEfont10(lcars_efont_10);
+}  // namespace
+const lgfx::IFont *const LCARS_FONT_BODY = &kEfont16;
 const lgfx::IFont *const LCARS_FONT_NUMERIC = &fonts::Font7;
-const lgfx::IFont *const LCARS_FONT_SMALL = &fonts::efontJA_10;
+const lgfx::IFont *const LCARS_FONT_SMALL = &kEfont10;
 // A touch larger than the 10px header text but still fits the 15px header
 // (13px line); a few KB, ASCII only — fine for "08:46".
 const lgfx::IFont *const LCARS_FONT_CLOCK = &fonts::DejaVu12;
-const lgfx::IFont *const LCARS_FONT_TABLE = &fonts::efontJA_14;
+const lgfx::IFont *const LCARS_FONT_TABLE = &kEfont14;
 
 TextMeasure gfxTextMeasure(lgfx::LovyanGFX &gfx) {
   return [&gfx](const std::string &s) { return static_cast<int>(gfx.textWidth(s.c_str())); };

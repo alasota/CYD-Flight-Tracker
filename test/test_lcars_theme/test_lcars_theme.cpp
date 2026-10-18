@@ -463,7 +463,7 @@ static void test_font_safe_accepts_ascii_and_polish_only(void) {
   TEST_ASSERT_TRUE(isFontSafeText("Krak\xC3\xB3w"));                // Kraków
   TEST_ASSERT_TRUE(isFontSafeText("plain ASCII 123"));
   TEST_ASSERT_FALSE(isFontSafeText("Z\xC3\xBCrich"));               // ü — not guaranteed
-  TEST_ASSERT_FALSE(isFontSafeText("\xE2\x80\x93"));                // en dash
+  TEST_ASSERT_FALSE(isFontSafeText("\xE2\x82\xAC"));                // € — not in the fonts
   TEST_ASSERT_FALSE(isFontSafeText("tab\there"));                   // control char
   TEST_ASSERT_FALSE(isFontSafeText("\xC5"));                        // truncated sequence
 }
