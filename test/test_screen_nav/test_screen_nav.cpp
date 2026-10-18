@@ -203,6 +203,72 @@ static void test_bottom_nav_segment_out_of_range_is_empty(void) {
   TEST_ASSERT_EQUAL_INT(0, r.h);
 }
 
+// ---- tab geometry ---------------------------------------------------------
+
+static void test_nav_tab_rule_spans_the_bar_top(void) {
+  Rect rule = navTabRule(kW, kH);
+  TEST_ASSERT_EQUAL_INT(0, rule.x);
+  TEST_ASSERT_EQUAL_INT(kW, rule.w);
+  TEST_ASSERT_EQUAL_INT(kContentBottom, rule.y);  // inside the bar, not the content
+  TEST_ASSERT_EQUAL_INT(kNavTabRulePx, rule.h);
+}
+
+static void test_active_tab_merges_into_the_rule_and_is_taller(void) {
+  for (int i = 0; i < kScreenCount; ++i) {
+    Rect a = navTabRect(i, true, kW, kH);
+    Rect n = navTabRect(i, false, kW, kH);
+    TEST_ASSERT_EQUAL_INT(kContentBottom, a.y);  // touches the rule
+    TEST_ASSERT_EQUAL_INT(kH, a.y + a.h);
+    TEST_ASSERT_EQUAL_INT(kH, n.y + n.h);
+    TEST_ASSERT_TRUE(n.y > kContentBottom + kNavTabRulePx);  // gap below the rule
+    TEST_ASSERT_TRUE(a.h > n.h);
+    TEST_ASSERT_TRUE(a.w > n.w);
+  }
+}
+
+static void test_nav_tabs_stay_on_screen(void) {
+  for (int i = 0; i < kScreenCount; ++i) {
+    for (int active = 0; active < 2; ++active) {
+      Rect t = navTabRect(i, active == 1, kW, kH);
+      TEST_ASSERT_TRUE(t.x >= 0);
+      TEST_ASSERT_TRUE(t.x + t.w <= kW);
+      TEST_ASSERT_TRUE(t.y >= kContentBottom);
+      TEST_ASSERT_TRUE(t.y + t.h <= kH);
+    }
+  }
+}
+
+static void test_inactive_tabs_are_separated(void) {
+  Rect t0 = navTabRect(0, false, kW, kH);
+  Rect t1 = navTabRect(1, false, kW, kH);
+  Rect t2 = navTabRect(2, false, kW, kH);
+  TEST_ASSERT_TRUE(t0.x + t0.w < t1.x);
+  TEST_ASSERT_TRUE(t1.x + t1.w < t2.x);
+}
+
+static void test_active_tab_overlaps_its_neighbours(void) {
+  Rect a1 = navTabRect(1, true, kW, kH);
+  Rect n0 = navTabRect(0, false, kW, kH);
+  Rect n2 = navTabRect(2, false, kW, kH);
+  TEST_ASSERT_TRUE(a1.x < n0.x + n0.w);
+  TEST_ASSERT_TRUE(a1.x + a1.w > n2.x);
+}
+
+static void test_nav_tabs_fit_a_16px_label(void) {
+  // LCARS_FONT_BODY (efontJA_16) plus its 1px outline must fit the shorter,
+  // inactive tab; the longest label ("FLIGHTS", 7 x 8px) its width.
+  for (int i = 0; i < kScreenCount; ++i) {
+    Rect n = navTabRect(i, false, kW, kH);
+    TEST_ASSERT_TRUE(n.h - 2 >= 16);
+    TEST_ASSERT_TRUE(n.w - 2 >= 7 * 8);
+  }
+}
+
+static void test_nav_tab_out_of_range_is_empty(void) {
+  TEST_ASSERT_EQUAL_INT(0, navTabRect(-1, true, kW, kH).w);
+  TEST_ASSERT_EQUAL_INT(0, navTabRect(3, false, kW, kH).w);
+}
+
 
 // ---- shouldDeferAutoSwitch: hold condition for Screen 2 ----------------
 //
@@ -331,6 +397,13 @@ int main(int, char **) {
   RUN_TEST(test_bottom_nav_bar_draws_at_215_to_240);
   RUN_TEST(test_bottom_nav_segments_tile_the_bar_without_gaps);
   RUN_TEST(test_bottom_nav_segment_out_of_range_is_empty);
+  RUN_TEST(test_nav_tab_rule_spans_the_bar_top);
+  RUN_TEST(test_active_tab_merges_into_the_rule_and_is_taller);
+  RUN_TEST(test_nav_tabs_stay_on_screen);
+  RUN_TEST(test_inactive_tabs_are_separated);
+  RUN_TEST(test_active_tab_overlaps_its_neighbours);
+  RUN_TEST(test_nav_tabs_fit_a_16px_label);
+  RUN_TEST(test_nav_tab_out_of_range_is_empty);
 
   RUN_TEST(test_defer_only_on_flight_screen);
   RUN_TEST(test_defer_requires_cpa_found);

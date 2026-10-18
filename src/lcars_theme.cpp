@@ -308,37 +308,58 @@ void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int1
   gfx.drawString(label, static_cast<int16_t>(x + w / 2), static_cast<int16_t>(y + h / 2));
 }
 
+namespace {
+// A tab: rounded bottom corners, square top. LovyanGFX can't round single
+// corners, so it's a rounded rect with its top corner rows squared off.
+void drawNavTabShape(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
+  int16_t r = kNavTabCornerRadius;
+  if (r > h / 2) r = static_cast<int16_t>(h / 2);
+  gfx.fillRoundRect(x, y, w, h, r, color);
+  gfx.fillRect(x, y, w, r, color);
+}
+}  // namespace
+
 void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t screenHeight,
                    const char *(*labelFor)(int screenIndex, Language lang)) {
   // Repaint the whole strip first so a screen change doesn't leave the
-  // previous active button behind.
+  // previous active tab behind.
   Rect bar = bottomNavBounds(screenWidth, screenHeight);
   gfx.fillRect(bar.x, bar.y, bar.w, bar.h, LCARS_BLACK);
 
-  constexpr int16_t kInsetX = 3;  // gap between neighbouring buttons
-  constexpr int16_t kInsetY = 2;
+  // The rule the tabs hang from; the active tab (same colour) merges into it.
+  Rect rule = navTabRule(screenWidth, screenHeight);
+  gfx.fillRect(rule.x, rule.y, rule.w, rule.h, THEME_CHROME_ACCENT);
 
-  gfx.setFont(LCARS_FONT_BODY);  // big, readable labels on the 25px buttons
+  gfx.setFont(LCARS_FONT_BODY);  // big, readable labels
   gfx.setTextDatum(middle_center);
 
-  for (int i = 0; i < kScreenCount; ++i) {
-    Rect seg = bottomNavSegment(i, screenWidth, screenHeight);
-    const bool active = (i == activeIndex);
-
-    // A pill button filling the segment (minus small insets).
-    const int16_t px = static_cast<int16_t>(seg.x + kInsetX);
-    const int16_t py = static_cast<int16_t>(seg.y + kInsetY);
-    const int16_t pw = static_cast<int16_t>(seg.w - 2 * kInsetX);
-    const int16_t ph = static_cast<int16_t>(seg.h - 2 * kInsetY);
-    const int16_t r = static_cast<int16_t>(ph / 2);
-
-    const uint16_t fill = active ? THEME_CHROME_ACCENT : THEME_CHROME_INACTIVE;
-    const uint16_t text = THEME_ON_FILL;
-    gfx.fillRoundRect(px, py, pw, ph, r, fill);
-
-    gfx.setTextColor(text, fill);
-    gfx.drawString(labelFor(i, i18nLanguage()), static_cast<int16_t>(px + pw / 2),
-                   static_cast<int16_t>(py + ph / 2));
+  // Inactive tabs first, active one last so its overlap sits on top.
+  for (int pass = 0; pass < 2; ++pass) {
+    for (int i = 0; i < kScreenCount; ++i) {
+      const bool active = (i == activeIndex);
+      if (active != (pass == 1)) continue;
+      Rect t = navTabRect(i, active, screenWidth, screenHeight);
+      uint16_t fill;
+      uint16_t text;
+      if (active) {
+        fill = THEME_CHROME_ACCENT;
+        text = THEME_ON_FILL;
+        drawNavTabShape(gfx, t.x, t.y, t.w, t.h, fill);
+      } else {
+        fill = THEME_CHROME_RECESSED;
+        text = THEME_CHROME_INACTIVE;
+        // 1px outline: outer shape in lavender, inner shape (inset on the
+        // sides and bottom; the top edge stays outlined too) in the fill.
+        drawNavTabShape(gfx, t.x, t.y, t.w, t.h, THEME_CHROME_INACTIVE);
+        drawNavTabShape(gfx, static_cast<int16_t>(t.x + 1), static_cast<int16_t>(t.y + 1),
+                        static_cast<int16_t>(t.w - 2), static_cast<int16_t>(t.h - 2), fill);
+      }
+      // Centre the label in the part of the tab below the rule.
+      const int16_t textTop = active ? static_cast<int16_t>(t.y + kNavTabRulePx) : t.y;
+      gfx.setTextColor(text, fill);
+      gfx.drawString(labelFor(i, i18nLanguage()), static_cast<int16_t>(t.x + t.w / 2),
+                     static_cast<int16_t>(textTop + (t.y + t.h - textTop) / 2));
+    }
   }
 }
 

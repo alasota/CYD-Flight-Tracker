@@ -132,6 +132,28 @@ constexpr int16_t kBottomNavTouchExtra = 5;
 Rect bottomNavBounds(int16_t screenWidth, int16_t screenHeight);
 Rect bottomNavSegment(int index, int16_t screenWidth, int16_t screenHeight);
 
+// ---- Tab look of the bottom nav (drawing geometry only) -------------------
+//
+// The nav is drawn as three folder tabs hanging from a peach rule along the
+// bar's top edge: the active tab is full height and merges into the rule
+// (the "pulled-out" sheet), inactive tabs sit lower, recessed behind it.
+// Touch zones are unaffected — navHitTest() still uses bottomNavSegment().
+constexpr int16_t kNavTabRulePx = 2;          // rule thickness, y:215..217
+constexpr int16_t kNavTabInactiveDropPx = 2;  // gap between rule and an inactive tab
+constexpr int16_t kNavTabOverlapPx = 2;       // active tab overlaps each neighbour
+constexpr int16_t kNavTabGapPx = 1;           // inset of inactive tabs (separates them)
+constexpr int16_t kNavTabCornerRadius = 6;    // bottom corners only; top is square
+
+// The full-width rule the tabs hang from (top kNavTabRulePx rows of the bar).
+Rect navTabRule(int16_t screenWidth, int16_t screenHeight);
+
+// Rectangle of tab `index` (rounded bottom corners, square top), drawn
+// `active` or not. Active: starts at the bar top (merging with the rule),
+// widened by kNavTabOverlapPx each side (clamped to the screen). Inactive:
+// starts kNavTabInactiveDropPx below the rule, inset by kNavTabGapPx.
+// Out-of-range index -> empty rect. Pure — native-tested.
+Rect navTabRect(int index, bool active, int16_t screenWidth, int16_t screenHeight);
+
 enum class NavAction {
   None,    // not a nav-button tap — leave it for the active screen
   JumpTo,  // a bottom nav segment — see NavHit::target for which screen

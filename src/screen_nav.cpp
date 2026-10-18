@@ -42,6 +42,32 @@ Rect bottomNavSegment(int index, int16_t screenWidth, int16_t screenHeight) {
   return r;
 }
 
+Rect navTabRule(int16_t screenWidth, int16_t screenHeight) {
+  Rect r = bottomNavBounds(screenWidth, screenHeight);
+  r.h = kNavTabRulePx;
+  return r;
+}
+
+Rect navTabRect(int index, bool active, int16_t screenWidth, int16_t screenHeight) {
+  Rect r = bottomNavSegment(index, screenWidth, screenHeight);
+  if (r.w == 0) return r;  // out of range
+  const int16_t bottom = static_cast<int16_t>(r.y + r.h);
+  if (active) {
+    int16_t left = static_cast<int16_t>(r.x - kNavTabOverlapPx);
+    int16_t right = static_cast<int16_t>(r.x + r.w + kNavTabOverlapPx);
+    if (left < 0) left = 0;
+    if (right > screenWidth) right = screenWidth;
+    r.x = left;
+    r.w = static_cast<int16_t>(right - left);
+    return r;  // full height: y from the bar top, merging with the rule
+  }
+  r.x = static_cast<int16_t>(r.x + kNavTabGapPx);
+  r.w = static_cast<int16_t>(r.w - 2 * kNavTabGapPx);
+  r.y = static_cast<int16_t>(r.y + kNavTabRulePx + kNavTabInactiveDropPx);
+  r.h = static_cast<int16_t>(bottom - r.y);
+  return r;
+}
+
 NavHit navHitTest(int16_t x, int16_t y, int16_t screenWidth, int16_t screenHeight) {
   NavHit hit;
 

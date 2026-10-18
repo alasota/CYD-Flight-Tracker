@@ -50,7 +50,7 @@ constexpr uint16_t LCARS_WHITE = 0xFFFF;
 // Chrome (header bar + bottom nav):
 constexpr uint16_t THEME_CHROME_ACCENT = LCARS_PEACH;        // header block (data OK), active button
 constexpr uint16_t THEME_CHROME_TEXT = LCARS_PEACH_LIGHT;    // header date / time
-constexpr uint16_t THEME_CHROME_INACTIVE = LCARS_LAVENDER;   // inactive nav buttons
+constexpr uint16_t THEME_CHROME_INACTIVE = LCARS_LAVENDER;   // inactive nav tab outline + label
 constexpr uint16_t THEME_CHROME_DIM = LCARS_LAVENDER;        // header app name (quiet label)
 constexpr uint16_t THEME_ON_FILL = LCARS_BLACK;              // text on any filled chrome/table bar
 constexpr uint16_t THEME_ALERT = LCARS_RED;                  // header block: auth/network error
@@ -84,6 +84,7 @@ constexpr int16_t LCARS_CONTENT_BOTTOM = LCARS_SCREEN_HEIGHT - LCARS_BOTTOM_NAV_
 // pops. Not part of CLAUDE.md's five-colour palette (that's the canonical
 // set above); this is a supporting shade, same role as the legacy tints.
 constexpr uint16_t LCARS_NAV_INACTIVE = 0x2124;
+constexpr uint16_t THEME_CHROME_RECESSED = LCARS_NAV_INACTIVE;  // inactive nav tab fill
 
 // --- Legacy palette (predates the canonical values above). Still
 // referenced by featured_panel / table_view / radar_view / main; those
@@ -306,12 +307,13 @@ void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int1
 // CLAUDE.md "Screen navigation"): `kScreenCount` equal-width segments, the
 // active one highlighted. Segment geometry comes straight from
 // screen_nav's bottomNavSegment(), so the drawn indicators line up exactly
-// with navHitTest()'s JumpTo hit zones. Each segment is a labelled pill
-// button filling the bar's height (label from `labelFor(index, i18nLanguage())`, in
-// LCARS_FONT_BODY on 25px buttons): the active screen filled `LCARS_ORANGE` with black
-// text, the others dim with a `LCARS_CYAN` outline and cyan text. (The
-// first version drew 6px-tall dots, which were too small to see on the
-// device.) Repaints its own strip first, so it's safe to call every frame.
+// with navHitTest()'s JumpTo hit zones. Drawn as folder tabs hanging from a
+// peach rule along the bar's top edge (geometry: screen_nav's navTabRule() /
+// navTabRect()): the active tab is peach, full height, merged into the rule,
+// black label; inactive tabs are recessed (dark fill, lavender outline and
+// label, a few px lower). Square top corners, rounded bottom ones. Labels
+// from `labelFor(index, i18nLanguage())` in LCARS_FONT_BODY. Repaints its
+// own strip first, so it's safe to call every frame.
 void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t screenHeight,
                    const char *(*labelFor)(int screenIndex, Language lang));
 

@@ -543,10 +543,14 @@ request — the summary text simply starts at x:208. (`drawVerticalDivider()` st
   left to the active screen (Screen 1's table paging taps on its first/last row). Don't
   reintroduce edge swiping without being asked.
 - **Bottom nav bar, y: 215 to 240px (`LCARS_BOTTOM_NAV_HEIGHT = 25px`, full 320px width)** — a
-  persistent strip, present on all three screens, showing three tappable **labelled pill buttons**
-  (the screen names — `LOTY`/`TERAZ`/`RADAR` or `FLIGHTS`/`NOW`/`RADAR` — in Font0, one per screen, each filling its ~107px-wide segment
-  and the bar's full height minus 1-3px insets), the active one filled `LCARS_ORANGE` with black
-  text, inactive ones dim fill + cyan outline + cyan text. Not tiny dots — the first
+  persistent strip, present on all three screens, drawn as **three folder tabs** (the screen
+  names — `LOTY`/`TERAZ`/`RADAR` or `FLIGHTS`/`NOW`/`RADAR` — in efontJA_16, one per ~107px
+  segment) hanging from a 2px peach rule along the bar's top edge: square top corners, rounded
+  bottom ones. The **active tab** is peach, full height, merges into the rule (the "pulled-out
+  sheet") and overlaps its neighbours by 2px, black label; **inactive tabs** are recessed — 2px
+  below the rule, dark fill (`THEME_CHROME_RECESSED`), lavender outline + label. Geometry is the
+  pure `navTabRule()` / `navTabRect()` in `screen_nav` (native-tested); touch zones are still the
+  plain segments. (Before: three separate pill buttons, which read as buttons, not tabs.) Not tiny dots — the first
   implementation drew 6px-tall pills and they were effectively invisible on the real board.
   Tapping a segment jumps directly to that
   screen. **This is the fix for the bottom bar being invisible/unreachable** — earlier versions
