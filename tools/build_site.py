@@ -255,8 +255,6 @@ def main():
     copy_tree(os.path.join(REPO, "docs", "icons"), os.path.join(out, "icons"))
     fill_roadmap(out)
     fill_releases(out)
-    # Pages would otherwise run Jekyll over it.
-    open(os.path.join(out, ".nojekyll"), "w").close()
 
     if args.firmware:
         print("firmware", add_firmware(out, args.firmware, args.boot_app0))
