@@ -4,7 +4,11 @@
     python tools/build_site.py --out _site [--firmware DIR [--boot-app0 PATH]]
 
 Copies site/ (the page itself) plus the README's images (docs/screenshots,
-docs/icons). With --firmware it also adds firmware/ for the in-browser
+docs/icons), and fills the page's "What's next" section from ROADMAP.md (in
+place of the <!-- ROADMAP --> marker in site/index.html) and the current
+version + changelog from git (<!-- VERSION --> / <!-- CHANGELOG -->): one entry
+per v* tag, listing the commit subjects since the previous tag — so it needs a
+checkout with full history and tags. With --firmware it also adds firmware/ for the in-browser
 installer (ESP Web Tools): the four flash parts and a manifest.json naming the
 version.
 
@@ -21,12 +25,138 @@ parts NVS is only erased when the user ticks "erase device" (first install).
 """
 
 import argparse
+import html
 import json
 import os
+import re
 import shutil
+import subprocess
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NAME = "cyd-sky-tracker"
+ROADMAP = os.path.join(REPO, "ROADMAP.md")
+ROADMAP_MARKER = "<!-- ROADMAP -->"
+VERSION_MARKER = "<!-- VERSION -->"
+CHANGELOG_MARKER = "<!-- CHANGELOG -->"
+GITHUB = "https://github.com/alasota/CYD-Flight-Tracker"
+CHANGELOG_MAX_ITEMS = 15  # per version; longer lists end with a link to GitHub
+# Section headings in ROADMAP.md -> Polish.
+SECTION_PL = {"Planned": "Planowane", "In progress": "W trakcie", "Done": "Zrobione"}
+
+
+def parse_roadmap(text):
+    """[(section, [(english, polish), ...]), ...] from ROADMAP.md."""
+    text = re.sub(r"^<!--\s*\n.*?-->\s*$", "", text, flags=re.S | re.M)  # format notes
+    sections = []
+    for line in text.splitlines():
+        heading = re.match(r"^##\s+(.+?)\s*$", line)
+        item = re.match(r"^\s*[-*]\s+(.+?)\s*$", line)
+        pl = re.match(r"^\s*<!--\s*pl:\s*(.+?)\s*-->\s*$", line)
+        if heading:
+            sections.append((heading.group(1), []))
+        elif item and sections:
+            sections[-1][1].append([item.group(1), item.group(1)])
+        elif pl and sections and sections[-1][1]:
+            sections[-1][1][-1][1] = pl.group(1)
+    return [(name, items) for name, items in sections if items]
+
+
+def roadmap_html(sections):
+    def both(en, pl):
+        return '<span class="en">%s</span><span class="pl">%s</span>' % (
+            html.escape(en), html.escape(pl))
+
+    cards = []
+    for name, items in sections:
+        lis = "".join("<li>%s</li>" % both(en, pl) for en, pl in items)
+        cards.append('<div class="card"><h3>%s</h3><ul class="ticks">%s</ul></div>' % (
+            both(name, SECTION_PL.get(name, name)), lis))
+    return '<div class="roadmap">%s</div>' % "".join(cards)
+
+
+def git(*args):
+    try:
+        return subprocess.check_output(["git"] + list(args), cwd=REPO,
+                                       stderr=subprocess.DEVNULL).decode("utf-8").strip()
+    except Exception:
+        return ""
+
+
+def releases():
+    """[(tag, date, [commit subjects]), ...], newest first: one entry per v* tag,
+    with the non-merge commits since the previous tag (all history for the first)."""
+    tags = [t for t in git("tag", "--list", "v*", "--sort=-v:refname").splitlines() if t]
+    out = []
+    for i, tag in enumerate(tags):
+        rng = tag if i == len(tags) - 1 else "%s..%s" % (tags[i + 1], tag)
+        subjects = [s for s in git("log", "--no-merges", "--format=%s", rng).splitlines() if s]
+        out.append((tag, git("log", "-1", "--format=%cs", tag), subjects))
+    return out
+
+
+def both(en, pl):
+    return '<span class="en">%s</span><span class="pl">%s</span>' % (en, pl)
+
+
+def version_html(rels):
+    if not rels:
+        return ""
+    tag, date, _ = rels[0]
+    return '<a class="version-badge" href="#changelog">%s <b>%s</b> · %s</a>' % (
+        both("Current version", "Aktualna wersja"), html.escape(tag), html.escape(date))
+
+
+def changelog_html(rels):
+    if not rels:
+        return '<p class="muted center">%s</p>' % both("No releases yet.", "Jeszcze nic nie wydano.")
+    blocks = []
+    for i, (tag, date, subjects) in enumerate(rels):
+        prev = rels[i + 1][0] if i + 1 < len(rels) else None
+        items = "".join("<li>%s</li>" % html.escape(s) for s in subjects[:CHANGELOG_MAX_ITEMS])
+        more = len(subjects) - CHANGELOG_MAX_ITEMS
+        if more > 0:
+            url = "%s/compare/%s...%s" % (GITHUB, prev, tag) if prev else "%s/commits/%s" % (GITHUB, tag)
+            items += '<li class="more"><a href="%s">%s</a></li>' % (
+                url, both("…and %d more" % more, "…i jeszcze %d" % more))
+        links = '<a href="%s/releases/tag/%s">%s</a>' % (GITHUB, tag, both("release", "wydanie"))
+        if prev:
+            links += ' · <a href="%s/compare/%s...%s">%s</a>' % (
+                GITHUB, prev, tag, both("diff", "różnice"))
+        blocks.append(
+            '<details class="card"%s><summary><b>%s</b> <span class="muted">%s · %s</span>'
+            '<span class="links-r">%s</span></summary><ul class="ticks">%s</ul></details>' % (
+                " open" if i == 0 else "", html.escape(tag), html.escape(date),
+                both("%d change(s)" % len(subjects), "zmian: %d" % len(subjects)), links,
+                items or "<li>—</li>"))
+    return '<div class="changelog">%s</div>' % "".join(blocks)
+
+
+def fill_releases(out):
+    index = os.path.join(out, "index.html")
+    with open(index, encoding="utf-8") as f:
+        page = f.read()
+    for marker in (VERSION_MARKER, CHANGELOG_MARKER):
+        if marker not in page:
+            raise SystemExit("index.html has no %s marker" % marker)
+    rels = releases()
+    page = page.replace(VERSION_MARKER, version_html(rels))
+    page = page.replace(CHANGELOG_MARKER, changelog_html(rels))
+    with open(index, "w", encoding="utf-8", newline="\n") as f:
+        f.write(page)
+    print("changelog: %d release(s)%s" % (len(rels), ", current " + rels[0][0] if rels else ""))
+
+
+def fill_roadmap(out):
+    index = os.path.join(out, "index.html")
+    with open(index, encoding="utf-8") as f:
+        page = f.read()
+    if ROADMAP_MARKER not in page:
+        raise SystemExit("index.html has no %s marker" % ROADMAP_MARKER)
+    with open(ROADMAP, encoding="utf-8") as f:
+        sections = parse_roadmap(f.read())
+    with open(index, "w", encoding="utf-8", newline="\n") as f:
+        f.write(page.replace(ROADMAP_MARKER, roadmap_html(sections)))
+    print("roadmap: %d item(s)" % sum(len(items) for _, items in sections))
 
 
 def copy_tree(src, dst):
@@ -81,6 +211,8 @@ def main():
     copy_tree(os.path.join(REPO, "site"), out)
     copy_tree(os.path.join(REPO, "docs", "screenshots"), os.path.join(out, "screenshots"))
     copy_tree(os.path.join(REPO, "docs", "icons"), os.path.join(out, "icons"))
+    fill_roadmap(out)
+    fill_releases(out)
     # Pages would otherwise run Jekyll over it.
     open(os.path.join(out, ".nojekyll"), "w").close()
 

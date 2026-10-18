@@ -965,6 +965,15 @@ mistakes here waste hours of debugging later.
   `manifest.json` for the ESP Web Tools install button). The manifest lists the four parts
   separately, **not** the merged -full.bin, so an update without "Erase device" keeps NVS
   (settings). Published by `site.yml` (see above).
+  The page's "What's next" section is generated from **`ROADMAP.md`** (replaces the
+  `<!-- ROADMAP -->` marker in `site/index.html`): `## Planned` / `## In progress` / `## Done`
+  headings, `- English text` items, each followed by an indented `<!-- pl: Polish text -->`
+  line (hidden on GitHub). Editing ROADMAP.md on main republishes the page.
+  The "Current version" badge (`<!-- VERSION -->`) and the "What changed" section
+  (`<!-- CHANGELOG -->`) come from git: one entry per `v*` tag (newest first, newest expanded)
+  listing the non-merge commit subjects since the previous tag, max 15 + a GitHub compare
+  link. Hence `site.yml` checks out with `fetch-depth: 0`. Commit subjects are shown as they
+  are (not translated) — write them so they read well in a changelog.
   `site/img/device.jpg` is a placeholder for a real photo: 1600×1000 px JPG, ≤ ~300 KB.
 
 ## Commands

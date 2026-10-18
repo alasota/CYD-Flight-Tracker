@@ -132,6 +132,33 @@ ol.steps li::before {
 .web-shots { margin: 28px auto 0; max-width: 860px; align-items: start; }
 .web-shots img { border-radius: 12px; border: 1px solid var(--line); }
 
+/* ---- roadmap */
+.intro { max-width: 620px; margin: -12px auto 28px; }
+.roadmap { max-width: 760px; margin: 0 auto 16px; display: grid; gap: 12px; }
+.roadmap ul.ticks { margin: 0; }
+.roadmap ul.ticks li:last-child { margin-bottom: 0; }
+
+/* ---- version badge + changelog */
+.version-badge {
+  display: inline-block; margin: -4px 0 16px; padding: 4px 12px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted); font-size: .82rem; text-decoration: none;
+}
+.version-badge b { color: var(--accent); font-weight: 600; }
+.version-badge:hover { border-color: var(--accent); }
+.changelog { max-width: 760px; margin: 0 auto; display: grid; gap: 12px; }
+.changelog details { padding: 0; }
+.changelog summary {
+  cursor: pointer; padding: 16px 22px; list-style: none; display: flex; flex-wrap: wrap;
+  align-items: baseline; gap: 10px;
+}
+.changelog summary::-webkit-details-marker { display: none; }
+.changelog summary b { color: var(--accent); font-size: 1.05rem; }
+.changelog summary .muted { font-size: .875rem; }
+.changelog .links-r { margin-left: auto; font-size: .85rem; }
+.changelog ul.ticks { margin: 0; padding: 0 22px 18px 22px; }
+.changelog ul.ticks li { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .88rem; color: #c9cad1; }
+.changelog li.more { font-family: inherit; }
+
 /* ---- FAQ */
 .faq { max-width: 760px; margin: 0 auto; display: grid; gap: 12px; }
 .faq details { padding: 0; }

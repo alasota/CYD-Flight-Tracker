@@ -1,4 +1,4 @@
-# Project page: assembles site/ (+ docs/screenshots, docs/icons) with
+# Project page: assembles site/ (+ docs/screenshots, docs/icons, ROADMAP.md) with
 # tools/build_site.py and publishes it to GitHub Pages.
 #
 # - On its own (page changes on main, or by hand): the browser installer gets
@@ -13,6 +13,7 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "ROADMAP.md"
       - "docs/screenshots/**"
       - "docs/icons/**"
       - "tools/build_site.py"
@@ -38,7 +39,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out (full history + tags, for the changelog)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:

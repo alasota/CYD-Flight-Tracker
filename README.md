@@ -221,6 +221,13 @@ WiFi/config portal → opensky_client (OAuth2 + /states/all)
 Networking and rendering are kept firmly separated, so nobody has to relive the trauma of
 untangling API calls from `tft.drawPixel()` at 2am.
 
+## Roadmap
+
+What might come next lives in **[ROADMAP.md](ROADMAP.md)**: no dates, no sprints, just ideas.
+The same list shows up in the *What's next* section of the
+[project page](https://alasota.github.io/CYD-Flight-Tracker/#roadmap), generated from that file
+whenever the page is published.
+
 ## Credits & attribution
 
 - Architecture inspiration: [micro-radar](https://github.com/AnthonySturdy/micro-radar) by
