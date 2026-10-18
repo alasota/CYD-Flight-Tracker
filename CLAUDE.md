@@ -740,11 +740,18 @@ each with a single responsibility:
   "Auto screen cycling"). Reachable via mDNS (e.g. `cyd-sky.local`), same pattern as
   micro-radar's `microradar.local`.
   The page HTML is rendered by the pure **`config_page`** module (`renderConfigPage(model,
-  sink)`, streamed chunk by chunk, native-tested): three tabs — **Location** (lat/lon, radius +
+  sink)`, streamed chunk by chunk, native-tested): four tabs — **Location** (lat/lon, radius +
   credits per request), **OpenSky client** (account status, client id/secret, credentials-file
   upload, poll interval + estimated credits per day vs. the 400/4000 limit), **General**
-  (display + web-panel language, auto-cycle, flight-phase thresholds); one Save for all tabs,
-  the active tab round-trips via `?tab=` / a hidden field. Look: dark (`#17181c`), muted greys,
+  (display + web-panel language, auto-cycle, flight-phase thresholds), **Backup** (download /
+  restore, below); one Save for the first three (hidden on Backup), the active tab round-trips
+  via `?tab=` / a hidden field.
+  **Backup / restore:** `GET /backup.json[?secrets=1]` downloads all settings as JSON
+  (grouped like the tabs, `"format": "cyd-sky-tracker-config"`, `format_version` 1; OpenSky
+  credentials only with `secrets=1`); `POST /restore` (multipart `backup_file`) applies such a
+  file on top of the current settings — missing keys keep their value, wrong-typed keys are
+  skipped and listed, other JSON is rejected; then `saveConfig()` (sanitizes) and a reload.
+  The JSON logic is the pure, native-tested **`config_backup`** module. Look: dark (`#17181c`), muted greys,
   thin borders, the display's peach `#ff9966` as the only accent (active tab, buttons, focus)
   with dark text on it.
   Also serves `GET /screenshot.bmp[?screen=N]`: the panel read back (LovyanGFX `readRect`,

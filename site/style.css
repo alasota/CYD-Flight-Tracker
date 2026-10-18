@@ -129,7 +129,10 @@ ol.steps li::before {
   background: var(--accent); color: var(--on-accent); font-weight: 700; text-align: center; line-height: 28px;
 }
 .steps-cards p { margin: 0; color: #c9cad1; }
-.web-shots { margin: 28px auto 0; max-width: 860px; align-items: start; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.backup-note { max-width: 860px; margin: 28px auto 0; }
+.backup-note p { margin: 0; color: #c9cad1; }
+.web-shots { margin: 28px auto 0; max-width: 1000px; align-items: start; }
 .web-shots img { border-radius: 12px; border: 1px solid var(--line); }
 
 /* ---- roadmap */
@@ -180,5 +183,5 @@ ol.steps li::before {
   .lang { margin-left: auto; }
   section.wrap { margin: 64px auto; }
   code { white-space: normal; word-break: break-all; }
-  .web-shots { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .web-shots { grid-template-columns: repeat(2, 1fr); gap: 10px; }
 }

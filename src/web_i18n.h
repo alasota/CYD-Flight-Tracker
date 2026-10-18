@@ -21,6 +21,7 @@
   X(TabLocation, "Lokalizacja", "Location")                                                        \
   X(TabOpenSky, "Klient OpenSky", "OpenSky client")                                                \
   X(TabGeneral, "Ogólne", "General")                                                               \
+  X(TabBackup, "Kopia", "Backup")                                                                  \
   /* Location */                                                                                   \
   X(LocationIntro, "Środek obszaru, nad którym śledzone są samoloty — zwykle Twój dom.",           \
     "The centre of the area to watch — usually your home.")                                        \
@@ -72,6 +73,29 @@
   X(ClimbRate, "Próg wznoszenia / opadania (m/s)", "Climb / descent threshold (m/s)")              \
   X(ClimbRateHint, "Szybciej w górę to start, szybciej w dół to lądowanie.",                       \
     "Climbing faster is a takeoff, descending faster a landing.")                                  \
+  /* Backup */                                                                                     \
+  X(BackupIntro,                                                                                   \
+    "Wszystkie ustawienia w jednym pliku JSON: na wypadek wymiany płytki, wyczyszczenia pamięci "  \
+    "albo eksperymentów, których potem żałujesz.",                                                 \
+    "All settings in one JSON file: for a new board, a wiped flash, or experiments you end up "    \
+    "regretting.")                                                                                 \
+  X(BackupSaveTitle, "Zapisz kopię", "Save a backup")                                              \
+  X(BackupIncludeSecrets, "Dołącz dane logowania OpenSky", "Include OpenSky credentials")          \
+  X(BackupSecretsHint,                                                                             \
+    "Client ID i secret trafią do pliku zwykłym tekstem. Trzymaj go w bezpiecznym miejscu.",       \
+    "The client ID and secret go into the file as plain text. Keep it somewhere safe.")            \
+  X(BackupDownload, "Pobierz plik JSON", "Download JSON file")                                     \
+  X(RestoreTitle, "Przywróć z kopii", "Restore from a backup")                                     \
+  X(RestoreHint,                                                                                   \
+    "Wczytaj plik zapisany wcześniej w tym panelu. Ustawienia, których nie ma w pliku, zostaną "   \
+    "bez zmian.",                                                                                  \
+    "Load a file saved from this page earlier. Settings missing from the file stay as they are.")  \
+  X(RestoreButton, "Przywróć", "Restore")                                                          \
+  X(RestoreOk, "Przywrócono ustawienia z kopii.", "Settings restored from the backup.")            \
+  X(RestoreWithInvalid, "Przywrócono, ale te pola miały błędne wartości i zostały bez zmian:",     \
+    "Restored, but these fields had invalid values and were left unchanged:")                      \
+  X(RestoreNotBackup, "Nie przywrócono: to nie jest plik kopii ustawień Sky Trackera.",            \
+    "Not restored: this is not a Sky Tracker settings backup.")                                    \
   /* Save + messages */                                                                            \
   X(Save, "Zapisz", "Save")                                                                        \
   X(Saved, "Zapisano.", "Saved.")                                                                  \

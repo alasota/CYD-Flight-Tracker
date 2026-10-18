@@ -157,8 +157,8 @@ Good to know:
 ### Configuring it from the browser
 
 Once it's on your network, open **http://cyd-sky.local** (or the board's IP address, which your
-router's list of connected devices will show if `.local` names don't work on your system). The settings page has three tabs and one **Save** button that
-saves all of them at once:
+router's list of connected devices will show if `.local` names don't work on your system).
+The settings page has four tabs; one **Save** button saves the first three at once:
 
 1. **Location**: paste your home latitude and longitude (right-click a spot in Google Maps to
    copy them) and pick a scan radius. The page shows how many OpenSky credits one request costs
@@ -170,24 +170,48 @@ saves all of them at once:
    account) and turns red if you'd run out.
 3. **General**: display language, web panel language, automatic screen cycling and the
    flight-phase thresholds.
+4. **Backup**: save all settings to a JSON file or restore them from one — see
+   [Backing up your settings](#backing-up-your-settings) below.
 
 The **PL / EN** switch in the top-right corner changes the page's language. It doesn't affect
 the display, which has its own setting on the General tab.
 
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/web_location.png" width="260" alt="Settings page, Location tab: latitude, longitude, scan radius and credits per request"></td>
-    <td align="center"><img src="docs/screenshots/web_opensky.png" width="260" alt="Settings page, OpenSky client tab: account status, client ID and secret, credentials file upload, refresh interval and daily credit estimate"></td>
-    <td align="center"><img src="docs/screenshots/web_general.png" width="260" alt="Settings page, General tab: display and web panel language, screen cycling, flight-phase thresholds"></td>
+    <td align="center"><img src="docs/screenshots/web_location.png" width="200" alt="Settings page, Location tab: latitude, longitude, scan radius and credits per request"></td>
+    <td align="center"><img src="docs/screenshots/web_opensky.png" width="200" alt="Settings page, OpenSky client tab: account status, client ID and secret, credentials file upload, refresh interval and daily credit estimate"></td>
+    <td align="center"><img src="docs/screenshots/web_general.png" width="200" alt="Settings page, General tab: display and web panel language, screen cycling, flight-phase thresholds"></td>
+    <td align="center"><img src="docs/screenshots/web_backup.png" width="200" alt="Settings page, Backup tab: download settings as JSON, restore from a file"></td>
   </tr>
   <tr>
     <td align="center"><b>Location</b></td>
     <td align="center"><b>OpenSky client</b></td>
     <td align="center"><b>General</b></td>
+    <td align="center"><b>Backup</b></td>
   </tr>
 </table>
 
 <sub>Screenshots show demo values (Warsaw city centre, a made-up API client).</sub>
+
+### Backing up your settings
+
+Flashing a fresh install with *Erase device*, swapping the board, or "just trying something"
+wipes everything you set up. The **Backup** tab saves you the retyping:
+
+- **Save a backup**: *Download JSON file* saves `cyd-sky-tracker-config.json` with all
+  settings, grouped like the tabs (home location and radius; OpenSky client and refresh
+  interval; languages, screen cycling and flight-phase thresholds), plus the firmware version
+  it came from. *Include OpenSky credentials* is ticked by default — untick it to leave the
+  `client_id` / `client_secret` out of the file (see the warning below).
+- **Restore from a backup**: pick such a file and press *Restore*. The settings are applied and
+  saved straight away, and the display picks them up (language, home location) without a
+  reboot. Anything missing from the file stays as it is, so restoring a backup without
+  credentials keeps the ones already on the board. Fields with invalid values are skipped and
+  listed; files that aren't a Sky Tracker backup (e.g. OpenSky's `credentials.json`) are
+  rejected and change nothing.
+
+The WiFi network isn't part of the backup — the board keeps that separately, and you set it up
+through the setup hotspot.
 
 > [!WARNING]
 > **The config page hands your OpenSky `client_secret` to anyone who asks.**
@@ -200,10 +224,18 @@ the display, which has its own setting on the General tab.
 > is also stored unencrypted in the board's flash (NVS), so whoever gets hold of the board can
 > dump it.
 >
+> **Settings backups can contain it too.** A backup downloaded with *Include OpenSky
+> credentials* ticked (the default) holds your `client_id` and `client_secret` as plain text in
+> the JSON file. The download link has no login either: anyone on your network can fetch
+> `http://<board-ip>/backup.json?secrets=1`.
+>
 > Until this is fixed in the firmware:
 > - Run the board only on a network you trust. No guest or shared networks.
 > - Create a separate OpenSky API client just for this board. Don't reuse credentials you need
 >   for anything else.
+> - Treat a backup file with credentials like a password: don't commit it to git, don't post it
+>   in an issue or a chat, and delete copies you no longer need. Untick *Include OpenSky
+>   credentials* when you only want to save the other settings.
 > - If you think the secret leaked, revoke or regenerate it on your OpenSky account page.
 
 ## How it works, briefly

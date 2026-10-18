@@ -11,6 +11,8 @@ const char *settingsTabId(SettingsTab tab) {
       return "opensky";
     case SettingsTab::General:
       return "general";
+    case SettingsTab::Backup:
+      return "backup";
     case SettingsTab::Location:
     default:
       return "location";
@@ -20,6 +22,7 @@ const char *settingsTabId(SettingsTab tab) {
 SettingsTab settingsTabFromArg(const std::string &arg) {
   if (arg == "opensky") return SettingsTab::OpenSky;
   if (arg == "general") return SettingsTab::General;
+  if (arg == "backup") return SettingsTab::Backup;
   return SettingsTab::Location;
 }
 
@@ -85,7 +88,7 @@ const char kStyle[] =
     ".lang a.on{background:var(--accent);color:var(--on-accent)}"
     ".tabs{display:flex;gap:4px;padding:4px;background:var(--field);"
     "border:1px solid var(--line);border-radius:12px;margin-bottom:20px}"
-    ".tabs button{flex:1;padding:9px 4px;background:none;border:0;border-radius:9px;"
+    ".tabs button{flex:1 1 auto;white-space:nowrap;padding:9px 8px;background:none;border:0;border-radius:9px;"
     "color:var(--muted);font:inherit;font-size:.85rem;font-weight:500;cursor:pointer}"
     ".tabs button.on{background:var(--accent);color:var(--on-accent);font-weight:600}"
     ".card{background:var(--card);border:1px solid var(--line);border-radius:14px;"
@@ -118,6 +121,7 @@ const char kStyle[] =
     "button.ghost{background:none;border:1px solid var(--line);color:var(--text);"
     "font-weight:500;white-space:nowrap}"
     ".save{width:100%;padding:13px;margin-top:4px}"
+    "button.wide{width:100%}"
     ".switch{display:flex;justify-content:space-between;align-items:center;gap:12px;"
     "margin-bottom:18px;cursor:pointer}"
     ".switch input{width:20px;height:20px;margin:0;accent-color:var(--accent)}"
@@ -138,7 +142,7 @@ const char kScript[] =
     "function show(t){"
     "document.querySelectorAll('section[data-tab]').forEach(function(s){s.hidden=s.dataset.tab!=t});"
     "document.querySelectorAll('.tabs button').forEach(function(b){b.classList.toggle('on',b.dataset.t==t)});"
-    "$('tab').value=t;"
+    "$('tab').value=t;$('save').hidden=t=='backup';"
     "document.querySelectorAll('.lang a').forEach(function(a){a.href='/lang?l='+a.dataset.l+'&tab='+t})}"
     "document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){show(b.dataset.t)}});"
     "function cost(r){var a=4*r*r;return a<=25?1:a<=100?2:a<=400?3:4}"
@@ -266,9 +270,9 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   // ---- tab bar
   w.raw("<div class=\"tabs\" role=\"tablist\">");
   const SettingsTab tabs[kSettingsTabCount] = {SettingsTab::Location, SettingsTab::OpenSky,
-                                               SettingsTab::General};
+                                               SettingsTab::General, SettingsTab::Backup};
   const WebStr tabLabels[kSettingsTabCount] = {WebStr::TabLocation, WebStr::TabOpenSky,
-                                               WebStr::TabGeneral};
+                                               WebStr::TabGeneral, WebStr::TabBackup};
   for (int i = 0; i < kSettingsTabCount; ++i) {
     w.raw("<button type=\"button\" data-t=\"");
     w.raw(settingsTabId(tabs[i]));
@@ -386,11 +390,40 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
           fmt("%.1f", c.climb_rate_threshold_mps), &climbHint);
   w.raw("</div></section>");
 
-  // ---- save, upload form, footer, script
-  w.raw("<button type=\"submit\" class=\"save\">");
+  // ---- Backup: download / restore. Its controls belong to their own forms
+  // (#bk, #rs, below the settings form — forms can't nest); the tab has no
+  // use for the settings Save button, so it's hidden there.
+  w.sectionOpen(SettingsTab::Backup, m.tab);
+  w.raw("<div class=\"card\"><p class=\"intro\">");
+  w.t(WebStr::BackupIntro);
+  w.raw("</p><h2>");
+  w.t(WebStr::BackupSaveTitle);
+  w.raw("</h2><label class=\"switch\"><span>");
+  w.t(WebStr::BackupIncludeSecrets);
+  w.raw("</span><input type=\"checkbox\" name=\"secrets\" value=\"1\" form=\"bk\" checked>"
+        "</label><div class=\"hint\" style=\"margin:-10px 0 16px\">");
+  w.t(WebStr::BackupSecretsHint);
+  w.raw("</div><button form=\"bk\" class=\"wide\">");
+  w.t(WebStr::BackupDownload);
+  w.raw("</button></div><div class=\"card\"><h2>");
+  w.t(WebStr::RestoreTitle);
+  w.raw("</h2><div class=\"pw\"><input type=\"file\" name=\"backup_file\" form=\"rs\" "
+        "accept=\"application/json,.json\" required><button form=\"rs\" class=\"ghost\">");
+  w.t(WebStr::RestoreButton);
+  w.raw("</button></div><div class=\"hint\">");
+  w.t(WebStr::RestoreHint);
+  w.raw("</div></div></section>");
+
+  // ---- save, side forms, footer, script
+  w.raw(m.tab == SettingsTab::Backup
+            ? "<button type=\"submit\" class=\"save\" id=\"save\" hidden>"
+            : "<button type=\"submit\" class=\"save\" id=\"save\">");
   w.t(WebStr::Save);
   w.raw("</button></form>"
         "<form id=\"up\" method=\"POST\" action=\"/upload_credentials\" "
+        "enctype=\"multipart/form-data\"></form>"
+        "<form id=\"bk\" method=\"GET\" action=\"/backup.json\"></form>"
+        "<form id=\"rs\" method=\"POST\" action=\"/restore\" "
         "enctype=\"multipart/form-data\"></form>"
         "<footer>CYD Sky Tracker · ");
   w.t(WebStr::Version);

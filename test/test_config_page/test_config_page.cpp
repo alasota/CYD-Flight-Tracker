@@ -36,7 +36,8 @@ ConfigPageModel baseModel() {
 // ---- pure helpers -----------------------------------------------------------
 
 static void test_tab_ids_round_trip(void) {
-  for (SettingsTab t : {SettingsTab::Location, SettingsTab::OpenSky, SettingsTab::General}) {
+  for (SettingsTab t : {SettingsTab::Location, SettingsTab::OpenSky, SettingsTab::General,
+                        SettingsTab::Backup}) {
     TEST_ASSERT_TRUE(settingsTabFromArg(settingsTabId(t)) == t);
   }
   TEST_ASSERT_TRUE(settingsTabFromArg("") == SettingsTab::Location);
@@ -193,8 +194,29 @@ static void test_footer_shows_the_firmware_version(void) {
   TEST_ASSERT_TRUE(contains(render(m), "version <span id=\"ver\">dev</span>"));
 }
 
+static void test_backup_tab_has_download_and_restore(void) {
+  ConfigPageModel m = baseModel();
+  m.tab = SettingsTab::Backup;
+  const std::string h = render(m);
+  TEST_ASSERT_TRUE(contains(h, "data-t=\"backup\" class=\"on\""));
+  TEST_ASSERT_TRUE(contains(h, "<section data-tab=\"backup\">"));
+  // Download: GET form with the secrets checkbox (on by default).
+  TEST_ASSERT_TRUE(contains(h, "<form id=\"bk\" method=\"GET\" action=\"/backup.json\">"));
+  TEST_ASSERT_TRUE(contains(h, "name=\"secrets\" value=\"1\" form=\"bk\" checked"));
+  // Restore: multipart upload in its own form.
+  TEST_ASSERT_TRUE(contains(h, "<form id=\"rs\" method=\"POST\" action=\"/restore\" "
+                               "enctype=\"multipart/form-data\">"));
+  TEST_ASSERT_TRUE(contains(h, "name=\"backup_file\" form=\"rs\""));
+  // The settings Save button means nothing on this tab.
+  TEST_ASSERT_TRUE(contains(h, "id=\"save\" hidden>"));
+
+  m.tab = SettingsTab::Location;
+  TEST_ASSERT_FALSE(contains(render(m), "id=\"save\" hidden>"));
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
+  RUN_TEST(test_backup_tab_has_download_and_restore);
   RUN_TEST(test_footer_shows_the_firmware_version);
   RUN_TEST(test_tab_ids_round_trip);
   RUN_TEST(test_daily_credits);

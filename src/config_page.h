@@ -1,6 +1,6 @@
 // config_page — the HTML of the config web page (served by config_portal),
 // rendered as a stream of chunks so the ESP32 never builds the whole page in
-// RAM. Three tabs (Location / OpenSky client / General), PL or EN text from
+// RAM. Four tabs (Location / OpenSky client / General / Backup), PL or EN text from
 // web_i18n (Config::web_language), dark theme with the display's peach as
 // the single accent colour.
 //
@@ -16,10 +16,10 @@
 #include "config_store.h"  // Config
 #include "web_i18n.h"      // WebStr
 
-enum class SettingsTab : uint8_t { Location, OpenSky, General };
-constexpr int kSettingsTabCount = 3;
+enum class SettingsTab : uint8_t { Location, OpenSky, General, Backup };
+constexpr int kSettingsTabCount = 4;
 
-// "location" / "opensky" / "general" — the ?tab= / hidden-field value.
+// "location" / "opensky" / "general" / "backup" — the ?tab= / hidden-field value.
 const char *settingsTabId(SettingsTab tab);
 // Inverse of settingsTabId(); anything unknown -> Location.
 SettingsTab settingsTabFromArg(const std::string &arg);

@@ -246,10 +246,24 @@
         zapytań dziennie, a panel ustawień uprzejmie je za Ciebie policzy.</p>
     </div>
   </div>
-  <div class="grid3 web-shots">
+  <div class="card backup-note">
+    <h3><span class="en">Bonus: a backup, because you'll flash it again</span><span class="pl">Bonus: kopia zapasowa, bo i tak wgrasz to jeszcze raz</span></h3>
+    <p class="en">The <b>Backup</b> tab saves every setting to one JSON file and restores it
+      later: after a clean install, on a second board, or after an experiment that seemed like a
+      good idea at the time. Anything missing from the file is left alone. Heads-up: with
+      <i>Include OpenSky credentials</i> ticked, your client secret sits in that file as plain
+      text, so treat it like a password.</p>
+    <p class="pl">Zakładka <b>Kopia</b> zapisuje wszystkie ustawienia do jednego pliku JSON i
+      przywraca je później: po czystej instalacji, na drugiej płytce albo po eksperymencie, który
+      wtedy wydawał się dobrym pomysłem. To, czego nie ma w pliku, zostaje bez zmian. Uwaga: z
+      zaznaczonym <i>Dołącz dane logowania OpenSky</i> sekret klienta leży w pliku zwykłym
+      tekstem, więc traktuj go jak hasło.</p>
+  </div>
+  <div class="grid4 web-shots">
     <img src="screenshots/web_location.png" width="1000" height="1591" alt="Settings page, Location tab" loading="lazy">
     <img src="screenshots/web_opensky.png" width="1000" height="2094" alt="Settings page, OpenSky client tab" loading="lazy">
     <img src="screenshots/web_general.png" width="1000" height="2193" alt="Settings page, General tab" loading="lazy">
+    <img src="screenshots/web_backup.png" width="1000" height="1420" alt="Settings page, Backup tab" loading="lazy">
   </div>
 </section>
 
@@ -340,10 +354,14 @@
     </details>
     <details class="card">
       <summary><span class="en">Is it production-ready?</span><span class="pl">Czy to jest gotowe na produkcję?</span></summary>
-      <p class="en">It's barbecue-ready. The settings page has no login, so keep the board on a
-        network you trust. And please don't land anything based on it.</p>
-      <p class="pl">Jest gotowe na grilla. Panel ustawień nie ma logowania, więc trzymaj płytkę
-        w zaufanej sieci. I proszę, nie lądujcie niczym na jego podstawie.</p>
+      <p class="en">It's barbecue-ready. The settings page has no login and shows your OpenSky
+        secret to anyone who looks (so does a backup file saved with credentials), so keep the
+        board on a network you trust and the backup somewhere private. And please don't land
+        anything based on it.</p>
+      <p class="pl">Jest gotowe na grilla. Panel ustawień nie ma logowania i pokaże sekret
+        OpenSky każdemu, kto zajrzy (podobnie plik kopii zapisany z danymi logowania), więc trzymaj
+        płytkę w zaufanej sieci, a kopię w prywatnym miejscu. I proszę, nie lądujcie niczym na jego
+        podstawie.</p>
     </details>
   </div>
 </section>
