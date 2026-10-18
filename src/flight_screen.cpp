@@ -82,6 +82,7 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang
     out.suffixText = tr(Str::UnitMinutes, lang);
     out.statusLabel = tr(Str::StatusEstimated, lang);
     out.color = LCARS_LILAC;
+    out.caption = tr(Str::CaptionOverheadIn, lang);
     return out;
   }
 
@@ -89,6 +90,7 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang
   out.mode = CountdownDisplay::Mode::Seconds;
   out.bigText = std::to_string(static_cast<long>(std::lround(t)));
   out.suffixText = "s";
+  if (t > 0.0f) out.caption = tr(Str::CaptionOverheadIn, lang);  // still ahead
 
   if (t > 10.0f) {
     out.color = LCARS_SKY;
@@ -112,6 +114,7 @@ constexpr int16_t kSideMargin = 10;   // identity panel x:10..(w-10), per CLAUDE
 constexpr int16_t kTextInset = 6;     // = aircraft_summary's text margin, so lines align
 constexpr int16_t kStatsLineOffset = 46;  // 3rd line (identity +6, route +26)
 constexpr int16_t kArrowSize = 12;
+constexpr int16_t kCaptionHeight = 18;  // "NAD TOBĄ ZA" line above the digits (16px + gap)
 constexpr int16_t kSuffixGap = 6;
 
 // Big-glyph font per countdown mode. Font8 is the ~75px 7-seg-style
@@ -172,9 +175,21 @@ void renderCountdown(lgfx::LovyanGFX &gfx, const CountdownDisplay &cd, int16_t o
 
   gfx.fillRect(0, originY, screenWidth, kStatusTop + kStatusHeight - kCountdownTop, LCARS_BLACK);
 
-  // ---- Countdown zone, y:82..195 — big number, small suffix, centered.
-  const int16_t countdownCy =
-      static_cast<int16_t>(kCountdownTop + kCountdownHeight / 2 + yOff);
+  // ---- Optional caption ("NAD TOBĄ ZA", review #10) at the top of the zone;
+  // the digits are then centred in what's left below it.
+  int16_t digitsTop = kCountdownTop;
+  if (!cd.caption.empty()) {
+    gfx.setFont(LCARS_FONT_BODY);
+    gfx.setTextSize(1);
+    gfx.setTextDatum(top_center);
+    gfx.setTextColor(THEME_CONTENT_MUTED, LCARS_BLACK);
+    gfx.drawString(cd.caption.c_str(), cx, static_cast<int16_t>(kCountdownTop + yOff));
+    digitsTop = static_cast<int16_t>(kCountdownTop + kCaptionHeight);
+  }
+
+  // ---- Countdown zone, y:92..186 — big number, small suffix, centered.
+  const int16_t countdownCy = static_cast<int16_t>(
+      digitsTop + (kCountdownTop + kCountdownHeight - digitsTop) / 2 + yOff);
 
   gfx.setFont(bigFont(cd.mode));
   gfx.setTextSize(bigTextSize(cd.mode));

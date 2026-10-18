@@ -242,8 +242,24 @@ static void test_now_stats_on_ground(void) {
   TEST_ASSERT_EQUAL_STRING("N 6km  NA ZIEMI", nowStatsText(r, Language::PL).c_str());
 }
 
+// ---- caption above the digits (review #10) ----------------------------------
+
+static void test_caption_only_while_the_overflight_is_ahead(void) {
+  TEST_ASSERT_EQUAL_STRING("NAD TOBĄ ZA",
+                           computeCountdownDisplay(cpaAt(30.0f), Language::PL, true).caption.c_str());
+  TEST_ASSERT_EQUAL_STRING("NAD TOBĄ ZA",
+                           computeCountdownDisplay(cpaAt(240.0f), Language::PL, true).caption.c_str());
+  TEST_ASSERT_EQUAL_STRING("OVERHEAD IN",
+                           computeCountdownDisplay(cpaAt(5.0f), Language::EN, true).caption.c_str());
+  // Passed / no prediction: "overhead in -3 s" would be nonsense.
+  TEST_ASSERT_EQUAL_STRING("", computeCountdownDisplay(cpaAt(-3.0f), Language::PL, true).caption.c_str());
+  TEST_ASSERT_EQUAL_STRING("", computeCountdownDisplay(CpaPrediction{}, Language::PL, true).caption.c_str());
+}
+
 int main(int, char **) {
   UNITY_BEGIN();
+
+  RUN_TEST(test_caption_only_while_the_overflight_is_ahead);
 
   RUN_TEST(test_empty_with_aircraft_says_not_overhead);
   RUN_TEST(test_empty_without_aircraft_says_no_flights);

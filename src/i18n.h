@@ -37,7 +37,7 @@ constexpr Language kDefaultLanguage = Language::PL;
   X(ScreenRadar, "RADAR", "RADAR")                                          \
   /* Screen 1 table column header (small font, must fit table_view cols) */ \
   X(ColFlight, "LOT", "FLIGHT")                                             \
-  X(ColDistance, "ODL.", "DIST")                                            \
+  X(ColDistance, "ODL", "DIST")                                             \
   X(ColFrom, "SKĄD", "FROM")                                                \
   X(ColTo, "DOKĄD", "TO")                                                   \
   X(ColType, "TYP", "TYPE")                                                 \
@@ -54,6 +54,7 @@ constexpr Language kDefaultLanguage = Language::PL;
   X(StatusEstimated, "SZACOWANY CZAS", "ESTIMATED TIME")                    \
   X(StatusNotOverhead, "NIE PRZELECI NAD TOBĄ", "NOT PASSING OVERHEAD")     \
   X(UnitMinutes, "MIN", "MIN")                                              \
+  X(CaptionOverheadIn, "NAD TOBĄ ZA", "OVERHEAD IN")                        \
   /* header block "<n> flights" — plural forms, see pluralForm() */         \
   X(FlightsOne, "LOT", "FLIGHT")                                            \
   X(FlightsFew, "LOTY", "FLIGHTS")                                          \

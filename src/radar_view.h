@@ -45,6 +45,25 @@ RadarLayout computeRadarLayout(int16_t x, int16_t y, int16_t w, int16_t h, int16
 // ring, not survey-grade.
 float radiusDegToKm(float radius_deg);
 
+// A point on the radar plot (screen px).
+struct RadarPoint {
+  int16_t x = 0;
+  int16_t y = 0;
+};
+
+// Where a range ring's "28km" label goes: on the ring at 45 degrees up and
+// to the right of centre — not at 12 o'clock, where aircraft north of home
+// kept covering it. Pure — native-tested.
+RadarPoint ringLabelAnchor(int16_t cx, int16_t cy, int16_t radiusPx);
+
+// End of the short heading tick drawn from a blip at (x, y) along the
+// aircraft's track (degrees, 0 = north/up, clockwise), `len` px long. Pure.
+RadarPoint headingTickEnd(int16_t x, int16_t y, float trackDeg, int16_t len);
+
+// Stats line under the route in the summary panel: compass + distance and
+// altitude — "S 4km  511m" — or "S 4km  NA ZIEMI" on the ground. Pure.
+std::string radarSummaryStats(const AircraftRow &row, Language lang);
+
 // (Airline truncation for the narrow summary panel uses lcars_theme's
 // fitToWidth(), measured in pixels — the shared helper all screens use.)
 

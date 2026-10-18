@@ -294,13 +294,6 @@ void drawElbowFrame(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h,
 void drawVerticalDivider(LGFX &gfx, int16_t x, int16_t y, int16_t h, int16_t thickness,
                          uint16_t color);
 
-// One radar range ring: a `drawCircle` outline at `radiusPx` around
-// (centerX, centerY), plus its distance in whole km labelled in small
-// text at the ring's 12-o'clock point (per CLAUDE.md "Screen 3 —
-// Radar"). Call once per ring from computeRingDistances()' output.
-void drawRadarRing(LGFX &gfx, int16_t centerX, int16_t centerY, int16_t radiusPx,
-                   int distanceKm, uint16_t color);
-
 // Header-bar name block: a filled rounded rectangle (`fillRoundRect`,
 // corner radius `cornerRadius`) with `label` centered inside in
 // LCARS_FONT_SMALL (8px — the header is only 15px tall). Screen chrome uses

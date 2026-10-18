@@ -75,6 +75,8 @@ struct CountdownDisplay {
   std::string bigText;      // large glyphs: "45", "-3", "~4", "--"
   std::string suffixText;   // smaller trailing text: "s", "MIN", or ""
   std::string statusLabel;  // text for the y:200 status strip
+  std::string caption;      // small line above the digits: "NAD TOBĄ ZA" while
+                            // the CPA is still ahead (t > 0), else ""
   uint16_t color = LCARS_CYAN;  // big-text + label colour
   bool colorCoded = true;       // false in the empty state ("no colour-coding")
 };

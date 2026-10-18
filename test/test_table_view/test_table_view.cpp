@@ -360,7 +360,7 @@ static void test_columns_count_and_order(void) {
   TEST_ASSERT_EQUAL_INT(6, kTableColumnCount);
   const TableColumn *cols = tableColumns();
   TEST_ASSERT_EQUAL_STRING("LOT", tr(cols[0].label, Language::PL));
-  TEST_ASSERT_EQUAL_STRING("ODL.", tr(cols[1].label, Language::PL));
+  TEST_ASSERT_EQUAL_STRING("ODL", tr(cols[1].label, Language::PL));  // no dot: it rendered like "+"
   TEST_ASSERT_EQUAL_STRING("SKĄ" "D", tr(cols[2].label, Language::PL));
   TEST_ASSERT_EQUAL_STRING("DOKĄ" "D", tr(cols[3].label, Language::PL));
   TEST_ASSERT_EQUAL_STRING("TYP", tr(cols[4].label, Language::PL));

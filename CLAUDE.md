@@ -262,8 +262,10 @@ switching feels like changing a mode on one console, not jumping between apps.
     rate-limited / backing off, red = auth or network error, i.e. the list may be stale) and the
     **number of aircraft in range** in white, with the correct plural (PL `1 LOT` / `3 LOTY` /
     `7 LOTÓW`, EN `1 FLIGHT` / `7 FLIGHTS`; `99+` above 99; `--` until the first successful poll).
-  - **Right:** date `DD.MM.YYYY` (small font) and time `HH:MM` right next to it in the slightly
-    larger `LCARS_FONT_CLOCK` (DejaVu12, 13px line), both light peach. No seconds — the header is
+  - **Right:** date `DD.MM.YYYY` (light peach) and time `HH:MM` (white) right next to it, both in
+    `LCARS_FONT_CLOCK` (DejaVu12, 13px line; the date's dots looked like "+" in the 10px efont).
+    Placed with *measured* widths (the font is proportional), and the count is centred in the gap
+    between the app name and the date. No seconds — the header is
     redrawn once per minute (see "Redraw policy"), so `HH:MM:SS` would sit frozen.
   - A **1px lilac rule** along the header's bottom edge separates it from the content.
 - **Why:** the previous header had a filled peach pill (count, coloured by feed health) that
@@ -442,6 +444,9 @@ name changed.
   to look" arrow (`directionArrow()`: bearing from home, screen top = north) + `nowStatsText()`
   ("3km  236m  266km/h" / "6km  NA ZIEMI"). Countdown zone y:92..186, status strip y:190..215.
 - Speeds everywhere are km/h (OpenSky's m/s x 3.6).
+- **Caption "NAD TOBĄ ZA" / "OVERHEAD IN"** (`CountdownDisplay::caption`, small muted text) sits
+  above the digits while the CPA is still ahead (t > 0); none once it has passed or without a
+  prediction. The digits are centred in the space below it.
 
 Deliberately minimal — one aircraft, one number that matters: when will it actually be
 overhead. **Exact pixel spec**, below the 25px header, no scrolling:
@@ -508,6 +513,13 @@ request — the summary text simply starts at x:208. (`drawVerticalDivider()` st
   `clamped == true` (beyond `max_distance_km`, per `polarToScreen`'s clamping — see the earlier
   radar geometry step).
 - Static plot, no sweep animation, consistent with the earlier radar_view spec.
+- **Readability fixes (review #5-#8):** ring labels in the small font on each ring at 45 degrees
+  up-right (`ringLabelAnchor()`), not at 12 o'clock where blips covered them; an "N" above the
+  outer ring (north-up plot); airborne blips get a short **heading tick** along their track
+  (`headingTickEnd()`); **ground traffic** is a small muted square (no tick) instead of a blip, so
+  the apron next to home no longer becomes one blob; the aircraft shown in the summary panel
+  (`rows.front()`) has a **white ring**. The summary panel gained a 5th row,
+  `radarSummaryStats()`: "SE 5km  61m" / "S 4km  NA ZIEMI".
 
 **Summary panel, x: 200 to 320px (120px wide), y: 18 to 215px.**
 - No frame and no divider (same as Screens 1/2) — just text, starting at x:208.

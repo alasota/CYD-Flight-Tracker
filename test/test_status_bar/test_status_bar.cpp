@@ -141,9 +141,13 @@ static void test_zones_do_not_overlap_for_longest_texts(void) {
   }
 }
 
-static void test_count_is_centred(void) {
+static void test_count_is_centred_in_the_free_space(void) {
+  // Centred between the app name and the date — with the wide date the
+  // screen centre left it glued to the date.
   HeaderZones z = statusBarZones(320, kStatusBarAppName, "7 LOT\xC3\x93W", "18.10.2026", "08:46");
-  TEST_ASSERT_INT_WITHIN(1, 160, (z.count_start + z.count_end) / 2);
+  TEST_ASSERT_INT_WITHIN(1, (z.name_end + z.right_start) / 2, (z.count_start + z.count_end) / 2);
+  TEST_ASSERT_TRUE(z.count_start - z.name_end >= 8);    // breathing room on both sides
+  TEST_ASSERT_TRUE(z.right_start - z.count_end >= 8);
 }
 
 int main(int, char **) {
@@ -170,7 +174,7 @@ int main(int, char **) {
   RUN_TEST(test_health_dot_colour);
   RUN_TEST(test_header_uses_no_button_colour);
   RUN_TEST(test_zones_do_not_overlap_for_longest_texts);
-  RUN_TEST(test_count_is_centred);
+  RUN_TEST(test_count_is_centred_in_the_free_space);
 
   return UNITY_END();
 }

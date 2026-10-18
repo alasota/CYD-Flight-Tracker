@@ -298,20 +298,6 @@ void drawVerticalDivider(LGFX &gfx, int16_t x, int16_t y, int16_t h, int16_t thi
   gfx.fillRect(x, y, thickness, h, color);
 }
 
-void drawRadarRing(LGFX &gfx, int16_t centerX, int16_t centerY, int16_t radiusPx,
-                   int distanceKm, uint16_t color) {
-  gfx.drawCircle(centerX, centerY, radiusPx, color);
-
-  char buf[12];
-  std::snprintf(buf, sizeof(buf), "%dkm", distanceKm);
-  gfx.setFont(LCARS_FONT_BODY);
-  gfx.setTextDatum(top_center);
-  gfx.setTextColor(color, LCARS_BLACK);
-  // Just inside the ring at its 12-o'clock point, so the text clears both
-  // the outer circle and the next ring out.
-  gfx.drawString(buf, centerX, static_cast<int16_t>(centerY - radiusPx + 1));
-}
-
 void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int16_t cornerRadius,
                      uint16_t fillColor, uint16_t textColor, const char *label) {
   gfx.fillRoundRect(x, y, w, h, cornerRadius, fillColor);

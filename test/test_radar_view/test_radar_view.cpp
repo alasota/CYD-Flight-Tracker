@@ -68,6 +68,53 @@ static void test_radius_deg_to_km_zero(void) {
   TEST_ASSERT_EQUAL_FLOAT(0.0f, radiusDegToKm(0.0f));
 }
 
+// ---- ring labels off the 12 o'clock spot (review #5) -------------------------
+
+static void test_ring_label_sits_upper_right_on_the_ring(void) {
+  // Labels used to sit at 12 o'clock, right where blips north of home land.
+  RadarPoint p = ringLabelAnchor(95, 117, 85);
+  TEST_ASSERT_TRUE(p.x > 95);   // right of centre
+  TEST_ASSERT_TRUE(p.y < 117);  // above centre
+  // ~45 degrees: equally far right and up.
+  TEST_ASSERT_INT_WITHIN(1, p.x - 95, 117 - p.y);
+  TEST_ASSERT_INT_WITHIN(1, 60, p.x - 95);  // 85 * cos(45) ~ 60
+}
+
+// ---- heading tick (review #7) ----------------------------------------------------
+
+static void test_heading_tick_points_along_the_track(void) {
+  RadarPoint n = headingTickEnd(50, 50, 0.0f, 9);
+  TEST_ASSERT_EQUAL_INT(50, n.x);
+  TEST_ASSERT_EQUAL_INT(41, n.y);  // north = up
+  RadarPoint e = headingTickEnd(50, 50, 90.0f, 9);
+  TEST_ASSERT_EQUAL_INT(59, e.x);
+  TEST_ASSERT_EQUAL_INT(50, e.y);
+  RadarPoint sw = headingTickEnd(50, 50, 225.0f, 10);
+  TEST_ASSERT_TRUE(sw.x < 50 && sw.y > 50);
+}
+
+// ---- summary panel stats line (review #8) ------------------------------------------
+
+static AircraftRow statsRow(bool onGround) {
+  AircraftRow r;
+  r.has_distance = true;
+  r.distance_km = 4.2f;
+  r.bearing_deg = 180.0f;
+  r.aircraft.has_position = true;
+  r.aircraft.on_ground = onGround;
+  r.aircraft.has_altitude = true;
+  r.aircraft.baro_altitude = 511.0f;
+  return r;
+}
+
+static void test_summary_stats_airborne(void) {
+  TEST_ASSERT_EQUAL_STRING("S 4km  511m", radarSummaryStats(statsRow(false), Language::PL).c_str());
+}
+
+static void test_summary_stats_on_ground(void) {
+  TEST_ASSERT_EQUAL_STRING("S 4km  NA ZIEMI", radarSummaryStats(statsRow(true), Language::PL).c_str());
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
 
@@ -82,5 +129,9 @@ int main(int argc, char **argv) {
   RUN_TEST(test_radius_deg_to_km_one_degree);
   RUN_TEST(test_radius_deg_to_km_zero);
 
+  RUN_TEST(test_ring_label_sits_upper_right_on_the_ring);
+  RUN_TEST(test_heading_tick_points_along_the_track);
+  RUN_TEST(test_summary_stats_airborne);
+  RUN_TEST(test_summary_stats_on_ground);
   return UNITY_END();
 }
