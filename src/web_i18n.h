@@ -81,7 +81,8 @@
   X(UploadInvalid, "Nie wczytano: w pliku brak poprawnych clientId / clientSecret.",               \
     "Not loaded: the file has no valid clientId / clientSecret.")                                  \
   X(UploadOk, "Wczytano dane OpenSky z pliku.", "OpenSky credentials loaded from the file.")       \
-  X(Screenshot, "Zrzut ekranu", "Screenshot")
+  X(Screenshot, "Zrzut ekranu", "Screenshot")                                                     \
+  X(Version, "wersja", "version")
 
 enum class WebStr : uint16_t {
 #define WEB_I18N_ENUM(id, pl, en) id,

@@ -935,6 +935,24 @@ This is a starting point, not gospel — verify it compiles and renders correctl
 board before building anything on top of it; TFT/panel setups are notoriously fiddly and small
 mistakes here waste hours of debugging later.
 
+## Versioning & CI
+
+- **Version = git tag.** `tools/pio_version.py` (PlatformIO `extra_scripts = pre:`) runs
+  `git describe --tags --always --dirty` (or takes `$FW_VERSION`) and passes it as the
+  `FW_VERSION` macro to `src/version.cpp` only (build middleware — a new version recompiles one
+  file). `firmwareVersion()` returns it, `"dev"` when not injected (native tests). Shown **only**
+  in the config web page footer — not on the display.
+- The script also writes `.pio/build/cyd/cyd-sky-tracker-<version>.bin` (copy of firmware.bin)
+  and `version.txt`.
+- **GitHub Actions** (`.github/workflows/build.yml`): on push to main / PRs / tags `v*` it runs
+  `pio test -e native`, builds, and uploads `cyd-sky-tracker-<version>.bin` (app, for OTA or
+  0x10000) and `cyd-sky-tracker-<version>-full.bin` (bootloader + partitions + boot_app0 + app
+  merged with esptool, flash at 0x0) as a build artifact; on a `v*` tag it also creates a GitHub
+  Release with them. Platform and library versions are pinned in `platformio.ini` so CI and
+  local builds match — bump them deliberately (and rerun `tools/subset_efont.py` after a
+  LovyanGFX bump).
+- Release: `git tag v1.2.0 && git push origin v1.2.0`.
+
 ## Commands
 
 - Build: `pio run`

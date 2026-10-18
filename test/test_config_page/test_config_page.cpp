@@ -183,8 +183,19 @@ static void test_auto_cycle_checkbox_state(void) {
   TEST_ASSERT_FALSE(contains(render(m), "name=\"auto_cycle\" value=\"1\" checked"));
 }
 
+static void test_footer_shows_the_firmware_version(void) {
+  ConfigPageModel m = baseModel();
+  m.cfg.web_language = Language::PL;
+  std::string h = render(m);
+  // Native builds get no injected version -> the fallback.
+  TEST_ASSERT_TRUE(contains(h, "wersja <span id=\"ver\">dev</span>"));
+  m.cfg.web_language = Language::EN;
+  TEST_ASSERT_TRUE(contains(render(m), "version <span id=\"ver\">dev</span>"));
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
+  RUN_TEST(test_footer_shows_the_firmware_version);
   RUN_TEST(test_tab_ids_round_trip);
   RUN_TEST(test_daily_credits);
   RUN_TEST(test_daily_credits_rounding_and_zero_interval);

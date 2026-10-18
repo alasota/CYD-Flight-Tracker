@@ -3,6 +3,7 @@
 #include <cstdio>
 
 #include "config_portal.h"  // openSkyCreditCost()
+#include "version.h"        // firmwareVersion() — page footer
 
 const char *settingsTabId(SettingsTab tab) {
   switch (tab) {
@@ -391,9 +392,13 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.raw("</button></form>"
         "<form id=\"up\" method=\"POST\" action=\"/upload_credentials\" "
         "enctype=\"multipart/form-data\"></form>"
-        "<footer><a href=\"/screenshot.bmp\" target=\"_blank\">");
+        "<footer>CYD Sky Tracker · ");
+  w.t(WebStr::Version);
+  w.raw(" <span id=\"ver\">");
+  w.esc(firmwareVersion());
+  w.raw("</span> · <a href=\"/screenshot.bmp\" target=\"_blank\">");
   w.t(WebStr::Screenshot);
-  w.raw("</a> · CYD Sky Tracker</footer></div><script>var T={day:\"");
+  w.raw("</a></footer></div><script>var T={day:\"");
   w.t(WebStr::CreditsPerDay);
   w.raw("\",lim:\"");
   w.t(WebStr::DailyLimit);

@@ -1,0 +1,86 @@
+# Builds the firmware on every push / pull request and publishes versioned
+# binaries:
+#   cyd-sky-tracker-<version>.bin       app only — OTA updates, or flashing at 0x10000
+#   cyd-sky-tracker-<version>-full.bin  whole flash image (bootloader + partition table
+#                                       + app) — first install / web flasher, at 0x0
+# The version comes from git tags (tools/pio_version.py): push a tag v1.2.0 and
+# this workflow also creates a GitHub Release "v1.2.0" with those files.
+name: Build firmware
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write  # only the release step (tags) actually writes
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out (with tags, for the version number)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - name: Install PlatformIO and esptool
+        # esptool pinned: v5 renamed merge_bin / --flash_mode to merge-bin / --flash-mode.
+        run: pip install --upgrade platformio "esptool==4.11.0"
+
+      - name: Unit tests (native)
+        run: pio test -e native
+
+      - name: Build firmware
+        run: pio run -e cyd
+
+      - name: Collect binaries
+        id: collect
+        run: |
+          set -euo pipefail
+          BUILD=.pio/build/cyd
+          VERSION=$(cat "$BUILD/version.txt")
+          NAME="cyd-sky-tracker-$VERSION"
+          mkdir -p dist
+          cp "$BUILD/$NAME.bin" "dist/$NAME.bin"
+          BOOT_APP0=$(find ~/.platformio/packages/framework-arduinoespressif32 -name boot_app0.bin | head -n 1)
+          python -m esptool --chip esp32 merge_bin -o "dist/$NAME-full.bin" \
+            --flash_mode dio --flash_freq 40m --flash_size 4MB \
+            0x1000 "$BUILD/bootloader.bin" \
+            0x8000 "$BUILD/partitions.bin" \
+            0xe000 "$BOOT_APP0" \
+            0x10000 "$BUILD/firmware.bin"
+          (cd dist && sha256sum *.bin > SHA256SUMS.txt)
+          ls -l dist
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Firmware version: **$VERSION**" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyd-sky-tracker-${{ steps.collect.outputs.version }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Create GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          files: dist/*
+          generate_release_notes: true
