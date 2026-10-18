@@ -99,11 +99,11 @@ void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, int16_t screenWidth) {
   }
 }
 
-void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth) {
+void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth, OpenSkyHealth health) {
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_center);
   gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
-  gfx.drawString(tr(Str::NoFlightsInRange), static_cast<int16_t>(screenWidth / 2),
+  gfx.drawString(tr(emptyStateText(health, false)), static_cast<int16_t>(screenWidth / 2),
                  static_cast<int16_t>(kPanelTop + kPanelHeight / 2));
 }
 

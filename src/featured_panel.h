@@ -17,6 +17,7 @@
 #include "aircraft_summary.h"  // RouteFormat, the identity/route formatters
 #include "lcars_theme.h"
 #include "route_lookup.h"  // AirportInfo
+#include "status_bar.h"    // OpenSkyHealth, emptyStateText()
 
 // Forward-declared rather than #include "table_view.h" (which includes
 // this header — cycle). featured_panel.cpp includes table_view.h for the
@@ -53,7 +54,8 @@ std::vector<std::string> featuredPillTexts(const AircraftRow &row, Language lang
 // and the stat pills from featuredPillTexts().
 void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, int16_t screenWidth);
 
-// Draws the "no aircraft in range" placeholder in the same bounds.
-void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth);
+// Draws the empty placeholder in the same bounds: "no aircraft in range",
+// or why there is no data (emptyStateText(health)).
+void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth, OpenSkyHealth health);
 
 #endif  // ARDUINO

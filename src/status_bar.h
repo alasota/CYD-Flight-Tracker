@@ -61,6 +61,14 @@ std::string statusBarBlockLabel(int aircraftCount, bool hasData, Language lang);
 // peach of the active nav button. Pure — native-tested.
 uint16_t statusBarHealthColor(OpenSkyHealth health);
 
+// What a screen with no aircraft to show says — why it's empty. Ok: the sky
+// really is empty ("BRAK LOTÓW W ZASIĘGU" / short "BRAK LOTU"); otherwise the
+// feed's problem: credits exhausted, login failed, OpenSky unreachable — an
+// empty screen must not claim "no flights" when we simply can't ask.
+// `shortForm` for narrow slots (radar summary panel, <= 15 chars).
+// Pure — native-tested.
+Str emptyStateText(OpenSkyHealth health, bool shortForm);
+
 // The app name shown at the left of the header.
 constexpr const char *kStatusBarAppName = "SKY TRACKER";
 

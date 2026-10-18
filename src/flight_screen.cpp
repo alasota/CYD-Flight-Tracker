@@ -60,7 +60,7 @@ std::string nowStatsText(const AircraftRow &row, Language lang) {
 }
 
 CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang,
-                                         bool anyAircraft) {
+                                         bool anyAircraft, OpenSkyHealth health) {
   CountdownDisplay out;
 
   const float t = cpa.t_cpa_seconds;
@@ -69,7 +69,9 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang
     out.mode = CountdownDisplay::Mode::Empty;
     out.bigText = "--";
     out.suffixText = "";
-    out.statusLabel = tr(anyAircraft ? Str::StatusNotOverhead : Str::NoFlightsInRange, lang);
+    // No aircraft at all: say why — an empty sky, or a feed problem
+    // (credits exhausted, login failed, OpenSky unreachable).
+    out.statusLabel = tr(anyAircraft ? Str::StatusNotOverhead : emptyStateText(health, false), lang);
     out.color = kEmptyColor;
     out.colorCoded = false;
     return out;
@@ -130,7 +132,7 @@ uint8_t bigTextSize(CountdownDisplay::Mode mode) {
 }  // namespace
 
 void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
-                      const CpaPrediction &cpa, int16_t screenWidth) {
+                      const CpaPrediction &cpa, int16_t screenWidth, OpenSkyHealth health) {
   const int16_t cx = static_cast<int16_t>(screenWidth / 2);
 
   // ---- Identity panel, y:28..78 — text only, no frame (same as Screen 1).
@@ -157,10 +159,11 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
     gfx.setFont(LCARS_FONT_BODY);
     gfx.setTextDatum(middle_center);
     gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
-    gfx.drawString(tr(Str::NoFlight), cx, static_cast<int16_t>(kIdentityTop + kIdentityHeight / 2));
+    gfx.drawString(tr(emptyStateText(health, true)), cx,
+                   static_cast<int16_t>(kIdentityTop + kIdentityHeight / 2));
   }
 
-  drawFlightCountdown(gfx, hasNearest, cpa, screenWidth);
+  drawFlightCountdown(gfx, hasNearest, cpa, screenWidth, health);
 }
 
 namespace {
@@ -238,9 +241,9 @@ bool countdownSpriteTried = false;
 }  // namespace
 
 void drawFlightCountdown(LGFX &gfx, bool hasNearest, const CpaPrediction &cpa,
-                         int16_t screenWidth) {
-  const CountdownDisplay cd =
-      computeCountdownDisplay(hasNearest ? cpa : CpaPrediction{}, i18nLanguage(), hasNearest);
+                         int16_t screenWidth, OpenSkyHealth health) {
+  const CountdownDisplay cd = computeCountdownDisplay(hasNearest ? cpa : CpaPrediction{},
+                                                      i18nLanguage(), hasNearest, health);
   const int16_t zoneH = static_cast<int16_t>(kStatusTop + kStatusHeight - kCountdownTop);
 
   if (!countdownSpriteTried) {

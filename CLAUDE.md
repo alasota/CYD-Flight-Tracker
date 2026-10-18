@@ -91,6 +91,19 @@ works**. Implement it like this:
   configured interval, even after a manual refresh (e.g. touch-triggered).
 - A `429` response means credits are exhausted — back off using
   `X-Rate-Limit-Retry-After-Seconds` if present, otherwise a sane fixed backoff (e.g. 60s).
+- **Credits left are tracked** (`opensky_quota`, pure + tested): every 200 carries
+  `X-Rate-Limit-Remaining` (checked live), a 429 carries the seconds until the pool renews.
+  `opensky_client` keeps the latest state (`openSkyQuota()`) and logs it
+  (`ok: 12 aircraft, credits remaining=3971 (account)` / `rate limited (429): credits exhausted,
+  pool renews in 25012s (~6 h 57 min), next try in 3600s` — the backoff itself stays capped at
+  3600 s). The config page's OpenSky tab shows it (`quotaStatusText()`).
+- **An empty screen says why** (`emptyStateText(health, shortForm)` in `status_bar`): only with
+  a healthy feed does it read "BRAK LOTÓW W ZASIĘGU" / "BRAK LOTU"; with exhausted credits it's
+  "LIMIT OPENSKY WYCZERPANY" / "LIMIT API", login failure "BŁĄD LOGOWANIA OPENSKY", no answer
+  "BRAK DOSTĘPU DO OPENSKY" ("BŁĄD API" short). Stale aircraft from the last good poll are still
+  shown as before; `main.cpp` repaints the content when the health changes and the list is empty.
+  (Found the hard way: 15 s polls = 5760 credits/day > the account's 4000, and the display just
+  said "no flights".)
 
 ## Aircraft identification: airline + flight + model
 

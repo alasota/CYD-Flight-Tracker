@@ -172,6 +172,7 @@ constexpr char kTokenUrl[] =
     "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token";
 constexpr char kStatesUrlBase[] = "https://opensky-network.org/api/states/all";
 constexpr char kRetryAfterHeader[] = "X-Rate-Limit-Retry-After-Seconds";
+constexpr char kRemainingHeader[] = "X-Rate-Limit-Remaining";
 constexpr uint32_t kDefaultRetryAfterS = 60;
 
 // HTTP timeouts are shared across the networking modules — see net_config.h.
@@ -180,6 +181,7 @@ TokenState cachedToken;
 uint32_t rateLimitedUntilMs = 0;
 uint32_t lastPollMs = 0;
 bool everPolled = false;
+OpenSkyQuota quota;  // credits left / reset time, from the last answer's headers
 
 // One /states/all attempt, with the 200-response body parsed inline
 // straight from the socket (streaming + an ArduinoJson field filter) so a
@@ -190,6 +192,7 @@ struct StatesAttempt {
   int code = 0;               // HTTP status when transport_ok
   bool body_ok = false;       // a 200 whose body parsed cleanly
   std::string retry_after;    // X-Rate-Limit-Retry-After-Seconds, if sent
+  std::string remaining;      // X-Rate-Limit-Remaining, if sent
   std::vector<Aircraft> aircraft;
 };
 
@@ -281,8 +284,8 @@ StatesAttempt requestStatesOnce(const BoundingBox &bbox, const std::string &bear
     authHeader += bearerToken;
     http.addHeader("Authorization", authHeader.c_str());
   }
-  const char *collectHeaders[] = {kRetryAfterHeader};
-  http.collectHeaders(collectHeaders, 1);
+  const char *collectHeaders[] = {kRetryAfterHeader, kRemainingHeader};
+  http.collectHeaders(collectHeaders, 2);
 
   int code = http.GET();
   if (code <= 0) {
@@ -294,6 +297,9 @@ StatesAttempt requestStatesOnce(const BoundingBox &bbox, const std::string &bear
   att.code = code;
   if (http.hasHeader(kRetryAfterHeader)) {
     att.retry_after = std::string(http.header(kRetryAfterHeader).c_str());
+  }
+  if (http.hasHeader(kRemainingHeader)) {
+    att.remaining = std::string(http.header(kRemainingHeader).c_str());
   }
 
   if (code == HTTP_CODE_OK) {
@@ -369,11 +375,21 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
     return result;
   }
 
+  quota = updateQuota(quota, att.code, att.remaining, att.retry_after, now);
+
   if (att.code == 429) {
     uint32_t backoff_s = parseRetryAfterSeconds(att.retry_after, kDefaultRetryAfterS);
     rateLimitedUntilMs = now + backoff_s * 1000UL;
-    Serial.printf("[opensky_client] rate limited (429), backing off %us\n",
-                  static_cast<unsigned>(backoff_s));
+    if (quota.reset_in_s > 0) {
+      Serial.printf(
+          "[opensky_client] rate limited (429): credits exhausted, pool renews in %us (~%s), "
+          "next try in %us\n",
+          static_cast<unsigned>(quota.reset_in_s), formatWait(quota.reset_in_s, Language::EN).c_str(),
+          static_cast<unsigned>(backoff_s));
+    } else {
+      Serial.printf("[opensky_client] rate limited (429), backing off %us\n",
+                    static_cast<unsigned>(backoff_s));
+    }
     result.status = OpenSkyPollStatus::RateLimited;
     result.retry_after_s = backoff_s;
     return result;
@@ -395,10 +411,21 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
     return result;
   }
 
+  if (quota.state == OpenSkyQuota::State::Available) {
+    Serial.printf("[opensky_client] ok: %u aircraft, credits remaining=%u (%s)\n",
+                  static_cast<unsigned>(att.aircraft.size()), static_cast<unsigned>(quota.remaining),
+                  useAuth ? "account" : "anonymous");
+  } else {
+    Serial.printf("[opensky_client] ok: %u aircraft, credits remaining unknown (no header)\n",
+                  static_cast<unsigned>(att.aircraft.size()));
+  }
+
   result.status = OpenSkyPollStatus::Ok;
   result.aircraft = std::move(att.aircraft);
   return result;
 }
+
+OpenSkyQuota openSkyQuota() { return quota; }
 
 OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const Config &cfg) {
   if (!shouldPollNow(now_ms, lastPollMs, everPolled, cfg.poll_interval_s * 1000UL)) {

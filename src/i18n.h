@@ -45,6 +45,12 @@ constexpr Language kDefaultLanguage = Language::PL;
   /* empty states */                                                        \
   X(NoFlightsInRange, "BRAK LOTÓW W ZASIĘGU", "NO FLIGHTS IN RANGE")        \
   X(NoFlight, "BRAK LOTU", "NO FLIGHT")                                     \
+  /* empty screen because the feed failed, not because the sky is empty */  \
+  X(FeedQuotaExhausted, "LIMIT OPENSKY WYCZERPANY", "OPENSKY LIMIT REACHED") \
+  X(FeedAuthError, "BŁĄD LOGOWANIA OPENSKY", "OPENSKY LOGIN FAILED")        \
+  X(FeedUnreachable, "BRAK DOSTĘPU DO OPENSKY", "OPENSKY UNREACHABLE")      \
+  X(FeedQuotaShort, "LIMIT API", "API LIMIT")                               \
+  X(FeedErrorShort, "BŁĄD API", "API ERROR")                                \
   /* featured pill when the aircraft is taxiing / parked */                 \
   X(OnGround, "NA ZIEMI", "ON GROUND")                                      \
   /* Screen 2 countdown status strip */                                     \

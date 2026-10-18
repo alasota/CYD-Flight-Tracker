@@ -38,6 +38,37 @@ uint32_t openSkyDailyCredits(float radius_deg, uint32_t poll_interval_s) {
 
 uint32_t openSkyDailyCreditLimit(bool authenticated) { return authenticated ? 4000u : 400u; }
 
+std::string quotaStatusText(const OpenSkyQuota &q, uint32_t resetInS, Language lang,
+                            bool *exhausted) {
+  *exhausted = false;
+  std::string s;
+  switch (q.state) {
+    case OpenSkyQuota::State::Available: {
+      char n[16];
+      std::snprintf(n, sizeof(n), "%u", static_cast<unsigned>(q.remaining));
+      s = std::string(webTr(WebStr::QuotaLeftToday, lang)) + " " + n + " " +
+          webTr(WebStr::QuotaFromLastRequest, lang);
+      break;
+    }
+    case OpenSkyQuota::State::Exhausted:
+      *exhausted = true;
+      s = std::string(webTr(WebStr::QuotaExhausted, lang)) + ": ";
+      if (q.reset_in_s == 0) {
+        s += webTr(WebStr::QuotaRenewsUnknown, lang);
+      } else if (resetInS == 0) {
+        s += webTr(WebStr::QuotaRenewsSoon, lang);
+      } else {
+        s += std::string(webTr(WebStr::QuotaRenewsIn, lang)) + " " + formatWait(resetInS, lang) + ".";
+      }
+      break;
+    case OpenSkyQuota::State::Unknown:
+    default:
+      s = webTr(WebStr::QuotaUnknown, lang);
+      break;
+  }
+  return s;
+}
+
 std::string htmlEscape(const std::string &in) {
   std::string out;
   out.reserve(in.size());
@@ -111,6 +142,8 @@ const char kStyle[] =
     "font-size:.85rem;color:var(--muted);margin-top:18px}"
     ".stat b{color:var(--accent);font-weight:600}"
     ".stat .warn{color:var(--err);margin-top:4px}"
+    ".stat.quota{margin-top:10px;border-style:solid}"
+    ".stat.quota.warn{color:var(--err);border-color:#553030}"
     ".pill{display:inline-flex;align-items:center;gap:8px;font-size:.8rem;padding:4px 11px;"
     "border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-bottom:14px}"
     ".dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}"
@@ -360,6 +393,13 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
     w.t(WebStr::OverLimit);
     w.raw("</div>");
   }
+  w.raw("</div>");
+  // What OpenSky itself last said about the credits (not an estimate).
+  bool exhausted = false;
+  const std::string quotaText = quotaStatusText(m.quota, m.quotaResetInS, lang, &exhausted);
+  w.raw(exhausted ? "<div class=\"stat quota warn\" id=\"quota\">"
+                  : "<div class=\"stat quota\" id=\"quota\">");
+  w.esc(quotaText);
   w.raw("</div></div></section>");
 
   // ---- General

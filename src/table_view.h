@@ -20,6 +20,7 @@
 #include "lcars_theme.h"
 #include "opensky_client.h"
 #include "route_lookup.h"
+#include "status_bar.h"  // OpenSkyHealth
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
@@ -221,6 +222,6 @@ std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int 
 // current, and reacting to touch, is main.cpp's job — this only lays out
 // whichever page it's told to draw.
 void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t screenWidth,
-                   int page);
+                   int page, OpenSkyHealth health);
 
 #endif  // ARDUINO

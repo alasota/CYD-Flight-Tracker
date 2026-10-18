@@ -59,6 +59,20 @@ uint16_t statusBarHealthColor(OpenSkyHealth health) {
   }
 }
 
+Str emptyStateText(OpenSkyHealth health, bool shortForm) {
+  switch (health) {
+    case OpenSkyHealth::RateLimited:
+      return shortForm ? Str::FeedQuotaShort : Str::FeedQuotaExhausted;
+    case OpenSkyHealth::AuthError:
+      return shortForm ? Str::FeedErrorShort : Str::FeedAuthError;
+    case OpenSkyHealth::NetworkError:
+      return shortForm ? Str::FeedErrorShort : Str::FeedUnreachable;
+    case OpenSkyHealth::Ok:
+    default:
+      return shortForm ? Str::NoFlight : Str::NoFlightsInRange;
+  }
+}
+
 namespace {
 constexpr int kMargin = 4;          // from the screen edges
 constexpr int kDotDiameter = 6;     // health dot

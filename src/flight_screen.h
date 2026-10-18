@@ -26,6 +26,7 @@
 #include "i18n.h"              // Language, tr()
 #include "lcars_theme.h"       // palette constants (pure section)
 #include "route_lookup.h"      // AirportInfo
+#include "status_bar.h"        // OpenSkyHealth, emptyStateText()
 
 // Forward-declared rather than #include "table_view.h" (cycle risk) — same
 // pattern as featured_panel.h / aircraft_summary.h. flight_screen.cpp
@@ -94,7 +95,8 @@ struct CountdownDisplay {
 // in Minutes mode). Only the text depends on `lang` — mode, number and
 // colour don't.
 CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang,
-                                         bool anyAircraft);
+                                         bool anyAircraft,
+                                         OpenSkyHealth health = OpenSkyHealth::Ok);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme +
 // aircraft_summary. Not covered by Unity (see CLAUDE.md "Testing").
@@ -106,7 +108,7 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang
 // false (no aircraft in range) draws the identity frame empty and forces
 // the countdown/status into their empty state regardless of `cpa`.
 void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
-                      const CpaPrediction &cpa, int16_t screenWidth);
+                      const CpaPrediction &cpa, int16_t screenWidth, OpenSkyHealth health);
 
 // Repaints only the countdown zone + status strip (y:82..225) — the 1 Hz
 // tick path (CLAUDE.md "Redraw policy"), leaving the identity panel,
@@ -115,6 +117,6 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
 // sprite can't be allocated (low heap) it falls back to drawing straight
 // to `gfx`. drawFlightScreen() calls this for its lower two zones.
 void drawFlightCountdown(LGFX &gfx, bool hasNearest, const CpaPrediction &cpa,
-                         int16_t screenWidth);
+                         int16_t screenWidth, OpenSkyHealth health);
 
 #endif  // ARDUINO

@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include "opensky_quota.h"  // OpenSkyQuota — openSkyQuota()
+
 // ---- Pure logic (no WiFi/HTTP dependency) — testable under
 // `pio test -e native`.
 
@@ -159,3 +161,9 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg);
 // interval". Returns {NotDue} without touching the network when a poll
 // isn't due yet; otherwise returns the fetch result.
 OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const Config &cfg);
+
+// Credits left / time until the pool renews, from the headers of the last
+// /states/all answer (opensky_quota). Unknown until the first answer; while
+// backing off after a 429 it stays Exhausted (count down with
+// quotaSecondsUntilReset()). Read by the config page.
+OpenSkyQuota openSkyQuota();

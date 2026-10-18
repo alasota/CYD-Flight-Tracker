@@ -214,8 +214,52 @@ static void test_backup_tab_has_download_and_restore(void) {
   TEST_ASSERT_FALSE(contains(render(m), "id=\"save\" hidden>"));
 }
 
+static void test_quota_status_text(void) {
+  bool exhausted = true;
+  OpenSkyQuota q;  // Unknown
+  TEST_ASSERT_EQUAL_STRING("Credits left: not known yet, shown after the first request.",
+                           quotaStatusText(q, 0, Language::EN, &exhausted).c_str());
+  TEST_ASSERT_FALSE(exhausted);
+
+  q.state = OpenSkyQuota::State::Available;
+  q.remaining = 1234;
+  TEST_ASSERT_EQUAL_STRING("Pozostało dziś kredytów: 1234 (z ostatniego zapytania)",
+                           quotaStatusText(q, 0, Language::PL, &exhausted).c_str());
+  TEST_ASSERT_FALSE(exhausted);
+
+  q.state = OpenSkyQuota::State::Exhausted;
+  q.reset_in_s = 25012;
+  TEST_ASSERT_EQUAL_STRING("Daily limit reached: renews in about 6 h 57 min.",
+                           quotaStatusText(q, 25012, Language::EN, &exhausted).c_str());
+  TEST_ASSERT_TRUE(exhausted);
+  TEST_ASSERT_EQUAL_STRING(
+      "Dzienny limit wyczerpany: powinien się już odnowić, płytka sprawdzi to przy następnej próbie.",
+      quotaStatusText(q, 0, Language::PL, &exhausted).c_str());
+  q.reset_in_s = 0;
+  TEST_ASSERT_EQUAL_STRING("Daily limit reached: OpenSky didn't say when it renews.",
+                           quotaStatusText(q, 0, Language::EN, &exhausted).c_str());
+}
+
+static void test_opensky_tab_shows_the_quota(void) {
+  ConfigPageModel m = baseModel();
+  m.cfg.web_language = Language::EN;
+  m.quota.state = OpenSkyQuota::State::Available;
+  m.quota.remaining = 3971;
+  std::string h = render(m);
+  TEST_ASSERT_TRUE(contains(h, "<div class=\"stat quota\" id=\"quota\">Credits left today: 3971"));
+
+  m.quota.state = OpenSkyQuota::State::Exhausted;
+  m.quota.reset_in_s = 7200;
+  m.quotaResetInS = 3600;
+  h = render(m);
+  TEST_ASSERT_TRUE(contains(h, "<div class=\"stat quota warn\" id=\"quota\">Daily limit reached: "
+                               "renews in about 1 h."));
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
+  RUN_TEST(test_quota_status_text);
+  RUN_TEST(test_opensky_tab_shows_the_quota);
   RUN_TEST(test_backup_tab_has_download_and_restore);
   RUN_TEST(test_footer_shows_the_firmware_version);
   RUN_TEST(test_tab_ids_round_trip);

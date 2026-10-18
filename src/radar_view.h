@@ -91,8 +91,9 @@ std::string radarSummaryStats(const AircraftRow &row, Language lang);
 // `rows` must already be annotated (annotateDistances()) and sorted
 // (sortRowsByDistance()).
 // Empty-range state (`rows` empty): the radar still draws its empty rings
-// and home marker; the summary panel shows a centered "BRAK LOTU".
+// and home marker; the summary panel shows a centered "BRAK LOTU" — or, when
+// the feed failed, why (emptyStateText(health, short form)).
 void drawRadarView(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg,
-                   int16_t screenWidth);
+                   int16_t screenWidth, OpenSkyHealth health);
 
 #endif  // ARDUINO

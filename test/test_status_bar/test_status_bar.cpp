@@ -150,8 +150,38 @@ static void test_count_is_centred_in_the_free_space(void) {
   TEST_ASSERT_TRUE(z.right_start - z.count_end >= 8);
 }
 
+static void test_empty_state_says_why_it_is_empty(void) {
+  // Ok: the sky really is empty.
+  TEST_ASSERT_TRUE(emptyStateText(OpenSkyHealth::Ok, false) == Str::NoFlightsInRange);
+  TEST_ASSERT_TRUE(emptyStateText(OpenSkyHealth::Ok, true) == Str::NoFlight);
+  // Feed problems must not read "no flights".
+  TEST_ASSERT_EQUAL_STRING("LIMIT OPENSKY WYCZERPANY",
+                           tr(emptyStateText(OpenSkyHealth::RateLimited, false), Language::PL));
+  TEST_ASSERT_EQUAL_STRING("OPENSKY LIMIT REACHED",
+                           tr(emptyStateText(OpenSkyHealth::RateLimited, false), Language::EN));
+  TEST_ASSERT_TRUE(emptyStateText(OpenSkyHealth::AuthError, false) == Str::FeedAuthError);
+  TEST_ASSERT_TRUE(emptyStateText(OpenSkyHealth::NetworkError, false) == Str::FeedUnreachable);
+  TEST_ASSERT_TRUE(emptyStateText(OpenSkyHealth::RateLimited, true) == Str::FeedQuotaShort);
+  TEST_ASSERT_TRUE(emptyStateText(OpenSkyHealth::AuthError, true) == Str::FeedErrorShort);
+}
+
+static void test_empty_state_texts_fit_their_slots(void) {
+  // Long form: centred across the 320px screen in the 8px body font;
+  // short form: the radar's 120px summary panel (minus insets) -> 13 chars.
+  const OpenSkyHealth all[] = {OpenSkyHealth::Ok, OpenSkyHealth::RateLimited,
+                               OpenSkyHealth::AuthError, OpenSkyHealth::NetworkError};
+  for (OpenSkyHealth h : all) {
+    for (Language lang : {Language::PL, Language::EN}) {
+      TEST_ASSERT_TRUE(utf8Length(tr(emptyStateText(h, false), lang)) * LCARS_FONT_BODY_CHAR_PX <= 300);
+      TEST_ASSERT_TRUE(utf8Length(tr(emptyStateText(h, true), lang)) <= 13);
+    }
+  }
+}
+
 int main(int, char **) {
   UNITY_BEGIN();
+  RUN_TEST(test_empty_state_says_why_it_is_empty);
+  RUN_TEST(test_empty_state_texts_fit_their_slots);
 
   RUN_TEST(test_screen_name_per_index_english);
   RUN_TEST(test_screen_name_per_index_polish);

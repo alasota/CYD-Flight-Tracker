@@ -13,8 +13,9 @@
 #include <functional>
 #include <string>
 
-#include "config_store.h"  // Config
-#include "web_i18n.h"      // WebStr
+#include "config_store.h"   // Config
+#include "opensky_quota.h"  // OpenSkyQuota
+#include "web_i18n.h"       // WebStr
 
 enum class SettingsTab : uint8_t { Location, OpenSky, General, Backup };
 constexpr int kSettingsTabCount = 4;
@@ -47,7 +48,21 @@ struct ConfigPageModel {
   WebStr message = WebStr::Saved;
   bool isError = false;
   std::string messageDetail;  // appended after the message (escaped on output)
+  // OpenSky credits, from opensky_client's last answer; quotaResetInS is the
+  // time left until an exhausted pool renews, already counted down to "now"
+  // by the caller (quotaSecondsUntilReset()).
+  OpenSkyQuota quota;
+  uint32_t quotaResetInS = 0;
 };
+
+// The OpenSky tab's "credits left" line as plain text (no HTML) in `lang`:
+//   Unknown    -> "Credits left: not known yet, ..."
+//   Available  -> "Credits left today: 1234 (as of the last request)"
+//   Exhausted  -> "Daily limit reached: renews in about 6 h 57 min." / "...should have
+//                 renewed by now..." / "...OpenSky didn't say when it renews."
+// `exhausted` is set for the last case (the page shows it as a warning).
+std::string quotaStatusText(const OpenSkyQuota &q, uint32_t resetInS, Language lang,
+                            bool *exhausted);
 
 using HtmlSink = std::function<void(const char *chunk)>;
 

@@ -148,15 +148,15 @@ static void drawActiveContent() {
       static const AircraftRow kNoRow{};
       const bool hasNow = nowRowIndex >= 0 && nowRowIndex < static_cast<int>(lastRows.size());
       drawFlightScreen(tft, hasNow ? lastRows[static_cast<size_t>(nowRowIndex)] : kNoRow, hasNow,
-                       currentCpa(), screenW);
+                       currentCpa(), screenW, lastHealth);
       break;
     }
     case kScreenRadar:
-      drawRadarView(tft, lastRows, lastRadiusDeg, screenW);
+      drawRadarView(tft, lastRows, lastRadiusDeg, screenW, lastHealth);
       break;
     case kScreenFlights:
     default:
-      drawTablePage(tft, lastRows, screenW, currentPage);
+      drawTablePage(tft, lastRows, screenW, currentPage, lastHealth);
       break;
   }
 }
@@ -194,7 +194,7 @@ static void applyRedraw(uint8_t mask) {
   }
 
   if (mask & kRedrawCountdown) {
-    drawFlightCountdown(tft, !lastRows.empty(), currentCpa(), screenW);
+    drawFlightCountdown(tft, !lastRows.empty(), currentCpa(), screenW, lastHealth);
   }
 }
 
@@ -401,7 +401,12 @@ void loop() {
           lastHealth = OpenSkyHealth::NetworkError;
           break;
       }
-      if (lastHealth != previousHealth) pendingRedraw.healthChanged = true;
+      if (lastHealth != previousHealth) {
+        pendingRedraw.healthChanged = true;
+        // An empty screen says why it is empty (emptyStateText()), so it has
+        // to be repainted when the reason changes, not only the header dot.
+        if (lastRows.empty()) pendingRedraw.newPoll = true;
+      }
 
       Serial.printf("[main] poll status=%d aircraft=%u home_configured=%d free_heap=%u\n",
                     static_cast<int>(poll.status), static_cast<unsigned>(poll.aircraft.size()),

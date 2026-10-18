@@ -68,6 +68,7 @@ bool isValidUnsignedIntString(const std::string &s) {
 #include "config_backup.h"
 #include "config_page.h"
 #include "config_store.h"
+#include "opensky_client.h"  // openSkyQuota() — credits left, shown on the OpenSky tab
 #include "screenshot.h"
 #include "version.h"
 
@@ -84,7 +85,11 @@ ScreenshotSource screenshotSource;  // see configPortalSetScreenshotSource()
 // a chunked response instead of building one large String (see CLAUDE.md
 // review notes 4.1). renderConfigPage() never emits an empty chunk — a
 // zero-length sendContent() would end the chunked stream early.
-void sendPage(const ConfigPageModel &model) {
+void sendPage(ConfigPageModel model) {
+  // The OpenSky tab shows what OpenSky last said about the day's credits.
+  model.quota = openSkyQuota();
+  model.quotaResetInS = quotaSecondsUntilReset(model.quota, millis());
+
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/html; charset=utf-8", "");
   renderConfigPage(model, [](const char *chunk) { server.sendContent(chunk, std::strlen(chunk)); });

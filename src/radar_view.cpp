@@ -162,7 +162,7 @@ void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg
   gfx.fillCircle(layout.center_x, layout.center_y, 2, LCARS_YELLOW);
 }
 
-void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows) {
+void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, OpenSkyHealth health) {
   // No frame (dropped by request) — the orange divider alone separates the
   // panel from the radar. Keep any long text from spilling past the panel.
   gfx.setClipRect(static_cast<int16_t>(kSummaryX + kSummaryInset), kContentTop,
@@ -172,7 +172,7 @@ void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows) {
     gfx.setFont(LCARS_FONT_BODY);
     gfx.setTextDatum(middle_center);
     gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
-    gfx.drawString(tr(Str::NoFlight), static_cast<int16_t>(kSummaryX + kSummaryW / 2),
+    gfx.drawString(tr(emptyStateText(health, true)), static_cast<int16_t>(kSummaryX + kSummaryW / 2),
                    static_cast<int16_t>(kContentTop + kContentHeight / 2));
     gfx.clearClipRect();
     return;
@@ -220,11 +220,11 @@ void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows) {
 }  // namespace
 
 void drawRadarView(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg,
-                   int16_t screenWidth) {
+                   int16_t screenWidth, OpenSkyHealth health) {
   (void)screenWidth;  // fixed 320px layout — parameter kept for signature symmetry
 
   drawRadar(gfx, rows, radius_deg);
-  drawSummaryPanel(gfx, rows);
+  drawSummaryPanel(gfx, rows, health);
 }
 
 #endif  // ARDUINO

@@ -58,6 +58,15 @@
   X(DailyLimit, "limit", "limit")                                                                  \
   X(OverLimit, "ponad limit — odświeżaj rzadziej albo zmniejsz promień",                           \
     "over the limit — refresh less often or shrink the radius")                                    \
+  X(QuotaLeftToday, "Pozostało dziś kredytów:", "Credits left today:")                             \
+  X(QuotaFromLastRequest, "(z ostatniego zapytania)", "(as of the last request)")                  \
+  X(QuotaUnknown, "Pozostałe kredyty: jeszcze nieznane, pokażą się po pierwszym zapytaniu.",       \
+    "Credits left: not known yet, shown after the first request.")                                 \
+  X(QuotaExhausted, "Dzienny limit wyczerpany", "Daily limit reached")                             \
+  X(QuotaRenewsIn, "odnowienie za ok.", "renews in about")                                         \
+  X(QuotaRenewsSoon, "powinien się już odnowić, płytka sprawdzi to przy następnej próbie.",        \
+    "it should have renewed by now; the board checks on its next try.")                            \
+  X(QuotaRenewsUnknown, "OpenSky nie podał, kiedy się odnowi.", "OpenSky didn't say when it renews.") \
   /* General */                                                                                    \
   X(SectionLanguage, "Język", "Language")                                                          \
   X(DisplayLanguage, "Język wyświetlacza", "Display language")                                     \
