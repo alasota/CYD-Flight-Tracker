@@ -944,14 +944,28 @@ mistakes here waste hours of debugging later.
   in the config web page footer — not on the display.
 - The script also writes `.pio/build/cyd/cyd-sky-tracker-<version>.bin` (copy of firmware.bin)
   and `version.txt`.
-- **GitHub Actions** (`.github/workflows/build.yml`): on push to main / PRs / tags `v*` it runs
-  `pio test -e native`, builds, and uploads `cyd-sky-tracker-<version>.bin` (app, for OTA or
-  0x10000) and `cyd-sky-tracker-<version>-full.bin` (bootloader + partitions + boot_app0 + app
-  merged with esptool, flash at 0x0) as a build artifact; on a `v*` tag it also creates a GitHub
-  Release with them. Platform and library versions are pinned in `platformio.ini` so CI and
-  local builds match — bump them deliberately (and rerun `tools/subset_efont.py` after a
-  LovyanGFX bump).
+- **GitHub Actions — three workflows** (`.github/workflows/`):
+  - `firmware.yml` — push to main / PRs / manual, and reusable (`workflow_call`): runs
+    `pio test -e native`, builds, uploads artifact `cyd-sky-tracker-<version>` with
+    `cyd-sky-tracker-<version>.bin` (app, OTA or 0x10000), `…-full.bin` (merged image, 0x0),
+    `bootloader.bin`, `partitions.bin`, `boot_app0.bin`, `version.txt`, `SHA256SUMS.txt`.
+  - `site.yml` — changes under `site/`, `docs/screenshots`, `docs/icons` on main / manual, and
+    reusable: builds the page and deploys it to Pages. On its own it takes the installer's
+    firmware from the **latest GitHub Release** (no release -> page without the installer);
+    called with `firmware-artifact` it uses that artifact.
+  - `release.yml` — tags `v*`: calls `firmware.yml`, creates the GitHub Release with its files,
+    then calls `site.yml` with the same artifact.
+  Platform and library versions are pinned in `platformio.ini` so CI and local builds match —
+  bump them deliberately (and rerun `tools/subset_efont.py` after a LovyanGFX bump).
 - Release: `git tag v1.2.0 && git push origin v1.2.0`.
+- **Project page** (GitHub Pages, https://alasota.github.io/CYD-Flight-Tracker/): source in
+  `site/` (static HTML/CSS/JS, PL/EN — every text is a `.en` / `.pl` element pair, CSS shows
+  one; light, humorous tone). `tools/build_site.py` assembles `_site/` = `site/` +
+  `docs/screenshots` + `docs/icons` + `firmware/` (bootloader, partitions, boot_app0, app +
+  `manifest.json` for the ESP Web Tools install button). The manifest lists the four parts
+  separately, **not** the merged -full.bin, so an update without "Erase device" keeps NVS
+  (settings). Published by `site.yml` (see above).
+  `site/img/device.jpg` is a placeholder for a real photo: 1600×1000 px JPG, ≤ ~300 KB.
 
 ## Commands
 

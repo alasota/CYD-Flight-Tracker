@@ -1,0 +1,44 @@
+# Release: on a version tag (git tag v1.2.0 && git push origin v1.2.0)
+#   1. builds the firmware (firmware.yml),
+#   2. creates the GitHub Release "v1.2.0" with its binaries,
+#   3. publishes the project page (site.yml) with that firmware in the
+#      browser installer.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  firmware:
+    uses: ./.github/workflows/firmware.yml
+    permissions:
+      contents: read
+
+  release:
+    needs: firmware
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.firmware.outputs.artifact }}
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          files: dist/*
+          generate_release_notes: true
+
+  site:
+    needs: [firmware, release]
+    uses: ./.github/workflows/site.yml
+    with:
+      firmware-artifact: ${{ needs.firmware.outputs.artifact }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

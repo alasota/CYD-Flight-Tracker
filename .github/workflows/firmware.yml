@@ -1,0 +1,94 @@
+# Firmware: native unit tests + build + versioned binaries (uploaded as a
+# build artifact). Runs on pushes to main, on pull requests and by hand; the
+# release workflow (release.yml) also calls it for tags.
+#
+# Output folder (artifact "cyd-sky-tracker-<version>"):
+#   cyd-sky-tracker-<version>.bin       app only — OTA updates, or flashing at 0x10000
+#   cyd-sky-tracker-<version>-full.bin  whole flash image — manual first install at 0x0
+#   bootloader.bin, partitions.bin, boot_app0.bin
+#                                       the other flash parts (browser installer, site.yml)
+#   version.txt, SHA256SUMS.txt
+# The version comes from git tags (tools/pio_version.py).
+name: Firmware
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      version:
+        description: Firmware version (git describe)
+        value: ${{ jobs.build.outputs.version }}
+      artifact:
+        description: Name of the uploaded artifact with the binaries
+        value: ${{ jobs.build.outputs.artifact }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.collect.outputs.version }}
+      artifact: ${{ steps.collect.outputs.artifact }}
+    steps:
+      - name: Check out (with tags, for the version number)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - name: Install PlatformIO and esptool
+        # esptool pinned: v5 renamed merge_bin / --flash_mode to merge-bin / --flash-mode.
+        run: pip install --upgrade platformio "esptool==4.11.0"
+
+      - name: Unit tests (native)
+        run: pio test -e native
+
+      - name: Build firmware
+        run: pio run -e cyd
+
+      - name: Collect binaries
+        id: collect
+        run: |
+          set -euo pipefail
+          BUILD=.pio/build/cyd
+          VERSION=$(cat "$BUILD/version.txt")
+          NAME="cyd-sky-tracker-$VERSION"
+          BOOT_APP0=$(find ~/.platformio/packages/framework-arduinoespressif32 -name boot_app0.bin | head -n 1)
+          mkdir -p dist
+          cp "$BUILD/$NAME.bin" "$BUILD/bootloader.bin" "$BUILD/partitions.bin" "$BUILD/version.txt" dist/
+          cp "$BOOT_APP0" dist/boot_app0.bin
+          python -m esptool --chip esp32 merge_bin -o "dist/$NAME-full.bin" \
+            --flash_mode dio --flash_freq 40m --flash_size 4MB \
+            0x1000 dist/bootloader.bin \
+            0x8000 dist/partitions.bin \
+            0xe000 dist/boot_app0.bin \
+            0x10000 "dist/$NAME.bin"
+          (cd dist && sha256sum *.bin > SHA256SUMS.txt)
+          ls -l dist
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "artifact=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Firmware version: **$VERSION**" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.collect.outputs.artifact }}
+          path: dist/*
+          if-no-files-found: error

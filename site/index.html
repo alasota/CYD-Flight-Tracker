@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en" class="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CYD Sky Tracker</title>
+<meta name="description" content="A cheap ESP32 yellow display that shows live aircraft over your house: airline, type, route and a countdown to when it is overhead. Install it from your browser.">
+<meta property="og:title" content="CYD Sky Tracker — what plane is that?">
+<meta property="og:description" content="Live aircraft over your house on a ~$15 ESP32 display. Hobby project, open source, installs from the browser.">
+<meta property="og:image" content="https://alasota.github.io/CYD-Flight-Tracker/img/device.jpg">
+<meta property="og:type" content="website">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<script>
+  // Pick the language before first paint: saved choice, else the browser's.
+  (function () {
+    var l = null;
+    try { l = localStorage.getItem('lang'); } catch (e) {}
+    if (l !== 'pl' && l !== 'en') l = /^pl\b/i.test(navigator.language || '') ? 'pl' : 'en';
+    document.documentElement.className = l;
+    document.documentElement.lang = l;
+  })();
+</script>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="#">
+      <img src="favicon.svg" alt="" width="22" height="22">
+      <span>Sky Tracker</span>
+    </a>
+    <nav class="links">
+      <a href="#screens"><span class="en">Screens</span><span class="pl">Ekrany</span></a>
+      <a href="#install"><span class="en">Install</span><span class="pl">Instalacja</span></a>
+      <a href="#setup"><span class="en">Setup</span><span class="pl">Konfiguracja</span></a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/alasota/CYD-Flight-Tracker">GitHub</a>
+    </nav>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" data-lang="pl">PL</button>
+      <button type="button" data-lang="en">EN</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================== hero -->
+<section class="hero wrap">
+  <div class="hero-text">
+    <p class="kicker">
+      <span class="en">Hobby project · open source · zero subscriptions</span>
+      <span class="pl">Projekt hobbystyczny · open source · zero abonamentów</span>
+    </p>
+    <h1><span class="en">What plane is that?</span><span class="pl">Co to za samolot?</span></h1>
+    <p class="lead en">A ~$15 yellow display that settles barbecue arguments. It shows the
+      aircraft over your house, live: airline, type, where it came from, where it's going, and
+      how many seconds until it's right above your head.</p>
+    <p class="lead pl">Żółty wyświetlacz za ~60 zł, który kończy spory przy grillu. Pokazuje
+      samoloty nad Twoim domem na żywo: linię, typ, skąd leci, dokąd leci i za ile sekund będzie
+      dokładnie nad Twoją głową.</p>
+    <div class="cta">
+      <a class="btn" href="#install"><span class="en">Install from your browser</span><span class="pl">Zainstaluj z przeglądarki</span></a>
+      <a class="btn ghost" href="https://github.com/alasota/CYD-Flight-Tracker"><span class="en">Source on GitHub</span><span class="pl">Kod na GitHubie</span></a>
+    </div>
+  </div>
+  <figure class="hero-img">
+    <img src="img/device.jpg" width="1600" height="1000"
+         alt="CYD Sky Tracker on a desk, showing the list of flights overhead">
+  </figure>
+</section>
+
+<!-- ============================== story -->
+<section class="wrap story">
+  <div class="card">
+    <h2><span class="en">Why does this exist?</span><span class="pl">Skąd to się wzięło?</span></h2>
+    <p class="en">It's a hobby project by a manager who noticed his calendar was 100% meetings and
+      0% compiler errors. Fixing that took one ESP32, a lot of coffee, and the discovery that a
+      watchdog reset feels exactly the way it did years ago. Very nostalgic. Would recommend.</p>
+    <p class="pl">To projekt hobbystyczny menedżera, który zauważył, że jego kalendarz to w 100%
+      spotkania i w 0% błędy kompilacji. Naprawa wymagała jednego ESP32, sporo kawy i odkrycia,
+      że reset przez watchdog smakuje dokładnie tak samo jak lata temu. Bardzo nostalgiczne.
+      Polecam.</p>
+    <p class="muted en">No Jira tickets were harmed. The only stakeholder is the person at the
+      grill pointing at the sky.</p>
+    <p class="muted pl">Żaden ticket w Jirze nie ucierpiał. Jedynym interesariuszem jest osoba
+      przy grillu, która pokazuje palcem niebo.</p>
+  </div>
+</section>
+
+<!-- ============================== screens -->
+<section id="screens" class="wrap">
+  <h2 class="sec"><span class="en">Three screens, zero scrolling</span><span class="pl">Trzy ekrany, zero przewijania</span></h2>
+  <div class="grid3">
+    <figure class="shot">
+      <img src="screenshots/flights.png" width="320" height="240" alt="Flights screen: nearest aircraft and a table of flights">
+      <figcaption>
+        <b><span class="en">FLIGHTS</span><span class="pl">LOTY</span></b>
+        <span class="en">The nearest aircraft up top, everything else in a table: flight,
+          distance, from, to, type and phase.</span>
+        <span class="pl">Najbliższy samolot na górze, reszta w tabeli: lot, odległość, skąd,
+          dokąd, typ i faza lotu.</span>
+      </figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="screenshots/now.png" width="320" height="240" alt="Now screen: countdown to the moment the aircraft is overhead">
+      <figcaption>
+        <b><span class="en">NOW</span><span class="pl">TERAZ</span></b>
+        <span class="en">One number that matters: seconds until it's overhead. Looking up is
+          still your job.</span>
+        <span class="pl">Jedna liczba, która się liczy: sekundy do przelotu nad Tobą.
+          Podniesienie głowy to nadal Twoja działka.</span>
+      </figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="screenshots/radar.png" width="320" height="240" alt="Radar screen: aircraft around the house with range rings">
+      <figcaption>
+        <b>RADAR</b>
+        <span class="en">Your house in the middle, planes around it, north at the top. Like a
+          real radar, minus the government budget.</span>
+        <span class="pl">Twój dom w środku, samoloty dookoła, północ na górze. Jak prawdziwy
+          radar, tylko bez budżetu państwowego.</span>
+      </figcaption>
+    </figure>
+  </div>
+
+  <h3 class="sub"><span class="en">Taking off or landing?</span><span class="pl">Startuje czy ląduje?</span></h3>
+  <div class="phases">
+    <div><img src="icons/phase_takeoff.png" width="72" height="56" alt=""><span class="en">Takeoff</span><span class="pl">Start</span></div>
+    <div><img src="icons/phase_landing.png" width="72" height="56" alt=""><span class="en">Landing</span><span class="pl">Lądowanie</span></div>
+    <div><img src="icons/phase_overflight.png" width="72" height="56" alt=""><span class="en">Overflight</span><span class="pl">Przelot</span></div>
+    <div><img src="icons/phase_ground.png" width="72" height="56" alt=""><span class="en">On the ground</span><span class="pl">Na ziemi</span></div>
+  </div>
+  <p class="muted center">
+    <span class="en">The exact question everyone at the barbecue asks. Now with pixel art.</span>
+    <span class="pl">Dokładnie to pytanie, które pada przy każdym grillu. Teraz w pixel arcie.</span>
+  </p>
+</section>
+
+<!-- ============================== install -->
+<section id="install" class="wrap">
+  <h2 class="sec"><span class="en">Install in about a minute</span><span class="pl">Instalacja w około minutę</span></h2>
+  <div class="grid2">
+    <div class="card">
+      <h3><span class="en">You'll need</span><span class="pl">Potrzebujesz</span></h3>
+      <ul class="ticks">
+        <li><span class="en">An <b>ESP32-2432S028R</b> “Cheap Yellow Display”, the ILI9341 +
+          resistive-touch variant.</span><span class="pl">Płytkę <b>ESP32-2432S028R</b> („Cheap
+          Yellow Display”) w wariancie z ILI9341 i ekranem rezystancyjnym.</span></li>
+        <li><span class="en">A USB cable that carries data, not just power. Yes, those exist.
+          Yes, you own several.</span><span class="pl">Kabel USB, który przesyła dane, a nie
+          tylko prąd. Tak, takie istnieją. Tak, masz ich kilka.</span></li>
+        <li><span class="en"><b>Chrome</b> or <b>Edge</b> on a computer.</span><span class="pl"><b>Chrome</b>
+          albo <b>Edge</b> na komputerze.</span></li>
+      </ul>
+      <h3><span class="en">Then</span><span class="pl">Potem</span></h3>
+      <ol class="steps">
+        <li><span class="en">Plug the board in.</span><span class="pl">Podłącz płytkę.</span></li>
+        <li><span class="en">Click the button and pick the serial port (usually CP210x or
+          CH340).</span><span class="pl">Kliknij przycisk i wybierz port (zwykle CP210x albo
+          CH340).</span></li>
+        <li><span class="en">First install: tick <b>Erase device</b>. Updating later? Leave it
+          unticked and your settings stay put.</span><span class="pl">Pierwsza instalacja:
+          zaznacz <b>Erase device</b>. Aktualizacja? Zostaw odznaczone, a ustawienia
+          zostaną.</span></li>
+      </ol>
+    </div>
+
+    <div class="card install">
+      <div id="installer">
+        <esp-web-install-button manifest="firmware/manifest.json">
+          <button slot="activate" class="btn big">
+            <span class="en">Install on my CYD</span><span class="pl">Zainstaluj na moim CYD</span>
+          </button>
+          <div slot="unsupported" class="note warn">
+            <span class="en">Your browser can't talk to USB devices. Try Chrome or Edge on a
+              computer. Phones, Firefox and Safari weren't invited to this party.</span>
+            <span class="pl">Twoja przeglądarka nie umie rozmawiać z urządzeniami USB. Spróbuj
+              Chrome albo Edge na komputerze. Telefony, Firefox i Safari nie zostały zaproszone
+              na tę imprezę.</span>
+          </div>
+          <div slot="not-allowed" class="note warn">
+            <span class="en">The installer needs the page to be served over HTTPS.</span>
+            <span class="pl">Instalator wymaga strony otwartej przez HTTPS.</span>
+          </div>
+        </esp-web-install-button>
+        <p class="version">
+          <span class="en">Firmware version</span><span class="pl">Wersja firmware</span>
+          <b id="fw-version">…</b>
+        </p>
+      </div>
+      <div id="no-firmware" class="note" hidden>
+        <span class="en">This copy of the page has no firmware attached (it's added when a
+          release is published). Grab the .bin files from the Releases page instead.</span>
+        <span class="pl">Ta kopia strony nie ma dołączonego firmware (dodaje się go przy
+          publikacji wydania). Pliki .bin znajdziesz na stronie Releases.</span>
+      </div>
+      <p class="muted small">
+        <span class="en">Prefer doing it by hand? Download the <code>.bin</code> files from
+          <a href="https://github.com/alasota/CYD-Flight-Tracker/releases">Releases</a> or build
+          it with PlatformIO. The app-only file also works for OTA updates.</span>
+        <span class="pl">Wolisz ręcznie? Pobierz pliki <code>.bin</code> z
+          <a href="https://github.com/alasota/CYD-Flight-Tracker/releases">Releases</a> albo
+          zbuduj w PlatformIO. Plik z samą aplikacją nadaje się też do aktualizacji OTA.</span>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== setup -->
+<section id="setup" class="wrap">
+  <h2 class="sec"><span class="en">First boot: two minutes of setup</span><span class="pl">Pierwsze uruchomienie: dwie minuty konfiguracji</span></h2>
+  <div class="grid3 steps-cards">
+    <div class="card">
+      <span class="num">1</span>
+      <h3>WiFi</h3>
+      <p class="en">The board opens a hotspot called <code>CYD-Sky-Tracker-Setup</code> (no
+        password). Join it from your phone, pick your home network and type its password.
+        2.4 GHz only: the ESP32 has never heard of 5 GHz.</p>
+      <p class="pl">Płytka otwiera hotspot <code>CYD-Sky-Tracker-Setup</code> (bez hasła).
+        Połącz się z nim telefonem, wybierz domową sieć i wpisz hasło. Tylko 2,4 GHz: ESP32 nigdy
+        nie słyszało o 5 GHz.</p>
+    </div>
+    <div class="card">
+      <span class="num">2</span>
+      <h3><span class="en">Home location</span><span class="pl">Lokalizacja</span></h3>
+      <p class="en">Open <code>http://cyd-sky.local</code> and paste your coordinates.
+        Right-clicking a spot in Google Maps copies them. Your house is the centre of the
+        universe now, at least for this display.</p>
+      <p class="pl">Otwórz <code>http://cyd-sky.local</code> i wklej współrzędne. Prawy klik w
+        Mapach Google je kopiuje. Twój dom jest teraz środkiem wszechświata, przynajmniej dla
+        tego wyświetlacza.</p>
+    </div>
+    <div class="card">
+      <span class="num">3</span>
+      <h3><span class="en">OpenSky (optional)</span><span class="pl">OpenSky (opcjonalnie)</span></h3>
+      <p class="en">It works anonymously out of the box. A free OpenSky account gives you ten
+        times more requests per day, which the settings page helpfully counts for you.</p>
+      <p class="pl">Działa od razu, anonimowo. Darmowe konto OpenSky daje dziesięć razy więcej
+        zapytań dziennie, a panel ustawień uprzejmie je za Ciebie policzy.</p>
+    </div>
+  </div>
+  <div class="grid3 web-shots">
+    <img src="screenshots/web_location.png" width="1000" height="1591" alt="Settings page, Location tab" loading="lazy">
+    <img src="screenshots/web_opensky.png" width="1000" height="2094" alt="Settings page, OpenSky client tab" loading="lazy">
+    <img src="screenshots/web_general.png" width="1000" height="2193" alt="Settings page, General tab" loading="lazy">
+  </div>
+</section>
+
+<!-- ============================== under the hood -->
+<section class="wrap">
+  <h2 class="sec"><span class="en">For the curious</span><span class="pl">Dla dociekliwych</span></h2>
+  <div class="grid2">
+    <ul class="ticks card">
+      <li><span class="en">ESP32 + LovyanGFX, with a console look inspired by a certain
+        24th-century starship.</span><span class="pl">ESP32 + LovyanGFX, z wyglądem inspirowanym
+        konsolą pewnego statku z XXIV wieku.</span></li>
+      <li><span class="en">Live positions from the OpenSky Network API (OAuth2 or
+        anonymous).</span><span class="pl">Pozycje na żywo z API OpenSky Network (OAuth2 albo
+        anonimowo).</span></li>
+      <li><span class="en">Airline, type and route from hexdb.io, cached in flash so nobody's
+        free service gets hammered.</span><span class="pl">Linia, typ i trasa z hexdb.io,
+        zapamiętane we flashu, żeby nie zamęczać niczyjego darmowego serwisu.</span></li>
+    </ul>
+    <ul class="ticks card">
+      <li><span class="en">Polish-capable fonts trimmed from 1 MB to 4 KB, so the firmware fits
+        twice and can update itself over the air.</span><span class="pl">Fonty z polskimi
+        literami odchudzone z 1 MB do 4 KB, żeby firmware zmieścił się dwa razy i mógł
+        aktualizować się bezprzewodowo.</span></li>
+      <li><span class="en">Hundreds of unit tests. The manager in me demanded KPIs.</span><span class="pl">Setki
+        testów jednostkowych. Menedżer we mnie zażądał KPI.</span></li>
+      <li><span class="en">Every release is built and published by GitHub Actions. Nobody
+        compiles on a Friday afternoon by hand.</span><span class="pl">Każde wydanie buduje i
+        publikuje GitHub Actions. Nikt nie kompiluje ręcznie w piątek po południu.</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================== FAQ -->
+<section id="faq" class="wrap">
+  <h2 class="sec">FAQ</h2>
+  <div class="faq">
+    <details class="card">
+      <summary><span class="en">Will it work with my CYD?</span><span class="pl">Czy zadziała z moim CYD?</span></summary>
+      <p class="en">If it's the ILI9341 + resistive-touch “R” version, yes. The capacitive
+        (ST7789) variants look identical and behave differently. Check before blaming the code.
+        The code would like that noted.</p>
+      <p class="pl">Jeśli to wersja „R” z ILI9341 i ekranem rezystancyjnym, tak. Warianty
+        pojemnościowe (ST7789) wyglądają identycznie, a zachowują się inaczej. Sprawdź, zanim
+        obwinisz kod. Kod prosi o odnotowanie tego w protokole.</p>
+    </details>
+    <details class="card">
+      <summary><span class="en">Does it cost anything?</span><span class="pl">Czy to coś kosztuje?</span></summary>
+      <p class="en">The board does. The data doesn't: OpenSky gives 400 free requests a day
+        anonymously and 4,000 with a free account.</p>
+      <p class="pl">Płytka tak. Dane nie: OpenSky daje 400 darmowych zapytań dziennie anonimowo
+        i 4000 z darmowym kontem.</p>
+    </details>
+    <details class="card">
+      <summary><span class="en">Why does it look like a starship console?</span><span class="pl">Dlaczego wygląda jak konsola statku kosmicznego?</span></summary>
+      <p class="en">Because a standard UI made nobody feel like a captain. It's LCARS-inspired,
+        not LCARS: no copyrighted assets were beamed aboard.</p>
+      <p class="pl">Bo zwykły interfejs nie sprawiał, że ktokolwiek czuł się jak kapitan. To
+        inspiracja LCARS, a nie LCARS: żadne chronione grafiki nie zostały przeteleportowane na
+        pokład.</p>
+    </details>
+    <details class="card">
+      <summary><span class="en">Is it production-ready?</span><span class="pl">Czy to jest gotowe na produkcję?</span></summary>
+      <p class="en">It's barbecue-ready. The settings page has no login, so keep the board on a
+        network you trust. And please don't land anything based on it.</p>
+      <p class="pl">Jest gotowe na grilla. Panel ustawień nie ma logowania, więc trzymaj płytkę
+        w zaufanej sieci. I proszę, nie lądujcie niczym na jego podstawie.</p>
+    </details>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <p>
+      <span class="en">Data: <a href="https://opensky-network.org">OpenSky Network</a> and
+        <a href="https://hexdb.io">hexdb.io</a>. Built with LovyanGFX, WiFiManager, ArduinoJson
+        and the efont fonts. Inspired by
+        <a href="https://github.com/AnthonySturdy/micro-radar">micro-radar</a>.</span>
+      <span class="pl">Dane: <a href="https://opensky-network.org">OpenSky Network</a> i
+        <a href="https://hexdb.io">hexdb.io</a>. Zbudowane z LovyanGFX, WiFiManager, ArduinoJson
+        i fontami efont. Inspiracja:
+        <a href="https://github.com/AnthonySturdy/micro-radar">micro-radar</a>.</span>
+    </p>
+    <p class="muted small">
+      <span class="en">Not affiliated with Paramount, Star Trek or any airline. Aircraft data is
+        provided as is, for curiosity only.</span>
+      <span class="pl">Brak powiązań z Paramount, Star Trekiem ani żadną linią lotniczą. Dane o
+        samolotach są podawane „tak jak są”, wyłącznie z ciekawości.</span>
+      · <a href="https://github.com/alasota/CYD-Flight-Tracker">GitHub</a>
+    </p>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

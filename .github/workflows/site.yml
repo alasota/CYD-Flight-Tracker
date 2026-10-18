@@ -1,0 +1,88 @@
+# Project page: assembles site/ (+ docs/screenshots, docs/icons) with
+# tools/build_site.py and publishes it to GitHub Pages.
+#
+# - On its own (page changes on main, or by hand): the browser installer gets
+#   the firmware of the latest GitHub Release; with no release yet the page
+#   just points to the Releases page.
+# - Called from release.yml: gets the firmware built in that same run
+#   (input firmware-artifact).
+name: Site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "docs/screenshots/**"
+      - "docs/icons/**"
+      - "tools/build_site.py"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      firmware-artifact:
+        description: Artifact (from firmware.yml) to put into the installer
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Firmware from this run
+        if: inputs.firmware-artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.firmware-artifact }}
+          path: firmware
+
+      - name: Firmware from the latest release
+        if: inputs.firmware-artifact == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release download --repo "$GITHUB_REPOSITORY" --dir firmware \
+               --pattern '*.bin' --pattern 'version.txt'; then
+            ls -l firmware
+          else
+            echo "No release yet - publishing the page without the installer."
+            rm -rf firmware
+          fi
+
+      - name: Assemble the page
+        run: |
+          if [ -f firmware/version.txt ]; then
+            python tools/build_site.py --out _site --firmware firmware
+          else
+            python tools/build_site.py --out _site
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

@@ -18,6 +18,9 @@ starship that definitely does not belong to any copyright holder in particular.
 
 No soldering. No radar dish. No red shirts were harmed in the making of this firmware.
 
+> 🌐 **Project page & one-click install:** https://alasota.github.io/CYD-Flight-Tracker/ —
+> plug the board in, open the page in Chrome or Edge, press *Install*. No PlatformIO required.
+
 ## Screenshots
 
 Real captures straight off the device (via its `/screenshot.bmp` endpoint), Polish UI:
