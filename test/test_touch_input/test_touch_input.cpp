@@ -95,12 +95,31 @@ static void test_map_touch_axis_supports_inverted_output(void) {
 // buttons to y~20 — the vertical axis is inverted on this digitizer.
 //
 // The samples were logged with the old XPT2046_Touchscreen library
-// (rotation 1), which reports the controller's channels the other way round
-// from LovyanGFX: LovyanGFX raw X = old raw y, LovyanGFX raw Y = old raw x.
-// The helpers take the samples exactly as logged and swap them.
+// (rotation 1). LovyanGFX reports the channels swapped AND the horizontal
+// one inverted: LovyanGFX raw X = old raw y, LovyanGFX raw Y = 4095 - old
+// raw x. (The first port forgot the inversion and mirrored the buttons —
+// see the LovyanGFX-native samples below.) The helper takes the samples
+// exactly as logged and converts them.
 
 static TouchXY mapLoggedSample(int32_t oldRawX, int32_t oldRawY) {
-  return mapRawTouch(/*rawX=*/oldRawY, /*rawY=*/oldRawX);
+  return mapRawTouch(/*rawX=*/oldRawY, /*rawY=*/4095 - oldRawX);
+}
+
+// Raw samples logged through LovyanGFX itself (2026-10-18), with the
+// screen the user reported each tap opened: ~3250 opened RADAR instead of
+// LOTY, i.e. it is the LEFT button. These pin the horizontal direction.
+static void test_lovyangfx_native_samples_hit_the_right_buttons(void) {
+  TouchXY left = mapRawTouch(585, 3288);
+  TouchXY left2 = mapRawTouch(504, 3216);
+  TouchXY middle = mapRawTouch(531, 1975);
+  TouchXY right = mapRawTouch(530, 696);
+  TouchXY right2 = mapRawTouch(649, 844);
+  TEST_ASSERT_TRUE_MESSAGE(left.x < 106, "raw Y ~3290 must be the LEFT (LOTY) button");
+  TEST_ASSERT_TRUE(left2.x < 106);
+  TEST_ASSERT_TRUE(middle.x >= 106 && middle.x < 213);
+  TEST_ASSERT_TRUE_MESSAGE(right.x >= 213, "raw Y ~700 must be the RIGHT (RADAR) button");
+  TEST_ASSERT_TRUE(right2.x >= 213);
+  for (const TouchXY &p : {left, left2, middle, right, right2}) TEST_ASSERT_TRUE(p.y >= 210);
 }
 
 static void assertInNavSegment(int32_t rawX, int32_t rawY, int16_t segMinX, int16_t segMaxX) {
@@ -146,6 +165,7 @@ static void test_map_raw_touch_stays_on_screen(void) {
 int main(int argc, char **argv) {
   UNITY_BEGIN();
 
+  RUN_TEST(test_lovyangfx_native_samples_hit_the_right_buttons);
   RUN_TEST(test_logged_left_button_taps);
   RUN_TEST(test_logged_middle_button_taps);
   RUN_TEST(test_logged_right_button_taps);

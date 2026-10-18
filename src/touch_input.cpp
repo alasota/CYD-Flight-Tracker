@@ -26,8 +26,10 @@ TouchXY mapRawTouch(int32_t rawX, int32_t rawY) {
   // maps raw X onto the panel's short side and raw Y onto its long side,
   // then rotation 1 swaps them and flips the vertical.
   TouchXY p;
-  p.x = mapTouchAxis(rawY, kTouchRawYMin, kTouchRawYMax, 0, kScreenWidth - 1);
-  p.y = mapTouchAxis(rawX, kTouchRawXMin, kTouchRawXMax, kScreenHeight - 1, 0);
+  // Horizontal: raw Y runs right-to-left (high raw = left edge).
+  p.x = mapTouchAxis(rawY, kTouchRawYAtRight, kTouchRawYAtLeft, kScreenWidth - 1, 0);
+  // Vertical: raw X grows towards the top.
+  p.y = mapTouchAxis(rawX, kTouchRawXAtBottom, kTouchRawXAtTop, kScreenHeight - 1, 0);
   return p;
 }
 

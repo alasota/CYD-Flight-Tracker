@@ -517,11 +517,14 @@ request — the summary text simply starts at x:208. (`drawVerticalDivider()` st
   hit it); `navHitTest()` accepts taps from y:210, 5px above where it draws.
 - **Touch calibration** (`include/touch_calibration.h`, handed to LovyanGFX's
   `Touch_XPT2046` config): in LovyanGFX raw terms, **raw X is the vertical axis** (~340 at the
-  bottom edge .. ~3900 at the top) and **raw Y the horizontal one** (~200 left .. ~3900 right);
-  with `offset_rotation = 0` and `setRotation(1)` LovyanGFX swaps and flips them itself.
+  bottom edge .. ~3900 at the top) and **raw Y the horizontal one, running right-to-left**
+  (~3900 at the LEFT edge .. ~200 at the right — passed to LovyanGFX as `y_min > y_max`);
+  with `offset_rotation = 0` and `setRotation(1)` LovyanGFX swaps the axes and flips the vertical.
   `touch_input::mapRawTouch()` is a pure copy of that conversion, so native tests check the
-  constants against raw taps logged on the real board (logged with the old library, whose raw
-  x/y are swapped relative to LovyanGFX's — the test helper accounts for that). Before this was
+  constants against raw taps logged on the real board — both the old library's samples (its raw
+  x/y relate to LovyanGFX's as X_L = y_old, Y_L = 4095 - x_old) and LovyanGFX-native ones. The
+  first LovyanGFX port forgot that inversion and mirrored the buttons (LOTY opened RADAR); the
+  native-sample test pins the direction now. Before any of this was
   measured, every bottom-button tap landed in the header and the buttons never responded. Each
   tap logs `[touch] raw=(x,y) -> screen=(x,y) nav=<action>` to Serial — use that to re-tune if
   taps near an edge feel off (corners were not measured yet). LovyanGFX's `calibrateTouch()`

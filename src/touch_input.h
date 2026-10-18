@@ -37,7 +37,7 @@ struct TouchXY {
 // Model of what LovyanGFX's getTouch() computes from a raw LovyanGFX touch
 // sample (`rawX`, `rawY` as tft.getTouchRaw() reports them) with this
 // board's calibration (touch_calibration.h), offset_rotation 0 and
-// tft.setRotation(1): raw Y -> screen x (left..right), raw X -> screen y,
+// tft.setRotation(1): raw Y -> screen x (inverted: high raw = left), raw X -> screen y,
 // flipped (raw X grows towards the top). The device uses LovyanGFX's own
 // conversion; this pure copy exists so the native tests can check the
 // calibration constants against raw taps logged on the real board.

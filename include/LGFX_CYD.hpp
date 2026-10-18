@@ -73,10 +73,10 @@ class LGFX : public lgfx::LGFX_Device {
 
     {  // Touch: XPT2046 on its own SPI bus (see note at the top)
       auto cfg = _touch_instance.config();
-      cfg.x_min = kTouchRawXMin;
-      cfg.x_max = kTouchRawXMax;
-      cfg.y_min = kTouchRawYMin;
-      cfg.y_max = kTouchRawYMax;
+      cfg.x_min = kTouchRawXAtBottom;
+      cfg.x_max = kTouchRawXAtTop;
+      cfg.y_min = kTouchRawYAtLeft;   // > y_max on purpose: the horizontal axis is
+      cfg.y_max = kTouchRawYAtRight;  // inverted (see touch_calibration.h)
       cfg.offset_rotation = kTouchOffsetRotation;
       cfg.pin_int = 36;        // Touch IRQ
       cfg.bus_shared = false;  // separate wiring from the display
