@@ -151,8 +151,146 @@ static void test_fit_identity_never_exceeds_width_once_callsign_fits(void) {
   }
 }
 
+// ---- pending ("...") vs unknown ("--") ----------------------------------------
+
+static void test_airline_and_type_show_dots_while_lookup_pending(void) {
+  AircraftRow row;
+  row.aircraft.callsign = "WZZ620U";
+  row.info_pending = true;  // not looked up yet (per-poll budget)
+  TEST_ASSERT_EQUAL_STRING("...", summaryAirline(row).c_str());
+  TEST_ASSERT_EQUAL_STRING("...", summaryType(row).c_str());
+}
+
+static void test_airline_dashes_once_lookup_confirmed_missing(void) {
+  AircraftRow row;
+  row.info_pending = false;  // looked up, hexdb.io didn't know it
+  TEST_ASSERT_EQUAL_STRING("--", summaryAirline(row).c_str());
+}
+
+// ---- rowAirportCode: IATA everywhere -------------------------------------------
+
+static void test_airport_code_prefers_iata(void) {
+  AircraftRow row = makeRow();
+  row.origin_airport = makeAirport("WAW", "PL");
+  row.dest_airport = makeAirport("FCO", "IT");
+  TEST_ASSERT_EQUAL_STRING("WAW", rowAirportCode(row, /*origin=*/true).c_str());
+  TEST_ASSERT_EQUAL_STRING("FCO", rowAirportCode(row, /*origin=*/false).c_str());
+}
+
+static void test_airport_code_dots_while_airport_pending(void) {
+  AircraftRow row = makeRow();
+  row.origin_airport_pending = true;
+  TEST_ASSERT_EQUAL_STRING("...", rowAirportCode(row, true).c_str());
+}
+
+static void test_airport_code_falls_back_to_icao_when_unknown(void) {
+  // hexdb.io had no airport record — the ICAO code is still better than "--".
+  AircraftRow row = makeRow();  // route EPWA-LIRF, airports unresolved, not pending
+  TEST_ASSERT_EQUAL_STRING("EPWA", rowAirportCode(row, true).c_str());
+  TEST_ASSERT_EQUAL_STRING("LIRF", rowAirportCode(row, false).c_str());
+}
+
+static void test_airport_code_without_route(void) {
+  AircraftRow row;
+  row.route_pending = true;
+  TEST_ASSERT_EQUAL_STRING("...", rowAirportCode(row, true).c_str());
+  row.route_pending = false;  // confirmed: no filed route
+  TEST_ASSERT_EQUAL_STRING("--", rowAirportCode(row, true).c_str());
+}
+
+// ---- formatRowRoute ------------------------------------------------------------
+
+static void test_row_route_with_country_and_iata(void) {
+  AircraftRow row = makeRow();
+  row.origin_airport = makeAirport("WAW", "PL");
+  row.dest_airport = makeAirport("FCO", "IT");
+  TEST_ASSERT_EQUAL_STRING("WAW (PL) -> FCO (IT)",
+                           formatRowRoute(row, RouteFormat::WithCountry).c_str());
+  TEST_ASSERT_EQUAL_STRING("WAW -> FCO", formatRowRoute(row, RouteFormat::CodesOnly).c_str());
+}
+
+static void test_row_route_pending_and_unknown(void) {
+  AircraftRow row;
+  row.route_pending = true;
+  TEST_ASSERT_EQUAL_STRING("...", formatRowRoute(row, RouteFormat::WithCountry).c_str());
+  row.route_pending = false;
+  TEST_ASSERT_EQUAL_STRING("--", formatRowRoute(row, RouteFormat::WithCountry).c_str());
+}
+
+static void test_row_route_endpoint_pending(void) {
+  AircraftRow row = makeRow();
+  row.origin_airport = makeAirport("WAW", "PL");
+  row.dest_airport_pending = true;
+  TEST_ASSERT_EQUAL_STRING("WAW (PL) -> ...", formatRowRoute(row, RouteFormat::WithCountry).c_str());
+}
+
+// ---- route with city names (detail views) -------------------------------------
+
+static AircraftRow rowWawFco() {
+  AircraftRow row = makeRow();  // route EPWA-LIRF
+  row.origin_airport = makeAirport("WAW", "PL");
+  row.dest_airport = makeAirport("FCO", "IT");
+  return row;
+}
+
+static void test_city_route_full_when_it_fits(void) {
+  TEST_ASSERT_EQUAL_STRING("Warszawa (PL) -> Rzym (IT)",
+                           formatRowRouteCities(rowWawFco(), Language::PL, 100, kOnePx).c_str());
+  TEST_ASSERT_EQUAL_STRING("Warsaw (PL) -> Rome (IT)",
+                           formatRowRouteCities(rowWawFco(), Language::EN, 100, kOnePx).c_str());
+}
+
+static void test_city_route_drops_country_codes_first(void) {
+  // "Warszawa (PL) -> Rzym (IT)" is 26 chars; 20 only fits the bare names.
+  TEST_ASSERT_EQUAL_STRING("Warszawa -> Rzym",
+                           formatRowRouteCities(rowWawFco(), Language::PL, 20, kOnePx).c_str());
+}
+
+static void test_city_route_then_shortens_both_names(void) {
+  std::string s = formatRowRouteCities(rowWawFco(), Language::PL, 14, kOnePx);
+  TEST_ASSERT_TRUE(onePx(s) <= 14);
+  TEST_ASSERT_TRUE(s.find(" -> ") != std::string::npos);
+}
+
+static void test_city_route_pending_and_unknown(void) {
+  AircraftRow row;
+  row.route_pending = true;
+  TEST_ASSERT_EQUAL_STRING("...", formatRowRouteCities(row, Language::PL, 100, kOnePx).c_str());
+  row.route_pending = false;
+  TEST_ASSERT_EQUAL_STRING("--", formatRowRouteCities(row, Language::PL, 100, kOnePx).c_str());
+
+  AircraftRow half = rowWawFco();
+  half.dest_airport = AirportInfo{};
+  half.dest_airport_pending = true;
+  TEST_ASSERT_EQUAL_STRING("Warszawa (PL) -> ...",
+                           formatRowRouteCities(half, Language::PL, 100, kOnePx).c_str());
+}
+
+static void test_row_place_name_per_endpoint(void) {
+  TEST_ASSERT_EQUAL_STRING("Warszawa", rowPlaceName(rowWawFco(), true, Language::PL).c_str());
+  TEST_ASSERT_EQUAL_STRING("Rome", rowPlaceName(rowWawFco(), false, Language::EN).c_str());
+  AircraftRow none;
+  TEST_ASSERT_EQUAL_STRING("--", rowPlaceName(none, true, Language::PL).c_str());
+}
+
 int main(int, char **) {
   UNITY_BEGIN();
+
+  RUN_TEST(test_city_route_full_when_it_fits);
+  RUN_TEST(test_city_route_drops_country_codes_first);
+  RUN_TEST(test_city_route_then_shortens_both_names);
+  RUN_TEST(test_city_route_pending_and_unknown);
+  RUN_TEST(test_row_place_name_per_endpoint);
+
+  RUN_TEST(test_airline_and_type_show_dots_while_lookup_pending);
+  RUN_TEST(test_airline_dashes_once_lookup_confirmed_missing);
+  RUN_TEST(test_airport_code_prefers_iata);
+  RUN_TEST(test_airport_code_dots_while_airport_pending);
+  RUN_TEST(test_airport_code_falls_back_to_icao_when_unknown);
+  RUN_TEST(test_airport_code_without_route);
+  RUN_TEST(test_row_route_with_country_and_iata);
+  RUN_TEST(test_row_route_pending_and_unknown);
+  RUN_TEST(test_row_route_endpoint_pending);
 
   RUN_TEST(test_fit_identity_unchanged_when_it_fits);
   RUN_TEST(test_fit_identity_excludes_phase_icon);

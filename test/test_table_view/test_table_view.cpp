@@ -304,13 +304,13 @@ static void test_table_shows_exactly_five_rows_per_page(void) {
   TEST_ASSERT_EQUAL_INT(5, tableRowsPerPage());
 }
 
-static void test_table_row_step_is_19px_from_y116(void) {
-  // Rows at y = 116, 135, 154, 173, 192 — a 19px step from y:116 (CLAUDE.md
-  // "Screen 1": no FLIGHTS sub-header strip any more, so rows got roomier).
-  TEST_ASSERT_EQUAL_INT(19, tableRowHeightPx());
+static void test_table_row_step_is_17px_from_y116(void) {
+  // Rows at y = 116, 133, 150, 167, 184 — a 17px step from y:116 (CLAUDE.md
+  // "Screen 1": tight rows, 1px above the 16px Font2 text).
+  TEST_ASSERT_EQUAL_INT(17, tableRowHeightPx());
   TEST_ASSERT_EQUAL_INT(116, tableFirstRowY());
   int16_t lastRowY = static_cast<int16_t>(tableFirstRowY() + (kTableRowsPerPage - 1) * tableRowHeightPx());
-  TEST_ASSERT_EQUAL_INT(192, lastRowY);
+  TEST_ASSERT_EQUAL_INT(184, lastRowY);
   // The 5th row ends inside the 215px content boundary (25px bottom nav).
   TEST_ASSERT_TRUE(lastRowY + tableRowHeightPx() <= 215);
 }
@@ -355,16 +355,29 @@ static void test_columns_fit_the_320px_screen(void) {
 
 static void test_column_labels_fit_their_columns_in_small_font(void) {
   // Labels are drawn in LCARS_FONT_SMALL (Font0, 6px advance) at
-  // x + kTableCellPadPx; they must not reach the next column — in every
+  // x + kTableHeaderLabelPadPx (clear of the divider line); they must not
+  // reach the next column — in every
   // language.
   const TableColumn *cols = tableColumns();
   for (Language lang : {Language::PL, Language::EN}) {
     for (int i = 0; i < kTableColumnCount; ++i) {
       const char *label = tr(cols[i].label, lang);
       int labelPx = static_cast<int>(std::string(label).size()) * 6;
-      TEST_ASSERT_TRUE_MESSAGE(kTableCellPadPx + labelPx <= cols[i].w, label);
+      TEST_ASSERT_TRUE_MESSAGE(kTableHeaderLabelPadPx + labelPx <= cols[i].w, label);
     }
   }
+}
+
+static void test_header_labels_keep_clear_of_the_divider(void) {
+  // Review note 9: labels sat right against the "|" divider line.
+  TEST_ASSERT_TRUE(kTableHeaderLabelPadPx >= 4);
+}
+
+static void test_airport_columns_fit_an_iata_code(void) {
+  // 3 letters of Font2 (~9px each) plus padding.
+  const TableColumn *cols = tableColumns();
+  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[2]) >= 30);
+  TEST_ASSERT_TRUE(tableCellTextWidthPx(cols[3]) >= 30);
 }
 
 static void test_cell_text_width_excludes_padding(void) {
@@ -473,7 +486,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_split_featured_and_rest_empty);
 
   RUN_TEST(test_table_shows_exactly_five_rows_per_page);
-  RUN_TEST(test_table_row_step_is_19px_from_y116);
+  RUN_TEST(test_table_row_step_is_17px_from_y116);
   RUN_TEST(test_page_count_uses_fixed_five_row_pages);
 
   RUN_TEST(test_columns_count_and_order);
@@ -481,6 +494,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_columns_fit_the_320px_screen);
   RUN_TEST(test_column_labels_fit_their_columns_in_small_font);
   RUN_TEST(test_cell_text_width_excludes_padding);
+  RUN_TEST(test_header_labels_keep_clear_of_the_divider);
+  RUN_TEST(test_airport_columns_fit_an_iata_code);
 
   RUN_TEST(test_page_count_zero_records);
   RUN_TEST(test_page_count_exact_multiple);

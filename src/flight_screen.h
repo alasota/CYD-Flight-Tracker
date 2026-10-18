@@ -77,11 +77,8 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang
 // Draws all three zones for a `screenWidth`-px display. `hasNearest` ==
 // false (no aircraft in range) draws the identity frame empty and forces
 // the countdown/status into their empty state regardless of `cpa`.
-// `origin`/`dest` are the nearest aircraft's route endpoints (pass
-// AirportInfo{} if unresolved).
 void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
-                      const AirportInfo &origin, const AirportInfo &dest, const CpaPrediction &cpa,
-                      int16_t screenWidth);
+                      const CpaPrediction &cpa, int16_t screenWidth);
 
 // Repaints only the countdown zone + status strip (y:82..225) — the 1 Hz
 // tick path (CLAUDE.md "Redraw policy"), leaving the identity panel,

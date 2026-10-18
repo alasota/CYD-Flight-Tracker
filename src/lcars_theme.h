@@ -128,6 +128,17 @@ char phaseIcon(Phase phase);
 // Pure — native-tested.
 uint16_t phaseColor(Phase phase);
 
+// The drawn phase icon (replaces the old ASCII ^ v > glyphs, which were too
+// small to read): a filled triangle fitting a `size` x `size` box centred on
+// (cx, cy) — ▲ takeoff (apex x0,y0 on top), ▼ landing (apex at the bottom),
+// ▶ overflight (tip x0,y0 on the right); `visible` is false for NONE (no
+// icon at all). Pure geometry — native-tested; drawPhaseIcon() fills it.
+struct PhaseTriangle {
+  bool visible = false;
+  int16_t x0 = 0, y0 = 0, x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+};
+PhaseTriangle phaseTriangle(Phase phase, int16_t cx, int16_t cy, int16_t size);
+
 // Text colour for table row `rowIndex` (0-based within the page): white /
 // sky alternating, so a row is easy to follow across the columns. Pure.
 uint16_t tableRowTextColor(int rowIndex);
@@ -155,6 +166,10 @@ constexpr int16_t LCARS_FONT_SMALL_HEIGHT_PX = 8;
 // Glyph height of LCARS_FONT_BODY (fonts::Font2) — for the native test
 // that bottom-nav labels fit the 25px buttons.
 constexpr int16_t LCARS_FONT_BODY_HEIGHT_PX = 16;
+
+// Side of the drawn phase triangle (drawPhaseIcon()) — a bit smaller than
+// the 16px text line it sits next to.
+constexpr int16_t kPhaseIconSize = 10;
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX. Not covered by
 // Unity (see CLAUDE.md "Testing") — this module is almost entirely draw
@@ -188,9 +203,12 @@ void drawPanel(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t c
 void drawElbow(LGFX &gfx, int16_t x, int16_t y, int16_t height, int16_t headerWidth,
                int16_t barWidth, uint16_t color);
 
+// Fills phaseTriangle(phase, cx, cy, size) in phaseColor(phase). Draws
+// nothing for Phase::NONE.
+void drawPhaseIcon(LGFX &gfx, Phase phase, int16_t cx, int16_t cy, int16_t size);
+
 // Pill-shaped button/label: a fully rounded rectangle (corner radius =
-// h/2) with text centered inside. Used for the view-toggle button and
-// section headers/labels.
+// h/2) with text centered inside. Used for the stat pills.
 void drawPillButton(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t fillColor,
                      uint16_t textColor, const char *text);
 

@@ -2,6 +2,8 @@
 
 #include <map>
 
+#include "place_names.h"  // asciiFold()
+
 #include <ArduinoJson.h>
 
 RouteInfo parseRouteLookupResponse(const std::string &json) {
@@ -48,6 +50,9 @@ AirportInfo parseAirportLookupResponse(const std::string &json) {
 
   info.country_code = doc["country_code"].as<std::string>();
   info.iata_code = doc["iata"].isNull() ? std::string() : doc["iata"].as<std::string>();
+  // Folded to ASCII once here (the bitmap fonts only cover 0x20-0x7E), so the
+  // cache and every screen get a drawable string.
+  info.name = doc["airport"].isNull() ? std::string() : asciiFold(doc["airport"].as<std::string>());
   info.found = !info.country_code.empty();
   return info;
 }
@@ -97,6 +102,10 @@ AirportInfo lookupAirportWithFetcher(const std::string &airport_code, AirportFet
 
 bool routeLookupIsCached(const std::string &callsign) {
   return routeCache.find(callsign) != routeCache.end();
+}
+
+bool airportLookupIsCached(const std::string &airport_code) {
+  return airportCache.find(airport_code) != airportCache.end();
 }
 
 void routeLookupClearCacheForTesting() { routeCache.clear(); }

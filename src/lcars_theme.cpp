@@ -58,6 +58,35 @@ uint16_t phaseColor(Phase phase) {
   }
 }
 
+namespace {
+PhaseTriangle makeTriangle(int x0, int y0, int x1, int y1, int x2, int y2) {
+  PhaseTriangle t;  // (no brace-init: the ESP32 toolchain builds as C++11)
+  t.visible = true;
+  t.x0 = static_cast<int16_t>(x0);
+  t.y0 = static_cast<int16_t>(y0);
+  t.x1 = static_cast<int16_t>(x1);
+  t.y1 = static_cast<int16_t>(y1);
+  t.x2 = static_cast<int16_t>(x2);
+  t.y2 = static_cast<int16_t>(y2);
+  return t;
+}
+}  // namespace
+
+PhaseTriangle phaseTriangle(Phase phase, int16_t cx, int16_t cy, int16_t size) {
+  const int h = size / 2;
+  switch (phase) {
+    case Phase::TAKEOFF:  // ▲ — apex on top
+      return makeTriangle(cx, cy - h, cx - h, cy + h, cx + h, cy + h);
+    case Phase::LANDING:  // ▼ — apex at the bottom
+      return makeTriangle(cx, cy + h, cx - h, cy - h, cx + h, cy - h);
+    case Phase::OVERFLIGHT:  // ▶ — tip on the right
+      return makeTriangle(cx + h, cy, cx - h, cy - h, cx - h, cy + h);
+    case Phase::NONE:
+    default:
+      return PhaseTriangle();  // no icon
+  }
+}
+
 uint16_t tableRowTextColor(int rowIndex) {
   return (rowIndex % 2 == 0) ? THEME_CONTENT_PRIMARY : THEME_CONTENT_SECONDARY;
 }
@@ -126,6 +155,12 @@ void drawElbow(LGFX &gfx, int16_t x, int16_t y, int16_t height, int16_t headerWi
 
   // Horizontal header: from just right of the curve out to headerWidth.
   gfx.fillRect(cx, y, (x + headerWidth) - cx, barWidth, color);
+}
+
+void drawPhaseIcon(LGFX &gfx, Phase phase, int16_t cx, int16_t cy, int16_t size) {
+  const PhaseTriangle t = phaseTriangle(phase, cx, cy, size);
+  if (!t.visible) return;
+  gfx.fillTriangle(t.x0, t.y0, t.x1, t.y1, t.x2, t.y2, phaseColor(phase));
 }
 
 void drawPillButton(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t fillColor,

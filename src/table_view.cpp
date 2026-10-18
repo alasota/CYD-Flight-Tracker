@@ -117,8 +117,8 @@ namespace {
 // the space went to roomier rows.
 constexpr int16_t kColHeaderY = 98;    // orange column labels, y:98..113
 constexpr int16_t kColHeaderH = 15;
-constexpr int16_t kFirstRowY = 116;    // rows at 116,135,154,173,192 (last ends y:211)
-constexpr int16_t kRowStep = 19;       // must end by LCARS_CONTENT_BOTTOM (215)
+constexpr int16_t kFirstRowY = 116;    // rows at 116,133,150,167,184 (last ends y:201)
+constexpr int16_t kRowStep = 17;       // 1px above the 16px Font2 text; must end by 215
 static_assert(kFirstRowY + kTableRowsPerPage * kRowStep <= LCARS_CONTENT_BOTTOM,
               "table rows must end above the bottom nav");
 
@@ -128,8 +128,8 @@ static_assert(kFirstRowY + kTableRowsPerPage * kRowStep <= LCARS_CONTENT_BOTTOM,
 // LOT is wide enough for an 8-char callsign in Font2; FAZA for the longest
 // phase label ("PHASE", 30px) in Font0.
 constexpr TableColumn kColumns[kTableColumnCount] = {
-    {Str::ColFlight, 2, 64}, {Str::ColAirline, 66, 92}, {Str::ColFrom, 158, 38},
-    {Str::ColTo, 196, 38},   {Str::ColType, 234, 52},   {Str::ColPhase, 286, 32},
+    {Str::ColFlight, 2, 64}, {Str::ColAirline, 66, 88}, {Str::ColFrom, 154, 36},
+    {Str::ColTo, 190, 36},   {Str::ColType, 226, 58},   {Str::ColPhase, 284, 34},
 };
 enum ColumnIndex { kColFlight, kColAirline, kColOrigin, kColDest, kColType, kColPhase };
 }  // namespace
@@ -165,8 +165,6 @@ std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int 
 
 namespace {
 
-std::string orDash(const std::string &s) { return s.empty() ? std::string("--") : s; }
-
 // One cell: text cut to the column's width (fitToWidth) and drawn at the
 // column's padded x, clipped to the column as a pixel-level backstop — so
 // nothing ever spills into the neighbouring column.
@@ -194,16 +192,19 @@ void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t 
     int16_t textY = static_cast<int16_t>(rowY + kRowStep / 2);
 
     gfx.setTextColor(tableRowTextColor(i), LCARS_BLACK);  // white / sky, alternating
-    drawCell(gfx, kColumns[kColFlight], orDash(row.aircraft.callsign), rowY, textY, measure);
-    drawCell(gfx, kColumns[kColAirline], orDash(row.info.airline), rowY, textY, measure);
-    drawCell(gfx, kColumns[kColOrigin], row.route.found ? row.route.origin_icao : "--", rowY,
-             textY, measure);
-    drawCell(gfx, kColumns[kColDest], row.route.found ? row.route.dest_icao : "--", rowY, textY,
+    // "..." = still loading, "--" = unknown; airports as IATA codes.
+    drawCell(gfx, kColumns[kColFlight], summaryFlight(row), rowY, textY, measure);
+    drawCell(gfx, kColumns[kColAirline], summaryAirline(row), rowY, textY, measure);
+    drawCell(gfx, kColumns[kColOrigin], rowAirportCode(row, /*origin=*/true), rowY, textY,
              measure);
-    drawCell(gfx, kColumns[kColType], orDash(row.info.aircraft_type), rowY, textY, measure);
-    gfx.setTextColor(phaseColor(row.phase), LCARS_BLACK);  // takeoff/landing stand out
-    drawCell(gfx, kColumns[kColPhase], std::string(1, phaseIcon(row.phase)), rowY, textY,
+    drawCell(gfx, kColumns[kColDest], rowAirportCode(row, /*origin=*/false), rowY, textY,
              measure);
+    drawCell(gfx, kColumns[kColType], summaryType(row), rowY, textY, measure);
+    // Phase: a drawn, coloured triangle centred in its column (nothing for
+    // "no phase") — far easier to read than the old ASCII ^ v >.
+    const TableColumn &phaseCol = kColumns[kColPhase];
+    drawPhaseIcon(gfx, row.phase, static_cast<int16_t>(phaseCol.x + phaseCol.w / 2), textY,
+                  kPhaseIconSize);
   }
 }
 
@@ -224,18 +225,18 @@ void drawColumnHeader(LGFX &gfx, int16_t screenWidth) {
       gfx.drawFastVLine(col.x, static_cast<int16_t>(kColHeaderY + 2),
                         static_cast<int16_t>(kColHeaderH - 4), LCARS_BLACK);
     }
-    gfx.drawString(tr(col.label), static_cast<int16_t>(col.x + kTableCellPadPx), textY);
+    gfx.drawString(tr(col.label), static_cast<int16_t>(col.x + kTableHeaderLabelPadPx), textY);
   }
 }
 
 }  // namespace
 
-void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, const AirportInfo &originAirport,
-                    const AirportInfo &destAirport, int16_t screenWidth, int page) {
+void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t screenWidth,
+                   int page) {
   FeaturedSplit split = splitFeaturedAndRest(rows);
 
   if (split.hasFeatured) {
-    drawFeaturedPanel(gfx, split.featured, originAirport, destAirport, screenWidth);
+    drawFeaturedPanel(gfx, split.featured, screenWidth);
   } else {
     drawFeaturedPanelEmpty(gfx, screenWidth);
   }

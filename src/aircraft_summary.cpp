@@ -1,6 +1,7 @@
 #include "aircraft_summary.h"
 
-#include "table_view.h"  // full AircraftRow definition
+#include "place_names.h"  // placeName()
+#include "table_view.h"   // full AircraftRow definition
 
 namespace {
 
@@ -24,11 +25,13 @@ std::string endpointLabel(const std::string &icao, const AirportInfo &airport, R
 std::string summaryFlight(const AircraftRow &row) { return orDash(row.aircraft.callsign); }
 
 std::string summaryAirline(const AircraftRow &row) {
-  return row.info.found ? orDash(row.info.airline) : "--";
+  if (row.info.found) return orDash(row.info.airline);
+  return row.info_pending ? kPendingText : kUnknownText;
 }
 
 std::string summaryType(const AircraftRow &row) {
-  return row.info.found ? orDash(row.info.aircraft_type) : "--";
+  if (row.info.found) return orDash(row.info.aircraft_type);
+  return row.info_pending ? kPendingText : kUnknownText;
 }
 
 std::string formatSummaryIdentity(const AircraftRow &row) {
@@ -69,6 +72,60 @@ std::string formatSummaryRoute(const RouteInfo &route, const AirportInfo &origin
          endpointLabel(route.dest_icao, destAirport, fmt);
 }
 
+namespace {
+
+// One endpoint of `row`'s route, pending-aware (see rowAirportCode()).
+std::string rowEndpoint(const AircraftRow &row, bool origin, RouteFormat fmt) {
+  const AirportInfo &airport = origin ? row.origin_airport : row.dest_airport;
+  const bool pending = origin ? row.origin_airport_pending : row.dest_airport_pending;
+  const std::string &icao = origin ? row.route.origin_icao : row.route.dest_icao;
+  if (airport.found && !airport.iata_code.empty()) return endpointLabel(icao, airport, fmt);
+  if (pending) return kPendingText;
+  return orDash(icao);
+}
+
+}  // namespace
+
+std::string rowAirportCode(const AircraftRow &row, bool origin) {
+  if (!row.route.found) return row.route_pending ? kPendingText : kUnknownText;
+  return rowEndpoint(row, origin, RouteFormat::CodesOnly);
+}
+
+std::string formatRowRoute(const AircraftRow &row, RouteFormat fmt) {
+  if (!row.route.found) return row.route_pending ? kPendingText : kUnknownText;
+  return rowEndpoint(row, true, fmt) + " -> " + rowEndpoint(row, false, fmt);
+}
+
+std::string rowPlaceName(const AircraftRow &row, bool origin, Language lang) {
+  if (!row.route.found) return row.route_pending ? kPendingText : kUnknownText;
+  const bool pending = origin ? row.origin_airport_pending : row.dest_airport_pending;
+  const AirportInfo &airport = origin ? row.origin_airport : row.dest_airport;
+  if (!airport.found && pending) return kPendingText;
+  return orDash(placeName(airport, origin ? row.route.origin_icao : row.route.dest_icao, lang));
+}
+
+std::string formatRowRouteCities(const AircraftRow &row, Language lang, int maxPx,
+                                 const TextMeasure &measure) {
+  if (!row.route.found) return row.route_pending ? kPendingText : kUnknownText;
+
+  static const std::string kArrow = " -> ";
+  const std::string from = rowPlaceName(row, true, lang);
+  const std::string to = rowPlaceName(row, false, lang);
+  auto withCountry = [](const std::string &place, const AirportInfo &a) {
+    return (a.found && !a.country_code.empty()) ? place + " (" + a.country_code + ")" : place;
+  };
+
+  const std::string full =
+      withCountry(from, row.origin_airport) + kArrow + withCountry(to, row.dest_airport);
+  if (measure(full) <= maxPx) return full;
+
+  const std::string bare = from + kArrow + to;
+  if (measure(bare) <= maxPx) return bare;
+
+  const int half = (maxPx - measure(kArrow)) / 2;
+  return fitToWidth(from, half, measure) + kArrow + fitToWidth(to, half, measure);
+}
+
 #ifdef ARDUINO
 
 #include "lcars_theme.h"
@@ -82,12 +139,12 @@ constexpr int16_t kIconGap = 6;  // min space between identity text and phase ic
 void drawIdentityLine(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, int16_t rightX) {
   gfx.setFont(LCARS_FONT_BODY);
 
-  // Phase icon first, pinned to the right edge, in its phase colour.
-  const char icon[2] = {phaseIcon(row.phase), '\0'};
-  gfx.setTextColor(phaseColor(row.phase), LCARS_BLACK);
-  gfx.setTextDatum(top_right);
-  gfx.drawString(icon, rightX, y);
-  const int iconW = static_cast<int>(gfx.textWidth(icon));
+  // Phase icon first: a drawn triangle pinned to the right edge, vertically
+  // centred on the 16px text line (the slot is reserved even with no phase,
+  // so the text never shifts when the phase changes).
+  drawPhaseIcon(gfx, row.phase, static_cast<int16_t>(rightX - kPhaseIconSize / 2),
+                static_cast<int16_t>(y + LCARS_FONT_BODY_HEIGHT_PX / 2), kPhaseIconSize);
+  const int iconW = kPhaseIconSize;
 
   // Then the identity text, fitted into what's left: airline/type in the
   // secondary colour, then the callsign re-drawn over its own prefix in
@@ -101,9 +158,8 @@ void drawIdentityLine(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, i
   gfx.drawString(summaryFlight(row).c_str(), x, y);
 }
 
-void drawAircraftSummary(LGFX &gfx, const AircraftRow &row, const AirportInfo &originAirport,
-                         const AirportInfo &destAirport, RouteFormat fmt, int16_t x, int16_t y,
-                         int16_t w, int16_t h) {
+void drawAircraftSummary(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, int16_t w,
+                         int16_t h) {
   (void)h;
 
   const int16_t textX = static_cast<int16_t>(x + kTextMargin);
@@ -115,9 +171,7 @@ void drawAircraftSummary(LGFX &gfx, const AircraftRow &row, const AirportInfo &o
   gfx.setTextDatum(top_left);
   gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
   gfx.drawString(
-      fitToWidth(formatSummaryRoute(row.route, originAirport, destAirport, fmt), rightX - textX,
-                 gfxTextMeasure(gfx))
-          .c_str(),
+      formatRowRouteCities(row, i18nLanguage(), rightX - textX, gfxTextMeasure(gfx)).c_str(),
       textX, static_cast<int16_t>(y + kTextMargin + kLineHeight));
 }
 

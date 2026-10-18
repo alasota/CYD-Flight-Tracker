@@ -61,6 +61,15 @@ static void test_parse_airport_found(void) {
   TEST_ASSERT_TRUE(info.found);
   TEST_ASSERT_EQUAL_STRING("GB", info.country_code.c_str());
   TEST_ASSERT_EQUAL_STRING("LHR", info.iata_code.c_str());
+  TEST_ASSERT_EQUAL_STRING("Heathrow Airport", info.name.c_str());
+}
+
+static void test_parse_airport_name_is_ascii_folded(void) {
+  // Real hexdb.io response for LIRF uses an en dash (–).
+  AirportInfo info = parseAirportLookupResponse(
+      R"({"country_code":"IT","iata":"FCO","icao":"LIRF",)"
+      R"("airport":"Rome–Fiumicino International Airport"})");
+  TEST_ASSERT_EQUAL_STRING("Rome-Fiumicino International Airport", info.name.c_str());
 }
 
 static void test_parse_airport_not_found(void) {
@@ -203,6 +212,15 @@ static void test_route_is_cached_reflects_confirmed_results_only(void) {
   TEST_ASSERT_FALSE(routeLookupIsCached("QQQ111"));  // a failed attempt does not
 }
 
+// ---- airportLookupIsCached ----------------------------------------------------
+
+static void test_airport_is_cached_after_lookup(void) {
+  TEST_ASSERT_FALSE(airportLookupIsCached("EPWA"));
+  lookupAirportWithFetcher("EPWA", stubAirportFetchFound);
+  TEST_ASSERT_TRUE(airportLookupIsCached("EPWA"));
+  TEST_ASSERT_FALSE(airportLookupIsCached("LIRF"));
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
 
@@ -214,6 +232,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_parse_route_rejects_oversized_body);
 
   RUN_TEST(test_parse_airport_found);
+  RUN_TEST(test_parse_airport_name_is_ascii_folded);
   RUN_TEST(test_parse_airport_not_found);
   RUN_TEST(test_parse_airport_empty_body);
   RUN_TEST(test_parse_airport_rejects_oversized_body);
@@ -228,5 +247,6 @@ int main(int argc, char **argv) {
 
   RUN_TEST(test_route_is_cached_reflects_confirmed_results_only);
 
+  RUN_TEST(test_airport_is_cached_after_lookup);
   return UNITY_END();
 }

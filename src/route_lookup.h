@@ -49,6 +49,7 @@ struct AirportInfo {
   bool found = false;
   std::string iata_code;     // hexdb.io "iata", e.g. "LHR" — for display
   std::string country_code;  // hexdb.io "country_code", e.g. "GB"
+  std::string name;          // hexdb.io "airport", ASCII-folded, e.g. "Heathrow Airport"
 };
 
 // Same defensive size cap as kMaxRouteResponseBytes, for airport responses.
@@ -90,6 +91,10 @@ RouteInfo lookupRouteWithFetcher(const std::string &callsign, RouteFetchFn fetch
 // one go, same reasoning as aircraft_lookup's aircraftLookupIsCached() (see
 // CLAUDE.md review notes 1.1). Pure — just a cache query.
 bool routeLookupIsCached(const std::string &callsign);
+
+// True if `airport_code` (ICAO) already has a cached airport result — so
+// main.cpp can budget *new* airport lookups per poll (cache hits are free).
+bool airportLookupIsCached(const std::string &airport_code);
 
 // Same idea, keyed by (ICAO) airport code.
 AirportInfo lookupAirportWithFetcher(const std::string &airport_code, AirportFetchFn fetch,

@@ -177,8 +177,11 @@ Answers "kierunek" for aircraft near the airport — pure logic, no I/O, lives i
   - else if `vertical_rate_mps > climb_rate_threshold_mps` → `TAKEOFF`.
   - else if `vertical_rate_mps < -climb_rate_threshold_mps` → `LANDING`.
   - else → `OVERFLIGHT` (near the airport but level — transiting through, not using it).
-- Icons (drawn via `lcars_theme` primitives, not bitmap assets): up chevron = takeoff, down
-  chevron = landing, sideways chevron = overflight, nothing/blank = `NONE`.
+- Icons — **filled triangles drawn with `fillTriangle`** (`lcars_theme::phaseTriangle()` /
+  `drawPhaseIcon()`, 10px, coloured by `phaseColor()`): ▲ = takeoff, ▼ = landing, ▶ =
+  overflight, nothing at all = `NONE`. They replaced the ASCII `^ v > -` glyphs, which were too
+  small to read on the device. Used in the table's FAZA column and at the right end of the
+  identity line (Screens 1 and 2).
 
 ## Time & WiFi status (for the header bar)
 
@@ -324,6 +327,10 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   unchanged in content, rendered smaller (8px / LovyanGFX's equivalent of Adafruit "Font 2" —
   again, verify the exact font reference name for LovyanGFX rather than assuming the TFT_eSPI
   name carries over).
+- **Stat chips** (`featured_panel::featuredPillTexts()`): airborne → altitude (m) / speed (m/s)
+  / distance (km). **On the ground** (`on_ground`, e.g. taxiing at the nearby airport) → one
+  double-width `NA ZIEMI` / `ON GROUND` chip + distance — altitude and speed are meaningless
+  there, and `0m` / `1m/s` looked like a bug. A missing value shows `--`, never a fake `0`.
 - Empty state ("no aircraft in range") still applies here, same as before — just now within
   these exact bounds.
 
@@ -348,11 +355,11 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   | Column  | x (px) | width (px) | Content                     |
   |---------|--------|------------|-----------------------------|
   | LOT     | 2      | 64         | callsign (8 chars in Font2) |
-  | LINIA   | 66     | 92         | airline (truncated)         |
-  | SKAD    | 158    | 38         | origin airport code         |
-  | DOKAD   | 196    | 38         | destination airport code    |
-  | TYP     | 234    | 52         | aircraft type (truncated)   |
-  | FAZA    | 286    | 32         | phase icon (EN label "PHASE" needs 30px in Font0) |
+  | LINIA   | 66     | 88         | airline (truncated)         |
+  | SKAD    | 154    | 36         | origin airport IATA code    |
+  | DOKAD   | 190    | 36         | destination airport IATA code |
+  | TYP     | 226    | 58         | aircraft type (truncated)   |
+  | FAZA    | 284    | 34         | phase triangle (EN label "PHASE" 30px + 4px label inset) |
 
 - **Every cell is truncated to its column width** before drawing — text must never spill into
   the next column (with a background color set, it overwrites its neighbour; without one, the
@@ -361,17 +368,29 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   `fitToWidth(text, maxPx, charWidthPx)` — reuse/generalize radar_view's `truncateAirline()`
   rather than writing a second one), and/or clip each cell with `setClipRect` as a pixel-level
   backstop. Callsign and phase icon always fit their columns and are never truncated.
-- **5 data rows**, starting at **y: 116px**, **19px step** (rows at y = 116, 135, 154, 173,
-  192) — the last row ends at y:211, inside the 215px content boundary (a `static_assert` in
+- **5 data rows**, starting at **y: 116px**, **17px step** (rows at y = 116, 133, 150, 167,
+  184) — 1px above the 16px Font2 text; the last row ends at y:201 (a `static_assert` in
   `table_view.cpp` enforces it). If more than 5 aircraft are in range, page via touch (Milestone 9's
   mechanism) rather than trying to fit more — pagination swaps which 5 are shown, it is not
   scrolling.
 - Columns per row: **flight (callsign), airline, from (IATA code), to (IATA code), aircraft
-  type, phase icon**. Airport codes only — no country codes, no room for them at 18px row
-  height.
+  type, phase icon**. Airport codes only — no country codes, no room for them in a 17px row.
+- **City names in the detail views** (featured panel, Screen 2, Screen 3 summary): the route is
+  shown as places, not codes — "Antalya (TR) -> Warszawa (PL)" (`formatRowRouteCities()`; drops
+  the country codes, then shortens both names, if it doesn't fit). Screen 3's narrow panel puts
+  origin and "-> destination" on two lines. The table keeps 3-letter IATA codes (no room).
+- **IATA codes everywhere** (table, featured panel, Screens 2 and 3). Every row with a route
+  gets its two airports looked up (`AircraftRow::origin_airport` / `dest_airport`); new hexdb.io
+  airport lookups are capped per poll (`kDefaultAirportLookupBudget`, planned with
+  `planLookups()`, nearest rows first), cache hits are free. If hexdb.io has no record for an
+  airport, its ICAO code is shown as a fallback (`rowAirportCode()` / `formatRowRoute()`).
 - Airline/type come from `aircraft_lookup`; from/to come from `route_lookup`; phase from
-  `flight_phase`. Any of these being unresolved/not-found shows "—" in that cell, never blocks
-  the row.
+  `flight_phase`. Never block the row on a missing value. **Two different placeholders:**
+  `...` = still loading (the per-poll lookup budget hasn't reached it yet —
+  `AircraftRow::info_pending` / `route_pending` / `*_airport_pending`), `--` = looked up,
+  nothing known. A wall of `--` while data was merely loading read like a failure.
+- Column-header labels sit `kTableHeaderLabelPadPx` (4px) right of the `|` divider line, so they
+  don't touch it; cell text keeps the 2px `kTableCellPadPx`.
 - Sorted by distance ascending, **excluding** whichever aircraft is currently shown in the
   featured panel above.
 - This is the priority screen — get it solid before spending time on the other two.
@@ -665,6 +684,10 @@ each with a single responsibility:
   `hitTest` pattern from Milestone 9), and the auto-cycle timer + `shouldDeferAutoSwitch()` (see
   "Auto screen cycling") — takes `t_cpa_seconds` as a parameter, doesn't call `cpa_predictor`
   itself. No TFT drawing, no OpenSky/hexdb.io calls.
+- `place_names` — readable place names for the detail views (pure): built-in IATA -> city table
+  (PL + EN, ~120 airports likely over Poland), else hexdb.io airport name minus "International
+  Airport", else IATA / ICAO; plus `asciiFold()` (UTF-8 -> drawable ASCII; hexdb.io names contain
+  en dashes and accents). hexdb.io has no city field, hence the table.
 - `i18n` — PL/EN string table (X-macro), `tr()`, current language, `pl`/`en` codes. See
   "Language". Pure, no I/O.
 - `redraw_policy` — pure `computeRedrawMask(events, currentScreen)`: turns "what happened"

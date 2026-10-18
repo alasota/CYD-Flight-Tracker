@@ -65,17 +65,15 @@ float radiusDegToKm(float radius_deg);
 //     beyond `radius_deg` range is clamped to the outer ring and drawn
 //     dimmer/smaller (radar_geometry::ScreenPoint::clamped);
 //   - divider      x:192..200 — an 8px vertical LCARS_ORANGE bar;
-//   - summary panel x:200..320 — an LCARS_MAGENTA elbow frame (swept
-//     corner facing the divider) with three rows for the nearest aircraft
-//     (rows.front()): callsign, airline, "WAW -> FCO" route (IATA only, no
-//     country codes — RouteFormat::CodesOnly), via aircraft_summary.
+//   - summary panel x:200..320 (no frame) with three rows for the nearest
+//     aircraft (rows.front()): callsign, airline, "WAW -> FCO" route (IATA
+//     only, no country codes — RouteFormat::CodesOnly, from the row's own
+//     airports).
 // `rows` must already be annotated (annotateDistances()) and sorted
-// (sortRowsByDistance()). `nearestOrigin`/`nearestDest` are rows.front()'s
-// route-endpoint AirportInfos (pass AirportInfo{} if unresolved).
+// (sortRowsByDistance()).
 // Empty-range state (`rows` empty): the radar still draws its empty rings
 // and home marker; the summary panel shows a centered "BRAK LOTU".
 void drawRadarView(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg,
-                   const AirportInfo &nearestOrigin, const AirportInfo &nearestDest,
                    int16_t screenWidth);
 
 #endif  // ARDUINO

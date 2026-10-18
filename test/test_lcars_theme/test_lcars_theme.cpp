@@ -197,6 +197,49 @@ static void test_table_rows_alternate_text_colour(void) {
   TEST_ASSERT_EQUAL_HEX16(THEME_CONTENT_SECONDARY, tableRowTextColor(3));
 }
 
+// ---- phaseTriangle: drawn ▲ / ▼ / ▶ icons ----------------------------------
+
+static void assertInsideBox(const PhaseTriangle &t, int16_t cx, int16_t cy, int16_t size) {
+  const int16_t half = size / 2;
+  const int16_t xs[] = {t.x0, t.x1, t.x2};
+  const int16_t ys[] = {t.y0, t.y1, t.y2};
+  for (int i = 0; i < 3; ++i) {
+    TEST_ASSERT_TRUE(xs[i] >= cx - half && xs[i] <= cx + half);
+    TEST_ASSERT_TRUE(ys[i] >= cy - half && ys[i] <= cy + half);
+  }
+}
+
+static void test_takeoff_triangle_points_up(void) {
+  PhaseTriangle t = phaseTriangle(Phase::TAKEOFF, 100, 50, 10);
+  TEST_ASSERT_TRUE(t.visible);
+  assertInsideBox(t, 100, 50, 10);
+  // Apex (x0,y0) above the flat base (y1 == y2).
+  TEST_ASSERT_EQUAL_INT(t.y1, t.y2);
+  TEST_ASSERT_TRUE(t.y0 < t.y1);
+  TEST_ASSERT_EQUAL_INT(100, t.x0);
+}
+
+static void test_landing_triangle_points_down(void) {
+  PhaseTriangle t = phaseTriangle(Phase::LANDING, 100, 50, 10);
+  TEST_ASSERT_TRUE(t.visible);
+  assertInsideBox(t, 100, 50, 10);
+  TEST_ASSERT_EQUAL_INT(t.y1, t.y2);
+  TEST_ASSERT_TRUE(t.y0 > t.y1);
+}
+
+static void test_overflight_triangle_points_right(void) {
+  PhaseTriangle t = phaseTriangle(Phase::OVERFLIGHT, 100, 50, 10);
+  TEST_ASSERT_TRUE(t.visible);
+  assertInsideBox(t, 100, 50, 10);
+  TEST_ASSERT_EQUAL_INT(t.x1, t.x2);  // flat left side
+  TEST_ASSERT_TRUE(t.x0 > t.x1);      // tip on the right
+  TEST_ASSERT_EQUAL_INT(50, t.y0);
+}
+
+static void test_no_phase_draws_nothing(void) {
+  TEST_ASSERT_FALSE(phaseTriangle(Phase::NONE, 100, 50, 10).visible);
+}
+
 static void test_phase_icon_distinct_ascii_per_phase(void) {
   char none = phaseIcon(Phase::NONE);
   char takeoff = phaseIcon(Phase::TAKEOFF);
@@ -320,6 +363,10 @@ int main(int argc, char **argv) {
   RUN_TEST(test_view_toggle_button_bounds_stays_within_screen);
 
   RUN_TEST(test_phase_icon_distinct_ascii_per_phase);
+  RUN_TEST(test_takeoff_triangle_points_up);
+  RUN_TEST(test_landing_triangle_points_down);
+  RUN_TEST(test_overflight_triangle_points_right);
+  RUN_TEST(test_no_phase_draws_nothing);
 
   RUN_TEST(test_variant_a_palette_values);
   RUN_TEST(test_chrome_and_content_use_different_colour_families);

@@ -36,9 +36,14 @@ enum class RouteFormat {
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
 
-// Individual identity fields, each falling back to "--" when the
-// underlying lookup hasn't resolved (info.found == false) or the field is
-// empty — same "show the row anyway as '—'" rule the rest of the UI uses.
+// Placeholders: "..." = lookup not run yet (still loading), "--" = looked up,
+// nothing known.
+constexpr const char *kPendingText = "...";
+constexpr const char *kUnknownText = "--";
+
+// Individual identity fields. Airline/type show "..." while the aircraft
+// lookup is pending (row.info_pending), "--" when it resolved without that
+// field — same "show the row anyway" rule the rest of the UI uses.
 std::string summaryFlight(const AircraftRow &row);   // callsign
 std::string summaryAirline(const AircraftRow &row);  // RegisteredOwners
 std::string summaryType(const AircraftRow &row);     // aircraft type
@@ -70,6 +75,31 @@ std::string fitSummaryIdentity(const AircraftRow &row, int maxPx, const TextMeas
 std::string formatSummaryRoute(const RouteInfo &route, const AirportInfo &originAirport,
                                const AirportInfo &destAirport, RouteFormat fmt);
 
+// One route endpoint of `row` as shown in the table — the IATA code when the
+// airport is known; "..." while the route or that airport is still loading;
+// the ICAO code if hexdb.io has no airport record (better than nothing);
+// "--" when the flight has no known route.
+std::string rowAirportCode(const AircraftRow &row, bool origin);
+
+// The route line for `row` using its own airports (row.origin_airport /
+// dest_airport) — "WAW (PL) -> FCO (IT)" / "WAW -> FCO"; "..." while the
+// route is loading, "--" when there is none; a still-loading endpoint shows
+// as "...".
+std::string formatRowRoute(const AircraftRow &row, RouteFormat fmt);
+
+// One route endpoint of `row` as a readable place name in `lang`
+// (place_names::placeName(): "Warszawa", "Londyn", "Rome-Fiumicino"...);
+// "..." while loading, "--" without a route.
+std::string rowPlaceName(const AircraftRow &row, bool origin, Language lang);
+
+// The detail views' route line with city names, fitted to `maxPx`:
+//   1. "Warszawa (PL) -> Rzym (IT)"  if it fits;
+//   2. "Warszawa -> Rzym"            (country codes dropped);
+//   3. both names cut to half the remaining width each.
+// "..." / "--" for a loading / missing route, "..." for a loading endpoint.
+std::string formatRowRouteCities(const AircraftRow &row, Language lang, int maxPx,
+                                 const TextMeasure &measure);
+
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme. Not
 // covered by Unity (see CLAUDE.md "Testing"). Guarded here in the header
 // too since the signature needs the LGFX device type.
@@ -80,10 +110,10 @@ std::string formatSummaryRoute(const RouteInfo &route, const AirportInfo &origin
 // Draws the two-line identity block (identity line + route line) into
 // [x, y, w, h], for Screen 1's featured panel and Screen 2. Uses
 // lcars_theme fonts/colors, no chrome of its own — the caller draws any
-// surrounding panel/frame. `fmt` selects the route line's detail level.
-void drawAircraftSummary(LGFX &gfx, const AircraftRow &row, const AirportInfo &originAirport,
-                         const AirportInfo &destAirport, RouteFormat fmt, int16_t x, int16_t y,
-                         int16_t w, int16_t h);
+// surrounding panel/frame. The route line uses city names
+// (formatRowRouteCities(), "Warszawa (PL) -> Rzym (IT)").
+void drawAircraftSummary(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, int16_t w,
+                         int16_t h);
 
 // The identity line alone, top-left at (x, y): fitSummaryIdentity() text
 // on the left, the phase icon right-aligned so its right edge sits at

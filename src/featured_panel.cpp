@@ -1,5 +1,7 @@
 #include "featured_panel.h"
 
+#include <cstdio>
+
 #include "table_view.h"  // full AircraftRow definition
 
 namespace {
@@ -10,9 +12,27 @@ constexpr int16_t kPanelHeight = 77;  // y:18..95 per CLAUDE.md "Screen 1"
 int16_t featuredPanelTopPx() { return kPanelTop; }
 int16_t featuredPanelHeightPx() { return kPanelHeight; }
 
-#ifdef ARDUINO
+namespace {
+// "<n><unit>" rounded to a whole number, or "--" when the value is unknown.
+std::string pillValue(bool known, float value, const char *unit) {
+  if (!known) return kUnknownText;
+  char buf[16];
+  std::snprintf(buf, sizeof(buf), "%.0f%s", static_cast<double>(value), unit);
+  return buf;
+}
+}  // namespace
 
-#include <cstdio>
+std::vector<std::string> featuredPillTexts(const AircraftRow &row, Language lang) {
+  const std::string distance = pillValue(row.has_distance, row.distance_km, "km");
+  if (row.aircraft.on_ground) {
+    return {tr(Str::OnGround, lang), distance};
+  }
+  const bool pos = row.aircraft.has_position;
+  return {pillValue(pos, row.aircraft.baro_altitude, "m"),
+          pillValue(pos, row.aircraft.velocity, "m/s"), distance};
+}
+
+#ifdef ARDUINO
 
 namespace {
 constexpr int16_t kSideMargin = 4;     // panel inset from the screen edges
@@ -24,8 +44,7 @@ constexpr int16_t kPillHeight = 22;
 constexpr int16_t kPillGap = 4;
 }  // namespace
 
-void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, const AirportInfo &originAirport,
-                       const AirportInfo &destAirport, int16_t screenWidth) {
+void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, int16_t screenWidth) {
   int16_t w = static_cast<int16_t>(screenWidth - 2 * kSideMargin);
 
   // No frame (dropped by request) — just text and pills on black.
@@ -35,14 +54,13 @@ void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, const AirportInfo &ori
   const int16_t textRightX = static_cast<int16_t>(kSideMargin + w - kContentInset - 4);
   drawIdentityLine(gfx, row, textX, kIdentityY, textRightX);
 
-  // Route line, with country codes (Screen 1 detail level).
+  // Route line with city names + country codes ("Warszawa (PL) -> Rzym (IT)").
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
   gfx.setTextDatum(top_left);
   const int16_t routeX = textX;
   gfx.drawString(
-      fitToWidth(formatSummaryRoute(row.route, originAirport, destAirport, RouteFormat::WithCountry),
-                 textRightX - routeX, gfxTextMeasure(gfx))
+      formatRowRouteCities(row, i18nLanguage(), textRightX - routeX, gfxTextMeasure(gfx))
           .c_str(),
       routeX, kRouteY);
 
@@ -51,21 +69,17 @@ void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, const AirportInfo &ori
   int16_t pillAreaW = static_cast<int16_t>(w - 2 * (kContentInset + 2));
   int16_t pillW = static_cast<int16_t>((pillAreaW - 2 * kPillGap) / 3);
 
-  char buf[16];
-
-  std::snprintf(buf, sizeof(buf), "%.0fm",
-                row.aircraft.has_position ? static_cast<double>(row.aircraft.baro_altitude) : 0.0);
-  drawPillButton(gfx, pillAreaX, kPillY, pillW, kPillHeight, THEME_PILL_FILL, THEME_CONTENT_SECONDARY, buf);
-
-  std::snprintf(buf, sizeof(buf), "%.0fm/s",
-                row.aircraft.has_position ? static_cast<double>(row.aircraft.velocity) : 0.0);
-  drawPillButton(gfx, static_cast<int16_t>(pillAreaX + pillW + kPillGap), kPillY, pillW, kPillHeight,
-                 THEME_PILL_FILL, THEME_CONTENT_SECONDARY, buf);
-
-  std::snprintf(buf, sizeof(buf), "%.0fkm",
-                row.has_distance ? static_cast<double>(row.distance_km) : 0.0);
-  drawPillButton(gfx, static_cast<int16_t>(pillAreaX + 2 * (pillW + kPillGap)), kPillY, pillW,
-                 kPillHeight, THEME_PILL_FILL, THEME_CONTENT_SECONDARY, buf);
+  // 3 pills in the air; on the ground the first ("NA ZIEMI") takes the
+  // width of two, so the row still lines up with the panel edges.
+  const std::vector<std::string> pills = featuredPillTexts(row, i18nLanguage());
+  int16_t x = pillAreaX;
+  for (size_t i = 0; i < pills.size(); ++i) {
+    const bool wide = (pills.size() == 2 && i == 0);
+    const int16_t pw = wide ? static_cast<int16_t>(2 * pillW + kPillGap) : pillW;
+    drawPillButton(gfx, x, kPillY, pw, kPillHeight, THEME_PILL_FILL, THEME_CONTENT_SECONDARY,
+                   pills[i].c_str());
+    x = static_cast<int16_t>(x + pw + kPillGap);
+  }
 }
 
 void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth) {

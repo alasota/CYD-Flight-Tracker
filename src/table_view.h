@@ -48,6 +48,20 @@ struct AircraftRow {
   float distance_km = 0.0f;
   float bearing_deg = 0.0f;
   bool has_distance = false;  // false when aircraft.has_position is false
+
+  // "Still loading" vs "confirmed unknown": a lookup that the per-poll
+  // budget hasn't reached yet is *pending* (shown as "..."); a lookup that
+  // ran and found nothing is not (shown as "--"). Set by main.cpp.
+  bool info_pending = false;   // aircraft_lookup (airline / type)
+  bool route_pending = false;  // route_lookup (origin / destination)
+
+  // Route endpoint airports (IATA code + country) — looked up for every row
+  // with a route, so the whole UI can show IATA codes. A pending flag means
+  // that airport's lookup hasn't run yet this cycle.
+  AirportInfo origin_airport;
+  AirportInfo dest_airport;
+  bool origin_airport_pending = false;
+  bool dest_airport_pending = false;
 };
 
 // Joins OpenSky state vectors with their hexdb.io aircraft lookups (by
@@ -135,6 +149,11 @@ constexpr int kTableColumnCount = 6;
 // Inset of text from its column's left (and right) edge.
 constexpr int16_t kTableCellPadPx = 2;
 
+// Inset of a column-header label from its column's left edge (where the
+// "|" divider line is drawn) — wider than the cell padding so the label
+// doesn't sit right against the line.
+constexpr int16_t kTableHeaderLabelPadPx = 4;
+
 // The 6 columns, in order: LOT/FLIGHT, LINIA/AIRLINE, SKAD/FROM, DOKAD/TO,
 // TYP/TYPE, FAZA/PHASE.
 const TableColumn *tableColumns();
@@ -175,13 +194,12 @@ std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int 
 //     phase icon — for everyone *except* the featured aircraft.
 // `rows` must already be annotated (annotateDistances()), classified
 // (classifyPhases()), and sorted (sortRowsByDistance()).
-// `originAirport`/`destAirport` are the featured aircraft's route
-// endpoints' AirportInfo (pass AirportInfo{} if not resolved). `page` is
+// `page` is
 // 0-based over the *rest* of the list (the featured row is never repeated
 // in the table); an out-of-range page draws no data rows. Which page is
 // current, and reacting to touch, is main.cpp's job — this only lays out
 // whichever page it's told to draw.
-void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, const AirportInfo &originAirport,
-                    const AirportInfo &destAirport, int16_t screenWidth, int page);
+void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t screenWidth,
+                   int page);
 
 #endif  // ARDUINO

@@ -86,8 +86,6 @@ static ScreenNav nav;
 // loop() iterations so a touch-driven page/screen change can redraw
 // immediately without waiting for the next OpenSky poll.
 static std::vector<AircraftRow> lastRows;
-static AirportInfo lastOriginAirport;  // nearest row's route origin, if resolved
-static AirportInfo lastDestAirport;    // nearest row's route destination, if resolved
 static float lastRadiusDeg = 2.5f;     // config_store's default — updated every poll
 
 // Whole config, loaded once at boot and refreshed after every poll that
@@ -146,16 +144,16 @@ static void drawActiveContent() {
     case kScreenFlight: {
       static const AircraftRow kNoRow{};
       bool hasNearest = !lastRows.empty();
-      drawFlightScreen(tft, hasNearest ? lastRows.front() : kNoRow, hasNearest, lastOriginAirport,
-                       lastDestAirport, currentCpa(), screenW);
+      drawFlightScreen(tft, hasNearest ? lastRows.front() : kNoRow, hasNearest, currentCpa(),
+                       screenW);
       break;
     }
     case kScreenRadar:
-      drawRadarView(tft, lastRows, lastRadiusDeg, lastOriginAirport, lastDestAirport, screenW);
+      drawRadarView(tft, lastRows, lastRadiusDeg, screenW);
       break;
     case kScreenFlights:
     default:
-      drawTablePage(tft, lastRows, lastOriginAirport, lastDestAirport, screenW, currentPage);
+      drawTablePage(tft, lastRows, screenW, currentPage);
       break;
   }
 }
@@ -436,21 +434,49 @@ void loop() {
 
         // Fold the enrichment into the already-sorted rows in place —
         // it doesn't change distance, so no re-sort needed.
+        // A key the budget didn't reach this cycle is *pending* ("..."),
+        // not unknown ("--") — it'll be fetched in a later poll.
         for (AircraftRow &r : lastRows) {
           auto info = infoByIcao24.find(r.aircraft.icao24);
-          if (info != infoByIcao24.end()) r.info = info->second;
+          if (info != infoByIcao24.end()) {
+            r.info = info->second;
+          } else {
+            r.info_pending = !r.aircraft.icao24.empty();
+          }
           auto route = routeByCallsign.find(r.aircraft.callsign);
-          if (route != routeByCallsign.end()) r.route = route->second;
+          if (route != routeByCallsign.end()) {
+            r.route = route->second;
+          } else {
+            r.route_pending = !r.aircraft.callsign.empty();
+          }
         }
         classifyPhases(lastRows, cachedCfg.near_airport_km, cachedCfg.climb_rate_threshold_mps);
 
-        // The nearest aircraft's route-endpoint airports, for the identity
-        // line's "WAW (PL) -> FCO (IT)" — 2 bounded calls, for that one row.
-        lastOriginAirport = AirportInfo{};
-        lastDestAirport = AirportInfo{};
-        if (!lastRows.empty() && lastRows.front().route.found) {
-          lastOriginAirport = lookupAirportCountry(lastRows.front().route.origin_icao);
-          lastDestAirport = lookupAirportCountry(lastRows.front().route.dest_icao);
+        // Route-endpoint airports for *every* row with a route, so the whole
+        // UI shows IATA codes. Cache hits are free; new hexdb.io lookups are
+        // budgeted per poll (planLookups, airport codes in the icao24 slot),
+        // nearest rows first — the rest stay pending and fill in over the
+        // next polls.
+        std::vector<LookupKeys> airportKeys;
+        for (const AircraftRow &r : lastRows) {
+          if (!r.route.found) continue;
+          airportKeys.push_back({r.route.origin_icao, ""});
+          airportKeys.push_back({r.route.dest_icao, ""});
+        }
+        LookupPlan airportPlan = planLookups(airportKeys, airportLookupIsCached,
+                                             routeLookupIsCached, kDefaultAirportLookupBudget);
+        std::map<std::string, AirportInfo> airportByCode;
+        for (const std::string &code : airportPlan.icao24) {
+          airportByCode[code] = lookupAirportCountry(code);
+        }
+        for (AircraftRow &r : lastRows) {
+          if (!r.route.found) continue;
+          auto o = airportByCode.find(r.route.origin_icao);
+          if (o != airportByCode.end()) r.origin_airport = o->second;
+          else r.origin_airport_pending = true;
+          auto d = airportByCode.find(r.route.dest_icao);
+          if (d != airportByCode.end()) r.dest_airport = d->second;
+          else r.dest_airport_pending = true;
         }
 
         // Recompute the nearest aircraft's CPA time; currentCpa() ticks it

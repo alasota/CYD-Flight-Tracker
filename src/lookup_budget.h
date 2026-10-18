@@ -24,6 +24,11 @@
 // main.cpp (review notes 5.2).
 constexpr int kDefaultLookupBudget = 2;
 
+// New hexdb.io airport lookups allowed per poll (IATA codes for every table
+// row). Airport codes repeat a lot (the same few nearby airports), so the
+// cache soon covers almost everything and this is rarely spent.
+constexpr int kDefaultAirportLookupBudget = 3;
+
 // One aircraft's lookup keys, in the caller's priority order.
 struct LookupKeys {
   std::string icao24;    // aircraft-info lookup key

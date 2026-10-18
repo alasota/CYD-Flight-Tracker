@@ -88,15 +88,14 @@ uint8_t bigTextSize(CountdownDisplay::Mode mode) {
 }  // namespace
 
 void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
-                      const AirportInfo &origin, const AirportInfo &dest, const CpaPrediction &cpa,
-                      int16_t screenWidth) {
+                      const CpaPrediction &cpa, int16_t screenWidth) {
   const int16_t cx = static_cast<int16_t>(screenWidth / 2);
 
   // ---- Identity panel, y:28..78 — text only, no frame (same as Screen 1).
   const int16_t frameW = static_cast<int16_t>(screenWidth - 2 * kSideMargin);
 
   if (hasNearest) {
-    drawAircraftSummary(gfx, nearest, origin, dest, RouteFormat::WithCountry, kSideMargin,
+    drawAircraftSummary(gfx, nearest, kSideMargin,
                         kIdentityTop, frameW, kIdentityHeight);
   } else {
     gfx.setFont(LCARS_FONT_BODY);

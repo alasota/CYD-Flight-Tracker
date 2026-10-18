@@ -50,9 +50,10 @@ constexpr int16_t kSummaryX = 200;
 constexpr int16_t kSummaryW = 120;  // x:200..320
 constexpr int16_t kSummaryInset = 3;
 constexpr int16_t kSummaryTextX = 208;
-constexpr int16_t kSummaryFlightY = kContentTop + 64;    // 82  — three rows centred
-constexpr int16_t kSummaryAirlineY = kContentTop + 99;   // 117   in the content area
-constexpr int16_t kSummaryRouteY = kContentTop + 134;    // 152
+constexpr int16_t kSummaryFlightY = kContentTop + 52;    // 70  — four rows centred
+constexpr int16_t kSummaryAirlineY = kContentTop + 86;   // 104   in the content area
+constexpr int16_t kSummaryFromY = kContentTop + 112;     // 130  origin city
+constexpr int16_t kSummaryToY = kContentTop + 132;       // 150  "-> destination city"
 // Text width between kSummaryTextX and the panel's right edge (less kSummaryInset),
 // minus a 2px breathing gap — what fitToWidth() cuts rows 2/3 down to.
 constexpr int kSummaryTextMaxPx = kSummaryX + kSummaryW - kSummaryInset - 2 - kSummaryTextX;
@@ -104,8 +105,7 @@ void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg
   gfx.fillCircle(layout.center_x, layout.center_y, 2, LCARS_YELLOW);
 }
 
-void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, const AirportInfo &origin,
-                      const AirportInfo &dest) {
+void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows) {
   // No frame (dropped by request) — the orange divider alone separates the
   // panel from the radar. Keep any long text from spilling past the panel.
   gfx.setClipRect(static_cast<int16_t>(kSummaryX + kSummaryInset), kContentTop,
@@ -138,12 +138,18 @@ void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, const Air
   gfx.drawString(fitToWidth(summaryAirline(nearest), kSummaryTextMaxPx, measure).c_str(),
                  kSummaryTextX, kSummaryAirlineY);
 
-  // Row 3: route, IATA codes only (no country codes — narrow panel).
-  gfx.drawString(
-      fitToWidth(formatSummaryRoute(nearest.route, origin, dest, RouteFormat::CodesOnly),
-                 kSummaryTextMaxPx, measure)
-          .c_str(),
-      kSummaryTextX, kSummaryRouteY);
+  // Rows 3-4: route as city names, one per line (the panel is too narrow
+  // for "Warszawa -> Rzym" on one line): "Warszawa" / "-> Rzym".
+  gfx.drawString(fitToWidth(rowPlaceName(nearest, /*origin=*/true, i18nLanguage()),
+                            kSummaryTextMaxPx, measure)
+                     .c_str(),
+                 kSummaryTextX, kSummaryFromY);
+  if (nearest.route.found) {
+    gfx.drawString(fitToWidth("-> " + rowPlaceName(nearest, /*origin=*/false, i18nLanguage()),
+                              kSummaryTextMaxPx, measure)
+                       .c_str(),
+                   kSummaryTextX, kSummaryToY);
+  }
 
   gfx.clearClipRect();
 }
@@ -151,12 +157,11 @@ void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, const Air
 }  // namespace
 
 void drawRadarView(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg,
-                   const AirportInfo &nearestOrigin, const AirportInfo &nearestDest,
                    int16_t screenWidth) {
   (void)screenWidth;  // fixed 320px layout — parameter kept for signature symmetry
 
   drawRadar(gfx, rows, radius_deg);
-  drawSummaryPanel(gfx, rows, nearestOrigin, nearestDest);
+  drawSummaryPanel(gfx, rows);
 }
 
 #endif  // ARDUINO

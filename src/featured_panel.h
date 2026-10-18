@@ -11,6 +11,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 #include "aircraft_summary.h"  // RouteFormat, the identity/route formatters
 #include "lcars_theme.h"
@@ -27,8 +29,15 @@ struct AircraftRow;
 // Fixed vertical bounds of the featured panel on the 320x240 frame, per
 // CLAUDE.md "Screen 1" ("Featured flight section, y: 28 to 105px").
 // table_view starts its table section immediately below.
-int16_t featuredPanelTopPx();     // 28
-int16_t featuredPanelHeightPx();  // 77 (28..105)
+int16_t featuredPanelTopPx();     // 18
+int16_t featuredPanelHeightPx();  // 77 (18..95)
+
+// Texts for the stat pills under the featured aircraft: airborne ->
+// {"<alt>m", "<speed>m/s", "<dist>km"}; on the ground -> {"NA ZIEMI" /
+// "ON GROUND", "<dist>km"} (altitude and speed mean nothing while taxiing,
+// and "0m" / "1m/s" read like a bug — the first pill is drawn double-width).
+// A missing value is "--", never a fake 0. Pure — native-tested.
+std::vector<std::string> featuredPillTexts(const AircraftRow &row, Language lang);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme +
 // aircraft_summary. Not covered by Unity (see CLAUDE.md "Testing").
@@ -39,13 +48,10 @@ int16_t featuredPanelHeightPx();  // 77 (28..105)
 #include "LGFX_CYD.hpp"
 
 // Draws the featured panel for `row` across a `screenWidth`-px display, at
-// the fixed y:28..105 bounds: the LCARS_MAGENTA elbow frame, the identity
-// line + "WAW (PL) -> FCO (IT)" route line (via aircraft_summary in
-// RouteFormat::WithCountry mode), and altitude/speed/distance as
-// lcars_theme pills. `originAirport`/`destAirport` are the row's route
-// endpoints (pass default-constructed AirportInfo{} if not resolved).
-void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, const AirportInfo &originAirport,
-                       const AirportInfo &destAirport, int16_t screenWidth);
+// the fixed y:18..95 bounds (no frame): the identity line + "WAW (PL) ->
+// FCO (IT)" route line (RouteFormat::WithCountry, airports from the row),
+// and the stat pills from featuredPillTexts().
+void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, int16_t screenWidth);
 
 // Draws the "no aircraft in range" placeholder in the same bounds.
 void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth);

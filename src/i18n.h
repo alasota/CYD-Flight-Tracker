@@ -44,6 +44,8 @@ constexpr Language kDefaultLanguage = Language::PL;
   /* empty states */                                                        \
   X(NoFlightsInRange, "BRAK LOTOW W ZASIEGU", "NO FLIGHTS IN RANGE")        \
   X(NoFlight, "BRAK LOTU", "NO FLIGHT")                                     \
+  /* featured pill when the aircraft is taxiing / parked */                 \
+  X(OnGround, "NA ZIEMI", "ON GROUND")                                      \
   /* Screen 2 countdown status strip */                                     \
   X(StatusApproaching, "ZBLIZA SIE", "APPROACHING")                         \
   X(StatusOverhead, "NAD TOBA", "OVERHEAD")                                 \
