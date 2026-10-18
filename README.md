@@ -119,9 +119,37 @@ pio run -t upload       # flash it, engage
 pio device monitor -b 115200   # watch the logs scroll by dramatically
 ```
 
-On first boot the board can't find a saved WiFi network, so it opens its own hotspot for setup.
-Connect to it from your phone, hand over your WiFi credentials, and the board will reboot onto
-your network like nothing happened.
+### Connecting it to your WiFi
+
+On first boot the board has no saved WiFi network, so it opens its own hotspot for setup:
+
+| | |
+|---|---|
+| Hotspot name (SSID) | `CYD-Sky-Tracker-Setup` |
+| Password | none (open network) |
+| Setup page | http://192.168.4.1 |
+
+1. On your phone or laptop, open the WiFi list and join **`CYD-Sky-Tracker-Setup`**. Your
+   device may warn that the network has no internet. That's expected, so stay connected.
+2. A sign-in page usually pops up on its own (the same kind hotels use). If it doesn't, open a
+   browser and go to **http://192.168.4.1**.
+3. Tap **Configure WiFi**, pick your home network from the list (or type its name), enter its
+   password and tap **Save**.
+4. The hotspot disappears and the board joins your network. Reconnect your phone to your
+   normal WiFi. If the board can't connect (wrong password, say), the hotspot comes back and you
+   can try again.
+
+Good to know:
+- The ESP32 only supports **2.4 GHz** WiFi. If your router broadcasts 5 GHz only, or uses the
+  same name for both bands with 2.4 GHz turned off, the board won't see it.
+- The board remembers the network across reboots and reconnects by itself if the router goes
+  away for a while.
+- If nobody connects to the hotspot within 3 minutes, it closes and reopens straight away, so
+  you never have to reset the board to get it back.
+- **Moving to another network:** power the board up somewhere its saved network isn't
+  reachable and the setup hotspot appears again. To wipe the saved network outright, run
+  `pio run -t erase` and flash again. That also erases every other setting (home location,
+  OpenSky credentials and so on).
 
 ### Configuring it from the browser
 
