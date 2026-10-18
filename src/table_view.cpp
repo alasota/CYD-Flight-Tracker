@@ -196,8 +196,6 @@ std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int 
 
 namespace {
 
-constexpr int16_t kGroundMarkerPx = 6;  // "on the ground" square in the FAZA column
-
 // One cell: text cut to the column's width (fitToWidth) and drawn at the
 // column's padded x, clipped to the column as a pixel-level backstop — so
 // nothing ever spills into the neighbouring column.
@@ -234,18 +232,12 @@ void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t 
     drawCell(gfx, kColumns[kColDest], rowAirportCode(row, /*origin=*/false), rowY, textY,
              measure);
     drawCell(gfx, kColumns[kColType], summaryType(row), rowY, textY, measure);
-    // Phase: a drawn, coloured triangle centred in its column (nothing for
-    // "no phase") — far easier to read than the old ASCII ^ v >.
+    // Phase: a small aircraft icon centred in its column — climbing /
+    // descending / level side view, or a top view when on the ground;
+    // nothing for "no phase".
     const TableColumn &phaseCol = kColumns[kColPhase];
-    if (row.aircraft.on_ground) {
-      // "Parked / taxiing" marker: a small muted square instead of a phase.
-      gfx.fillRect(static_cast<int16_t>(phaseCol.x + phaseCol.w / 2 - kGroundMarkerPx / 2),
-                   static_cast<int16_t>(textY - kGroundMarkerPx / 2), kGroundMarkerPx,
-                   kGroundMarkerPx, THEME_CONTENT_MUTED);
-    } else {
-      drawPhaseIcon(gfx, row.phase, static_cast<int16_t>(phaseCol.x + phaseCol.w / 2), textY,
-                    kPhaseIconSize);
-    }
+    drawPhaseIcon(gfx, phaseIconKind(row.phase, row.aircraft.on_ground),
+                  static_cast<int16_t>(phaseCol.x + phaseCol.w / 2), textY);
   }
 }
 

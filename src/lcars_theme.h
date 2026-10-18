@@ -130,16 +130,44 @@ char phaseIcon(Phase phase);
 // Pure — native-tested.
 uint16_t phaseColor(Phase phase);
 
-// The drawn phase icon (replaces the old ASCII ^ v > glyphs, which were too
-// small to read): a filled triangle fitting a `size` x `size` box centred on
-// (cx, cy) — ▲ takeoff (apex x0,y0 on top), ▼ landing (apex at the bottom),
-// ▶ overflight (tip x0,y0 on the right); `visible` is false for NONE (no
-// icon at all). Pure geometry — native-tested; drawPhaseIcon() fills it.
+// A filled triangle (x0,y0 = tip) — the head of directionArrow() below.
+// `visible` false = nothing to draw.
 struct PhaseTriangle {
   bool visible = false;
   int16_t x0 = 0, y0 = 0, x1 = 0, y1 = 0, x2 = 0, y2 = 0;
 };
-PhaseTriangle phaseTriangle(Phase phase, int16_t cx, int16_t cy, int16_t size);
+
+// ---- Phase icons: small aircraft pixel art ---------------------------------
+//
+// Replaced the ▲ / ▼ / ▶ triangles, which nobody read as "takeoff / landing /
+// overflight". Side view for the airborne phases (nose up / nose down / level,
+// with a runway strip under the tail on takeoff and under the nose on
+// landing); top view for an aircraft on the ground. 16 x 12 px, ~18 degree
+// climb/descent ("variant B" of the 2026-10-18 mock-ups).
+enum class PhaseIconKind : uint8_t { NONE, TAKEOFF, LANDING, OVERFLIGHT, GROUND };
+
+// Which icon a row gets: GROUND whenever the aircraft is on the ground
+// (flight_phase gives NONE there), else the phase's own icon; NONE = no icon.
+PhaseIconKind phaseIconKind(Phase phase, bool onGround);
+
+constexpr int16_t kPhaseIconW = 16;
+constexpr int16_t kPhaseIconH = 12;
+
+// Pixel rows of an icon, kPhaseIconH strings of kPhaseIconW chars:
+// '#' body (phaseIconColor), 'd' darker body shade (engines), 'k' black
+// (cockpit / windows), 'g' runway grey, '.' transparent. nullptr for NONE.
+// String literals — they stay in flash.
+const char *const *phaseIconRows(PhaseIconKind kind);
+
+// Body colour per icon: takeoff green, landing peach, overflight sky (as
+// phaseColor()), ground muted lavender.
+uint16_t phaseIconColor(PhaseIconKind kind);
+
+// Colour of one pixel character of `kind`'s icon; false = transparent.
+bool phaseIconPixelColor(PhaseIconKind kind, char pixel, uint16_t *color);
+
+// RGB565 colour scaled towards black by num/den (each channel).
+uint16_t shadeRgb565(uint16_t color, int num, int den);
 
 // "Where to look" arrow in a `size` x `size` box centred on (cx, cy),
 // pointing along `bearingDeg` from home — 0 = up/north, 90 = right/east
@@ -211,9 +239,8 @@ constexpr int16_t LCARS_FONT_BODY_CHAR_PX = 8;
 constexpr int16_t LCARS_FONT_TABLE_HEIGHT_PX = 14;
 constexpr int16_t LCARS_FONT_TABLE_CHAR_PX = 7;
 
-// Side of the drawn phase triangle (drawPhaseIcon()) — a bit smaller than
-// the 16px text line it sits next to.
-constexpr int16_t kPhaseIconSize = 10;
+// Runway strip under the takeoff / landing icons.
+constexpr uint16_t LCARS_RUNWAY_GREY = rgb565(0x80, 0x80, 0x80);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX. Not covered by
 // Unity (see CLAUDE.md "Testing") — this module is almost entirely draw
@@ -249,9 +276,9 @@ void drawPanel(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t c
 void drawElbow(LGFX &gfx, int16_t x, int16_t y, int16_t height, int16_t headerWidth,
                int16_t barWidth, uint16_t color);
 
-// Fills phaseTriangle(phase, cx, cy, size) in phaseColor(phase). Draws
-// nothing for Phase::NONE.
-void drawPhaseIcon(LGFX &gfx, Phase phase, int16_t cx, int16_t cy, int16_t size);
+// Draws phaseIconRows(kind) centred on (cx, cy), one fastHLine per run of
+// same-coloured pixels. Draws nothing for PhaseIconKind::NONE.
+void drawPhaseIcon(LGFX &gfx, PhaseIconKind kind, int16_t cx, int16_t cy);
 
 // Fills directionArrow(bearingDeg, cx, cy, size) in `color` — the "where to
 // look" arrow next to distances (featured panel, Screen 2).

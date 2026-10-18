@@ -197,43 +197,116 @@ static void test_table_rows_alternate_text_colour(void) {
   TEST_ASSERT_EQUAL_HEX16(THEME_CONTENT_SECONDARY, tableRowTextColor(3));
 }
 
-// ---- phaseTriangle: drawn ▲ / ▼ / ▶ icons ----------------------------------
+// ---- phase icons: aircraft pixel art -------------------------------------
 
-static void assertInsideBox(const PhaseTriangle &t, int16_t cx, int16_t cy, int16_t size) {
-  const int16_t half = size / 2;
-  const int16_t xs[] = {t.x0, t.x1, t.x2};
-  const int16_t ys[] = {t.y0, t.y1, t.y2};
-  for (int i = 0; i < 3; ++i) {
-    TEST_ASSERT_TRUE(xs[i] >= cx - half && xs[i] <= cx + half);
-    TEST_ASSERT_TRUE(ys[i] >= cy - half && ys[i] <= cy + half);
+static const PhaseIconKind kDrawnIcons[] = {PhaseIconKind::TAKEOFF, PhaseIconKind::LANDING,
+                                            PhaseIconKind::OVERFLIGHT, PhaseIconKind::GROUND};
+
+static void test_phase_icon_kind_mapping(void) {
+  TEST_ASSERT_TRUE(phaseIconKind(Phase::TAKEOFF, false) == PhaseIconKind::TAKEOFF);
+  TEST_ASSERT_TRUE(phaseIconKind(Phase::LANDING, false) == PhaseIconKind::LANDING);
+  TEST_ASSERT_TRUE(phaseIconKind(Phase::OVERFLIGHT, false) == PhaseIconKind::OVERFLIGHT);
+  TEST_ASSERT_TRUE(phaseIconKind(Phase::NONE, false) == PhaseIconKind::NONE);
+  // On the ground always gets the top-view icon, whatever the phase says.
+  TEST_ASSERT_TRUE(phaseIconKind(Phase::NONE, true) == PhaseIconKind::GROUND);
+  TEST_ASSERT_TRUE(phaseIconKind(Phase::OVERFLIGHT, true) == PhaseIconKind::GROUND);
+}
+
+static void test_phase_icons_are_well_formed(void) {
+  for (PhaseIconKind k : kDrawnIcons) {
+    const char *const *rows = phaseIconRows(k);
+    TEST_ASSERT_NOT_NULL(rows);
+    int bodyPixels = 0;
+    for (int y = 0; y < kPhaseIconH; ++y) {
+      TEST_ASSERT_EQUAL_size_t(static_cast<size_t>(kPhaseIconW), std::string(rows[y]).size());
+      for (int x = 0; x < kPhaseIconW; ++x) {
+        const char c = rows[y][x];
+        TEST_ASSERT_TRUE(c == '.' || c == '#' || c == 'd' || c == 'k' || c == 'g');
+        if (c == '#') ++bodyPixels;
+      }
+    }
+    TEST_ASSERT_TRUE(bodyPixels > 20);  // an aircraft, not a speck
+  }
+  TEST_ASSERT_NULL(phaseIconRows(PhaseIconKind::NONE));
+}
+
+static void test_phase_icons_are_all_different(void) {
+  for (int a = 0; a < 4; ++a) {
+    for (int b = a + 1; b < 4; ++b) {
+      const char *const *ra = phaseIconRows(kDrawnIcons[a]);
+      const char *const *rb = phaseIconRows(kDrawnIcons[b]);
+      bool differ = false;
+      for (int y = 0; y < kPhaseIconH && !differ; ++y) differ = std::string(ra[y]) != rb[y];
+      TEST_ASSERT_TRUE(differ);
+    }
   }
 }
 
-static void test_takeoff_triangle_points_up(void) {
-  PhaseTriangle t = phaseTriangle(Phase::TAKEOFF, 100, 50, 10);
-  TEST_ASSERT_TRUE(t.visible);
-  assertInsideBox(t, 100, 50, 10);
-  // Apex (x0,y0) above the flat base (y1 == y2).
-  TEST_ASSERT_EQUAL_INT(t.y1, t.y2);
-  TEST_ASSERT_TRUE(t.y0 < t.y1);
-  TEST_ASSERT_EQUAL_INT(100, t.x0);
+static bool rowHas(const char *row, char c, int from, int to) {
+  for (int x = from; x < to; ++x) {
+    if (row[x] == c) return true;
+  }
+  return false;
 }
 
-static void test_landing_triangle_points_down(void) {
-  PhaseTriangle t = phaseTriangle(Phase::LANDING, 100, 50, 10);
-  TEST_ASSERT_TRUE(t.visible);
-  assertInsideBox(t, 100, 50, 10);
-  TEST_ASSERT_EQUAL_INT(t.y1, t.y2);
-  TEST_ASSERT_TRUE(t.y0 > t.y1);
+static void test_runway_under_tail_on_takeoff_and_under_nose_on_landing(void) {
+  const char *takeoffBottom = phaseIconRows(PhaseIconKind::TAKEOFF)[kPhaseIconH - 1];
+  const char *landingBottom = phaseIconRows(PhaseIconKind::LANDING)[kPhaseIconH - 1];
+  // Nose points right: takeoff leaves the runway behind (left), landing
+  // heads for it (right).
+  TEST_ASSERT_TRUE(rowHas(takeoffBottom, 'g', 0, 4));
+  TEST_ASSERT_FALSE(rowHas(takeoffBottom, 'g', 12, kPhaseIconW));
+  TEST_ASSERT_TRUE(rowHas(landingBottom, 'g', 12, kPhaseIconW));
+  TEST_ASSERT_FALSE(rowHas(landingBottom, 'g', 0, 4));
+  // Airborne-level and ground icons have no runway.
+  for (PhaseIconKind k : {PhaseIconKind::OVERFLIGHT, PhaseIconKind::GROUND}) {
+    for (int y = 0; y < kPhaseIconH; ++y) TEST_ASSERT_FALSE(rowHas(phaseIconRows(k)[y], 'g', 0, kPhaseIconW));
+  }
 }
 
-static void test_overflight_triangle_points_right(void) {
-  PhaseTriangle t = phaseTriangle(Phase::OVERFLIGHT, 100, 50, 10);
-  TEST_ASSERT_TRUE(t.visible);
-  assertInsideBox(t, 100, 50, 10);
-  TEST_ASSERT_EQUAL_INT(t.x1, t.x2);  // flat left side
-  TEST_ASSERT_TRUE(t.x0 > t.x1);      // tip on the right
-  TEST_ASSERT_EQUAL_INT(50, t.y0);
+static int topBodyRow(PhaseIconKind k, int x) {
+  for (int y = 0; y < kPhaseIconH; ++y) {
+    if (phaseIconRows(k)[y][x] == '#') return y;
+  }
+  return -1;
+}
+
+static void test_takeoff_climbs_and_landing_descends(void) {
+  // Fuselage top towards the nose (x:10) vs. behind the wing (x:4).
+  TEST_ASSERT_TRUE(topBodyRow(PhaseIconKind::TAKEOFF, 10) < topBodyRow(PhaseIconKind::TAKEOFF, 4));
+  TEST_ASSERT_TRUE(topBodyRow(PhaseIconKind::LANDING, 10) > topBodyRow(PhaseIconKind::LANDING, 4));
+  TEST_ASSERT_EQUAL_INT(topBodyRow(PhaseIconKind::OVERFLIGHT, 10),
+                        topBodyRow(PhaseIconKind::OVERFLIGHT, 4));  // level
+}
+
+static void test_phase_icon_colours(void) {
+  TEST_ASSERT_EQUAL_HEX16(LCARS_GREEN, phaseIconColor(PhaseIconKind::TAKEOFF));
+  TEST_ASSERT_EQUAL_HEX16(LCARS_PEACH, phaseIconColor(PhaseIconKind::LANDING));
+  TEST_ASSERT_EQUAL_HEX16(LCARS_SKY, phaseIconColor(PhaseIconKind::OVERFLIGHT));
+  TEST_ASSERT_EQUAL_HEX16(THEME_CONTENT_MUTED, phaseIconColor(PhaseIconKind::GROUND));
+
+  uint16_t c = 0;
+  TEST_ASSERT_TRUE(phaseIconPixelColor(PhaseIconKind::TAKEOFF, '#', &c));
+  TEST_ASSERT_EQUAL_HEX16(LCARS_GREEN, c);
+  TEST_ASSERT_TRUE(phaseIconPixelColor(PhaseIconKind::TAKEOFF, 'd', &c));
+  TEST_ASSERT_NOT_EQUAL(LCARS_GREEN, c);  // engines darker than the body
+  TEST_ASSERT_NOT_EQUAL(LCARS_BLACK, c);
+  TEST_ASSERT_TRUE(phaseIconPixelColor(PhaseIconKind::LANDING, 'g', &c));
+  TEST_ASSERT_EQUAL_HEX16(LCARS_RUNWAY_GREY, c);
+  TEST_ASSERT_TRUE(phaseIconPixelColor(PhaseIconKind::LANDING, 'k', &c));
+  TEST_ASSERT_EQUAL_HEX16(LCARS_BLACK, c);
+  TEST_ASSERT_FALSE(phaseIconPixelColor(PhaseIconKind::LANDING, '.', &c));
+}
+
+static void test_shade_rgb565(void) {
+  TEST_ASSERT_EQUAL_HEX16(0xFFFF, shadeRgb565(0xFFFF, 1, 1));
+  TEST_ASSERT_EQUAL_HEX16(0x0000, shadeRgb565(0xFFFF, 0, 1));
+  TEST_ASSERT_EQUAL_HEX16(0x7BEF, shadeRgb565(0xFFFF, 1, 2));  // each channel halved, rounded down
+}
+
+static void test_phase_icon_fits_text_line(void) {
+  // Identity line: 16px text; table rows are checked in test_table_view.
+  TEST_ASSERT_TRUE(kPhaseIconH <= LCARS_FONT_BODY_HEIGHT_PX);
 }
 
 // ---- directionArrow: "where to look" (bearing from home, north up) ----------
@@ -289,10 +362,6 @@ static void test_compass_points(void) {
   TEST_ASSERT_EQUAL_STRING("N", compassPoint(350.0f));
   TEST_ASSERT_EQUAL_STRING("N", compassPoint(360.0f));
   TEST_ASSERT_EQUAL_STRING("W", compassPoint(-90.0f));
-}
-
-static void test_no_phase_draws_nothing(void) {
-  TEST_ASSERT_FALSE(phaseTriangle(Phase::NONE, 100, 50, 10).visible);
 }
 
 static void test_phase_icon_distinct_ascii_per_phase(void) {
@@ -449,10 +518,14 @@ int main(int argc, char **argv) {
   RUN_TEST(test_view_toggle_button_bounds_stays_within_screen);
 
   RUN_TEST(test_phase_icon_distinct_ascii_per_phase);
-  RUN_TEST(test_takeoff_triangle_points_up);
-  RUN_TEST(test_landing_triangle_points_down);
-  RUN_TEST(test_overflight_triangle_points_right);
-  RUN_TEST(test_no_phase_draws_nothing);
+  RUN_TEST(test_phase_icon_kind_mapping);
+  RUN_TEST(test_phase_icons_are_well_formed);
+  RUN_TEST(test_phase_icons_are_all_different);
+  RUN_TEST(test_runway_under_tail_on_takeoff_and_under_nose_on_landing);
+  RUN_TEST(test_takeoff_climbs_and_landing_descends);
+  RUN_TEST(test_phase_icon_colours);
+  RUN_TEST(test_shade_rgb565);
+  RUN_TEST(test_phase_icon_fits_text_line);
   RUN_TEST(test_arrow_points_along_the_bearing);
   RUN_TEST(test_arrow_stays_inside_its_box);
   RUN_TEST(test_arrow_has_a_stem_so_it_is_not_a_phase_triangle);

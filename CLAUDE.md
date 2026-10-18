@@ -179,11 +179,15 @@ Answers "kierunek" for aircraft near the airport — pure logic, no I/O, lives i
   - else → `OVERFLIGHT` (near the airport but level — transiting through, not using it).
   (The first implementation skipped the `NONE` step and returned `OVERFLIGHT` for every distant
   aircraft, so the FAZA column showed ▶ almost everywhere — fixed and pinned by tests.)
-- Icons — **filled triangles drawn with `fillTriangle`** (`lcars_theme::phaseTriangle()` /
-  `drawPhaseIcon()`, 10px, coloured by `phaseColor()`): ▲ = takeoff, ▼ = landing, ▶ =
-  overflight, nothing at all = `NONE`. They replaced the ASCII `^ v > -` glyphs, which were too
-  small to read on the device. Used in the table's FAZA column and at the right end of the
-  identity line (Screens 1 and 2).
+- Icons — **16×12 px aircraft pixel art** (`lcars_theme`: `phaseIconKind(phase, onGround)`,
+  `phaseIconRows()` = char grids `# d k g .`, `drawPhaseIcon()` draws them as fastHLine runs):
+  side view climbing ~18° with a runway strip under the tail = takeoff (green), side view
+  descending with the runway under the nose = landing (peach), side view level = overflight
+  (sky), **top view = on the ground** (muted lavender, any phase), nothing at all = `NONE`.
+  Used in the table's FAZA column and at the right end of the identity line (Screens 1-3).
+  History: ASCII `^ v > -` (too small) → filled ▲ ▼ ▶ triangles (nobody read them as
+  takeoff/landing) → these planes ("variant B" of the 2026-10-18 mock-ups). The README shows
+  them from `docs/icons/phase_*.png` — regenerate those if the grids change.
 
 ## Time & WiFi status (for the header bar)
 
@@ -416,8 +420,8 @@ coordinates to fit the 320x240 frame, consistent with "Design language" below:
   `on_ground=false` and null altitude/speed — trusting the flag put a parked LOT jet in the
   featured slot as "0m 0km/h" with an overflight icon. Null altitude/speed are tracked
   (`has_altitude` / `has_velocity`) and shown as `--`, never as a fake `0`.
-- **Ground rows are dimmed** (`tableRowColor(i, onGround)` -> muted lavender) and get a small
-  muted square in the FAZA column instead of a phase — otherwise "5km" listed after "23km" read
+- **Ground rows are dimmed** (`tableRowColor(i, onGround)` -> muted lavender) and get the
+  top-view "on the ground" plane in the FAZA column instead of a phase — otherwise "5km" listed after "23km" read
   like a sorting bug.
 - **Page indicator:** "1/2" (`tablePageLabel()`) right-aligned in the TYP column header whenever
   there is more than one page; nothing on a single page.

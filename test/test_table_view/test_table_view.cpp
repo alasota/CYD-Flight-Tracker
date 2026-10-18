@@ -356,6 +356,12 @@ static void test_table_row_step_is_17px_from_y116(void) {
 
 // ---- column layout (CLAUDE.md "Screen 1" column table) ----------------------
 
+static void test_phase_icon_fits_the_phase_column_and_row(void) {
+  const TableColumn &phase = tableColumns()[5];
+  TEST_ASSERT_TRUE(kPhaseIconW <= phase.w);
+  TEST_ASSERT_TRUE(kPhaseIconH < tableRowHeightPx());  // 1px+ gap between rows' icons
+}
+
 static void test_columns_count_and_order(void) {
   TEST_ASSERT_EQUAL_INT(6, kTableColumnCount);
   const TableColumn *cols = tableColumns();
@@ -556,6 +562,7 @@ static void test_page_slice_empty_input(void) {
 int main(int argc, char **argv) {
   UNITY_BEGIN();
 
+  RUN_TEST(test_phase_icon_fits_the_phase_column_and_row);
   RUN_TEST(test_distance_zero_when_home_equals_aircraft);
   RUN_TEST(test_distance_one_degree_north_at_equator);
   RUN_TEST(test_distance_one_degree_east_at_equator);

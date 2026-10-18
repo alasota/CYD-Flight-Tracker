@@ -147,12 +147,13 @@ constexpr int16_t kIconGap = 6;  // min space between identity text and phase ic
 void drawIdentityLine(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, int16_t rightX) {
   gfx.setFont(LCARS_FONT_BODY);
 
-  // Phase icon first: a drawn triangle pinned to the right edge, vertically
+  // Phase icon first: a small aircraft pinned to the right edge, vertically
   // centred on the 16px text line (the slot is reserved even with no phase,
   // so the text never shifts when the phase changes).
-  drawPhaseIcon(gfx, row.phase, static_cast<int16_t>(rightX - kPhaseIconSize / 2),
-                static_cast<int16_t>(y + LCARS_FONT_BODY_HEIGHT_PX / 2), kPhaseIconSize);
-  const int iconW = kPhaseIconSize;
+  drawPhaseIcon(gfx, phaseIconKind(row.phase, row.aircraft.on_ground),
+                static_cast<int16_t>(rightX - kPhaseIconW / 2),
+                static_cast<int16_t>(y + LCARS_FONT_BODY_HEIGHT_PX / 2));
+  const int iconW = kPhaseIconW;
 
   // Then the identity text, fitted into what's left: airline/type in the
   // secondary colour, then the callsign re-drawn over its own prefix in

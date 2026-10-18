@@ -35,6 +35,28 @@ Real captures straight off the device (via its `/screenshot.bmp` endpoint), Poli
   </tr>
 </table>
 
+### Phase icons
+
+What each aircraft is doing near the airport, as a tiny 16×12 px plane (shown here at 4×) in
+the table's FAZA / PHASE column and next to the featured flight:
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/icons/phase_takeoff.png" width="72" alt="Takeoff icon: green side-view plane climbing away from a runway"></td>
+    <td align="center"><img src="docs/icons/phase_landing.png" width="72" alt="Landing icon: peach side-view plane descending towards a runway"></td>
+    <td align="center"><img src="docs/icons/phase_overflight.png" width="72" alt="Overflight icon: sky-blue side-view plane flying level"></td>
+    <td align="center"><img src="docs/icons/phase_ground.png" width="72" alt="On-the-ground icon: lavender plane seen from above"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Takeoff</b><br>climbing, runway behind it</td>
+    <td align="center"><b>Landing</b><br>descending, runway ahead</td>
+    <td align="center"><b>Overflight</b><br>near the airport, level</td>
+    <td align="center"><b>On the ground</b><br>taxiing or parked (top view)</td>
+  </tr>
+</table>
+
+No icon at all means the aircraft is too far from the airport for a phase to mean anything.
+
 ## What is this thing
 
 It polls live aircraft state vectors for a bounding box around your house (or your grill, same
@@ -50,13 +72,14 @@ answer to "what plane is that." Think of it as the away-team variant with better
 
 - 📋 **Flights screen** — the closest aircraft featured up top (**flight, airline, aircraft
   type**, route with city names, altitude, speed, direction), plus a paged table of everything
-  else in range: flight, distance, from/to (IATA), type and phase (takeoff / landing / overflight).
+  else in range: flight, distance, from/to (IATA), type and phase (takeoff / landing / overflight /
+  on the ground — see [Phase icons](#phase-icons)).
   This is the bet-settling screen, front and center.
 - ⏱️ **Now screen** — a big countdown to the moment the next aircraft is actually over your head.
 - 🎯 **Radar screen** — a static radar plot with range rings, heading ticks and a nearest-aircraft
   summary.
 - 🇵🇱/🇬🇧 **Polish or English UI**, switchable on the config web page.
-- 🖖 **LCARS-inspired chrome** — black background, chunky color blocks, pill buttons. An homage,
+- 🖖 **LCARS-inspired chrome** — black background, chunky color blocks, folder-tab navigation. An homage,
   not a photocopy. All shapes hand-drawn with LovyanGFX, zero ripped assets.
 - 📡 Lives entirely on the ESP32 — no server, no phone app, no subscription, no away mission
   required.
