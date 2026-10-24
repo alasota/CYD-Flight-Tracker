@@ -63,6 +63,13 @@ jobs:
       - name: Build firmware
         run: pio run -e cyd
 
+      - name: Check the OTA firmware marker
+        # The config page's OTA update refuses a .bin without it (ota_update).
+        run: |
+          set -euo pipefail
+          VERSION=$(cat .pio/build/cyd/version.txt)
+          grep -a -q "CYDSKY-FW1|board=cyd-r|v=$VERSION" .pio/build/cyd/firmware.bin
+
       - name: Collect binaries
         id: collect
         run: |

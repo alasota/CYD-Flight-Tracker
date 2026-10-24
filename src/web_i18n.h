@@ -22,6 +22,7 @@
   X(TabOpenSky, "Klient OpenSky", "OpenSky client")                                                \
   X(TabGeneral, "Ogólne", "General")                                                               \
   X(TabBackup, "Kopia", "Backup")                                                                  \
+  X(TabFirmware, "Firmware", "Firmware")                                                           \
   /* Location */                                                                                   \
   X(LocationIntro, "Środek obszaru, nad którym śledzone są samoloty — zwykle Twój dom.",           \
     "The centre of the area to watch — usually your home.")                                        \
@@ -49,6 +50,10 @@
   X(ShowSecret, "Pokaż", "Show")                                                                   \
   X(CredentialsHint, "Utworzysz je na opensky-network.org → Account → API client.",                \
     "Create them at opensky-network.org → Account → API client.")                                  \
+  X(SecretKeepPlaceholder, "zapisany — zostaw puste, żeby nie zmieniać",                           \
+    "saved — leave empty to keep it")                                                              \
+  X(ClearCredentials, "Usuń dane logowania OpenSky (tryb anonimowy)",                              \
+    "Remove the OpenSky credentials (anonymous mode)")                                             \
   X(UploadTitle, "Albo wczytaj plik z danymi", "Or load the credentials file")                     \
   X(UploadHint, "Plik JSON pobrany ze strony konta OpenSky (credentials.json).",                   \
     "The JSON file downloaded from your OpenSky account page (credentials.json).")                 \
@@ -82,6 +87,31 @@
   X(ClimbRate, "Próg wznoszenia / opadania (m/s)", "Climb / descent threshold (m/s)")              \
   X(ClimbRateHint, "Szybciej w górę to start, szybciej w dół to lądowanie.",                       \
     "Climbing faster is a takeoff, descending faster a landing.")                                  \
+  X(SectionAccess, "Dostęp do panelu", "Panel access")                                             \
+  X(AccessPasswordSet, "Hasło ustawione · login: admin", "Password set · login: admin")            \
+  X(AccessNoPassword,                                                                              \
+    "Panel nie ma hasła — każdy w Twojej sieci WiFi może zmienić ustawienia i wgrać firmware.",    \
+    "The panel has no password — anyone on your WiFi can change the settings and flash firmware.") \
+  X(NewPassword, "Nowe hasło", "New password")                                                     \
+  X(RepeatPassword, "Powtórz hasło", "Repeat password")                                            \
+  X(PasswordHint,                                                                                  \
+    "8–64 znaki, bez polskich liter. Login: admin. Puste pola = bez zmian. Zapomniane hasło: "     \
+    "przytrzymaj palec na ekranie podczas włączania płytki.",                                      \
+    "8–64 characters, plain ASCII. Login: admin. Empty fields = no change. Forgot it: hold a "     \
+    "finger on the screen while the board powers up.")                                             \
+  X(ClearPassword, "Usuń hasło", "Remove the password")                                            \
+  X(PasswordChanged,                                                                               \
+    "Zapisano. Hasło panelu zmienione — przeglądarka zapyta o nie przy następnym kliknięciu.",     \
+    "Saved. The panel password changed — your browser will ask for it on the next click.")         \
+  X(PasswordCleared, "Zapisano. Panel nie ma już hasła.", "Saved. The panel no longer has a password.") \
+  X(PasswordMismatch, "hasło panelu (wpisane hasła się różnią)",                                   \
+    "panel password (the two entries differ)")                                                     \
+  X(PasswordTooShort, "hasło panelu (za krótkie, min. 8 znaków)",                                  \
+    "panel password (too short, at least 8 characters)")                                           \
+  X(PasswordTooLong, "hasło panelu (za długie, max. 64 znaki)",                                    \
+    "panel password (too long, 64 characters max)")                                                \
+  X(PasswordBadChar, "hasło panelu (tylko znaki ASCII, bez polskich liter)",                       \
+    "panel password (plain ASCII characters only)")                                                \
   /* Backup */                                                                                     \
   X(BackupIntro,                                                                                   \
     "Wszystkie ustawienia w jednym pliku JSON: na wypadek wymiany płytki, wyczyszczenia pamięci "  \
@@ -91,8 +121,10 @@
   X(BackupSaveTitle, "Zapisz kopię", "Save a backup")                                              \
   X(BackupIncludeSecrets, "Dołącz dane logowania OpenSky", "Include OpenSky credentials")          \
   X(BackupSecretsHint,                                                                             \
-    "Client ID i secret trafią do pliku zwykłym tekstem. Trzymaj go w bezpiecznym miejscu.",       \
-    "The client ID and secret go into the file as plain text. Keep it somewhere safe.")            \
+    "Client ID, secret i hasło panelu trafią do pliku zwykłym tekstem. Trzymaj go w bezpiecznym "  \
+    "miejscu.",                                                                                    \
+    "The client ID, secret and panel password go into the file as plain text. Keep it somewhere " \
+    "safe.")                                                                                       \
   X(BackupDownload, "Pobierz plik JSON", "Download JSON file")                                     \
   X(RestoreTitle, "Przywróć z kopii", "Restore from a backup")                                     \
   X(RestoreHint,                                                                                   \
@@ -105,6 +137,47 @@
     "Restored, but these fields had invalid values and were left unchanged:")                      \
   X(RestoreNotBackup, "Nie przywrócono: to nie jest plik kopii ustawień Sky Trackera.",            \
     "Not restored: this is not a Sky Tracker settings backup.")                                    \
+  /* Firmware */                                                                                   \
+  X(FirmwareIntro,                                                                                 \
+    "Nowa wersja przez WiFi, bez kabla. Ustawienia i zapamiętane samoloty zostają.",               \
+    "A new version over WiFi, no cable. Settings and remembered aircraft are kept.")               \
+  X(FirmwareInstalled, "Zainstalowana wersja", "Installed version")                                \
+  X(FirmwareReleases, "Najnowsze wydanie na GitHubie", "Latest release on GitHub")                 \
+  X(FirmwareChoose, "Plik firmware (.bin)", "Firmware file (.bin)")                                \
+  X(FirmwareHint,                                                                                  \
+    "Wybierz plik cyd-sky-tracker-WERSJA.bin — nie ten z -full w nazwie.",                         \
+    "Pick cyd-sky-tracker-VERSION.bin — not the one with -full in its name.")                      \
+  X(FirmwareUpdateButton, "Aktualizuj", "Update")                                                  \
+  X(FirmwareDontPowerOff, "Nie wyłączaj zasilania podczas aktualizacji (ok. 30 s).",               \
+    "Don't power off during the update (about 30 s).")                                             \
+  X(FirmwareUploading, "Wysyłanie", "Uploading")                                                   \
+  X(FirmwareRestarting, "Płytka uruchamia się ponownie — strona odświeży się sama.",               \
+    "The board is restarting — this page reloads by itself.")                                      \
+  X(FirmwareLooksLikeFull,                                                                         \
+    "To pełny obraz (-full.bin) do instalacji kablem. Wybierz plik bez -full.",                    \
+    "That is the full image (-full.bin) for cable installs. Pick the file without -full.")         \
+  X(OtaOk, "Zaktualizowano firmware:", "Firmware updated:")                                        \
+  X(OtaNoFile, "Nie wybrano pliku.", "No file chosen.")                                            \
+  X(OtaFullImage,                                                                                  \
+    "Nie zaktualizowano: to pełny obraz (-full.bin) do instalacji kablem. Wybierz plik bez -full.", \
+    "Not updated: that is the full image (-full.bin) for cable installs. Pick the file without "   \
+    "-full.")                                                                                      \
+  X(OtaNotFirmware, "Nie zaktualizowano: to nie jest plik firmware ESP32.",                        \
+    "Not updated: this is not an ESP32 firmware file.")                                            \
+  X(OtaWrongChip, "Nie zaktualizowano: firmware jest na inny układ niż ESP32.",                    \
+    "Not updated: this firmware is for a different chip than the ESP32.")                          \
+  X(OtaTooLarge, "Nie zaktualizowano: plik nie mieści się w pamięci płytki.",                      \
+    "Not updated: the file does not fit the board's memory.")                                      \
+  X(OtaNotSkyTracker, "Nie zaktualizowano: to nie jest firmware Sky Trackera.",                    \
+    "Not updated: this is not Sky Tracker firmware.")                                              \
+  X(OtaWriteFailed, "Nie zaktualizowano: błąd zapisu do pamięci flash.",                           \
+    "Not updated: writing to flash failed.")                                                       \
+  X(OtaVerifyFailed, "Nie zaktualizowano: plik jest uszkodzony (suma kontrolna się nie zgadza).",  \
+    "Not updated: the file is corrupt (checksum mismatch).")                                       \
+  X(OtaAborted, "Nie zaktualizowano: wysyłanie zostało przerwane.",                                \
+    "Not updated: the upload was interrupted.")                                                    \
+  X(OtaUnauthorized, "Nie zaktualizowano: wymagane hasło panelu.",                                 \
+    "Not updated: the panel password is required.")                                                \
   /* Save + messages */                                                                            \
   X(Save, "Zapisz", "Save")                                                                        \
   X(Saved, "Zapisano.", "Saved.")                                                                  \

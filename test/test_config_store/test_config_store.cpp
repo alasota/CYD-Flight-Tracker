@@ -195,9 +195,21 @@ static void test_web_language_is_independent_and_sanitized(void) {
                         static_cast<int>(sanitizeConfig(c).web_language));
 }
 
+static void test_web_password_defaults_to_none_and_invalid_ones_are_dropped(void) {
+  TEST_ASSERT_TRUE(defaultConfig().web_password.empty());
+  Config c = defaultConfig();
+  c.web_password = "hunter22";
+  TEST_ASSERT_EQUAL_STRING("hunter22", sanitizeConfig(c).web_password.c_str());
+  c.web_password = "short";
+  TEST_ASSERT_TRUE(sanitizeConfig(c).web_password.empty());
+  c.web_password = "zaÅ¼Ã³Åcgesl";
+  TEST_ASSERT_TRUE(sanitizeConfig(c).web_password.empty());
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_web_language_is_independent_and_sanitized);
+  RUN_TEST(test_web_password_defaults_to_none_and_invalid_ones_are_dropped);
   RUN_TEST(test_default_language_is_polish);
   RUN_TEST(test_sanitize_config_preserves_valid_language);
   RUN_TEST(test_sanitize_config_resets_invalid_language);

@@ -13,6 +13,8 @@ const char *settingsTabId(SettingsTab tab) {
       return "general";
     case SettingsTab::Backup:
       return "backup";
+    case SettingsTab::Firmware:
+      return "firmware";
     case SettingsTab::Location:
     default:
       return "location";
@@ -23,6 +25,7 @@ SettingsTab settingsTabFromArg(const std::string &arg) {
   if (arg == "opensky") return SettingsTab::OpenSky;
   if (arg == "general") return SettingsTab::General;
   if (arg == "backup") return SettingsTab::Backup;
+  if (arg == "firmware") return SettingsTab::Firmware;
   return SettingsTab::Location;
 }
 
@@ -127,7 +130,7 @@ const char kStyle[] =
     ".lang a{padding:4px 11px;font-size:.78rem;font-weight:600;color:var(--muted);"
     "text-decoration:none}"
     ".lang a.on{background:var(--accent);color:var(--on-accent)}"
-    ".tabs{display:flex;gap:4px;padding:4px;background:var(--field);"
+    ".tabs{display:flex;flex-wrap:wrap;gap:4px;padding:4px;background:var(--field);"
     "border:1px solid var(--line);border-radius:12px;margin-bottom:20px}"
     ".tabs button{flex:1 1 auto;white-space:nowrap;padding:9px 8px;background:none;border:0;border-radius:9px;"
     "color:var(--muted);font:inherit;font-size:.85rem;font-weight:500;cursor:pointer}"
@@ -172,6 +175,10 @@ const char kStyle[] =
     "border:1px solid}"
     ".msg.ok{color:var(--ok);border-color:#2e4a2e;background:#1a231a}"
     ".msg.err{color:var(--err);border-color:#553030;background:#271b1b}"
+    "progress{width:100%;height:10px;margin:4px 0 6px;accent-color:var(--accent)}"
+    "button:disabled{opacity:.5;cursor:default}"
+    ".alert{color:var(--err);border:1px solid #553030;background:#271b1b;border-radius:10px;"
+    "padding:11px 13px;margin-bottom:16px;font-size:.875rem}"
     "footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:32px}"
     "a{color:var(--accent-soft)}"
     "[hidden]{display:none!important}"
@@ -185,19 +192,36 @@ const char kScript[] =
     "function show(t){"
     "document.querySelectorAll('section[data-tab]').forEach(function(s){s.hidden=s.dataset.tab!=t});"
     "document.querySelectorAll('.tabs button').forEach(function(b){b.classList.toggle('on',b.dataset.t==t)});"
-    "$('tab').value=t;$('save').hidden=t=='backup';"
+    "$('tab').value=t;$('save').hidden=t=='backup'||t=='firmware';"
     "document.querySelectorAll('.lang a').forEach(function(a){a.href='/lang?l='+a.dataset.l+'&tab='+t})}"
     "document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){show(b.dataset.t)}});"
     "function cost(r){var a=4*r*r;return a<=25?1:a<=100?2:a<=400?3:4}"
     "function calc(){"
     "var c=cost(parseFloat($('radius').value)||0),p=Math.max(parseInt($('poll').value)||0,1),"
-    "d=Math.ceil(86400/p)*c,l=($('cid').value&&$('cs').value)?4000:400;"
+    "d=Math.ceil(86400/p)*c,l=($('cid').value&&($('cs').value||$('cs').dataset.saved))?4000:400;"
     "$('cost').textContent=c;"
     "$('daily').innerHTML='≈ <b>'+d+'</b> '+T.day+' · '+T.lim+' '+l+"
     "(d>l?'<div class=warn>'+T.over+'</div>':'')}"
     "['radius','poll','cid','cs'].forEach(function(i){$(i).addEventListener('input',calc)});"
     "function pw(){var i=$('cs');i.type=i.type=='password'?'text':'password'}"
+    // Firmware upload with a progress bar (a plain form post works too, just
+    // without one). The answer page replaces this one.
+    "$('fw').onsubmit=function(e){var i=$('fwf').files[0];if(!i)return;e.preventDefault();"
+    "if(/-full/i.test(i.name)){$('fws').textContent=T.full;return}"
+    "var x=new XMLHttpRequest(),d=new FormData();d.append('firmware',i);"
+    "x.open('POST','/update?size='+i.size);"
+    "x.upload.onprogress=function(v){if(!v.lengthComputable)return;var p=Math.round(v.loaded*100/v.total);"
+    "$('fwp').hidden=false;$('fwp').value=p;$('fws').textContent=T.up+' '+p+'%'};"
+    "x.onload=function(){document.open();document.write(x.responseText);document.close()};"
+    "x.onerror=function(){$('fwb').disabled=false;$('fws').textContent=T.fail};"
+    "$('fwb').disabled=true;$('fws').textContent=T.up+'…';x.send(d)};"
     "show($('tab').value);calc();";
+
+// After a successful update: wait for the board to come back, then reload.
+const char kRestartScript[] =
+    "setTimeout(function p(){fetch('/',{cache:'no-store'}).then(function(r){"
+    "if(r.ok||r.status==401)location.href='/?tab=firmware';else setTimeout(p,2000)})"
+    ".catch(function(){setTimeout(p,2000)})},5000);";
 
 class Writer {
  public:
@@ -308,15 +332,21 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
       w.raw(" ");
       w.esc(m.messageDetail);
     }
+    if (m.restarting) {
+      w.raw("<br>");
+      w.t(WebStr::FirmwareRestarting);
+    }
     w.raw("</div>");
   }
 
   // ---- tab bar
   w.raw("<div class=\"tabs\" role=\"tablist\">");
   const SettingsTab tabs[kSettingsTabCount] = {SettingsTab::Location, SettingsTab::OpenSky,
-                                               SettingsTab::General, SettingsTab::Backup};
+                                               SettingsTab::General, SettingsTab::Backup,
+                                               SettingsTab::Firmware};
   const WebStr tabLabels[kSettingsTabCount] = {WebStr::TabLocation, WebStr::TabOpenSky,
-                                               WebStr::TabGeneral, WebStr::TabBackup};
+                                               WebStr::TabGeneral, WebStr::TabBackup,
+                                               WebStr::TabFirmware};
   for (int i = 0; i < kSettingsTabCount; ++i) {
     w.raw("<button type=\"button\" data-t=\"");
     w.raw(settingsTabId(tabs[i]));
@@ -366,14 +396,26 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
           c.opensky_client_id);
   w.raw("<div class=\"f\"><label for=\"cs\">");
   w.t(WebStr::ClientSecret);
+  // The saved secret never goes into the page (anyone could read it from the
+  // source): the field stays empty, empty = keep it.
   w.raw("</label><div class=\"pw\"><input id=\"cs\" type=\"password\" name=\"client_secret\" "
-        "autocomplete=\"off\" value=\"");
-  w.esc(c.opensky_client_secret);
-  w.raw("\"><button type=\"button\" class=\"ghost\" onclick=\"pw()\">");
+        "autocomplete=\"off\" value=\"\"");
+  if (!c.opensky_client_secret.empty()) {
+    w.raw(" data-saved=\"1\" placeholder=\"");
+    w.t(WebStr::SecretKeepPlaceholder);
+    w.raw("\"");
+  }
+  w.raw("><button type=\"button\" class=\"ghost\" onclick=\"pw()\">");
   w.t(WebStr::ShowSecret);
   w.raw("</button></div><div class=\"hint\">");
   w.t(WebStr::CredentialsHint);
-  w.raw("</div></div></div>");
+  w.raw("</div></div>");
+  if (authed) {
+    w.raw("<label class=\"switch\"><span>");
+    w.t(WebStr::ClearCredentials);
+    w.raw("</span><input type=\"checkbox\" name=\"clear_credentials\" value=\"1\"></label>");
+  }
+  w.raw("</div>");
 
   // Upload: its controls live here but belong to the separate #up form
   // (form="up") — forms can't nest.
@@ -439,6 +481,37 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
           fmt("%.1f", c.near_airport_km), &nearHint);
   w.field("climb", WebStr::ClimbRate, "name=\"climb_rate_mps\" inputmode=\"decimal\"",
           fmt("%.1f", c.climb_rate_threshold_mps), &climbHint);
+  w.raw("</div>");
+
+  // Panel password: the fields are never pre-filled; both empty = no change.
+  const bool hasPassword = !c.web_password.empty();
+  w.raw("<div class=\"card\" id=\"access\"><h2>");
+  w.t(WebStr::SectionAccess);
+  w.raw("</h2>");
+  if (hasPassword) {
+    w.raw("<span class=\"pill ok\"><span class=\"dot\"></span>");
+    w.t(WebStr::AccessPasswordSet);
+    w.raw("</span>");
+  } else {
+    w.raw("<div class=\"alert\">");
+    w.t(WebStr::AccessNoPassword);
+    w.raw("</div>");
+  }
+  w.raw("<div class=\"row\">");
+  w.field("np", WebStr::NewPassword,
+          "type=\"password\" name=\"new_password\" autocomplete=\"new-password\" maxlength=\"64\"",
+          "");
+  w.field("np2", WebStr::RepeatPassword,
+          "type=\"password\" name=\"new_password2\" autocomplete=\"new-password\" maxlength=\"64\"",
+          "");
+  w.raw("</div><div class=\"hint\">");
+  w.t(WebStr::PasswordHint);
+  w.raw("</div>");
+  if (hasPassword) {
+    w.raw("<label class=\"switch\" style=\"margin:16px 0 0\"><span>");
+    w.t(WebStr::ClearPassword);
+    w.raw("</span><input type=\"checkbox\" name=\"clear_password\" value=\"1\"></label>");
+  }
   w.raw("</div></section>");
 
   // ---- Backup: download / restore. Its controls belong to their own forms
@@ -465,8 +538,39 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.t(WebStr::RestoreHint);
   w.raw("</div></div></section>");
 
+  // ---- Firmware: OTA update. Its controls belong to the #fw form.
+  w.sectionOpen(SettingsTab::Firmware, m.tab);
+  w.raw("<div class=\"card\"><p class=\"intro\">");
+  w.t(WebStr::FirmwareIntro);
+  w.raw("</p>");
+  if (!hasPassword) {
+    w.raw("<div class=\"alert\">");
+    w.t(WebStr::AccessNoPassword);
+    w.raw("</div>");
+  }
+  w.raw("<div class=\"stat\" style=\"margin:0 0 18px\">");
+  w.t(WebStr::FirmwareInstalled);
+  w.raw(": <b id=\"fwv\">");
+  w.esc(firmwareVersion());
+  w.raw("</b> · <a href=\"");
+  w.raw(kReleasesUrl);
+  w.raw("\" target=\"_blank\" rel=\"noopener\">");
+  w.t(WebStr::FirmwareReleases);
+  w.raw("</a></div><div class=\"f\"><label for=\"fwf\">");
+  w.t(WebStr::FirmwareChoose);
+  w.raw("</label><input id=\"fwf\" type=\"file\" name=\"firmware\" form=\"fw\" "
+        "accept=\".bin,application/octet-stream\" required><div class=\"hint\">");
+  w.t(WebStr::FirmwareHint);
+  w.raw("</div></div><progress id=\"fwp\" max=\"100\" value=\"0\" hidden></progress>"
+        "<div class=\"hint\" id=\"fws\" style=\"margin:0 0 12px\"></div>"
+        "<button form=\"fw\" class=\"wide\" id=\"fwb\">");
+  w.t(WebStr::FirmwareUpdateButton);
+  w.raw("</button><div class=\"hint\">");
+  w.t(WebStr::FirmwareDontPowerOff);
+  w.raw("</div></div></section>");
+
   // ---- save, side forms, footer, script
-  w.raw(m.tab == SettingsTab::Backup
+  w.raw(m.tab == SettingsTab::Backup || m.tab == SettingsTab::Firmware
             ? "<button type=\"submit\" class=\"save\" id=\"save\" hidden>"
             : "<button type=\"submit\" class=\"save\" id=\"save\">");
   w.t(WebStr::Save);
@@ -475,6 +579,8 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
         "enctype=\"multipart/form-data\"></form>"
         "<form id=\"bk\" method=\"GET\" action=\"/backup.json\"></form>"
         "<form id=\"rs\" method=\"POST\" action=\"/restore\" "
+        "enctype=\"multipart/form-data\"></form>"
+        "<form id=\"fw\" method=\"POST\" action=\"/update\" "
         "enctype=\"multipart/form-data\"></form>"
         "<footer>CYD Sky Tracker · ");
   w.t(WebStr::Version);
@@ -488,7 +594,14 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.t(WebStr::DailyLimit);
   w.raw("\",over:\"");
   w.t(WebStr::OverLimit);
+  w.raw("\",up:\"");
+  w.t(WebStr::FirmwareUploading);
+  w.raw("\",full:\"");
+  w.t(WebStr::FirmwareLooksLikeFull);
+  w.raw("\",fail:\"");
+  w.t(WebStr::OtaAborted);
   w.raw("\"};");
   w.raw(kScript);
+  if (m.restarting) w.raw(kRestartScript);
   w.raw("</script></body></html>");
 }

@@ -66,7 +66,19 @@ constexpr Language kDefaultLanguage = Language::PL;
   X(FlightsFew, "LOTY", "FLIGHTS")                                          \
   X(FlightsMany, "LOTÓW", "FLIGHTS")                                        \
   /* first-boot setup prompt */                                             \
-  X(SetupPrompt, "Ustaw lokalizację domu na", "Set your home location at")
+  X(SetupPrompt, "Ustaw lokalizację domu na", "Set your home location at")  \
+  /* firmware update screen (service_screen) */                             \
+  X(OtaTitle, "AKTUALIZACJA FIRMWARE", "FIRMWARE UPDATE")                   \
+  X(OtaDontPowerOff, "NIE WYŁĄCZAJ ZASILANIA", "DO NOT POWER OFF")          \
+  X(OtaRestarting, "GOTOWE · RESTART…", "DONE · RESTARTING…")               \
+  X(OtaFailed, "AKTUALIZACJA NIEUDANA", "UPDATE FAILED")                    \
+  /* forgotten web password, reset from the touchscreen at power-up */      \
+  X(ResetTitle, "HASŁO PANELU WWW", "WEB PANEL PASSWORD")                   \
+  X(ResetHold, "TRZYMAJ PALEC, ABY JE USUNĄĆ", "KEEP HOLDING TO REMOVE IT") \
+  X(ResetConfirm, "USUNĄĆ HASŁO PANELU?", "REMOVE THE PASSWORD?")           \
+  X(ResetYes, "TAK", "YES")                                                 \
+  X(ResetNo, "NIE", "NO")                                                   \
+  X(ResetDone, "HASŁO USUNIĘTE", "PASSWORD REMOVED")
 
 enum class Str : int {
 #define I18N_ENUM_ENTRY(id, pl, en) id,

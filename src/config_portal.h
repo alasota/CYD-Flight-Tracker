@@ -5,6 +5,7 @@
 // config_store (Milestone 2).
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -98,3 +99,18 @@ struct ScreenshotSource {
   void (*readRow)(int y, uint8_t *bgr) = nullptr;
 };
 void configPortalSetScreenshotSource(const ScreenshotSource &source);
+
+// POST /update (firmware over WiFi, ota_update) reports what it's doing so
+// main.cpp can show it on the display — this module draws nothing. All
+// callbacks run inside configPortalLoop() (the upload is handled there in
+// one go). `newVersion` is "" until the firmware marker has been seen.
+struct OtaObserver {
+  void (*onStart)(size_t totalOrZero) = nullptr;
+  void (*onProgress)(size_t written, size_t totalOrZero, const char *newVersion) = nullptr;
+  void (*onEnd)(bool ok) = nullptr;  // ok: the board restarts ~1.5 s later
+};
+void configPortalSetOtaObserver(const OtaObserver &observer);
+
+// True between a successful update and the restart it triggers — main.cpp
+// leaves the display (and the network) alone meanwhile.
+bool configPortalRestartPending();

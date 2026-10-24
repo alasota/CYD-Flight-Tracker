@@ -12,3 +12,10 @@
 constexpr const char *kFirmwareVersionUnknown = "dev";
 
 const char *firmwareVersion();
+
+// Board variant the build is for, e.g. "cyd-r".
+const char *firmwareBoard();
+
+// "CYDSKY-FW1|board=<board>|v=<version>" — embedded in every build so an OTA
+// upload can be recognised as this project's firmware (ota_update).
+const char *firmwareMarker();

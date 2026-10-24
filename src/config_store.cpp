@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "web_auth.h"  // validateWebPassword()
+
 namespace {
 constexpr float kMinRadiusDeg = 0.1f;
 constexpr float kMaxRadiusDeg = 10.0f;
@@ -62,6 +64,7 @@ Config sanitizeConfig(const Config &cfg) {
   out.climb_rate_threshold_mps = clampClimbRateThresholdMps(out.climb_rate_threshold_mps);
   out.language = clampLanguage(static_cast<int>(out.language));
   out.web_language = clampLanguage(static_cast<int>(out.web_language));
+  if (validateWebPassword(out.web_password) != WebPasswordCheck::Ok) out.web_password.clear();
   return out;
 }
 
@@ -93,6 +96,8 @@ Config loadConfig() {
   cfg.language = clampLanguage(prefs.getUChar("lang", static_cast<uint8_t>(cfg.language)));
   cfg.web_language =
       clampLanguage(prefs.getUChar("wlang", static_cast<uint8_t>(cfg.web_language)));
+  // isKey() first: getString() logs an error for a key that was never written.
+  if (prefs.isKey("wpass")) cfg.web_password = prefs.getString("wpass", "").c_str();
 
   prefs.end();
   return sanitizeConfig(cfg);
@@ -118,6 +123,7 @@ void saveConfig(const Config &cfg) {
   prefs.putBool("home_cfg", sanitized.home_configured);
   prefs.putUChar("lang", static_cast<uint8_t>(sanitized.language));
   prefs.putUChar("wlang", static_cast<uint8_t>(sanitized.web_language));
+  prefs.putString("wpass", sanitized.web_password.c_str());
 
   prefs.end();
 }

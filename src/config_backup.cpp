@@ -4,6 +4,8 @@
 
 #include <cstring>
 
+#include "web_auth.h"  // validateWebPassword()
+
 std::string configToBackupJson(const Config &cfg, bool includeSecrets, const char *firmwareVersion) {
   JsonDocument doc;
   doc["format"] = kBackupFormat;
@@ -29,6 +31,12 @@ std::string configToBackupJson(const Config &cfg, bool includeSecrets, const cha
   general["auto_cycle_interval_s"] = cfg.auto_cycle_interval_s;
   general["near_airport_km"] = cfg.near_airport_km;
   general["climb_rate_mps"] = cfg.climb_rate_threshold_mps;
+
+  // The panel password is a secret too: only with includeSecrets, and only
+  // when one is set.
+  if (includeSecrets && !cfg.web_password.empty()) {
+    doc["security"]["web_password"] = cfg.web_password;
+  }
 
   std::string out;
   serializeJsonPretty(doc, out);
@@ -135,6 +143,19 @@ BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const C
   a.count(general, "general", "auto_cycle_interval_s", c.auto_cycle_interval_s);
   a.number(general, "general", "near_airport_km", c.near_airport_km);
   a.number(general, "general", "climb_rate_mps", c.climb_rate_threshold_mps);
+
+  JsonObjectConst security = doc["security"];
+  std::string password = c.web_password;
+  const int beforePassword = r.appliedFields;
+  a.text(security, "security", "web_password", password);
+  if (r.appliedFields > beforePassword) {
+    if (validateWebPassword(password) == WebPasswordCheck::Ok) {
+      c.web_password = password;
+    } else {
+      --r.appliedFields;
+      r.invalidFields.push_back("security.web_password");
+    }
+  }
 
   return r;
 }

@@ -37,6 +37,14 @@
 //     is imminent on the Flight screen, in which case hold and re-check
 //     every loop until it clears. screen_nav::shouldAutoAdvance() is the
 //     pure decision; every screen change resets the timer.
+//   - Firmware updates (spec/01-ota-updates.md): config_portal handles
+//     POST /update and calls back here to draw the progress screen
+//     (service_screen); after a good update the loop only services the web
+//     server until the restart. A freshly updated image is marked valid
+//     (cancelling the bootloader's rollback) once it has run 30 s and can be
+//     reached (ota_update::shouldMarkAppValid()).
+//   - Holding a finger on the screen at power-up offers to remove a
+//     forgotten web panel password (web_auth, service_screen).
 //   - Redraw (only what changed — CLAUDE.md "Redraw policy"): loop()
 //     collects RedrawEvents and redraw_policy::computeRedrawMask() picks
 //     the regions. A full clear (fillScreen + header + content + bottom
@@ -50,6 +58,7 @@
 // code is allowed to go untested by Unity.
 
 #include <Arduino.h>
+#include <esp_ota_ops.h>
 
 #include <map>
 #include <string>
@@ -66,14 +75,18 @@
 #include "lookup_budget.h"
 #include "lookup_store.h"
 #include "opensky_client.h"
+#include "ota_update.h"
 #include "radar_view.h"
 #include "redraw_policy.h"
 #include "route_lookup.h"
 #include "screen_nav.h"
+#include "service_screen.h"
 #include "status_bar.h"
 #include "table_view.h"
 #include "time_sync.h"
 #include "touch_input.h"
+#include "version.h"
+#include "web_auth.h"
 #include "wifi_manager.h"
 
 static LGFX tft;
@@ -289,6 +302,97 @@ static void handleTap(int16_t x, int16_t y) {
   }
 }
 
+// --- Firmware update over WiFi (config_portal's POST /update) -----------
+
+// The arduino-esp32 core marks a freshly updated image valid right at boot
+// unless this says "later" — we do it ourselves once the board has proven
+// it runs (see markAppValidWhenStable()).
+extern "C" bool verifyRollbackLater() { return true; }
+
+static bool appPendingVerify = false;  // running image still on probation
+static uint32_t otaFailedAtMs = 0;     // != 0: "update failed" on screen since then
+static constexpr uint32_t kOtaFailedShowMs = 5000;  // long enough to read on the board
+
+static void otaOnStart(size_t total) {
+  drawOtaScreen(tft, firmwareVersion());
+  drawOtaProgress(tft, firmwareVersion(), "", 0, total);
+}
+
+static void otaOnProgress(size_t written, size_t total, const char *newVersion) {
+  drawOtaProgress(tft, firmwareVersion(), newVersion, written, total);
+}
+
+static void otaOnEnd(bool ok) {
+  drawOtaResult(tft, ok);
+  if (!ok) otaFailedAtMs = millis() | 1;  // back to the normal screens in a moment
+}
+
+static void markAppValidWhenStable() {
+  if (!appPendingVerify) return;
+  const WifiStatus ws = wifiManagerStatus();
+  const bool reachable =
+      (ws == WifiStatus::Connected && configPortalIsActive()) || ws == WifiStatus::PortalActive;
+  if (shouldMarkAppValid(appPendingVerify, millis(), reachable)) {
+    esp_ota_mark_app_valid_cancel_rollback();
+    appPendingVerify = false;
+    Serial.printf("[ota] %s marked valid after %u s, rollback cancelled\n", firmwareVersion(),
+                  static_cast<unsigned>(millis() / 1000));
+  }
+}
+
+// --- Forgotten web panel password: hold a finger on the screen at power-up
+
+static void offerWebPasswordReset() {
+  if (cachedCfg.web_password.empty() || !touchInputRead(tft).pressed) return;
+
+  const int16_t w = static_cast<int16_t>(tft.width());
+  const int16_t h = static_cast<int16_t>(tft.height());
+  drawResetHoldScreen(tft);
+  const uint32_t holdStart = millis();
+  uint32_t lastPressedMs = holdStart;
+  for (;;) {
+    if (touchInputRead(tft).pressed) lastPressedMs = millis();
+    const uint32_t held = millis() - holdStart;
+    const ResetHoldState st = resetHoldState(millis() - lastPressedMs, held);
+    if (st == ResetHoldState::Released) {
+      tft.fillScreen(LCARS_BLACK);
+      return;
+    }
+    drawResetHoldProgress(tft, held);
+    if (st == ResetHoldState::Done) break;
+    delay(30);
+  }
+
+  // Wait for the finger to come off, then ask.
+  uint32_t releasedSince = millis();
+  while (millis() - releasedSince < kResetReleaseGraceMs) {
+    if (touchInputRead(tft).pressed) releasedSince = millis();
+    delay(20);
+  }
+  drawResetConfirmScreen(tft);
+  const uint32_t askedAt = millis();
+  bool wasPressed = false;
+  while (millis() - askedAt < kResetConfirmTimeoutMs) {
+    const TouchPoint t = touchInputRead(tft);
+    if (t.pressed && !wasPressed) {
+      const ResetChoice c = resetConfirmHit(t.x, t.y, w, h);
+      if (c == ResetChoice::Yes) {
+        cachedCfg.web_password.clear();
+        saveConfig(cachedCfg);
+        cachedCfg = loadConfig();
+        Serial.println("[auth] web password cleared from the touchscreen");
+        drawResetDoneScreen(tft);
+        delay(1500);
+        break;
+      }
+      if (c == ResetChoice::No) break;
+    }
+    wasPressed = t.pressed;
+    delay(20);
+  }
+  tft.fillScreen(LCARS_BLACK);
+}
+
 // --- /screenshot.bmp support (config_portal streams, we read pixels) ---
 
 // ?screen=N: switch to that screen and repaint it right now, so the
@@ -322,6 +426,19 @@ void setup() {
 
   cachedCfg = loadConfig();
   i18nSetLanguage(cachedCfg.language);  // before anything is drawn
+
+  Serial.printf("[ota] %s\n", firmwareMarker());
+  {
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t state;
+    appPendingVerify = running != nullptr &&
+                       esp_ota_get_state_partition(running, &state) == ESP_OK &&
+                       state == ESP_OTA_IMG_PENDING_VERIFY;
+    Serial.printf("[ota] running from %s, %s\n", running != nullptr ? running->label : "?",
+                  appPendingVerify ? "pending verify (rollback armed)" : "valid");
+  }
+
+  offerWebPasswordReset();  // finger on the screen at power-up + a password set
   nav.set(cachedCfg.last_screen);  // restore the last-active screen
   lastPersistedScreen = nav.current();
   lastRadiusDeg = cachedCfg.radius_deg;
@@ -347,12 +464,30 @@ void setup() {
   shot.readRow = screenshotReadRow;
   configPortalSetScreenshotSource(shot);
 
+  OtaObserver otaObs;
+  otaObs.onStart = otaOnStart;
+  otaObs.onProgress = otaOnProgress;
+  otaObs.onEnd = otaOnEnd;
+  configPortalSetOtaObserver(otaObs);
+
   pendingRedraw.firstDraw = true;  // paint the (empty) active screen + chrome immediately
 }
 
 void loop() {
   wifiManagerLoop();
   configPortalLoop();
+
+  // A good firmware update restarts the board in a moment: keep the
+  // "restarting" screen and stay off the network until then.
+  if (configPortalRestartPending()) return;
+  markAppValidWhenStable();
+
+  // A failed update: show "update failed" briefly, then the normal screens.
+  if (otaFailedAtMs != 0) {
+    if (millis() - otaFailedAtMs < kOtaFailedShowMs) return;
+    otaFailedAtMs = 0;
+    pendingRedraw.firstDraw = true;
+  }
 
   // --- Settings saved on the config page: apply them now ---------------
   static uint32_t lastSeenSaveCount = 0;

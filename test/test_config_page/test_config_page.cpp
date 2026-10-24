@@ -37,7 +37,7 @@ ConfigPageModel baseModel() {
 
 static void test_tab_ids_round_trip(void) {
   for (SettingsTab t : {SettingsTab::Location, SettingsTab::OpenSky, SettingsTab::General,
-                        SettingsTab::Backup}) {
+                        SettingsTab::Backup, SettingsTab::Firmware}) {
     TEST_ASSERT_TRUE(settingsTabFromArg(settingsTabId(t)) == t);
   }
   TEST_ASSERT_TRUE(settingsTabFromArg("") == SettingsTab::Location);
@@ -263,6 +263,74 @@ static void test_opensky_tab_shows_the_quota(void) {
                                "renews in about 1 h."));
 }
 
+static void test_firmware_tab(void) {
+  ConfigPageModel m = baseModel();
+  m.cfg.web_language = Language::EN;
+  m.tab = SettingsTab::Firmware;
+  const std::string h = render(m);
+  TEST_ASSERT_TRUE(contains(h, "<section data-tab=\"firmware\">"));
+  TEST_ASSERT_TRUE(contains(h, "id=\"tab\" value=\"firmware\""));
+  TEST_ASSERT_TRUE(contains(h, "<form id=\"fw\" method=\"POST\" action=\"/update\" "
+                               "enctype=\"multipart/form-data\">"));
+  TEST_ASSERT_TRUE(contains(h, "name=\"firmware\" form=\"fw\""));
+  TEST_ASSERT_TRUE(contains(h, "Installed version: <b id=\"fwv\">dev</b>"));
+  TEST_ASSERT_TRUE(contains(h, kReleasesUrl));
+  TEST_ASSERT_TRUE(contains(h, "id=\"save\" hidden>"));  // nothing to save here
+  TEST_ASSERT_TRUE(contains(h, ">Firmware</button>"));
+}
+
+static void test_restarting_page_reloads_itself(void) {
+  ConfigPageModel m = baseModel();
+  m.cfg.web_language = Language::EN;
+  m.tab = SettingsTab::Firmware;
+  m.hasMessage = true;
+  m.message = WebStr::OtaOk;
+  m.messageDetail = "v1.2.0 â v1.3.0";
+  TEST_ASSERT_FALSE(contains(render(m), "location.href='/?tab=firmware'"));
+  m.restarting = true;
+  const std::string h = render(m);
+  TEST_ASSERT_TRUE(contains(h, "Firmware updated: v1.2.0"));
+  TEST_ASSERT_TRUE(contains(h, "The board is restarting"));
+  TEST_ASSERT_TRUE(contains(h, "location.href='/?tab=firmware'"));
+}
+
+static void test_saved_secret_never_reaches_the_page(void) {
+  ConfigPageModel m = baseModel();
+  m.cfg.web_language = Language::EN;
+  m.cfg.opensky_client_id = "my-id";
+  m.cfg.opensky_client_secret = "TOP-SECRET-VALUE";
+  std::string h = render(m);
+  TEST_ASSERT_FALSE(contains(h, "TOP-SECRET-VALUE"));
+  TEST_ASSERT_TRUE(contains(h, "name=\"client_secret\" autocomplete=\"off\" value=\"\" "
+                               "data-saved=\"1\" placeholder=\"saved"));
+  TEST_ASSERT_TRUE(contains(h, "name=\"clear_credentials\""));
+
+  m.cfg.opensky_client_secret.clear();
+  h = render(m);
+  TEST_ASSERT_FALSE(contains(h, "data-saved"));
+  TEST_ASSERT_FALSE(contains(h, "name=\"clear_credentials\""));
+}
+
+static void test_panel_password_card(void) {
+  ConfigPageModel m = baseModel();
+  m.cfg.web_language = Language::EN;
+  std::string h = render(m);
+  // No password: warned on General and on Firmware, nothing to remove.
+  size_t first = h.find("The panel has no password");
+  TEST_ASSERT_TRUE(first != std::string::npos);
+  TEST_ASSERT_TRUE(h.find("The panel has no password", first + 1) != std::string::npos);
+  TEST_ASSERT_TRUE(contains(h, "name=\"new_password\" autocomplete=\"new-password\""));
+  TEST_ASSERT_TRUE(contains(h, "name=\"new_password2\""));
+  TEST_ASSERT_FALSE(contains(h, "name=\"clear_password\""));
+
+  m.cfg.web_password = "hunter22-secret";
+  h = render(m);
+  TEST_ASSERT_FALSE(contains(h, "hunter22-secret"));  // never echoed
+  TEST_ASSERT_FALSE(contains(h, "The panel has no password"));
+  TEST_ASSERT_TRUE(contains(h, "Password set"));
+  TEST_ASSERT_TRUE(contains(h, "name=\"clear_password\""));
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_quota_status_text);
@@ -285,5 +353,9 @@ int main(int argc, char **argv) {
   RUN_TEST(test_message_and_detail);
   RUN_TEST(test_status_and_daily_credit_readout);
   RUN_TEST(test_auto_cycle_checkbox_state);
+  RUN_TEST(test_firmware_tab);
+  RUN_TEST(test_restarting_page_reloads_itself);
+  RUN_TEST(test_saved_secret_never_reaches_the_page);
+  RUN_TEST(test_panel_password_card);
   return UNITY_END();
 }

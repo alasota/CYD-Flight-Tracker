@@ -82,8 +82,10 @@ answer to "what plane is that." Think of it as the away-team variant with better
 - 🎯 **Radar screen** — a static radar plot with range rings, heading ticks and a nearest-aircraft
   summary.
 - 🇵🇱/🇬🇧 **Polish or English UI** — on the display and, separately, on the config web page
-  (a dark, tabbed panel: Location / OpenSky client / General, with a live estimate of your
-  daily OpenSky credit use).
+  (a dark, tabbed panel: Location / OpenSky client / General / Backup / Firmware, with a live
+  estimate of your daily OpenSky credit use).
+- 📶 **Firmware updates over WiFi** — pick the new `.bin` on the settings page, no cable, settings
+  kept. A bad build rolls itself back. The settings page can have a password.
 - 🖖 **LCARS-inspired chrome** — black background, chunky color blocks, folder-tab navigation. An homage,
   not a photocopy. All shapes hand-drawn with LovyanGFX, zero ripped assets.
 - 📡 Lives entirely on the ESP32 — no server, no phone app, no subscription, no away mission
@@ -122,6 +124,13 @@ pio run -t upload       # flash it, engage
 pio device monitor -b 115200   # watch the logs scroll by dramatically
 ```
 
+After the first USB flash, later builds can go over WiFi instead (see
+[Updating the firmware](#updating-the-firmware-over-wifi)):
+
+```bash
+CYD_WEB_PASSWORD=your-panel-password pio run -e cyd-ota -t upload   # or --upload-port <board-ip>
+```
+
 ### Connecting it to your WiFi
 
 On first boot the board has no saved WiFi network, so it opens its own hotspot for setup:
@@ -158,7 +167,7 @@ Good to know:
 
 Once it's on your network, open **http://cyd-sky.local** (or the board's IP address, which your
 router's list of connected devices will show if `.local` names don't work on your system).
-The settings page has four tabs; one **Save** button saves the first three at once:
+The settings page has five tabs; one **Save** button saves the first three at once:
 
 1. **Location**: paste your home latitude and longitude (right-click a spot in Google Maps to
    copy them) and pick a scan radius. The page shows how many OpenSky credits one request costs
@@ -167,11 +176,16 @@ The settings page has four tabs; one **Save** button saves the first three at on
 2. **OpenSky client**: optional. Paste your OpenSky `client_id` / `client_secret`, or upload
    the `credentials.json` file from your OpenSky account page. Set how often to refresh. The
    page estimates your daily credit use against the limit (400 anonymous, 4,000 with an
-   account) and turns red if you'd run out.
-3. **General**: display language, web panel language, automatic screen cycling and the
-   flight-phase thresholds.
+   account) and turns red if you'd run out. Once saved, the secret is never shown again: the
+   field stays empty, and leaving it empty keeps the saved one. To go back to anonymous mode,
+   tick *Remove the OpenSky credentials*.
+3. **General**: display language, web panel language, automatic screen cycling, the
+   flight-phase thresholds and the settings page's own password — see
+   [Protecting the settings page](#protecting-the-settings-page-with-a-password) below.
 4. **Backup**: save all settings to a JSON file or restore them from one — see
    [Backing up your settings](#backing-up-your-settings) below.
+5. **Firmware**: install a new version over WiFi — see
+   [Updating the firmware](#updating-the-firmware-over-wifi) below.
 
 The **PL / EN** switch in the top-right corner changes the page's language. It doesn't affect
 the display, which has its own setting on the General tab.
@@ -202,7 +216,8 @@ wipes everything you set up. The **Backup** tab saves you the retyping:
   settings, grouped like the tabs (home location and radius; OpenSky client and refresh
   interval; languages, screen cycling and flight-phase thresholds), plus the firmware version
   it came from. *Include OpenSky credentials* is ticked by default — untick it to leave the
-  `client_id` / `client_secret` out of the file (see the warning below).
+  `client_id` / `client_secret` and the settings page password out of the file (see the
+  warning below).
 - **Restore from a backup**: pick such a file and press *Restore*. The settings are applied and
   saved straight away, and the display picks them up (language, home location) without a
   reboot. Anything missing from the file stays as it is, so restoring a backup without
@@ -213,29 +228,64 @@ wipes everything you set up. The **Backup** tab saves you the retyping:
 The WiFi network isn't part of the backup — the board keeps that separately, and you set it up
 through the setup hotspot.
 
+### Updating the firmware over WiFi
+
+The first install needs the USB cable (or the *Install* button on the
+[project page](https://alasota.github.io/CYD-Flight-Tracker/)). After that:
+
+1. Download **`cyd-sky-tracker-<version>.bin`** from the
+   [latest release](https://github.com/alasota/CYD-Flight-Tracker/releases/latest) — *not* the
+   `…-full.bin` (that's the whole-flash image for cable installs; the page refuses it anyway).
+2. Open the settings page → **Firmware** tab, pick the file, press **Update**. A progress bar
+   shows on the page and on the display. Don't pull the plug for the ~20 seconds it takes.
+3. The board restarts and the page reloads with the new version in the footer. Settings,
+   OpenSky credentials and the remembered aircraft are all kept.
+
+Safety nets:
+- The board checks the file before switching to it: an ESP32 app image, fits the memory, and
+  actually Sky Tracker firmware (each build carries a `CYDSKY-FW1|board=…|v=…` marker). Anything
+  else is rejected and the running version stays.
+- A cut connection or a power loss mid-upload leaves the old version running.
+- **Automatic rollback:** a new version must run for 30 seconds and get the settings page up
+  (or the WiFi setup hotspot) before it counts as good. If it crashes or restarts before that,
+  the board boots the previous version again on its own.
+- Going back to an older version works the same way (pick the older `.bin`). Versions released
+  before OTA support existed don't carry the marker, so those need the cable / web installer.
+
+From PlatformIO, `pio run -e cyd-ota -t upload` builds and sends the firmware to the same page
+with `curl` (password from the `CYD_WEB_PASSWORD` environment variable, board address
+`cyd-sky.local` or `--upload-port <ip>`).
+
+### Protecting the settings page with a password
+
+Out of the box the settings page has no password — the first setup has to work without one.
+Anyone on your WiFi can then change the settings and install firmware, so the General and
+Firmware tabs nag until you set one:
+
+- **General → Panel access**: type a new password twice (8–64 characters, plain ASCII) and press
+  **Save**. From then on the browser asks for it — login **`admin`** — on every page, the backup
+  download, the screenshot and the firmware upload. Leave both fields empty to keep the current
+  password; tick *Remove the password* to go back to none.
+- The browser uses HTTP *Digest* login, so the password itself doesn't cross the network.
+- Five wrong passwords in a row lock the page for 60 seconds.
+- **Forgot it?** Hold a finger on the screen while you power the board up. After 5 seconds it
+  asks *Remove the password?* — tap **YES**, and the page is open again (all other settings
+  stay). Whoever can touch the board could reflash it anyway, so that's the trust boundary.
+
 > [!WARNING]
-> **The config page hands your OpenSky `client_secret` to anyone who asks.**
-> The page has no login and is served over plain HTTP. When it loads, the saved secret is written
-> straight into the page's HTML as the `value` of the password field. The dots only hide it on
-> screen: *View source*, browser dev tools or a single `curl http://<board-ip>/` show it in plain
-> text, and it crosses your network unencrypted.
+> **The password keeps your housemates out, not a network eavesdropper.** The page is still
+> plain HTTP: the password is protected by Digest, but the pages themselves, a backup you
+> download and a firmware upload cross the network unencrypted, and an OpenSky secret you
+> *type in* travels in clear text once. The secret and the password are stored unencrypted in
+> the board's flash (NVS), so whoever gets hold of the board can dump them.
 >
-> Anyone on the same WiFi can read it, and so can anyone who can sniff that network. The secret
-> is also stored unencrypted in the board's flash (NVS), so whoever gets hold of the board can
-> dump it.
->
-> **Settings backups can contain it too.** A backup downloaded with *Include OpenSky
-> credentials* ticked (the default) holds your `client_id` and `client_secret` as plain text in
-> the JSON file. The download link has no login either: anyone on your network can fetch
-> `http://<board-ip>/backup.json?secrets=1`.
->
-> Until this is fixed in the firmware:
-> - Run the board only on a network you trust. No guest or shared networks.
-> - Create a separate OpenSky API client just for this board. Don't reuse credentials you need
->   for anything else.
-> - Treat a backup file with credentials like a password: don't commit it to git, don't post it
->   in an issue or a chat, and delete copies you no longer need. Untick *Include OpenSky
->   credentials* when you only want to save the other settings.
+> - Run the board on a network you trust. No guest or shared networks, never exposed to the
+>   internet.
+> - Set a password, and use one you don't use anywhere else.
+> - Create a separate OpenSky API client just for this board.
+> - Treat a backup file with credentials like a password: it holds the `client_id`,
+>   `client_secret` and the page password as plain text. Don't commit it to git or post it in
+>   an issue or a chat; untick *Include OpenSky credentials* when you only need the rest.
 > - If you think the secret leaked, revoke or regenerate it on your OpenSky account page.
 
 ## How it works, briefly

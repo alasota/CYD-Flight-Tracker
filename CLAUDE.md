@@ -683,6 +683,40 @@ language / Jezyk wyswietlacza" select, values `pl` / `en`). Default: Polish.
   (`WEB_I18N_STRINGS`, `webTr()`); they go into HTML/JS raw, so `test_web_i18n` forbids
   `" < > \ &` in them.
 
+## Firmware updates (OTA) & panel password
+
+Spec: `spec/01-ota-updates.md` (roadmap #1). Released in v1.1.0, tested on the board 2026-10-24.
+
+- **Upload:** `POST /update[?size=N]` (multipart field `firmware`) on the config page —
+  Firmware tab (XHR with a progress bar; a plain form post works too) or
+  `pio run -e cyd-ota -t upload` (`curl --digest`, password from `$CYD_WEB_PASSWORD`). The file
+  is the CI's `cyd-sky-tracker-<version>.bin` (app only). `OtaSession` checks the header before
+  anything reaches `Update`, and only calls `Update.end()` (which switches the boot slot) when
+  the file carried the **firmware marker** `CYDSKY-FW1|board=<FW_BOARD>|v=<FW_VERSION>`
+  (`version.cpp`, `firmwareMarker()`; `FW_BOARD` defaults to `cyd-r` — roadmap #4 will set it
+  per env and reject a mismatch). `firmware.yml` greps the built `.bin` for it. Builds older
+  than this feature have no marker, so going back to them needs USB / the web installer.
+- **Display:** `config_portal` draws nothing; `configPortalSetOtaObserver()` hands start /
+  progress (every 16 KB) / end to `main.cpp`, which draws `service_screen`. Success: answer page,
+  ~1.5 s, `ESP.restart()` (`configPortalRestartPending()` keeps `loop()` off the network
+  meanwhile). Failure: "update failed" for 5 s, then a full redraw.
+- **Rollback:** `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` in this arduino-esp32 (2.0.17).
+  `main.cpp` overrides `verifyRollbackLater()` -> true and calls
+  `esp_ota_mark_app_valid_cancel_rollback()` once `shouldMarkAppValid()` (pending verify, ≥ 30 s
+  up, settings page reachable or WiFi setup hotspot up). OpenSky trouble never rolls back.
+  Verified with an image that `abort()`s after 8 s: the board came back on the previous slot.
+- **Password:** `Config::web_password` (NVS `wpass`), optional (default none). When set, *every*
+  route calls `authorize()` first: HTTP Digest (`WebServer::authenticate`, realm
+  `CYD Sky Tracker`, user `admin` — Basic is accepted too), `AuthThrottle` lockout -> 429 +
+  `Retry-After`. Upload callbacks check credentials *before* buffering/writing anything.
+  Forgotten password: finger on the screen at power-up, 5 s, YES (`offerWebPasswordReset()`).
+- ⚠️ **arduino-esp32 2.x `WebServer` pitfall:** a route registered with an upload callback gets
+  that callback for **any** POST body — a non-multipart one (e.g. the empty probe `curl
+  --digest` sends first) arrives as "raw", and `server.upload()` then dereferences null and
+  crashes the board. Every upload callback starts with `if (!isMultipartRequest()) return;`
+  (needs `collectHeaders({"Content-Type"})`), and handlers take the buffered file with
+  `takeUpload()` so a later request can't reuse a stale one.
+
 ## Design language — LCARS-inspired (Star Trek console aesthetic)
 
 Build an **LCARS-inspired** look, not a reproduction of the exact copyrighted LCARS design
@@ -753,15 +787,18 @@ each with a single responsibility:
   "Auto screen cycling"). Reachable via mDNS (e.g. `cyd-sky.local`), same pattern as
   micro-radar's `microradar.local`.
   The page HTML is rendered by the pure **`config_page`** module (`renderConfigPage(model,
-  sink)`, streamed chunk by chunk, native-tested): four tabs — **Location** (lat/lon, radius +
+  sink)`, streamed chunk by chunk, native-tested): five tabs — **Location** (lat/lon, radius +
   credits per request), **OpenSky client** (account status, client id/secret, credentials-file
   upload, poll interval + estimated credits per day vs. the 400/4000 limit), **General**
-  (display + web-panel language, auto-cycle, flight-phase thresholds), **Backup** (download /
-  restore, below); one Save for the first three (hidden on Backup), the active tab round-trips
-  via `?tab=` / a hidden field.
+  (display + web-panel language, auto-cycle, flight-phase thresholds, panel password),
+  **Backup** (download / restore, below), **Firmware** (OTA update, see "Firmware updates (OTA)
+  & panel password"); one Save for the first three (hidden on Backup and Firmware), the active
+  tab round-trips via `?tab=` / a hidden field. The saved `client_secret` is **never written
+  into the page** (empty field + "saved" placeholder; empty on save = keep it, a
+  `clear_credentials` checkbox removes both).
   **Backup / restore:** `GET /backup.json[?secrets=1]` downloads all settings as JSON
   (grouped like the tabs, `"format": "cyd-sky-tracker-config"`, `format_version` 1; OpenSky
-  credentials only with `secrets=1`); `POST /restore` (multipart `backup_file`) applies such a
+  credentials and the panel password (`"security": {"web_password"}`) only with `secrets=1`); `POST /restore` (multipart `backup_file`) applies such a
   file on top of the current settings — missing keys keep their value, wrong-typed keys are
   skipped and listed, other JSON is rejected; then `saveConfig()` (sanitizes) and a reload.
   The JSON logic is the pure, native-tested **`config_backup`** module. Look: dark (`#17181c`), muted greys,
@@ -771,6 +808,18 @@ each with a single responsibility:
   panel `readable = true`) and streamed as a 24-bit BMP row by row — for UX reviews without a
   camera. Pixels come from `main.cpp` via `configPortalSetScreenshotSource()`; BMP header/row math
   is the pure `screenshot` module (native-tested). `?screen=N` switches to that screen first.
+- `web_auth` — the panel password, pure: `validateWebPassword()` (8–64 printable ASCII, "" =
+  none), `decidePasswordChange()` (the General tab's two fields + "remove"), `decideAuth()`
+  (allow / 401 challenge / 429 locked), `AuthThrottle` (5 wrong in a row -> 60 s lock), the
+  power-up reset gesture timing (`resetHoldState()`).
+- `ota_update` — pure OTA logic: `checkImageHeader()` (0xE9 magic, chip id, `0xFF` = the merged
+  `-full.bin`), `checkImageSize()`, `FirmwareMarkerScanner` (finds `CYDSKY-FW1|board=…|v=…`
+  across chunk boundaries), `OtaSession` (start/feed/finish/abort over an `OtaWriter`
+  interface — `config_portal` plugs in arduino-esp32 `Update`, tests a fake),
+  `otaResultMessage()` / `otaResultHttpStatus()`, `shouldMarkAppValid()`.
+- `service_screen` — full-screen maintenance displays: OTA progress (title, "v1 → v2", bar,
+  percent / KB, "do not power off", then restarting / failed) and the password-reset hold +
+  YES/NO confirm. Geometry/text pure and tested, drawing behind `#ifdef ARDUINO`.
 - `opensky_client` — token fetch/refresh + `/states/all` polling. Returns a plain struct/array
   of aircraft. **No TFT/drawing code in this module** — must be swappable/testable independently
   of the visualization.

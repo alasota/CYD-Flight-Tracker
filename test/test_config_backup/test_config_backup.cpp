@@ -152,6 +152,40 @@ static void test_rejects_oversized_files(void) {
   TEST_ASSERT_TRUE(restoreConfigFromBackupJson(big, sample()).status == BackupRestoreStatus::NotJson);
 }
 
+static void test_panel_password_travels_only_with_secrets(void) {
+  Config c = sample();
+  c.web_password = "hunter22";
+  TEST_ASSERT_TRUE(contains(configToBackupJson(c, true, "v1"), "\"web_password\": \"hunter22\""));
+  TEST_ASSERT_FALSE(contains(configToBackupJson(c, false, "v1"), "hunter22"));
+  TEST_ASSERT_FALSE(contains(configToBackupJson(sample(), true, "v1"), "security"));  // none set
+
+  BackupRestoreResult r = restoreConfigFromBackupJson(configToBackupJson(c, true, "v1"),
+                                                      defaultConfig());
+  TEST_ASSERT_EQUAL_STRING("hunter22", r.config.web_password.c_str());
+  TEST_ASSERT_EQUAL_INT(13, r.appliedFields);
+}
+
+static void test_restore_without_password_keeps_the_devices(void) {
+  Config device = defaultConfig();
+  device.web_password = "device-pass";
+  BackupRestoreResult r = restoreConfigFromBackupJson(configToBackupJson(sample(), false, "v1"),
+                                                      device);
+  TEST_ASSERT_EQUAL_STRING("device-pass", r.config.web_password.c_str());
+}
+
+static void test_invalid_password_in_backup_is_reported_and_skipped(void) {
+  Config device = defaultConfig();
+  device.web_password = "device-pass";
+  BackupRestoreResult r = restoreConfigFromBackupJson(
+      "{\"format\":\"cyd-sky-tracker-config\",\"security\":{\"web_password\":\"short\"}}",
+      device);
+  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  TEST_ASSERT_EQUAL_STRING("device-pass", r.config.web_password.c_str());
+  TEST_ASSERT_EQUAL_INT(0, r.appliedFields);
+  TEST_ASSERT_EQUAL_INT(1, static_cast<int>(r.invalidFields.size()));
+  TEST_ASSERT_EQUAL_STRING("security.web_password", r.invalidFields[0].c_str());
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_round_trip_restores_every_setting);
@@ -162,5 +196,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_restoring_location_marks_home_configured);
   RUN_TEST(test_rejects_files_that_are_not_backups);
   RUN_TEST(test_rejects_oversized_files);
+  RUN_TEST(test_panel_password_travels_only_with_secrets);
+  RUN_TEST(test_restore_without_password_keeps_the_devices);
+  RUN_TEST(test_invalid_password_in_backup_is_reported_and_skipped);
   return UNITY_END();
 }

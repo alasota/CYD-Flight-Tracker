@@ -8,7 +8,8 @@
 //     "opensky":  { "client_id": "...", "client_secret": "...", "poll_interval_s": 30 },
 //     "general":  { "language": "pl", "web_language": "en", "auto_cycle": false,
 //                   "auto_cycle_interval_s": 15, "near_airport_km": 15.0,
-//                   "climb_rate_mps": 1.5 }
+//                   "climb_rate_mps": 1.5 },
+//     "security": { "web_password": "..." }   // only with secrets, only when set
 //   }
 //
 // Restoring is forgiving: a missing key keeps the current value (so a file
@@ -30,7 +31,8 @@ constexpr int kBackupFormatVersion = 1;
 constexpr size_t kMaxBackupJsonBytes = 4096;
 
 // The backup file for `cfg`. Without `includeSecrets` the "opensky" group
-// has no client_id / client_secret (restoring it then keeps the device's).
+// has no client_id / client_secret and there is no "security" group
+// (restoring it then keeps the device's).
 std::string configToBackupJson(const Config &cfg, bool includeSecrets, const char *firmwareVersion);
 
 enum class BackupRestoreStatus {

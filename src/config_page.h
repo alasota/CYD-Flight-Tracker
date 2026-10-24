@@ -1,6 +1,6 @@
 // config_page — the HTML of the config web page (served by config_portal),
 // rendered as a stream of chunks so the ESP32 never builds the whole page in
-// RAM. Four tabs (Location / OpenSky client / General / Backup), PL or EN text from
+// RAM. Five tabs (Location / OpenSky client / General / Backup / Firmware), PL or EN text from
 // web_i18n (Config::web_language), dark theme with the display's peach as
 // the single accent colour.
 //
@@ -17,10 +17,10 @@
 #include "opensky_quota.h"  // OpenSkyQuota
 #include "web_i18n.h"       // WebStr
 
-enum class SettingsTab : uint8_t { Location, OpenSky, General, Backup };
-constexpr int kSettingsTabCount = 4;
+enum class SettingsTab : uint8_t { Location, OpenSky, General, Backup, Firmware };
+constexpr int kSettingsTabCount = 5;
 
-// "location" / "opensky" / "general" / "backup" — the ?tab= / hidden-field value.
+// "location" / "opensky" / "general" / "backup" / "firmware" — the ?tab= / hidden-field value.
 const char *settingsTabId(SettingsTab tab);
 // Inverse of settingsTabId(); anything unknown -> Location.
 SettingsTab settingsTabFromArg(const std::string &arg);
@@ -53,7 +53,13 @@ struct ConfigPageModel {
   // by the caller (quotaSecondsUntilReset()).
   OpenSkyQuota quota;
   uint32_t quotaResetInS = 0;
+  // A firmware update just succeeded and the board is about to restart: the
+  // page says so and reloads itself once the board answers again.
+  bool restarting = false;
 };
+
+// Where the Firmware tab sends people for new versions.
+constexpr const char *kReleasesUrl = "https://github.com/alasota/CYD-Flight-Tracker/releases/latest";
 
 // The OpenSky tab's "credits left" line as plain text (no HTML) in `lang`:
 //   Unknown    -> "Credits left: not known yet, ..."

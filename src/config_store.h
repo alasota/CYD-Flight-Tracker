@@ -60,6 +60,11 @@ struct Config {
   // Language of the config web page itself (web_i18n), independent of the
   // display's. NVS key `wlang`, same index/clamping as `language`.
   Language web_language = kDefaultLanguage;
+  // Optional password of the config web page (web_auth; HTTP Digest, login
+  // "admin"). Empty = no password. NVS key `wpass`, plain text — Digest needs
+  // the password itself. One that fails validateWebPassword() is dropped by
+  // sanitizeConfig().
+  std::string web_password;
   // True once the user has saved the settings form at least once via
   // config_portal. (0, 0) is a real place (Gulf of Guinea) — without this
   // flag there's no way to tell "user hasn't configured their home
