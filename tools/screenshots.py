@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""Screenshots of the "new version on GitHub" feature (spec/02-github-release-check.md),
-made from the same demo data the tests use (release_check's updateDemoState()):
+"""Screenshots of the config page and the update question, made from the same demo
+data the tests use (test_config_page; release_check's updateDemoState()):
 
+  docs/screenshots/web_general.png       config page, General tab: the Display card
+                                         (brightness + night mode, spec/03)
+  docs/screenshots/web_opensky.png       config page, OpenSky tab: credits/day with
+                                         the night pause counted
   docs/screenshots/web_firmware.png      config page, Firmware tab: v1.3.0 available
+                                         (spec/02-github-release-check.md)
   docs/screenshots/web_firmware_dev.png  ...with "show development versions" on
   docs/screenshots/update_prompt.png     the question on the display (--device)
 
@@ -67,7 +72,8 @@ def render_pages(tmp):
             break
     if r.returncode != 0:
         sys.exit("test_config_page failed:\n" + r.stdout[-3000:] + r.stderr[-2000:])
-    return [tmp / "web_firmware.html", tmp / "web_firmware_dev.html"]
+    return [tmp / name for name in ("web_general.html", "web_opensky.html",
+                                    "web_firmware.html", "web_firmware_dev.html")]
 
 
 def crop_page(png):
@@ -87,7 +93,7 @@ def crop_page(png):
 def shoot_page(browser, html, png):
     with tempfile.TemporaryDirectory() as profile:
         subprocess.run([browser, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                        "--force-device-scale-factor=2", "--window-size=500,2600",
+                        "--force-device-scale-factor=2", "--window-size=500,3200",
                         "--user-data-dir=" + profile, "--screenshot=" + str(png),
                         html.as_uri()], check=True, capture_output=True, timeout=120)
     crop_page(png).save(png, optimize=True)

@@ -58,6 +58,99 @@ static void test_daily_credits_rounding_and_zero_interval(void) {
   TEST_ASSERT_EQUAL_UINT32(86400u, openSkyDailyCredits(2.5f, 0));  // 0 treated as 1 s
 }
 
+static void test_daily_credits_with_a_night_pause(void) {
+  // 15 s polls, 23:00-06:30 paused (450 min) -> 5760 - 1800 (spec/03 §5.6).
+  TEST_ASSERT_EQUAL_UINT32(3960u, openSkyDailyRequests(15, 450));
+  TEST_ASSERT_EQUAL_UINT32(3960u, openSkyDailyCredits(2.5f, 15, 450));
+  TEST_ASSERT_EQUAL_UINT32(5760u, openSkyDailyRequests(15, 0));
+  TEST_ASSERT_EQUAL_UINT32(0u, openSkyDailyRequests(15, 1440));  // polar night, all paused
+  TEST_ASSERT_EQUAL_UINT32(0u, openSkyDailyRequests(15, 5000));
+}
+
+static void test_paused_minutes_follow_the_settings(void) {
+  Config c = defaultConfig();
+  BacklightStatus l;
+  c.night_mode = NightMode::Schedule;  // 23:00-06:30 by default
+  TEST_ASSERT_EQUAL_UINT32(450u, nightMinutesToday(c, l));
+  TEST_ASSERT_EQUAL_UINT32(0u, pausedMinutesPerDay(c, l));  // pause off (default)
+  c.night_pause_polling = true;
+  TEST_ASSERT_EQUAL_UINT32(450u, pausedMinutesPerDay(c, l));
+  c.night_mode = NightMode::Sun;  // sun not known yet
+  TEST_ASSERT_EQUAL_UINT32(0u, pausedMinutesPerDay(c, l));
+  l.sun_known = true;
+  l.sun_local.sunrise_min = 7 * 60 + 17;
+  l.sun_local.sunset_min = 17 * 60 + 23;
+  TEST_ASSERT_EQUAL_UINT32(834u, pausedMinutesPerDay(c, l));  // 17:23 -> 07:17
+  c.night_mode = NightMode::Off;
+  TEST_ASSERT_EQUAL_UINT32(0u, pausedMinutesPerDay(c, l));
+}
+
+static void test_light_state_text(void) {
+  BacklightStatus l;
+  TEST_ASSERT_EQUAL_STRING("clock not synced — night mode inactive",
+                           lightStateText(l, Language::EN).c_str());
+  l.synced = true;
+  TEST_ASSERT_EQUAL_STRING("dzień", lightStateText(l, Language::PL).c_str());
+  l.night = true;
+  TEST_ASSERT_EQUAL_STRING("night", lightStateText(l, Language::EN).c_str());
+  l.woken = true;
+  TEST_ASSERT_EQUAL_STRING("night, woken by a touch", lightStateText(l, Language::EN).c_str());
+  l.woken = false;
+  l.screen_off = true;
+  l.polling = false;
+  TEST_ASSERT_EQUAL_STRING("night, screen off · fetching paused",
+                           lightStateText(l, Language::EN).c_str());
+}
+
+static void test_display_card(void) {
+  ConfigPageModel m = baseModel();
+  m.cfg.web_language = Language::EN;
+  m.cfg.home_configured = true;
+  std::string h = render(m);
+  // Defaults: automatic brightness, sunset to sunrise, no pause.
+  TEST_ASSERT_TRUE(contains(h, "<option value=\"auto\" selected>automatic (light sensor)"));
+  TEST_ASSERT_TRUE(contains(h, "<option value=\"sun\" selected>sunset to sunrise"));
+  TEST_ASSERT_TRUE(contains(h, "<div id=\"blauto\">"));
+  TEST_ASSERT_TRUE(contains(h, "<div id=\"blfix\" hidden>"));
+  TEST_ASSERT_TRUE(contains(h, "<div id=\"ntsch\" hidden>"));
+  TEST_ASSERT_TRUE(contains(h, "<div id=\"ntopt\">"));
+  TEST_ASSERT_TRUE(contains(h, "name=\"bl_min\" min=\"5\" max=\"100\" value=\"10\""));
+  TEST_ASSERT_TRUE(contains(h, "name=\"night_pct\" min=\"0\" max=\"100\" value=\"10\""));
+  TEST_ASSERT_TRUE(contains(h, "name=\"night_wake_s\" min=\"10\" max=\"600\" value=\"60\""));
+  TEST_ASSERT_TRUE(contains(h, "name=\"night_pause\" value=\"1\">"));
+  TEST_ASSERT_FALSE(contains(h, "name=\"night_pause\" value=\"1\" checked"));
+  TEST_ASSERT_TRUE(contains(h, "Sunrise and sunset appear once the clock is synced."));
+
+  m.cfg.brightness_auto = false;
+  m.cfg.night_mode = NightMode::Schedule;
+  m.cfg.night_from_min = 22 * 60 + 30;
+  m.cfg.night_pause_polling = true;
+  m.light.synced = true;
+  m.light.sun_known = true;
+  m.light.sun_local.sunrise_min = 7 * 60 + 17;
+  m.light.sun_local.sunset_min = 17 * 60 + 23;
+  m.light.raw = 1234;
+  m.light.pct = 35;
+  h = render(m);
+  TEST_ASSERT_TRUE(contains(h, "<option value=\"fixed\" selected>fixed"));
+  TEST_ASSERT_TRUE(contains(h, "<div id=\"blfix\">"));
+  TEST_ASSERT_TRUE(contains(h, "<div id=\"ntsch\">"));
+  TEST_ASSERT_TRUE(contains(h, "type=\"time\" name=\"night_from\" value=\"22:30\""));
+  TEST_ASSERT_TRUE(contains(h, "name=\"night_pause\" value=\"1\" checked"));
+  TEST_ASSERT_TRUE(contains(h, "<b id=\"lr\">1234</b>"));
+  TEST_ASSERT_TRUE(contains(h, "<b id=\"lp\">35</b> %"));
+  TEST_ASSERT_TRUE(contains(h, "Sun today: sunrise 07:17, sunset 17:23"));
+  // 22:30-06:30 = 480 min at 15 s = 1920 fewer requests; the OpenSky tab counts them.
+  TEST_ASSERT_TRUE(contains(h, "<b id=\"ntsv\">1920</b> fewer requests tonight"));
+  TEST_ASSERT_TRUE(contains(h, "data-night=\"480\">≈ <b>3840</b>"));
+
+  m.cfg.night_mode = NightMode::Off;
+  m.cfg.home_configured = false;
+  h = render(m);
+  TEST_ASSERT_TRUE(contains(h, "<div id=\"ntopt\" hidden>"));
+  TEST_ASSERT_TRUE(contains(h, "Set the location to work out sunrise and sunset."));
+}
+
 static void test_daily_limits(void) {
   TEST_ASSERT_EQUAL_UINT32(400u, openSkyDailyCreditLimit(false));
   TEST_ASSERT_EQUAL_UINT32(4000u, openSkyDailyCreditLimit(true));
@@ -409,6 +502,51 @@ static void test_render_firmware_tab_demo(void) {
   }
 }
 
+// The General and OpenSky tabs for docs/screenshots/web_general.png /
+// web_opensky.png (spec/03 §5.8): the Display card with the demo values
+// (automatic brightness, sunset to sunrise at 10 %, the night pause on, so
+// the OpenSky tab's estimate counts the night).
+static ConfigPageModel displayDemoModel(SettingsTab tab) {
+  ConfigPageModel m = baseModel();
+  m.tab = tab;
+  m.cfg.web_language = Language::PL;
+  m.cfg.web_password = "demo-password";
+  m.cfg.home_configured = true;
+  m.cfg.opensky_client_id = "demo-client";
+  m.cfg.opensky_client_secret = "demo-secret";
+  m.cfg.night_pause_polling = true;
+  m.quota.state = OpenSkyQuota::State::Available;
+  m.quota.remaining = 2814;
+  m.light.raw = 0;
+  m.light.avg = 0.0f;
+  m.light.pct = 100;
+  m.light.pwm = 255;
+  m.light.synced = true;
+  m.light.sun_known = true;
+  m.light.sun_local.sunrise_min = 7 * 60 + 17;
+  m.light.sun_local.sunset_min = 17 * 60 + 23;
+  return m;
+}
+
+static void test_render_general_and_opensky_demo(void) {
+  const char *dir = std::getenv("SCREENSHOT_OUT");
+  if (dir == nullptr || *dir == '\0') {
+    TEST_IGNORE_MESSAGE("SCREENSHOT_OUT not set");
+    return;
+  }
+  const struct {
+    SettingsTab tab;
+    const char *file;
+  } pages[] = {{SettingsTab::General, "/web_general.html"}, {SettingsTab::OpenSky, "/web_opensky.html"}};
+  for (const auto &p : pages) {
+    std::FILE *f = std::fopen((std::string(dir) + p.file).c_str(), "wb");
+    TEST_ASSERT_NOT_NULL(f);
+    const std::string h = render(displayDemoModel(p.tab));
+    std::fwrite(h.data(), 1, h.size(), f);
+    std::fclose(f);
+  }
+}
+
 static void test_restarting_page_reloads_itself(void) {
   ConfigPageModel m = baseModel();
   m.cfg.web_language = Language::EN;
@@ -471,6 +609,10 @@ int main(int argc, char **argv) {
   RUN_TEST(test_daily_credits);
   RUN_TEST(test_daily_credits_rounding_and_zero_interval);
   RUN_TEST(test_daily_limits);
+  RUN_TEST(test_daily_credits_with_a_night_pause);
+  RUN_TEST(test_paused_minutes_follow_the_settings);
+  RUN_TEST(test_light_state_text);
+  RUN_TEST(test_display_card);
   RUN_TEST(test_credentials_need_both_fields);
   RUN_TEST(test_html_escape);
   RUN_TEST(test_page_is_complete_and_never_emits_empty_chunks);
@@ -492,6 +634,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_update_card_escapes_what_came_from_the_network);
   RUN_TEST(test_update_check_switch_on_general);
   RUN_TEST(test_render_firmware_tab_demo);
+  RUN_TEST(test_render_general_and_opensky_demo);
   RUN_TEST(test_saved_secret_never_reaches_the_page);
   RUN_TEST(test_panel_password_card);
   return UNITY_END();

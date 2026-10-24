@@ -88,6 +88,10 @@ answer to "what plane is that." Think of it as the away-team variant with better
   screen when there's a new version (tap **YES**, a minute later it's done), or pick the `.bin`
   on the settings page yourself. No cable, settings kept. A bad build rolls itself back. The
   settings page can have a password.
+- 🌙 **Automatic brightness and night mode**: the built-in light sensor dims the screen in a
+  dark room. From sunset to sunrise (worked out on the board for your location) or between set
+  hours it goes down to a night level, or fully dark until you tap it. It can also pause
+  OpenSky requests at night to save credits.
 - 🖖 **LCARS-inspired chrome** — black background, chunky color blocks, folder-tab navigation. An homage,
   not a photocopy. All shapes hand-drawn with LovyanGFX, zero ripped assets.
 - 📡 Lives entirely on the ESP32 — no server, no phone app, no subscription, no away mission
@@ -181,8 +185,9 @@ The settings page has five tabs; one **Save** button saves the first three at on
    account) and turns red if you'd run out. Once saved, the secret is never shown again: the
    field stays empty, and leaving it empty keeps the saved one. To go back to anonymous mode,
    tick *Remove the OpenSky credentials*.
-3. **General**: display language, web panel language, automatic screen cycling, the
-   flight-phase thresholds and the settings page's own password — see
+3. **General**: display language, web panel language, screen brightness and night mode (see
+   [Brightness and night mode](#brightness-and-night-mode) below), automatic screen cycling,
+   the flight-phase thresholds and the settings page's own password — see
    [Protecting the settings page](#protecting-the-settings-page-with-a-password) below.
 4. **Backup**: save all settings to a JSON file or restore them from one — see
    [Backing up your settings](#backing-up-your-settings) below.
@@ -196,7 +201,7 @@ the display, which has its own setting on the General tab.
   <tr>
     <td align="center"><img src="docs/screenshots/web_location.png" width="200" alt="Settings page, Location tab: latitude, longitude, scan radius and credits per request"></td>
     <td align="center"><img src="docs/screenshots/web_opensky.png" width="200" alt="Settings page, OpenSky client tab: account status, client ID and secret, credentials file upload, refresh interval and daily credit estimate"></td>
-    <td align="center"><img src="docs/screenshots/web_general.png" width="200" alt="Settings page, General tab: display and web panel language, screen cycling, flight-phase thresholds, panel password"></td>
+    <td align="center"><img src="docs/screenshots/web_general.png" width="200" alt="Settings page, General tab: display and web panel language, screen brightness and night mode, screen cycling, flight-phase thresholds, panel password"></td>
     <td align="center"><img src="docs/screenshots/web_backup.png" width="200" alt="Settings page, Backup tab: download settings as JSON, restore from a file"></td>
     <td align="center"><img src="docs/screenshots/web_firmware.png" width="200" alt="Settings page, Firmware tab: installed and latest version on GitHub, Install and Check now buttons, development versions switch, firmware file upload"></td>
   </tr>
@@ -210,6 +215,30 @@ the display, which has its own setting on the General tab.
 </table>
 
 <sub>Screenshots show demo values (Warsaw city centre, a made-up API client).</sub>
+
+### Brightness and night mode
+
+**General → Display** controls the backlight:
+
+- **Brightness**: *automatic* (default) follows the light sensor next to the screen, between a
+  minimum and a maximum you pick; *fixed* is one level. (Before this feature the board ran
+  at half brightness all the time.)
+- **Night mode**: *sunset to sunrise* (default, computed on the board from your home location),
+  *by the clock* (e.g. 23:00–06:30) or *off*. At night the screen goes down to the night
+  brightness (default 10 %). At **0 %** it's fully dark: a tap lights it for the wake time
+  (default 60 s, adjustable), and that tap doesn't press anything.
+- **Pause data fetching at night** (off by default): no OpenSky requests during the night
+  window, except for the wake time after a tap. With a 15 s refresh, 23:00–06:30 saves 1,800
+  requests a day, enough to fit an account's 4,000 credits. The OpenSky tab's daily estimate
+  counts the pause.
+- The card shows the sensor reading, the current brightness and today's sunrise and sunset,
+  refreshed every 2 seconds. Without a synced clock there is no night mode, only daytime
+  brightness.
+
+Notes on the sensor: in a lit room it reads about 0. It only responds once the room gets dim,
+and in the dark the screen's own light shines into it. That feedback pushes the right way
+(darker room, dimmer screen, even darker reading), so the screen settles at its minimum in the
+dark. Update screens and the password reset always run at full brightness.
 
 ### Backing up your settings
 

@@ -312,6 +312,32 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       nigdy na wyświetlaczu. Codzienne sprawdzanie wyłączysz na zakładce Ogólne; GitHub dowiaduje
       się z niego tylko Twojego IP i wersji firmware.</p>
   </div>
+  <div class="card backup-note" id="night-mode">
+    <h3><span class="en">New: it dims itself, and it knows when the sun sets</span><span class="pl">Nowość: sam się przyciemnia i wie, kiedy zachodzi słońce</span></h3>
+    <p class="en">The CYD has a tiny light sensor next to the screen, and now it's put to work:
+      bright by the window, dimmed by the reading lamp, no flicker, no jumps. At sunset (worked
+      out on the board from your home location, no internet needed) the display drops to a gentle
+      10&nbsp;% for the night and comes back at sunrise. Prefer a bedroom-friendly black screen?
+      Set the night brightness to 0&nbsp;%: a tap lights it up for a minute (that tap doesn't
+      switch tabs, it just says hello). Short on OpenSky credits? <i>Pause data fetching at
+      night</i> skips the requests nobody watches. A 15-second poll from 23:00 to 06:30 is
+      1,800 requests a day saved, enough to fit an account's 4,000. A tap still brings fresh
+      planes for the wake time. It's off by default, because some people do watch planes at 2 a.m.</p>
+    <p class="pl">CYD ma obok ekranu malutki czujnik światła i wreszcie ma co robić: przy oknie
+      ekran jest jasny, przy lampce przygaszony, bez migania i skoków. O zachodzie słońca
+      (policzonym na płytce z Twojej lokalizacji, bez internetu) wyświetlacz schodzi na noc do
+      łagodnych 10&nbsp;% i wraca o wschodzie. Wolisz czarny ekran w sypialni? Ustaw jasność w
+      nocy na 0&nbsp;%: dotknięcie zapala go na minutę (ten dotyk nie przełącza zakładek, tylko
+      mówi „cześć”). Brakuje kredytów OpenSky? <i>Wstrzymaj pobieranie danych w nocy</i> pomija
+      zapytania, których nikt nie ogląda. Przy odświeżaniu co 15 s od 23:00 do 6:30 to 1800
+      zapytań mniej na dobę, czyli tyle, żeby zmieścić się w 4000 z konta. Dotknięcie i tak przyniesie
+      świeże samoloty na czas wybudzenia. Domyślnie wyłączone, bo niektórzy oglądają samoloty o
+      drugiej w nocy.</p>
+    <p class="en">All of it lives in <b>General → Display</b>, with a live readout of the sensor
+      and today's sunrise and sunset.</p>
+    <p class="pl">Wszystko jest w <b>Ogólne → Ekran</b>, razem z podglądem czujnika na żywo
+      i dzisiejszymi godzinami wschodu i zachodu.</p>
+  </div>
   <div class="card backup-note">
     <h3><span class="en">Set a panel password (recommended)</span><span class="pl">Ustaw hasło do panelu (zalecane)</span></h3>
     <p class="en">Out of the box the settings page is open, so the first setup just works. That
@@ -332,8 +358,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   </div>
   <div class="grid4 web-shots">
     <img src="screenshots/web_location.png" width="1000" height="1465" alt="Settings page, Location tab" loading="lazy">
-    <img src="screenshots/web_opensky.png" width="1000" height="2320" alt="Settings page, OpenSky client tab" loading="lazy">
-    <img src="screenshots/web_general.png" width="1000" height="2813" alt="Settings page, General tab with the panel password" loading="lazy">
+    <img src="screenshots/web_opensky.png" width="1000" height="2270" alt="Settings page, OpenSky client tab: credits per day with the night pause" loading="lazy">
+    <img src="screenshots/web_general.png" width="1000" height="4512" alt="Settings page, General tab: screen brightness and night mode, panel password" loading="lazy">
     <img src="screenshots/web_backup.png" width="1000" height="1424" alt="Settings page, Backup tab" loading="lazy">
     <img src="screenshots/web_firmware.png" width="1000" height="1981" alt="Settings page, Firmware tab: updates from GitHub and a manual upload" loading="lazy">
   </div>

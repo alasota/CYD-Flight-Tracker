@@ -67,6 +67,7 @@ bool isValidUnsignedIntString(const std::string &s) {
 #include <cstring>
 #include <string>
 
+#include "backlight.h"  // backlightStatus() — General tab, GET /light.json
 #include "config_backup.h"
 #include "config_page.h"
 #include "config_store.h"
@@ -168,6 +169,7 @@ void sendPage(ConfigPageModel model, int status = 200) {
   model.quotaResetInS = quotaSecondsUntilReset(model.quota, millis());
   model.update = releaseUpdateState();
   model.installedVersion = firmwareVersion();
+  model.light = backlightStatus(model.cfg);
 
   server.sendHeader("Cache-Control", "no-store");
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -300,6 +302,49 @@ void handleSave() {
     }
   }
 
+  // Screen brightness + night mode (spec/03). Out-of-range numbers are
+  // clamped by sanitizeConfig(); malformed ones keep the previous value.
+  if (server.hasArg("brightness_mode")) {
+    cfg.brightness_auto = server.arg("brightness_mode") != "fixed";
+  }
+  auto percent = [&](const char *arg, WebStr label, int &out) {
+    if (!server.hasArg(arg)) return;
+    std::string v = server.arg(arg).c_str();
+    if (isValidUnsignedIntString(v) && v.size() <= 4) {
+      out = std::atoi(v.c_str());
+    } else {
+      rejected.push_back(label);
+    }
+  };
+  int blMin = cfg.brightness_min_pct, blMax = cfg.brightness_max_pct;
+  int blFixed = cfg.brightness_fixed_pct, ntPct = cfg.night_pct, ntWake = cfg.night_wake_s;
+  percent("bl_min", WebStr::BrightnessMin, blMin);
+  percent("bl_max", WebStr::BrightnessMax, blMax);
+  percent("bl_fixed", WebStr::BrightnessFixedPct, blFixed);
+  percent("night_pct", WebStr::NightBrightness, ntPct);
+  percent("night_wake_s", WebStr::NightWake, ntWake);
+  cfg.brightness_min_pct = clampBrightnessPct(blMin);
+  cfg.brightness_max_pct = clampBrightnessPct(blMax);
+  cfg.brightness_fixed_pct = clampBrightnessPct(blFixed);
+  cfg.night_pct = clampNightPct(ntPct);
+  cfg.night_wake_s = clampNightWakeS(ntWake);
+  if (server.hasArg("night_mode")) {
+    NightMode mode;
+    if (nightModeFromCode(server.arg("night_mode").c_str(), &mode)) cfg.night_mode = mode;
+  }
+  auto clockArg = [&](const char *arg, WebStr label, uint16_t &out) {
+    if (!server.hasArg(arg)) return;
+    int minutes = 0;
+    if (parseClockMinutes(server.arg(arg).c_str(), &minutes)) {
+      out = static_cast<uint16_t>(minutes);
+    } else {
+      rejected.push_back(label);
+    }
+  };
+  clockArg("night_from", WebStr::NightFrom, cfg.night_from_min);
+  clockArg("night_to", WebStr::NightTo, cfg.night_to_min);
+  cfg.night_pause_polling = server.hasArg("night_pause");
+
   if (server.hasArg("language")) {
     cfg.language = languageFromCode(server.arg("language").c_str());  // unknown -> default
   }
@@ -396,6 +441,14 @@ void handleScreenshot() {
     src.readRow(y, row.data());
     server.sendContent(reinterpret_cast<const char *>(row.data()), stride);
   }
+}
+
+// GET /light.json — light sensor + backlight right now (the General tab's
+// live "Now" line; spec/03 §5.6).
+void handleLight() {
+  if (!authorize()) return;
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json", lightStatusJson(backlightStatus(loadConfig())).c_str());
 }
 
 void handleNotFound() { server.send(404, "text/plain", "Not found"); }
@@ -663,6 +716,7 @@ void configPortalBegin() {
   server.on("/save", HTTP_POST, handleSave);
   server.on("/lang", HTTP_GET, handleLang);
   server.on("/screenshot.bmp", HTTP_GET, handleScreenshot);
+  server.on("/light.json", HTTP_GET, handleLight);
   server.on("/upload_credentials", HTTP_POST, handleCredentialsUpload, handleUploadChunk);
   server.on("/backup.json", HTTP_GET, handleBackupDownload);
   server.on("/restore", HTTP_POST, handleRestore, handleUploadChunk);

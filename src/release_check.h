@@ -191,6 +191,7 @@ struct PromptGate {
   bool cpaFound = false;           // as for shouldDeferAutoSwitch()
   int tCpaSeconds = 0;
   bool touchActive = false;        // never pop up under a finger
+  bool screenOff = false;          // night, backlight off (backlight) — nobody would see it
 };
 bool shouldShowUpdatePrompt(const PromptGate &g);
 constexpr uint32_t kUpdatePromptTimeoutMs = 30000;

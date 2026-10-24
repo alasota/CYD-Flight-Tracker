@@ -53,6 +53,18 @@ float clampClimbRateThresholdMps(float climb_rate_threshold_mps) {
                   kMaxClimbRateThresholdMps);
 }
 
+uint8_t clampBrightnessPct(int pct) { return static_cast<uint8_t>(std::min(std::max(pct, 5), 100)); }
+
+uint8_t clampNightPct(int pct) { return static_cast<uint8_t>(std::min(std::max(pct, 0), 100)); }
+
+uint16_t clampClockMinutes(int minutes) {
+  return static_cast<uint16_t>(std::min(std::max(minutes, 0), 1439));
+}
+
+uint16_t clampNightWakeS(int seconds) {
+  return static_cast<uint16_t>(std::min(std::max(seconds, 10), 600));
+}
+
 Config sanitizeConfig(const Config &cfg) {
   Config out = cfg;
   out.home_lat = clampLat(out.home_lat);
@@ -69,6 +81,17 @@ Config sanitizeConfig(const Config &cfg) {
   if (!out.update_skipped_tag.empty() && !isReleaseTagFormat(out.update_skipped_tag)) {
     out.update_skipped_tag.clear();
   }
+  out.brightness_fixed_pct = clampBrightnessPct(out.brightness_fixed_pct);
+  out.brightness_min_pct = clampBrightnessPct(out.brightness_min_pct);
+  out.brightness_max_pct = clampBrightnessPct(out.brightness_max_pct);
+  if (out.brightness_min_pct > out.brightness_max_pct) {
+    std::swap(out.brightness_min_pct, out.brightness_max_pct);
+  }
+  out.night_mode = clampNightMode(static_cast<int>(out.night_mode));
+  out.night_from_min = clampClockMinutes(out.night_from_min);
+  out.night_to_min = clampClockMinutes(out.night_to_min);
+  out.night_pct = clampNightPct(out.night_pct);
+  out.night_wake_s = clampNightWakeS(out.night_wake_s);
   return out;
 }
 
@@ -105,6 +128,16 @@ Config loadConfig() {
   cfg.update_check_enabled = prefs.getBool("updchk", cfg.update_check_enabled);
   cfg.update_show_prerelease = prefs.getBool("updpre", cfg.update_show_prerelease);
   if (prefs.isKey("updskip")) cfg.update_skipped_tag = prefs.getString("updskip", "").c_str();
+  cfg.brightness_auto = prefs.getBool("bl_auto", cfg.brightness_auto);
+  cfg.brightness_fixed_pct = prefs.getUChar("bl_fix", cfg.brightness_fixed_pct);
+  cfg.brightness_min_pct = prefs.getUChar("bl_min", cfg.brightness_min_pct);
+  cfg.brightness_max_pct = prefs.getUChar("bl_max", cfg.brightness_max_pct);
+  cfg.night_mode = clampNightMode(prefs.getUChar("nt_mode", static_cast<uint8_t>(cfg.night_mode)));
+  cfg.night_from_min = prefs.getUShort("nt_from", cfg.night_from_min);
+  cfg.night_to_min = prefs.getUShort("nt_to", cfg.night_to_min);
+  cfg.night_pct = prefs.getUChar("nt_pct", cfg.night_pct);
+  cfg.night_wake_s = prefs.getUShort("nt_wake", cfg.night_wake_s);
+  cfg.night_pause_polling = prefs.getBool("nt_poll", cfg.night_pause_polling);
 
   prefs.end();
   return sanitizeConfig(cfg);
@@ -134,6 +167,16 @@ void saveConfig(const Config &cfg) {
   prefs.putBool("updchk", sanitized.update_check_enabled);
   prefs.putBool("updpre", sanitized.update_show_prerelease);
   prefs.putString("updskip", sanitized.update_skipped_tag.c_str());
+  prefs.putBool("bl_auto", sanitized.brightness_auto);
+  prefs.putUChar("bl_fix", sanitized.brightness_fixed_pct);
+  prefs.putUChar("bl_min", sanitized.brightness_min_pct);
+  prefs.putUChar("bl_max", sanitized.brightness_max_pct);
+  prefs.putUChar("nt_mode", static_cast<uint8_t>(sanitized.night_mode));
+  prefs.putUShort("nt_from", sanitized.night_from_min);
+  prefs.putUShort("nt_to", sanitized.night_to_min);
+  prefs.putUChar("nt_pct", sanitized.night_pct);
+  prefs.putUShort("nt_wake", sanitized.night_wake_s);
+  prefs.putBool("nt_poll", sanitized.night_pause_polling);
 
   prefs.end();
 }

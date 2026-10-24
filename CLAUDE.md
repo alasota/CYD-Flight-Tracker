@@ -103,7 +103,8 @@ works**. Implement it like this:
   "BRAK DOSTĘPU DO OPENSKY" ("BŁĄD API" short). Stale aircraft from the last good poll are still
   shown as before; `main.cpp` repaints the content when the health changes and the list is empty.
   (Found the hard way: 15 s polls = 5760 credits/day > the account's 4000, and the display just
-  said "no flights".)
+  said "no flights".) One way out: *Pause data fetching at night* (see "Brightness & night
+  mode"); 23:00-06:30 at 15 s = 1800 requests less.
 
 ## Aircraft identification: airline + flight + model
 
@@ -757,6 +758,46 @@ Spec: `spec/02-github-release-check.md` (built and tested on the board 2026-10-2
 - ⚠️ Windows: a native test run sometimes reports `ERRORED` with no failed assertion — that's
   application control blocking a fresh test `.exe` (WinError 4551). Rerun that suite.
 
+## Brightness & night mode (backlight, sun_times)
+
+Spec: `spec/03-brightness-night-mode.md` (built and tested on the board 2026-10-24).
+
+- **Backlight:** `tft.setBrightness()` (LovyanGFX `Light_PWM`, GPIO21). LovyanGFX starts at
+  127. Before this feature the board ran at half brightness all the time; `backlightBegin()`
+  sets 255 right after `tft.init()`.
+- **Light sensor:** LDR on GPIO34 (ADC1), read at **11 dB**. Measured on the board: a lit room
+  reads ~0 (with single spikes up to ~150), darkness ~1100-1300, higher = darker. 0 dB saturates
+  at 4095 in the dark. In the dark the backlight shines into the sensor (under a cloth: PWM 255
+  -> ~260, 127 -> ~450, 10 -> ~1100, 0 -> ~1260). That feedback is not compensated because it
+  pushes the right way (darker -> dimmer -> reads darker), so the screen settles at its minimum.
+  Curve constants in `backlight.h` (`kLightRawBright` 40, `kLightRawDark` 1000): fixed per
+  board, not user settings (spec §8.5).
+- **Pure logic** (`backlight`): `LightFilter` (median of 5 + EMA, 2 s warm-up on full
+  brightness), `autoBrightnessPct()` (linear between the two constants, 5 % hysteresis),
+  `pctToPwm()` (min duty 8 + quadratic), `stepPwm()` ramps (1 s by day, 3 s into / out of the
+  night, a wake-up jumps), `nightWindowFor()` / `isNight()` (Off / by the clock, through midnight
+  / sunset->sunrise, polar day = never, polar night = always), `decideBacklight()`,
+  `onTouchWake()`, `shouldPollOpenSky()`, `lightStatusJson()`. `sun_times` = the sunrise
+  equation (UTC minutes; `shiftSunTimes()` to local), tested against api.sunrise-sunset.org
+  (±3 min).
+- **Rules:** a service screen (OTA progress / failed, update question, GitHub install) gets
+  100 % at once (`backlightFullNow()` from the OTA observers). There is no night without a
+  synced clock, and the night never brightens the screen (min of day and night level). At
+  night with `night_pct` 0 the backlight is off: the first tap only lights it (`max(min, 10 %)`)
+  for `night_wake_s` and is **not** passed to `handleTap()`. A tap at night always restarts
+  the wake time. `night_pause_polling` (default **off**) skips `openSkyClientPoll()` during
+  the night window except within the wake time. Auto-cycle stops and the update question
+  isn't shown while the screen is dark (`PromptGate::screenOff`).
+- **Settings** (General tab, "Display" card; backup group `display`): `brightness_auto`
+  (default on), min / max (10 / 100 %) or fixed (80 %), `night_mode` (default **sunset to
+  sunrise**), night from / to (23:00 / 06:30), `night_pct` (default **10 %**, 0 = off),
+  `night_wake_s` (60 s, 10-600), `night_pause_polling` (off). The card's "Now" line comes from
+  `GET /light.json` every 2 s. The OpenSky tab's credits/day estimate subtracts the night window
+  when pausing is on (`openSkyDailyCredits(radius, poll, pausedMinutesPerDay())`).
+- Log: `[light] raw=… avg=… -> N% (pwm P)`, `[light] night (sun): 10%`, `[light] sun today:
+  sunrise 07:17, sunset 17:25`, `[light] touch at night: awake for 60 s (screen lit)`,
+  `[light] polling paused (night)` / `resumed (touch)`.
+
 ## Design language — LCARS-inspired (Star Trek console aesthetic)
 
 Build an **LCARS-inspired** look, not a reproduction of the exact copyrighted LCARS design
@@ -934,6 +975,10 @@ each with a single responsibility:
 - `radar_view` — draws Screen 3's content area: the radar circle in a left-side bounding rect it
   receives (not the full screen anymore) plus a call to `aircraft_summary` for the right-side
   panel. Same enriched-aircraft input contract as the other screens. No networking code.
+- `backlight` — automatic brightness from the light sensor, night mode, touch wake-up,
+  "may we poll OpenSky at night" (see "Brightness & night mode"); pure logic + an `#ifdef
+  ARDUINO` adapter (ADC, `tft.setBrightness()`, `backlightStatus()` for the config page).
+- `sun_times` — sunrise / sunset from date + lat/lon (pure; no network).
 - `config_store` — Preferences/NVS read/write for all persisted settings, including
   `last_screen` (0/1/2) — replaces the old two-screen `last_view` field — and
   `auto_cycle_enabled` / `auto_cycle_interval_s` (see "Auto screen cycling").
@@ -1098,7 +1143,8 @@ mistakes here waste hours of debugging later.
 - Upload: `pio run -t upload`
 - Monitor: `pio device monitor -b 115200`
 - Test (native, logic only, no hardware): `pio test -e native`
-- Screenshots of the update feature: `python tools/screenshots.py [--device cyd-sky.local]`
+- Screenshots of the config page (General, OpenSky, Firmware tabs) and the update question:
+  `python tools/screenshots.py [--device cyd-sky.local]`
 
 ## Out of scope for MVP
 

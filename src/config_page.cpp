@@ -1,5 +1,6 @@
 #include "config_page.h"
 
+#include <algorithm>
 #include <cstdio>
 
 #include "config_portal.h"  // openSkyCreditCost()
@@ -34,10 +35,42 @@ bool hasOpenSkyCredentials(const Config &cfg) {
   return !cfg.opensky_client_id.empty() && !cfg.opensky_client_secret.empty();
 }
 
-uint32_t openSkyDailyCredits(float radius_deg, uint32_t poll_interval_s) {
+uint32_t openSkyDailyRequests(uint32_t poll_interval_s, uint32_t paused_min_per_day) {
   const uint32_t poll = poll_interval_s == 0 ? 1 : poll_interval_s;
-  const uint32_t requests = (86400u + poll - 1) / poll;
-  return requests * static_cast<uint32_t>(openSkyCreditCost(radius_deg));
+  const uint32_t pausedS = std::min<uint32_t>(paused_min_per_day, 1440u) * 60u;
+  return (86400u - pausedS + poll - 1) / poll;
+}
+
+uint32_t openSkyDailyCredits(float radius_deg, uint32_t poll_interval_s,
+                             uint32_t paused_min_per_day) {
+  return openSkyDailyRequests(poll_interval_s, paused_min_per_day) *
+         static_cast<uint32_t>(openSkyCreditCost(radius_deg));
+}
+
+uint32_t nightMinutesToday(const Config &cfg, const BacklightStatus &light) {
+  const NightWindow w = nightWindowFor(cfg.night_mode, cfg.night_from_min, cfg.night_to_min,
+                                       light.sun_local, light.sun_known);
+  return static_cast<uint32_t>(nightWindowMinutes(w));
+}
+
+uint32_t pausedMinutesPerDay(const Config &cfg, const BacklightStatus &light) {
+  return cfg.night_pause_polling ? nightMinutesToday(cfg, light) : 0;
+}
+
+std::string lightStateText(const BacklightStatus &s, Language lang) {
+  WebStr id = WebStr::LightDay;
+  if (!s.synced) {
+    id = WebStr::LightNotSynced;
+  } else if (s.screen_off) {
+    id = WebStr::LightScreenOff;
+  } else if (s.woken) {
+    id = WebStr::LightWoken;
+  } else if (s.night) {
+    id = WebStr::LightNight;
+  }
+  std::string out = webTr(id, lang);
+  if (!s.polling) out += std::string(" \xC2\xB7 ") + webTr(WebStr::LightPollingPaused, lang);
+  return out;
 }
 
 uint32_t openSkyDailyCreditLimit(bool authenticated) { return authenticated ? 4000u : 400u; }
@@ -199,11 +232,23 @@ const char kScript[] =
     "function cost(r){var a=4*r*r;return a<=25?1:a<=100?2:a<=400?3:4}"
     "function calc(){"
     "var c=cost(parseFloat($('radius').value)||0),p=Math.max(parseInt($('poll').value)||0,1),"
-    "d=Math.ceil(86400/p)*c,l=($('cid').value&&($('cs').value||$('cs').dataset.saved))?4000:400;"
-    "$('cost').textContent=c;"
+    "n=parseInt($('daily').dataset.night)||0,"
+    "d=Math.ceil((86400-($('ntp').checked&&$('ntm').value!='off'?n*60:0))/p)*c,"
+    "l=($('cid').value&&($('cs').value||$('cs').dataset.saved))?4000:400;"
+    "$('cost').textContent=c;$('ntsv').textContent=Math.ceil(n*60/p);"
     "$('daily').innerHTML='≈ <b>'+d+'</b> '+T.day+' · '+T.lim+' '+l+"
     "(d>l?'<div class=warn>'+T.over+'</div>':'')}"
     "['radius','poll','cid','cs'].forEach(function(i){$(i).addEventListener('input',calc)});"
+    // Screen card: show only the fields of the chosen modes; the "Now" line
+    // follows the board (GET /light.json) while the General tab is open.
+    "function disp(){var a=$('blm').value=='auto',n=$('ntm').value;"
+    "$('blauto').hidden=!a;$('blfix').hidden=a;$('ntsch').hidden=n!='schedule';$('ntopt').hidden=n=='off'}"
+    "$('blm').onchange=disp;$('ntm').onchange=function(){disp();calc()};$('ntp').onchange=calc;disp();"
+    "setInterval(function(){if($('tab').value!='general')return;"
+    "fetch('/light.json',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){"
+    "$('lr').textContent=j.raw;$('la').textContent=j.avg;$('lp').textContent=j.pct;"
+    "$('ls').textContent=(!j.synced?T.lns:j.screen_off?T.loff:j.woken?T.lwk:j.night?T.lnt:T.lday)+"
+    "(j.polling?'':' · '+T.lpz)}).catch(function(){})},2000);"
     "function pw(){var i=$('cs');i.type=i.type=='password'?'text':'password'}"
     // Firmware upload with a progress bar (a plain form post works too, just
     // without one). The answer page replaces this one.
@@ -276,6 +321,32 @@ class Writer {
                                  : "<option value=\"pl\">Polski</option>");
     raw(selected == Language::EN ? "<option value=\"en\" selected>English</option>"
                                  : "<option value=\"en\">English</option>");
+    raw("</select></div>");
+  }
+
+  struct Option {
+    const char *value;
+    WebStr label;
+  };
+  // <div class=f><label>LABEL</label><select id name>...options...</select></div>
+  void select(const char *id, const char *name, WebStr label, const Option *options, int count,
+              const char *selected) {
+    raw("<div class=\"f\"><label for=\"");
+    raw(id);
+    raw("\">");
+    t(label);
+    raw("</label><select id=\"");
+    raw(id);
+    raw("\" name=\"");
+    raw(name);
+    raw("\">");
+    for (int i = 0; i < count; ++i) {
+      raw("<option value=\"");
+      raw(options[i].value);
+      raw(std::string(options[i].value) == selected ? "\" selected>" : "\">");
+      t(options[i].label);
+      raw("</option>");
+    }
     raw("</select></div>");
   }
 
@@ -406,6 +477,105 @@ void updateCard(Writer &w, const ConfigPageModel &m, const std::string &installe
     }
   }
   w.raw("</div>");
+}
+
+// General tab, "Display" card: brightness, night mode, and what the light
+// sensor / backlight do right now (spec/03 §4.4). The script hides the
+// fields of the modes not chosen (#blauto / #blfix / #ntsch / #ntopt).
+void displayCard(Writer &w, const ConfigPageModel &m, Language lang) {
+  const Config &c = m.cfg;
+  const BacklightStatus &l = m.light;
+  w.raw("<div class=\"card\" id=\"display\"><h2>");
+  w.t(WebStr::SectionDisplay);
+  w.raw("</h2>");
+  const Writer::Option modes[] = {{"auto", WebStr::BrightnessAuto},
+                                  {"fixed", WebStr::BrightnessFixed}};
+  w.select("blm", "brightness_mode", WebStr::BrightnessMode, modes, 2,
+           c.brightness_auto ? "auto" : "fixed");
+  w.raw(c.brightness_auto ? "<div id=\"blauto\">" : "<div id=\"blauto\" hidden>");
+  w.raw("<div class=\"row\">");
+  w.field("blmin", WebStr::BrightnessMin, "type=\"number\" name=\"bl_min\" min=\"5\" max=\"100\"",
+          fmtU(c.brightness_min_pct));
+  w.field("blmax", WebStr::BrightnessMax, "type=\"number\" name=\"bl_max\" min=\"5\" max=\"100\"",
+          fmtU(c.brightness_max_pct));
+  w.raw("</div><div class=\"hint\" style=\"margin:0 0 18px\">");
+  w.t(WebStr::BrightnessAutoHint);
+  w.raw("</div></div>");
+  w.raw(c.brightness_auto ? "<div id=\"blfix\" hidden>" : "<div id=\"blfix\">");
+  w.field("blfx", WebStr::BrightnessFixedPct,
+          "type=\"number\" name=\"bl_fixed\" min=\"5\" max=\"100\"", fmtU(c.brightness_fixed_pct));
+  w.raw("</div>");
+
+  const Writer::Option nights[] = {{"off", WebStr::NightOff},
+                                   {"schedule", WebStr::NightSchedule},
+                                   {"sun", WebStr::NightSun}};
+  w.select("ntm", "night_mode", WebStr::NightModeLabel, nights, 3, nightModeCode(c.night_mode));
+  w.raw(c.night_mode == NightMode::Schedule ? "<div id=\"ntsch\">" : "<div id=\"ntsch\" hidden>");
+  w.raw("<div class=\"row\" style=\"margin-bottom:18px\">");
+  w.field("ntf", WebStr::NightFrom, "type=\"time\" name=\"night_from\"",
+          formatClockMinutes(c.night_from_min));
+  w.field("ntt", WebStr::NightTo, "type=\"time\" name=\"night_to\"",
+          formatClockMinutes(c.night_to_min));
+  w.raw("</div></div>");
+  w.raw(c.night_mode == NightMode::Off ? "<div id=\"ntopt\" hidden>" : "<div id=\"ntopt\">");
+  const WebStr nightHint = WebStr::NightBrightnessHint;
+  w.field("ntpct", WebStr::NightBrightness,
+          "type=\"number\" name=\"night_pct\" min=\"0\" max=\"100\"", fmtU(c.night_pct),
+          &nightHint);
+  w.field("ntw", WebStr::NightWake, "type=\"number\" name=\"night_wake_s\" min=\"10\" max=\"600\"",
+          fmtU(c.night_wake_s));
+  w.raw("<label class=\"switch\" style=\"margin:0\"><span>");
+  w.t(WebStr::NightPause);
+  w.raw(c.night_pause_polling
+            ? "</span><input type=\"checkbox\" id=\"ntp\" name=\"night_pause\" value=\"1\" checked>"
+            : "</span><input type=\"checkbox\" id=\"ntp\" name=\"night_pause\" value=\"1\">");
+  w.raw("</label><div class=\"hint\">");
+  w.t(WebStr::NightPauseHint);
+  const uint32_t poll = c.poll_interval_s == 0 ? 1 : c.poll_interval_s;
+  w.raw(" \xE2\x89\x88 <b id=\"ntsv\">");
+  w.uint((nightMinutesToday(c, l) * 60u + poll - 1) / poll);
+  w.raw("</b> ");
+  w.t(WebStr::NightPauseSaving);
+  w.raw(".</div></div>");
+
+  // What the board does right now (live: GET /light.json).
+  w.raw("<div class=\"stat\" id=\"light\">");
+  w.t(WebStr::LightNow);
+  w.raw(": ");
+  w.t(WebStr::LightSensor);
+  w.raw(" <b id=\"lr\">");
+  w.uint(l.raw);
+  w.raw("</b> (");
+  w.t(WebStr::LightAverage);
+  w.raw(" <span id=\"la\">");
+  w.uint(static_cast<uint32_t>(l.avg + 0.5f));
+  w.raw("</span>) \xC2\xB7 ");
+  w.t(WebStr::LightLevel);
+  w.raw(" <b id=\"lp\">");
+  w.uint(l.pct);
+  w.raw("</b> % \xC2\xB7 <span id=\"ls\">");
+  w.esc(lightStateText(l, lang));
+  w.raw("</span><br>");
+  if (!c.home_configured) {
+    w.t(WebStr::SunNeedsLocation);
+  } else if (!l.sun_known) {
+    w.t(WebStr::SunNeedsClock);
+  } else if (l.sun_local.kind == SunTimes::Kind::PolarDay) {
+    w.t(WebStr::SunPolarDay);
+  } else if (l.sun_local.kind == SunTimes::Kind::PolarNight) {
+    w.t(WebStr::SunPolarNight);
+  } else {
+    w.t(WebStr::SunToday);
+    w.raw(" ");
+    w.raw(formatClockMinutes(l.sun_local.sunrise_min));
+    w.raw(", ");
+    w.t(WebStr::SunSet);
+    w.raw(" ");
+    w.raw(formatClockMinutes(l.sun_local.sunset_min));
+    w.raw(" ");
+    w.t(WebStr::SunForLocation);
+  }
+  w.raw("</div></div>");
 }
 
 // <form id=ID ... action=/update/install><input type=hidden name=tag value=TAG></form>
@@ -550,9 +720,12 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.raw("<div class=\"card\">");
   w.field("poll", WebStr::PollInterval, "type=\"number\" name=\"poll_interval\" min=\"5\"",
           fmtU(c.poll_interval_s));
-  const uint32_t daily = openSkyDailyCredits(c.radius_deg, c.poll_interval_s);
+  const uint32_t daily =
+      openSkyDailyCredits(c.radius_deg, c.poll_interval_s, pausedMinutesPerDay(c, m.light));
   const uint32_t limit = openSkyDailyCreditLimit(authed);
-  w.raw("<div class=\"stat\" id=\"daily\">\xE2\x89\x88 <b>");
+  w.raw("<div class=\"stat\" id=\"daily\" data-night=\"");
+  w.uint(nightMinutesToday(c, m.light));
+  w.raw("\">\xE2\x89\x88 <b>");
   w.uint(daily);
   w.raw("</b> ");
   w.t(WebStr::CreditsPerDay);
@@ -581,7 +754,9 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.raw("</h2>");
   w.languageSelect("lang", "language", WebStr::DisplayLanguage, c.language);
   w.languageSelect("wlang", "web_language", WebStr::WebLanguage, c.web_language);
-  w.raw("</div><div class=\"card\"><h2>");
+  w.raw("</div>");
+  displayCard(w, m, lang);
+  w.raw("<div class=\"card\"><h2>");
   w.t(WebStr::SectionScreens);
   w.raw("</h2><label class=\"switch\"><span>");
   w.t(WebStr::AutoCycle);
@@ -724,6 +899,18 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.t(WebStr::FirmwareLooksLikeFull);
   w.raw("\",fail:\"");
   w.t(WebStr::OtaAborted);
+  w.raw("\",lday:\"");
+  w.t(WebStr::LightDay);
+  w.raw("\",lnt:\"");
+  w.t(WebStr::LightNight);
+  w.raw("\",loff:\"");
+  w.t(WebStr::LightScreenOff);
+  w.raw("\",lwk:\"");
+  w.t(WebStr::LightWoken);
+  w.raw("\",lns:\"");
+  w.t(WebStr::LightNotSynced);
+  w.raw("\",lpz:\"");
+  w.t(WebStr::LightPollingPaused);
   w.raw("\"};");
   w.raw(kScript);
   if (m.restarting) w.raw(kRestartScript);

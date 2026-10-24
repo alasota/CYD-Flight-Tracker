@@ -226,6 +226,51 @@ static void test_update_settings_defaults_and_sanitizing(void) {
   }
 }
 
+// ---- Brightness / night mode (spec/03) ----------------------------------------
+
+static void test_display_defaults(void) {
+  const Config c = defaultConfig();
+  TEST_ASSERT_TRUE(c.brightness_auto);
+  TEST_ASSERT_EQUAL_UINT8(10, c.brightness_min_pct);
+  TEST_ASSERT_EQUAL_UINT8(100, c.brightness_max_pct);
+  TEST_ASSERT_TRUE(c.night_mode == NightMode::Sun);  // owner decision §8.2
+  TEST_ASSERT_EQUAL_UINT8(10, c.night_pct);
+  TEST_ASSERT_EQUAL_UINT16(60, c.night_wake_s);
+  TEST_ASSERT_FALSE(c.night_pause_polling);           // owner decision §8.3
+  TEST_ASSERT_EQUAL_UINT16(23 * 60, c.night_from_min);
+  TEST_ASSERT_EQUAL_UINT16(6 * 60 + 30, c.night_to_min);
+}
+
+static void test_sanitize_display_settings(void) {
+  Config c = defaultConfig();
+  c.brightness_fixed_pct = 0;
+  c.brightness_min_pct = 90;
+  c.brightness_max_pct = 200;
+  c.night_mode = static_cast<NightMode>(9);
+  c.night_from_min = 5000;
+  c.night_pct = 150;
+  c.night_wake_s = 3;
+  Config s = sanitizeConfig(c);
+  TEST_ASSERT_EQUAL_UINT8(5, s.brightness_fixed_pct);
+  TEST_ASSERT_EQUAL_UINT8(90, s.brightness_min_pct);
+  TEST_ASSERT_EQUAL_UINT8(100, s.brightness_max_pct);
+  TEST_ASSERT_TRUE(s.night_mode == kDefaultNightMode);
+  TEST_ASSERT_EQUAL_UINT16(1439, s.night_from_min);
+  TEST_ASSERT_EQUAL_UINT8(100, s.night_pct);
+  TEST_ASSERT_EQUAL_UINT16(10, s.night_wake_s);
+
+  c = defaultConfig();
+  c.brightness_min_pct = 80;  // min > max: swapped
+  c.brightness_max_pct = 30;
+  c.night_pct = 0;            // 0 = off is allowed at night
+  c.night_wake_s = 9999;
+  s = sanitizeConfig(c);
+  TEST_ASSERT_EQUAL_UINT8(30, s.brightness_min_pct);
+  TEST_ASSERT_EQUAL_UINT8(80, s.brightness_max_pct);
+  TEST_ASSERT_EQUAL_UINT8(0, s.night_pct);
+  TEST_ASSERT_EQUAL_UINT16(600, s.night_wake_s);
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_web_language_is_independent_and_sanitized);
@@ -249,5 +294,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_clamp_climb_rate_threshold_floors_and_ceils);
   RUN_TEST(test_sanitize_config_clamps_flight_phase_thresholds);
   RUN_TEST(test_update_settings_defaults_and_sanitizing);
+  RUN_TEST(test_display_defaults);
+  RUN_TEST(test_sanitize_display_settings);
   return UNITY_END();
 }

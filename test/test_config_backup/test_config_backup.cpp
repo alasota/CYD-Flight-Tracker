@@ -41,7 +41,7 @@ static void test_round_trip_restores_every_setting(void) {
 
   TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(r.invalidFields.size()));
-  TEST_ASSERT_EQUAL_INT(14, r.appliedFields);
+  TEST_ASSERT_EQUAL_INT(24, r.appliedFields);  // 14 + the display group (10)
   const Config &c = r.config;
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, original.home_lat, c.home_lat);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, original.home_lon, c.home_lon);
@@ -189,7 +189,7 @@ static void test_panel_password_travels_only_with_secrets(void) {
   BackupRestoreResult r = restoreConfigFromBackupJson(configToBackupJson(c, true, "v1"),
                                                       defaultConfig());
   TEST_ASSERT_EQUAL_STRING("hunter22", r.config.web_password.c_str());
-  TEST_ASSERT_EQUAL_INT(15, r.appliedFields);
+  TEST_ASSERT_EQUAL_INT(25, r.appliedFields);
 }
 
 static void test_restore_without_password_keeps_the_devices(void) {
@@ -213,10 +213,68 @@ static void test_invalid_password_in_backup_is_reported_and_skipped(void) {
   TEST_ASSERT_EQUAL_STRING("security.web_password", r.invalidFields[0].c_str());
 }
 
+static void test_display_group_round_trip(void) {
+  Config c = defaultConfig();
+  c.brightness_auto = false;
+  c.brightness_fixed_pct = 42;
+  c.brightness_min_pct = 15;
+  c.brightness_max_pct = 90;
+  c.night_mode = NightMode::Schedule;
+  c.night_from_min = 22 * 60 + 15;
+  c.night_to_min = 7 * 60;
+  c.night_pct = 0;
+  c.night_wake_s = 120;
+  c.night_pause_polling = true;
+  const std::string json = configToBackupJson(c, false, "v1");
+  TEST_ASSERT_TRUE(contains(json, "\"display\": {"));
+  TEST_ASSERT_TRUE(contains(json, "\"night_mode\": \"schedule\""));
+  TEST_ASSERT_TRUE(contains(json, "\"night_from\": \"22:15\""));
+  BackupRestoreResult r = restoreConfigFromBackupJson(json, defaultConfig());
+  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  TEST_ASSERT_TRUE(r.invalidFields.empty());
+  TEST_ASSERT_FALSE(r.config.brightness_auto);
+  TEST_ASSERT_EQUAL_UINT8(42, r.config.brightness_fixed_pct);
+  TEST_ASSERT_EQUAL_UINT8(15, r.config.brightness_min_pct);
+  TEST_ASSERT_EQUAL_UINT8(90, r.config.brightness_max_pct);
+  TEST_ASSERT_TRUE(r.config.night_mode == NightMode::Schedule);
+  TEST_ASSERT_EQUAL_UINT16(22 * 60 + 15, r.config.night_from_min);
+  TEST_ASSERT_EQUAL_UINT16(7 * 60, r.config.night_to_min);
+  TEST_ASSERT_EQUAL_UINT8(0, r.config.night_pct);
+  TEST_ASSERT_EQUAL_UINT16(120, r.config.night_wake_s);
+  TEST_ASSERT_TRUE(r.config.night_pause_polling);
+}
+
+static void test_display_group_bad_values_and_old_backups(void) {
+  // Without the group (a backup from before spec/03): current values kept.
+  Config current = defaultConfig();
+  current.night_pct = 33;
+  BackupRestoreResult r = restoreConfigFromBackupJson(
+      "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"general\":{}}", current);
+  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  TEST_ASSERT_EQUAL_UINT8(33, r.config.night_pct);
+  // Wrong values are skipped and listed; a huge number is capped (sanitizeConfig clamps it).
+  r = restoreConfigFromBackupJson(
+      "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"display\":{"
+      "\"night_mode\":\"dark\",\"night_from\":\"25:00\",\"night_brightness\":\"x\","
+      "\"brightness_max\":70000}}",
+      current);
+  TEST_ASSERT_EQUAL_INT(3, static_cast<int>(r.invalidFields.size()));
+  TEST_ASSERT_EQUAL_STRING("display.night_mode", r.invalidFields[0].c_str());
+  TEST_ASSERT_EQUAL_UINT8(255, r.config.brightness_max_pct);
+  TEST_ASSERT_EQUAL_UINT8(33, r.config.night_pct);
+  // An unknown group (a backup from a newer firmware) doesn't reject the file.
+  r = restoreConfigFromBackupJson(
+      "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"future\":{\"x\":1}}",
+      current);
+  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_round_trip_restores_every_setting);
   RUN_TEST(test_update_settings_in_the_general_group);
+  RUN_TEST(test_display_group_round_trip);
+  RUN_TEST(test_display_group_bad_values_and_old_backups);
   RUN_TEST(test_backup_names_its_format_and_firmware);
   RUN_TEST(test_backup_without_secrets_keeps_the_devices_credentials);
   RUN_TEST(test_missing_keys_keep_current_values);

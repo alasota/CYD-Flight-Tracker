@@ -30,10 +30,23 @@ SettingsTab settingsTabFromArg(const std::string &arg);
 // anonymously).
 bool hasOpenSkyCredentials(const Config &cfg);
 
-// Rough OpenSky credit use per day if the display polls non-stop:
-// ceil(86400 / poll_interval_s) requests x openSkyCreditCost(radius).
+// Rough OpenSky credit use per day if the display polls non-stop except for
+// `paused_min_per_day` minutes (night pause, spec/03):
+// ceil((86400 - 60 * paused) / poll_interval_s) requests x openSkyCreditCost(radius).
 // poll_interval_s 0 is treated as 1.
-uint32_t openSkyDailyCredits(float radius_deg, uint32_t poll_interval_s);
+uint32_t openSkyDailyRequests(uint32_t poll_interval_s, uint32_t paused_min_per_day = 0);
+uint32_t openSkyDailyCredits(float radius_deg, uint32_t poll_interval_s,
+                             uint32_t paused_min_per_day = 0);
+
+// Minutes of tonight's night window (by the clock, or today's sunset ->
+// sunrise from `light`); 0 when the night mode is off or the sun unknown.
+uint32_t nightMinutesToday(const Config &cfg, const BacklightStatus &light);
+// Minutes a day OpenSky isn't polled: the night window, if pausing is on.
+uint32_t pausedMinutesPerDay(const Config &cfg, const BacklightStatus &light);
+
+// The General tab's "Now: ..." state word(s): day / night / screen off /
+// woken by a touch / clock not synced, + "fetching paused" when it is.
+std::string lightStateText(const BacklightStatus &s, Language lang);
 
 // OpenSky's daily credit allowance: 4000 with an account, 400 anonymous
 // (CLAUDE.md "Rate limits / credits").
@@ -62,6 +75,9 @@ struct ConfigPageModel {
   // The version shown as installed; "" = firmwareVersion(). (The demo
   // screenshot renders a made-up one.)
   std::string installedVersion;
+  // Light sensor / backlight right now (General tab; refreshed live from
+  // GET /light.json by the page's script).
+  BacklightStatus light;
 };
 
 // Where the Firmware tab sends people for new versions.

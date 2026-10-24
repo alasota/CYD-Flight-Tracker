@@ -11,7 +11,8 @@
 #include <cstdint>
 #include <string>
 
-#include "i18n.h"  // Language
+#include "backlight.h"  // NightMode
+#include "i18n.h"       // Language
 
 // Clamps the auto-cycle interval (see CLAUDE.md "Auto screen cycling") to
 // a sane floor — a few seconds minimum, so the display can't be
@@ -76,6 +77,24 @@ struct Config {
   bool update_check_enabled = true;
   bool update_show_prerelease = false;
   std::string update_skipped_tag;
+  // Screen brightness and night mode (backlight, spec/03-brightness-night-mode.md).
+  // brightness_auto: from the light sensor between min and max (NVS `bl_auto`,
+  // `bl_min`, `bl_max`), else fixed (`bl_fix`); percent, 5..100.
+  // night_mode Off / by the clock (night_from..night_to, minutes after local
+  // midnight; `nt_from`, `nt_to`) / sunset to sunrise (`nt_mode`); at night
+  // the brightness is night_pct (0 = backlight off; `nt_pct`). A touch at
+  // night wakes the screen / the polling for night_wake_s (`nt_wake`).
+  // night_pause_polling: no OpenSky requests at night outside that (`nt_poll`).
+  bool brightness_auto = true;
+  uint8_t brightness_fixed_pct = 80;
+  uint8_t brightness_min_pct = 10;
+  uint8_t brightness_max_pct = 100;
+  NightMode night_mode = kDefaultNightMode;
+  uint16_t night_from_min = 23 * 60;
+  uint16_t night_to_min = 6 * 60 + 30;
+  uint8_t night_pct = 10;
+  uint16_t night_wake_s = 60;
+  bool night_pause_polling = false;
   // True once the user has saved the settings form at least once via
   // config_portal. (0, 0) is a real place (Gulf of Guinea) — without this
   // flag there's no way to tell "user hasn't configured their home
@@ -104,6 +123,14 @@ uint32_t clampPollIntervalS(uint32_t poll_interval_s);
 // value in config_portal can't break the classifier. Pure — native-tested.
 float clampNearAirportKm(float near_airport_km);
 float clampClimbRateThresholdMps(float climb_rate_threshold_mps);
+
+// Brightness / night clamps (spec/03 §5.5): day brightness 5..100 %, night
+// 0..100 % (0 = off), a time of day 0..1439 min, the wake time 10..600 s.
+// sanitizeConfig() also swaps min / max when min > max.
+uint8_t clampBrightnessPct(int pct);
+uint8_t clampNightPct(int pct);
+uint16_t clampClockMinutes(int minutes);
+uint16_t clampNightWakeS(int seconds);
 
 // --- Hardware adapter: reads/writes ESP32 NVS via the Preferences library.
 // Thin wrapper around a hardware/SDK API — see CLAUDE.md "Testing" — not

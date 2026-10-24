@@ -49,6 +49,11 @@
 //     asks GitHub once a day, between OpenSky polls; a newer release is
 //     asked about once on the display (YES installs it, NO skips that
 //     version), or installed from the config page's Firmware tab.
+//   - Brightness (spec/03-brightness-night-mode.md): backlight follows the
+//     light sensor (or a fixed level) and the night mode (by the clock or
+//     sunset to sunrise); at night the screen may go dark — the first touch
+//     then only lights it — and, if asked for, OpenSky isn't polled outside
+//     the wake time after a touch. Service screens always get full brightness.
 //   - Redraw (only what changed — CLAUDE.md "Redraw policy"): loop()
 //     collects RedrawEvents and redraw_policy::computeRedrawMask() picks
 //     the regions. A full clear (fillScreen + header + content + bottom
@@ -70,6 +75,7 @@
 
 #include "LGFX_CYD.hpp"
 #include "aircraft_lookup.h"
+#include "backlight.h"
 #include "config_portal.h"
 #include "config_store.h"
 #include "cpa_predictor.h"
@@ -325,6 +331,7 @@ static uint32_t otaFailedAtMs = 0;     // != 0: "update failed" on screen since 
 static constexpr uint32_t kOtaFailedShowMs = 5000;  // long enough to read on the board
 
 static void otaOnStart(size_t total) {
+  backlightFullNow(tft);
   drawOtaScreen(tft, firmwareVersion());
   drawOtaProgress(tft, firmwareVersion(), "", 0, total);
 }
@@ -340,6 +347,7 @@ static void otaOnEnd(bool ok) {
 
 // The same screen for an install from GitHub (release_check), titled so.
 static void githubOtaOnStart(size_t total) {
+  backlightFullNow(tft);
   drawOtaScreen(tft, firmwareVersion(), /*fromGithub=*/true);
   drawOtaProgress(tft, firmwareVersion(), "", 0, total);
 }
@@ -382,6 +390,7 @@ static void maybeShowUpdatePrompt(bool touchPressed) {
   g.cpaFound = cpa.found;
   g.tCpaSeconds = static_cast<int>(cpa.t_cpa_seconds);
   g.touchActive = touchPressed;
+  g.screenOff = backlightDecision().screen_off;
   if (!shouldShowUpdatePrompt(g)) return;
 
   promptActive = true;
@@ -541,6 +550,7 @@ void setup() {
   Serial.begin(115200);
 
   tft.init();  // also brings up the XPT2046 touch controller (LGFX_CYD.hpp)
+  backlightBegin(tft);  // full brightness until the light sensor has settled
   tft.setRotation(1);  // landscape, 320x240
   tft.fillScreen(LCARS_BLACK);
 
@@ -601,6 +611,11 @@ void loop() {
   wifiManagerLoop();
   configPortalLoop();
 
+  // Backlight: sensor, night mode, ramps. Service screens get full brightness.
+  backlightLoop(tft, cachedCfg,
+                promptActive || otaFailedAtMs != 0 || configPortalRestartPending() ||
+                    releaseInstallPending());
+
   // A good firmware update restarts the board in a moment: keep the
   // "restarting" screen and stay off the network until then.
   if (configPortalRestartPending()) return;
@@ -641,12 +656,27 @@ void loop() {
                   static_cast<int>(navHitTest(touch.x, touch.y, static_cast<int16_t>(tft.width()),
                                               static_cast<int16_t>(tft.height()))
                                        .action));
-    handleTap(touch.x, touch.y);
+    if (backlightHandleTouch(cachedCfg)) {
+      lastScreenChangeMs = millis();  // only woke a dark screen: no tap, a fresh auto-cycle
+    } else {
+      handleTap(touch.x, touch.y);
+    }
   }
   wasTouchPressed = touch.pressed;
 
   // --- OpenSky polling (only meaningful once connected) -------------------
-  if (wifiManagerStatus() == WifiStatus::Connected) {
+  // Paused at night when asked for (outside the wake time after a touch).
+  const bool pollingAllowed =
+      shouldPollOpenSky(backlightDecision(), cachedCfg.night_pause_polling);
+  static bool pollingWasAllowed = true;
+  if (pollingAllowed != pollingWasAllowed) {
+    pollingWasAllowed = pollingAllowed;
+    const char *why = !pollingAllowed                ? "paused (night)"
+                      : backlightDecision().woken ? "resumed (touch)"
+                                                  : "resumed";
+    Serial.printf("[light] polling %s\n", why);
+  }
+  if (wifiManagerStatus() == WifiStatus::Connected && pollingAllowed) {
     OpenSkyPollResult poll = openSkyClientPoll(millis(), cachedCfg);
 
     if (poll.status != OpenSkyPollStatus::NotDue) {
@@ -818,7 +848,8 @@ void loop() {
   }
 
   // --- Auto screen cycling (CLAUDE.md "Auto screen cycling") ------------
-  if (cachedCfg.auto_cycle_enabled && cachedCfg.home_configured) {
+  if (cachedCfg.auto_cycle_enabled && cachedCfg.home_configured &&
+      !backlightDecision().screen_off) {  // nobody sees a dark screen change
     CpaPrediction cpa = currentCpa();
     bool deferHold = shouldDeferAutoSwitch(nav.current(), cpa.found, cpa.t_cpa_seconds);
     if (shouldAutoAdvance(millis() - lastScreenChangeMs, cachedCfg.auto_cycle_interval_s,

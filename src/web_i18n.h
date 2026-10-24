@@ -224,6 +224,51 @@
   X(UpdStatusRateLimited, "GitHub chwilowo ogranicza zapytania — spróbuję później.",                \
     "GitHub is limiting requests for now — will try later.")                                        \
   X(UpdStatusDisabled, "Automatyczne sprawdzanie jest wyłączone.", "Automatic checking is off.")    \
+  /* General tab: screen brightness + night mode (spec/03) */                                     \
+  X(SectionDisplay, "Ekran", "Display")                                                            \
+  X(BrightnessMode, "Jasność", "Brightness")                                                       \
+  X(BrightnessAuto, "automatyczna (czujnik światła)", "automatic (light sensor)")                  \
+  X(BrightnessFixed, "stała", "fixed")                                                             \
+  X(BrightnessMin, "Minimalna (%)", "Minimum (%)")                                                 \
+  X(BrightnessMax, "Maksymalna (%)", "Maximum (%)")                                                \
+  X(BrightnessAutoHint, "W ciemnym pokoju ekran schodzi do minimum, w jasnym świeci na maksimum.", \
+    "In a dark room the screen goes down to the minimum, in a bright one up to the maximum.")      \
+  X(BrightnessFixedPct, "Stała jasność (%)", "Fixed brightness (%)")                               \
+  X(NightModeLabel, "Tryb nocny", "Night mode")                                                    \
+  X(NightOff, "wyłączony", "off")                                                                  \
+  X(NightSchedule, "według godzin", "by the clock")                                                \
+  X(NightSun, "od zachodu do wschodu słońca", "sunset to sunrise")                                 \
+  X(NightFrom, "Noc od", "Night from")                                                             \
+  X(NightTo, "do", "until")                                                                        \
+  X(NightBrightness, "Jasność w nocy (%)", "Brightness at night (%)")                              \
+  X(NightBrightnessHint, "0 % = ekran wygaszony; dotknięcie zapala go na czas wybudzenia.",         \
+    "0 % = screen off; a touch lights it for the wake time.")                                      \
+  X(NightWake, "Po dotknięciu w nocy świeć / pobieraj dane przez (s)",                             \
+    "After a touch at night, stay on / fetch data for (s)")                                        \
+  X(NightPause, "Wstrzymaj pobieranie danych w nocy", "Pause data fetching at night")              \
+  X(NightPauseHint, "Oszczędza kredyty OpenSky. Dotknięcie ekranu wznawia pobieranie na czas wybudzenia.", \
+    "Saves OpenSky credits. A touch on the screen resumes fetching for the wake time.")            \
+  X(NightPauseSaving, "zapytań mniej tej nocy", "fewer requests tonight")                          \
+  X(LightNow, "Teraz", "Now")                                                                      \
+  X(LightSensor, "czujnik", "sensor")                                                              \
+  X(LightAverage, "średnio", "average")                                                            \
+  X(LightLevel, "jasność", "brightness")                                                           \
+  X(LightDay, "dzień", "day")                                                                      \
+  X(LightNight, "noc", "night")                                                                    \
+  X(LightScreenOff, "noc, ekran wygaszony", "night, screen off")                                   \
+  X(LightWoken, "noc, wybudzony dotykiem", "night, woken by a touch")                              \
+  X(LightPollingPaused, "pobieranie wstrzymane", "fetching paused")                                \
+  X(LightNotSynced, "czas niezsynchronizowany — tryb nocny nieaktywny",                            \
+    "clock not synced — night mode inactive")                                                      \
+  X(SunToday, "Dziś słońce: wschód", "Sun today: sunrise")                                         \
+  X(SunSet, "zachód", "sunset")                                                                    \
+  X(SunForLocation, "(dla Twojej lokalizacji)", "(for your location)")                             \
+  X(SunPolarDay, "Dziś dzień polarny — nie ma nocy.", "Polar day today — no night.")               \
+  X(SunPolarNight, "Dziś noc polarna — noc przez całą dobę.", "Polar night today — night all day.")\
+  X(SunNeedsLocation, "Ustaw lokalizację, żeby liczyć wschód i zachód słońca.",                    \
+    "Set the location to work out sunrise and sunset.")                                            \
+  X(SunNeedsClock, "Wschód i zachód pojawią się po synchronizacji zegara.",                        \
+    "Sunrise and sunset appear once the clock is synced.")                                         \
   /* Save + messages */                                                                            \
   X(Save, "Zapisz", "Save")                                                                        \
   X(Saved, "Zapisano.", "Saved.")                                                                  \

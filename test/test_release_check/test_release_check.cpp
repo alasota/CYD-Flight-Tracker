@@ -402,6 +402,12 @@ static void test_prompt_only_for_an_available_release(void) {
   }
 }
 
+static void test_prompt_not_on_a_dark_screen(void) {
+  PromptGate g = availableGate();
+  g.screenOff = true;
+  TEST_ASSERT_FALSE(shouldShowUpdatePrompt(g));
+}
+
 static void test_prompt_skipped_versions(void) {
   PromptGate g = availableGate();
   g.skippedTag = "v1.4.0";
@@ -494,6 +500,7 @@ int main(int, char **) {
   RUN_TEST(test_status_for_release);
   RUN_TEST(test_prompt_only_for_an_available_release);
   RUN_TEST(test_prompt_skipped_versions);
+  RUN_TEST(test_prompt_not_on_a_dark_screen);
   RUN_TEST(test_prompt_never_for_development_builds_or_twice);
   RUN_TEST(test_prompt_waits_for_the_overhead_moment);
   RUN_TEST(test_prompt_tap_needs_a_fresh_touch);
