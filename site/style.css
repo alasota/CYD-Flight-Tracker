@@ -132,7 +132,7 @@ ol.steps li::before {
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .backup-note { max-width: 860px; margin: 28px auto 0; }
 .backup-note p { margin: 0; color: #c9cad1; }
-.web-shots { margin: 28px auto 0; max-width: 1000px; align-items: start; }
+.web-shots { margin: 28px auto 0; max-width: 1100px; align-items: start; grid-template-columns: repeat(5, 1fr); }
 .web-shots img { border-radius: 12px; border: 1px solid var(--line); }
 
 /* ---- roadmap */

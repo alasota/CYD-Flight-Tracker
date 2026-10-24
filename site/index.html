@@ -181,6 +181,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           zaznacz <b>Erase device</b>. Aktualizacja? Zostaw odznaczone, a ustawienia
           zostaną.</span></li>
       </ol>
+      <p class="muted small">
+        <span class="en">The cable is only needed once. Later versions go in over WiFi, from
+          the <b>Firmware</b> tab of the settings page.</span>
+        <span class="pl">Kabel jest potrzebny tylko raz. Kolejne wersje wgrasz przez WiFi, z
+          zakładki <b>Firmware</b> w panelu ustawień.</span>
+      </p>
     </div>
 
     <div class="card install">
@@ -270,11 +276,47 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       zaznaczonym <i>Dołącz dane logowania OpenSky</i> sekret klienta leży w pliku zwykłym
       tekstem, więc traktuj go jak hasło.</p>
   </div>
+  <div class="card backup-note">
+    <h3><span class="en">New: the Firmware tab, or updates without the cable</span><span class="pl">Nowość: zakładka Firmware, czyli aktualizacje bez kabla</span></h3>
+    <p class="en">Download <code>cyd-sky-tracker-&lt;version&gt;.bin</code> from
+      <a href="https://github.com/alasota/CYD-Flight-Tracker/releases/latest">the latest release</a>
+      (not the <code>-full.bin</code> one), open the <b>Firmware</b> tab, pick the file, press
+      <b>Update</b>. A progress bar shows on the page and on the display; half a minute later the
+      board restarts with the new version and every setting where you left it. Files that aren't
+      Sky Tracker firmware are refused, a cut connection leaves the old version running, and a
+      version that crashes on start rolls itself back to the previous one.</p>
+    <p class="pl">Pobierz <code>cyd-sky-tracker-&lt;wersja&gt;.bin</code> z
+      <a href="https://github.com/alasota/CYD-Flight-Tracker/releases/latest">najnowszego wydania</a>
+      (nie ten z <code>-full.bin</code>), otwórz zakładkę <b>Firmware</b>, wybierz plik, naciśnij
+      <b>Aktualizuj</b>. Pasek postępu widać na stronie i na wyświetlaczu; pół minuty później
+      płytka wstaje z nową wersją, a ustawienia zostają tam, gdzie je zostawiłeś. Pliki, które nie
+      są firmware Sky Trackera, zostaną odrzucone, zerwane połączenie zostawia starą wersję, a
+      wersja, która wywraca się przy starcie, sama wraca do poprzedniej.</p>
+  </div>
+  <div class="card backup-note">
+    <h3><span class="en">Set a panel password (recommended)</span><span class="pl">Ustaw hasło do panelu (zalecane)</span></h3>
+    <p class="en">Out of the box the settings page is open, so the first setup just works. That
+      also means anyone on your WiFi can change the settings or flash their own firmware. Fix it in
+      <b>General → Panel access</b>: type a password twice (8–64 characters) and save. The browser
+      then asks for it (login <code>admin</code>); five wrong tries lock the page for a minute.
+      Forgot it? Hold a finger on the screen while the board powers up, wait 5 seconds and tap
+      <b>YES</b>. The page is still plain HTTP, so it keeps housemates out, not a determined
+      network snoop: use a password you don't use anywhere else.</p>
+    <p class="pl">Na start panel ustawień jest otwarty, żeby pierwsza konfiguracja po prostu
+      działała. To znaczy też, że każdy w Twoim WiFi może zmienić ustawienia albo wgrać własny
+      firmware. Napraw to w <b>Ogólne → Dostęp do panelu</b>: wpisz hasło dwa razy (8–64 znaki) i
+      zapisz. Przeglądarka będzie o nie pytać (login <code>admin</code>); pięć błędnych prób blokuje
+      stronę na minutę. Zapomniałeś? Przytrzymaj palec na ekranie przy włączaniu płytki, odczekaj
+      5 sekund i stuknij <b>TAK</b>. Strona to wciąż zwykłe HTTP, więc hasło trzyma z dala
+      domowników, a nie zdeterminowanego podsłuchiwacza w sieci: użyj hasła, którego nie używasz
+      nigdzie indziej.</p>
+  </div>
   <div class="grid4 web-shots">
-    <img src="screenshots/web_location.png" width="1000" height="1591" alt="Settings page, Location tab" loading="lazy">
-    <img src="screenshots/web_opensky.png" width="1000" height="2094" alt="Settings page, OpenSky client tab" loading="lazy">
-    <img src="screenshots/web_general.png" width="1000" height="2193" alt="Settings page, General tab" loading="lazy">
-    <img src="screenshots/web_backup.png" width="1000" height="1420" alt="Settings page, Backup tab" loading="lazy">
+    <img src="screenshots/web_location.png" width="1000" height="1465" alt="Settings page, Location tab" loading="lazy">
+    <img src="screenshots/web_opensky.png" width="1000" height="2320" alt="Settings page, OpenSky client tab" loading="lazy">
+    <img src="screenshots/web_general.png" width="1000" height="2813" alt="Settings page, General tab with the panel password" loading="lazy">
+    <img src="screenshots/web_backup.png" width="1000" height="1424" alt="Settings page, Backup tab" loading="lazy">
+    <img src="screenshots/web_firmware.png" width="1000" height="1446" alt="Settings page, Firmware tab: update over WiFi" loading="lazy">
   </div>
 </section>
 
@@ -376,13 +418,13 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </details>
     <details class="card">
       <summary><span class="en">Is it production-ready?</span><span class="pl">Czy to jest gotowe na produkcję?</span></summary>
-      <p class="en">It's barbecue-ready. The settings page has no login and shows your OpenSky
-        secret to anyone who looks (so does a backup file saved with credentials), so keep the
-        board on a network you trust and the backup somewhere private. And please don't land
+      <p class="en">It's barbecue-ready. Set a panel password (it's off until you do), keep the
+        board on a network you trust, and keep a backup saved with credentials somewhere private:
+        it holds your OpenSky secret and the password as plain text. And please don't land
         anything based on it.</p>
-      <p class="pl">Jest gotowe na grilla. Panel ustawień nie ma logowania i pokaże sekret
-        OpenSky każdemu, kto zajrzy (podobnie plik kopii zapisany z danymi logowania), więc trzymaj
-        płytkę w zaufanej sieci, a kopię w prywatnym miejscu. I proszę, nie lądujcie niczym na jego
+      <p class="pl">Jest gotowe na grilla. Ustaw hasło do panelu (domyślnie go nie ma), trzymaj
+        płytkę w zaufanej sieci, a kopię zapisaną z danymi logowania w prywatnym miejscu: sekret
+        OpenSky i hasło leżą w niej zwykłym tekstem. I proszę, nie lądujcie niczym na jego
         podstawie.</p>
     </details>
   </div>

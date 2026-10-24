@@ -194,14 +194,16 @@ the display, which has its own setting on the General tab.
   <tr>
     <td align="center"><img src="docs/screenshots/web_location.png" width="200" alt="Settings page, Location tab: latitude, longitude, scan radius and credits per request"></td>
     <td align="center"><img src="docs/screenshots/web_opensky.png" width="200" alt="Settings page, OpenSky client tab: account status, client ID and secret, credentials file upload, refresh interval and daily credit estimate"></td>
-    <td align="center"><img src="docs/screenshots/web_general.png" width="200" alt="Settings page, General tab: display and web panel language, screen cycling, flight-phase thresholds"></td>
+    <td align="center"><img src="docs/screenshots/web_general.png" width="200" alt="Settings page, General tab: display and web panel language, screen cycling, flight-phase thresholds, panel password"></td>
     <td align="center"><img src="docs/screenshots/web_backup.png" width="200" alt="Settings page, Backup tab: download settings as JSON, restore from a file"></td>
+    <td align="center"><img src="docs/screenshots/web_firmware.png" width="200" alt="Settings page, Firmware tab: installed version, firmware file upload and Update button"></td>
   </tr>
   <tr>
     <td align="center"><b>Location</b></td>
     <td align="center"><b>OpenSky client</b></td>
     <td align="center"><b>General</b></td>
     <td align="center"><b>Backup</b></td>
+    <td align="center"><b>Firmware</b></td>
   </tr>
 </table>
 
