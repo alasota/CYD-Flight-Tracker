@@ -3,6 +3,10 @@
 #   2. creates the GitHub Release "v1.2.0" with its binaries,
 #   3. publishes the project page (site.yml) with that firmware in the
 #      browser installer.
+# A tag with a suffix (v1.3.0-rc.1, -beta.N, -dev.N) is a development
+# version: its Release is marked pre-release — offered only on the config
+# page of devices whose admin ticked "show development versions"
+# (release_check) — and the project page / web installer are left alone.
 name: Release
 
 on:
@@ -30,11 +34,13 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: dist/*
           generate_release_notes: true
 
   site:
     needs: [firmware, release]
+    if: ${{ !contains(github.ref_name, '-') }}
     uses: ./.github/workflows/site.yml
     with:
       firmware-artifact: ${{ needs.firmware.outputs.artifact }}

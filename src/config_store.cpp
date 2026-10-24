@@ -2,7 +2,8 @@
 
 #include <algorithm>
 
-#include "web_auth.h"  // validateWebPassword()
+#include "release_check.h"  // isReleaseTagFormat()
+#include "web_auth.h"       // validateWebPassword()
 
 namespace {
 constexpr float kMinRadiusDeg = 0.1f;
@@ -65,6 +66,9 @@ Config sanitizeConfig(const Config &cfg) {
   out.language = clampLanguage(static_cast<int>(out.language));
   out.web_language = clampLanguage(static_cast<int>(out.web_language));
   if (validateWebPassword(out.web_password) != WebPasswordCheck::Ok) out.web_password.clear();
+  if (!out.update_skipped_tag.empty() && !isReleaseTagFormat(out.update_skipped_tag)) {
+    out.update_skipped_tag.clear();
+  }
   return out;
 }
 
@@ -98,6 +102,9 @@ Config loadConfig() {
       clampLanguage(prefs.getUChar("wlang", static_cast<uint8_t>(cfg.web_language)));
   // isKey() first: getString() logs an error for a key that was never written.
   if (prefs.isKey("wpass")) cfg.web_password = prefs.getString("wpass", "").c_str();
+  cfg.update_check_enabled = prefs.getBool("updchk", cfg.update_check_enabled);
+  cfg.update_show_prerelease = prefs.getBool("updpre", cfg.update_show_prerelease);
+  if (prefs.isKey("updskip")) cfg.update_skipped_tag = prefs.getString("updskip", "").c_str();
 
   prefs.end();
   return sanitizeConfig(cfg);
@@ -124,6 +131,9 @@ void saveConfig(const Config &cfg) {
   prefs.putUChar("lang", static_cast<uint8_t>(sanitized.language));
   prefs.putUChar("wlang", static_cast<uint8_t>(sanitized.web_language));
   prefs.putString("wpass", sanitized.web_password.c_str());
+  prefs.putBool("updchk", sanitized.update_check_enabled);
+  prefs.putBool("updpre", sanitized.update_show_prerelease);
+  prefs.putString("updskip", sanitized.update_skipped_tag.c_str());
 
   prefs.end();
 }
@@ -132,6 +142,20 @@ void saveLastScreen(int screen) {
   Preferences prefs;
   prefs.begin(kNamespace, /*readOnly=*/false);
   prefs.putInt("last_screen", clampLastScreen(screen));
+  prefs.end();
+}
+
+void saveUpdateSkippedTag(const std::string &tag) {
+  Preferences prefs;
+  prefs.begin(kNamespace, /*readOnly=*/false);
+  prefs.putString("updskip", isReleaseTagFormat(tag) ? tag.c_str() : "");
+  prefs.end();
+}
+
+void saveUpdateShowPrerelease(bool show) {
+  Preferences prefs;
+  prefs.begin(kNamespace, /*readOnly=*/false);
+  prefs.putBool("updpre", show);
   prefs.end();
 }
 

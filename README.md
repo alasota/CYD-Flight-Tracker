@@ -84,8 +84,10 @@ answer to "what plane is that." Think of it as the away-team variant with better
 - 🇵🇱/🇬🇧 **Polish or English UI** — on the display and, separately, on the config web page
   (a dark, tabbed panel: Location / OpenSky client / General / Backup / Firmware, with a live
   estimate of your daily OpenSky credit use).
-- 📶 **Firmware updates over WiFi** — pick the new `.bin` on the settings page, no cable, settings
-  kept. A bad build rolls itself back. The settings page can have a password.
+- 📶 **Firmware updates over WiFi** — the board checks GitHub once a day and asks on the
+  screen when there's a new version (tap **YES**, a minute later it's done), or pick the `.bin`
+  on the settings page yourself. No cable, settings kept. A bad build rolls itself back. The
+  settings page can have a password.
 - 🖖 **LCARS-inspired chrome** — black background, chunky color blocks, folder-tab navigation. An homage,
   not a photocopy. All shapes hand-drawn with LovyanGFX, zero ripped assets.
 - 📡 Lives entirely on the ESP32 — no server, no phone app, no subscription, no away mission
@@ -196,7 +198,7 @@ the display, which has its own setting on the General tab.
     <td align="center"><img src="docs/screenshots/web_opensky.png" width="200" alt="Settings page, OpenSky client tab: account status, client ID and secret, credentials file upload, refresh interval and daily credit estimate"></td>
     <td align="center"><img src="docs/screenshots/web_general.png" width="200" alt="Settings page, General tab: display and web panel language, screen cycling, flight-phase thresholds, panel password"></td>
     <td align="center"><img src="docs/screenshots/web_backup.png" width="200" alt="Settings page, Backup tab: download settings as JSON, restore from a file"></td>
-    <td align="center"><img src="docs/screenshots/web_firmware.png" width="200" alt="Settings page, Firmware tab: installed version, firmware file upload and Update button"></td>
+    <td align="center"><img src="docs/screenshots/web_firmware.png" width="200" alt="Settings page, Firmware tab: installed and latest version on GitHub, Install and Check now buttons, development versions switch, firmware file upload"></td>
   </tr>
   <tr>
     <td align="center"><b>Location</b></td>
@@ -233,7 +235,27 @@ through the setup hotspot.
 ### Updating the firmware over WiFi
 
 The first install needs the USB cable (or the *Install* button on the
-[project page](https://alasota.github.io/CYD-Flight-Tracker/)). After that:
+[project page](https://alasota.github.io/CYD-Flight-Tracker/)). After that there are three ways,
+from laziest up.
+
+**1. It asks you.** Once a day the board asks GitHub whether there's a newer release (the first
+time about two minutes after power-up). If there is, the display asks once:
+
+<p align="center"><img src="docs/screenshots/update_prompt.png" width="320" alt="Display: NEW VERSION AVAILABLE, v1.2.0 → v1.3.0, INSTALL IT? with YES and NO buttons"></p>
+
+- **YES** — it downloads the release's `cyd-sky-tracker-<version>.bin` straight from GitHub,
+  checks it and installs it (about a minute, progress on screen), then restarts.
+- **NO** — it won't ask about *that* version again (the settings page still offers it).
+- Nothing for 30 seconds — it goes back to the planes and asks again after the next restart.
+
+It never installs anything without a YES, and it never interrupts the *NOW* countdown while a
+plane is about to pass over. To switch the daily check off: **General → Check GitHub for new
+versions once a day**.
+
+**2. From the settings page.** **Firmware → Updates from GitHub** shows the installed and the
+latest version, *Check now* and *Install vX.Y.Z*. Same download, same checks.
+
+**3. By hand.**
 
 1. Download **`cyd-sky-tracker-<version>.bin`** from the
    [latest release](https://github.com/alasota/CYD-Flight-Tracker/releases/latest) — *not* the
@@ -253,6 +275,22 @@ Safety nets:
   the board boots the previous version again on its own.
 - Going back to an older version works the same way (pick the older `.bin`). Versions released
   before OTA support existed don't carry the marker, so those need the cable / web installer.
+- **Downloads from GitHub** use HTTPS with the certificate actually checked (the board carries
+  GitHub's root certificates and talks only to GitHub's own hosts), and the file's SHA-256 has
+  to match the one GitHub lists for the release, and its version the release's, before the board
+  switches to it. If GitHub ever changes its certificates, the check just fails safely ("could
+  not connect securely") and you update by hand, as above.
+
+**Development versions.** Releases tagged like `v1.4.0-rc.1` (also `-beta.N`, `-dev.N`) are
+published as GitHub *pre-releases*. Nobody gets them by accident: the display never asks about
+them, and the settings page shows them only after you tick **Firmware → Show development
+versions** — then with an *Install v1.4.0-rc.1* button and a warning. To go back, install the
+release shown above it (*Go back to release vX.Y.Z*).
+
+<p align="center"><img src="docs/screenshots/web_firmware_dev.png" width="260" alt="Firmware tab with Show development versions ticked: latest development version v1.4.0-rc.1 with a warning and an Install button"></p>
+
+What the daily check sends: one request to `api.github.com` with the firmware version in the
+`User-Agent` (two with development versions shown) — GitHub sees your IP, as with any website.
 
 From PlatformIO, `pio run -e cyd-ota -t upload` builds and sends the firmware to the same page
 with `curl` (password from the `CYD_WEB_PASSWORD` environment variable, board address

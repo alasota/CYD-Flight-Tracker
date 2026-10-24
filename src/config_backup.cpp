@@ -31,6 +31,8 @@ std::string configToBackupJson(const Config &cfg, bool includeSecrets, const cha
   general["auto_cycle_interval_s"] = cfg.auto_cycle_interval_s;
   general["near_airport_km"] = cfg.near_airport_km;
   general["climb_rate_mps"] = cfg.climb_rate_threshold_mps;
+  general["update_check"] = cfg.update_check_enabled;
+  general["update_show_prerelease"] = cfg.update_show_prerelease;
 
   // The panel password is a secret too: only with includeSecrets, and only
   // when one is set.
@@ -143,6 +145,8 @@ BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const C
   a.count(general, "general", "auto_cycle_interval_s", c.auto_cycle_interval_s);
   a.number(general, "general", "near_airport_km", c.near_airport_km);
   a.number(general, "general", "climb_rate_mps", c.climb_rate_threshold_mps);
+  a.flag(general, "general", "update_check", c.update_check_enabled);
+  a.flag(general, "general", "update_show_prerelease", c.update_show_prerelease);
 
   JsonObjectConst security = doc["security"];
   std::string password = c.web_password;

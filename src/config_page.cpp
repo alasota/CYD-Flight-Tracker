@@ -3,6 +3,7 @@
 #include <cstdio>
 
 #include "config_portal.h"  // openSkyCreditCost()
+#include "time_sync.h"      // formatDate() / formatTime() — "checked" time
 #include "version.h"        // firmwareVersion() — page footer
 
 const char *settingsTabId(SettingsTab tab) {
@@ -300,12 +301,130 @@ std::string fmtU(uint32_t v) {
   return buf;
 }
 
+// "<b>v1.3.0</b> · published 20.10.2026 · What is new" for one release.
+void releaseLine(Writer &w, const ReleaseInfo &r) {
+  w.raw("<b>");
+  w.esc(r.tag);
+  w.raw("</b>");
+  const std::string date = formatIsoDate(r.publishedAt);
+  if (!date.empty()) {
+    w.raw(" \xC2\xB7 ");
+    w.t(WebStr::UpdPublished);
+    w.raw(" ");
+    w.esc(date);
+  }
+  if (!r.htmlUrl.empty()) {
+    w.raw(" \xC2\xB7 <a href=\"");
+    w.esc(r.htmlUrl);
+    w.raw("\" target=\"_blank\" rel=\"noopener\">");
+    w.t(WebStr::UpdWhatsNew);
+    w.raw("</a>");
+  }
+}
+
+// Firmware tab, first card: what GitHub has, and the buttons to get it.
+// The buttons belong to the #uc / #ui / #uip / #upr forms after the main one.
+void updateCard(Writer &w, const ConfigPageModel &m, const std::string &installed) {
+  const UpdateState &u = m.update;
+  w.raw("<div class=\"card\" id=\"gh\"><h2>");
+  w.t(WebStr::UpdCardTitle);
+  w.raw("</h2>");
+  if (u.lastInstall != OtaResult::NoFile && u.lastInstall != OtaResult::Ok) {
+    w.raw("<div class=\"msg err\">");
+    w.t(WebStr::UpdLastInstallFailed);
+    w.raw(" (");
+    w.esc(u.lastInstallTag);
+    w.raw("): ");
+    w.t(otaResultMessage(u.lastInstall));
+    w.raw("</div>");
+  }
+  w.raw("<div class=\"stat\" style=\"margin:0 0 14px\">");
+  w.t(WebStr::FirmwareInstalled);
+  w.raw(": <b id=\"fwv\">");
+  w.esc(installed);
+  w.raw("</b>");
+  if (!u.latest.tag.empty()) {
+    w.raw("<br>");
+    w.t(WebStr::UpdLatest);
+    w.raw(": ");
+    releaseLine(w, u.latest);
+  }
+  w.raw("</div>");
+
+  const bool good = u.status == UpdateStatus::UpToDate || u.status == UpdateStatus::Available;
+  w.raw(good ? "<span class=\"pill ok\" id=\"ups\"><span class=\"dot\"></span>"
+             : "<span class=\"pill\" id=\"ups\"><span class=\"dot\"></span>");
+  w.t(updateStatusMessage(u.status));
+  w.raw("</span>");
+  if (u.checkedAt > 0) {
+    w.raw("<div class=\"hint\" style=\"margin:-8px 0 14px\">");
+    w.t(WebStr::UpdChecked);
+    w.raw(" ");
+    w.esc(formatDate(u.checkedAt) + " " + formatTime(u.checkedAt));
+    w.raw("</div>");
+  }
+
+  if (statusAllowsInstall(u.status) && !u.latest.tag.empty() && u.latest.tag != installed) {
+    w.raw("<button form=\"ui\" class=\"wide\" id=\"upi\" style=\"margin-bottom:10px\">");
+    w.t(u.status == UpdateStatus::BackToRelease ? WebStr::UpdBackToRelease : WebStr::UpdInstall);
+    w.raw(" ");
+    w.esc(u.latest.tag);
+    w.raw("</button>");
+  }
+  w.raw("<button form=\"uc\" class=\"ghost wide\">");
+  w.t(WebStr::UpdCheckNow);
+  w.raw("</button>");
+
+  // Development versions: only on request (spec/02 §8.6).
+  const bool showPre = m.cfg.update_show_prerelease;
+  w.raw("<label class=\"switch\" style=\"margin:18px 0 0\"><span>");
+  w.t(WebStr::UpdShowPrerelease);
+  w.raw(showPre ? "</span><input type=\"checkbox\" name=\"on\" value=\"1\" form=\"upr\" "
+                  "onchange=\"this.form.submit()\" checked></label>"
+                : "</span><input type=\"checkbox\" name=\"on\" value=\"1\" form=\"upr\" "
+                  "onchange=\"this.form.submit()\"></label>");
+  if (showPre && preReleaseWorthShowing(u.latestPre, u.latest)) {
+    w.raw("<div class=\"stat\" id=\"upre\" style=\"margin:14px 0 10px\">");
+    w.t(WebStr::UpdLatestPre);
+    w.raw(": ");
+    releaseLine(w, u.latestPre);
+    w.raw("<div class=\"warn\">");
+    w.t(WebStr::UpdPreWarning);
+    w.raw("</div></div>");
+    if (u.latestPre.tag == installed) {
+      w.raw("<div class=\"hint\">");
+      w.esc(u.latestPre.tag);
+      w.raw(" \xC2\xB7 ");
+      w.t(WebStr::UpdInstalledHere);
+      w.raw("</div>");
+    } else {
+      w.raw("<button form=\"uip\" class=\"ghost wide\" id=\"upip\">");
+      w.t(WebStr::UpdInstall);
+      w.raw(" ");
+      w.esc(u.latestPre.tag);
+      w.raw("</button>");
+    }
+  }
+  w.raw("</div>");
+}
+
+// <form id=ID ... action=/update/install><input type=hidden name=tag value=TAG></form>
+void installForm(Writer &w, const char *id, const std::string &tag) {
+  w.raw("<form id=\"");
+  w.raw(id);
+  w.raw("\" method=\"POST\" action=\"/update/install\"><input type=\"hidden\" name=\"tag\" "
+        "value=\"");
+  w.esc(tag);
+  w.raw("\"></form>");
+}
+
 }  // namespace
 
 void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   const Config &c = m.cfg;
   const Language lang = c.web_language;
   Writer w(emit, lang);
+  const std::string installed = m.installedVersion.empty() ? firmwareVersion() : m.installedVersion;
 
   // ---- head + header
   w.raw("<!DOCTYPE html><html lang=\"");
@@ -472,6 +591,11 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.field("aci", WebStr::AutoCycleInterval,
           "type=\"number\" name=\"auto_cycle_interval\" min=\"3\"",
           fmtU(c.auto_cycle_interval_s));
+  w.raw("<label class=\"switch\" style=\"margin:0\"><span>");
+  w.t(WebStr::UpdAutoCheck);
+  w.raw(c.update_check_enabled
+            ? "</span><input type=\"checkbox\" name=\"update_check\" value=\"1\" checked></label>"
+            : "</span><input type=\"checkbox\" name=\"update_check\" value=\"1\"></label>");
   w.raw("</div><div class=\"card\"><h2>");
   w.t(WebStr::SectionPhases);
   w.raw("</h2>");
@@ -540,23 +664,19 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
 
   // ---- Firmware: OTA update. Its controls belong to the #fw form.
   w.sectionOpen(SettingsTab::Firmware, m.tab);
-  w.raw("<div class=\"card\"><p class=\"intro\">");
-  w.t(WebStr::FirmwareIntro);
-  w.raw("</p>");
   if (!hasPassword) {
     w.raw("<div class=\"alert\">");
     w.t(WebStr::AccessNoPassword);
     w.raw("</div>");
   }
-  w.raw("<div class=\"stat\" style=\"margin:0 0 18px\">");
-  w.t(WebStr::FirmwareInstalled);
-  w.raw(": <b id=\"fwv\">");
-  w.esc(firmwareVersion());
-  w.raw("</b> · <a href=\"");
+  updateCard(w, m, installed);
+  w.raw("<div class=\"card\"><p class=\"intro\">");
+  w.t(WebStr::FirmwareIntro);
+  w.raw(" <a href=\"");
   w.raw(kReleasesUrl);
   w.raw("\" target=\"_blank\" rel=\"noopener\">");
   w.t(WebStr::FirmwareReleases);
-  w.raw("</a></div><div class=\"f\"><label for=\"fwf\">");
+  w.raw("</a></p><div class=\"f\"><label for=\"fwf\">");
   w.t(WebStr::FirmwareChoose);
   w.raw("</label><input id=\"fwf\" type=\"file\" name=\"firmware\" form=\"fw\" "
         "accept=\".bin,application/octet-stream\" required><div class=\"hint\">");
@@ -582,10 +702,14 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
         "enctype=\"multipart/form-data\"></form>"
         "<form id=\"fw\" method=\"POST\" action=\"/update\" "
         "enctype=\"multipart/form-data\"></form>"
-        "<footer>CYD Sky Tracker · ");
+        "<form id=\"uc\" method=\"POST\" action=\"/update/check\"></form>"
+        "<form id=\"upr\" method=\"POST\" action=\"/update/prerelease\"></form>");
+  installForm(w, "ui", m.update.latest.tag);
+  installForm(w, "uip", m.update.latestPre.tag);
+  w.raw("<footer>CYD Sky Tracker · ");
   w.t(WebStr::Version);
   w.raw(" <span id=\"ver\">");
-  w.esc(firmwareVersion());
+  w.esc(installed);
   w.raw("</span> · <a href=\"/screenshot.bmp\" target=\"_blank\">");
   w.t(WebStr::Screenshot);
   w.raw("</a></footer></div><script>var T={day:\"");

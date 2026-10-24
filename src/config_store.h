@@ -65,6 +65,17 @@ struct Config {
   // the password itself. One that fails validateWebPassword() is dropped by
   // sanitizeConfig().
   std::string web_password;
+  // New versions on GitHub (release_check, spec/02-github-release-check.md).
+  // update_check_enabled: ask GitHub once a day (NVS `updchk`) — it only
+  // checks, installing always needs a YES. update_show_prerelease: the
+  // config page also lists development versions (pre-releases; NVS
+  // `updpre`). update_skipped_tag: the release NO was tapped for on the
+  // display, which then isn't asked about again (NVS `updskip`; not in
+  // backups — device state, not a setting); one that isn't a vX.Y.Z tag is
+  // dropped by sanitizeConfig().
+  bool update_check_enabled = true;
+  bool update_show_prerelease = false;
+  std::string update_skipped_tag;
   // True once the user has saved the settings form at least once via
   // config_portal. (0, 0) is a real place (Gulf of Guinea) — without this
   // flag there's no way to tell "user hasn't configured their home
@@ -106,3 +117,7 @@ void saveConfig(const Config &cfg);
 // which fires every few seconds) shouldn't rewrite lat/lon/credentials/
 // every other setting the way saveConfig() does.
 void saveLastScreen(int screen);
+
+// Single-key writes for release_check's state (same reason as above).
+void saveUpdateSkippedTag(const std::string &tag);
+void saveUpdateShowPrerelease(bool show);

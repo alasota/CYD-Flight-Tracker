@@ -46,6 +46,13 @@ bool shouldPollNow(uint32_t now_ms, uint32_t last_poll_ms, bool ever_polled, uin
   return (now_ms - last_poll_ms) >= interval_ms;  // unsigned: rollover-safe
 }
 
+uint32_t msUntilNextPoll(uint32_t now_ms, uint32_t last_poll_ms, bool ever_polled,
+                         uint32_t interval_ms) {
+  if (!ever_polled) return 0;
+  const uint32_t elapsed = now_ms - last_poll_ms;  // unsigned: rollover-safe
+  return elapsed >= interval_ms ? 0 : interval_ms - elapsed;
+}
+
 bool shouldUseOAuth(const std::string &client_id, const std::string &client_secret) {
   return !client_id.empty() && !client_secret.empty();
 }
@@ -426,6 +433,10 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
 }
 
 OpenSkyQuota openSkyQuota() { return quota; }
+
+uint32_t openSkyMsUntilNextPoll(uint32_t now_ms, const Config &cfg) {
+  return msUntilNextPoll(now_ms, lastPollMs, everPolled, cfg.poll_interval_s * 1000UL);
+}
 
 OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const Config &cfg) {
   if (!shouldPollNow(now_ms, lastPollMs, everPolled, cfg.poll_interval_s * 1000UL)) {

@@ -45,6 +45,10 @@
 //     reached (ota_update::shouldMarkAppValid()).
 //   - Holding a finger on the screen at power-up offers to remove a
 //     forgotten web panel password (web_auth, service_screen).
+//   - New versions on GitHub (spec/02-github-release-check.md): release_check
+//     asks GitHub once a day, between OpenSky polls; a newer release is
+//     asked about once on the display (YES installs it, NO skips that
+//     version), or installed from the config page's Firmware tab.
 //   - Redraw (only what changed — CLAUDE.md "Redraw policy"): loop()
 //     collects RedrawEvents and redraw_policy::computeRedrawMask() picks
 //     the regions. A full clear (fillScreen + header + content + bottom
@@ -78,6 +82,7 @@
 #include "ota_update.h"
 #include "radar_view.h"
 #include "redraw_policy.h"
+#include "release_check.h"
 #include "route_lookup.h"
 #include "screen_nav.h"
 #include "service_screen.h"
@@ -88,6 +93,12 @@
 #include "version.h"
 #include "web_auth.h"
 #include "wifi_manager.h"
+
+// loop() runs everything, including release_check's TLS handshakes with the
+// certificate chain verified (P-384 ECDSA in mbedTLS) — which overflowed the
+// core's default 8 KB loopTask stack on the board (Guru Meditation, "Unhandled
+// debug exception", when an install started). 16 KB costs 8 KB of heap.
+SET_LOOP_TASK_STACK_SIZE(16 * 1024);
 
 static LGFX tft;
 
@@ -327,6 +338,102 @@ static void otaOnEnd(bool ok) {
   if (!ok) otaFailedAtMs = millis() | 1;  // back to the normal screens in a moment
 }
 
+// The same screen for an install from GitHub (release_check), titled so.
+static void githubOtaOnStart(size_t total) {
+  drawOtaScreen(tft, firmwareVersion(), /*fromGithub=*/true);
+  drawOtaProgress(tft, firmwareVersion(), "", 0, total);
+}
+
+// --- New version on GitHub (release_check) ---------------------------------
+
+// What release_check needs to know before it may open a TLS connection.
+static CheckGate updateGate() {
+  CheckGate g;
+  g.enabled = cachedCfg.update_check_enabled;
+  g.wifi = wifiManagerStatus() == WifiStatus::Connected;
+  g.timeSynced = isTimeSynced();
+  g.otaBusy = otaFlashSession().inProgress() || configPortalRestartPending();
+  g.msUntilNextPoll = openSkyMsUntilNextPoll(millis(), cachedCfg);
+  g.maxFreeBlock = ESP.getMaxAllocHeap();
+  return g;
+}
+
+// "NEW VERSION AVAILABLE — INSTALL IT?" — shown at most once per boot, over
+// the normal screens, until YES / NO / 30 s.
+static bool promptActive = false;
+static bool promptShownThisBoot = false;
+static bool promptReleased = false;  // finger lifted since the prompt appeared
+static bool promptWasPressed = false;
+static uint32_t promptShownAtMs = 0;
+static uint32_t promptTimerDrawnMs = 0;
+static std::string promptTag;
+
+static void maybeShowUpdatePrompt(bool touchPressed) {
+  const UpdateState &u = releaseUpdateState();
+  PromptGate g;
+  g.status = u.status;
+  g.latestTag = u.latest.tag;
+  g.skippedTag = cachedCfg.update_skipped_tag;
+  g.installedIsDev = isDevelopmentBuild(parseFwVersion(u.installed));
+  g.alreadyPromptedThisBoot = promptShownThisBoot;
+  g.homeConfigured = cachedCfg.home_configured;
+  g.currentScreen = nav.current();
+  const CpaPrediction cpa = currentCpa();
+  g.cpaFound = cpa.found;
+  g.tCpaSeconds = static_cast<int>(cpa.t_cpa_seconds);
+  g.touchActive = touchPressed;
+  if (!shouldShowUpdatePrompt(g)) return;
+
+  promptActive = true;
+  promptShownThisBoot = true;
+  promptReleased = false;
+  promptWasPressed = true;
+  promptShownAtMs = millis();
+  promptTimerDrawnMs = promptShownAtMs;
+  promptTag = u.latest.tag;
+  Serial.printf("[update] asking on the display: %s -> %s\n", u.installed.c_str(),
+                promptTag.c_str());
+  drawUpdatePromptScreen(tft, u.installed, promptTag);
+}
+
+// While the prompt is up it owns the touchscreen; returns once answered.
+static void serviceUpdatePrompt() {
+  const uint32_t shownFor = millis() - promptShownAtMs;
+  const TouchPoint t = touchInputRead(tft);
+  if (!t.pressed) promptReleased = true;
+  if (t.pressed && !promptWasPressed && acceptPromptTap(promptReleased, shownFor)) {
+    const ResetChoice c = confirmHit(t.x, t.y, static_cast<int16_t>(tft.width()),
+                                     static_cast<int16_t>(tft.height()));
+    if (c == ResetChoice::Yes) {
+      promptActive = false;
+      if (releaseInstallRequest(promptTag)) {
+        Serial.printf("[update] YES on the display, installing %s\n", promptTag.c_str());
+      } else {
+        pendingRedraw.firstDraw = true;
+      }
+      return;
+    }
+    if (c == ResetChoice::No) {
+      Serial.printf("[update] NO on the display, %s skipped\n", promptTag.c_str());
+      saveUpdateSkippedTag(promptTag);
+      cachedCfg.update_skipped_tag = promptTag;
+      promptActive = false;
+      pendingRedraw.firstDraw = true;
+      return;
+    }
+  }
+  promptWasPressed = t.pressed;
+  if (shownFor >= kUpdatePromptTimeoutMs) {
+    promptActive = false;  // "later": asked again after the next boot
+    pendingRedraw.firstDraw = true;
+    return;
+  }
+  if (millis() - promptTimerDrawnMs >= 250) {
+    promptTimerDrawnMs = millis();
+    drawUpdatePromptTimer(tft, kUpdatePromptTimeoutMs - shownFor);
+  }
+}
+
 static void markAppValidWhenStable() {
   if (!appPendingVerify) return;
   const WifiStatus ws = wifiManagerStatus();
@@ -375,7 +482,7 @@ static void offerWebPasswordReset() {
   while (millis() - askedAt < kResetConfirmTimeoutMs) {
     const TouchPoint t = touchInputRead(tft);
     if (t.pressed && !wasPressed) {
-      const ResetChoice c = resetConfirmHit(t.x, t.y, w, h);
+      const ResetChoice c = confirmHit(t.x, t.y, w, h);
       if (c == ResetChoice::Yes) {
         cachedCfg.web_password.clear();
         saveConfig(cachedCfg);
@@ -397,7 +504,20 @@ static void offerWebPasswordReset() {
 
 // ?screen=N: switch to that screen and repaint it right now, so the
 // capture shows it (same path as a tap on its nav button).
+// One more index after the real screens: the update question, drawn from
+// release_check's demo data — what docs/screenshots/update_prompt.png is
+// taken from (tools/screenshots.py). The normal screen comes back right after.
+static constexpr int kScreenshotUpdatePrompt = kScreenCount;
+
 static void screenshotPrepare(int screenIndex) {
+  if (screenIndex == kScreenshotUpdatePrompt) {
+    const UpdateState demo = updateDemoState(/*withPrerelease=*/false);
+    drawUpdatePromptScreen(tft, demo.installed, demo.latest.tag);
+    drawUpdatePromptTimer(tft, kUpdatePromptTimeoutMs * 2 / 3);
+    pendingRedraw = RedrawEvents{};
+    pendingRedraw.firstDraw = true;  // repaints the real screen once the capture is out
+    return;
+  }
   if (nav.set(screenIndex)) onScreenChanged(/*userInitiated=*/true);
   if (cachedCfg.home_configured) {
     applyRedraw(computeRedrawMask(pendingRedraw, nav.current()));
@@ -459,7 +579,7 @@ void setup() {
   ScreenshotSource shot;
   shot.width = static_cast<int>(tft.width());
   shot.height = static_cast<int>(tft.height());
-  shot.screenCount = kScreenCount;
+  shot.screenCount = kScreenCount + 1;  // + the update prompt demo
   shot.prepare = screenshotPrepare;
   shot.readRow = screenshotReadRow;
   configPortalSetScreenshotSource(shot);
@@ -469,6 +589,10 @@ void setup() {
   otaObs.onProgress = otaOnProgress;
   otaObs.onEnd = otaOnEnd;
   configPortalSetOtaObserver(otaObs);
+  otaObs.onStart = githubOtaOnStart;
+  releaseSetOtaObserver(otaObs);
+  releaseCheckBegin(cachedCfg);
+  configPortalSetUpdateGateSource(updateGate);
 
   pendingRedraw.firstDraw = true;  // paint the (empty) active screen + chrome immediately
 }
@@ -494,6 +618,16 @@ void loop() {
   if (configPortalSaveCount() != lastSeenSaveCount) {
     lastSeenSaveCount = configPortalSaveCount();
     reloadConfig();
+    releaseCheckBegin(cachedCfg);
+  }
+
+  // --- The update question owns the screen until it's answered ----------
+  if (promptActive && releaseInstallPending()) {
+    promptActive = false;  // installed from the config page meanwhile: the OTA screen follows
+  }
+  if (promptActive) {
+    serviceUpdatePrompt();
+    if (promptActive) return;
   }
 
   // --- Touch: edge-detected, one handleTap() per press --------------------
@@ -657,6 +791,14 @@ void loop() {
         pendingRedraw.newPoll = true;  // content + header count; bottom nav untouched
       }
     }
+  }
+
+  // --- New version on GitHub: a due check / an asked-for install --------
+  releaseCheckLoop(updateGate());
+  if (!promptActive && !releaseInstallPending()) maybeShowUpdatePrompt(touch.pressed);
+  if (promptActive) {
+    pendingRedraw = RedrawEvents{};
+    return;
   }
 
   // --- Flight screen: tick the countdown ~1 Hz between polls --------------

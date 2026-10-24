@@ -80,8 +80,12 @@ enum class OtaResult : uint8_t {
   VerifyFailed,   // finishing failed (image checksum / SHA-256 didn't verify)
   Aborted,        // the upload broke off
   Unauthorized,   // password set, request not logged in (nothing was written)
+  // Download from GitHub (release_check):
+  ChecksumMismatch,  // the file's SHA-256 isn't the one GitHub lists for it
+  VersionMismatch,   // the marker's version isn't the release's tag
+  DownloadFailed,    // connection / HTTP error, or the size GitHub gave didn't match
 };
-constexpr int kOtaResultCount = 13;
+constexpr int kOtaResultCount = 16;
 WebStr otaResultMessage(OtaResult r);
 // HTTP status for the /update response.
 int otaResultHttpStatus(OtaResult r);
@@ -96,20 +100,40 @@ class OtaWriter {
   virtual void abort() = 0;
 };
 
+// SHA-256 of everything an upload delivers — a seam like OtaWriter
+// (mbedTLS on the board, a fake in the native tests).
+class OtaDigest {
+ public:
+  virtual ~OtaDigest() = default;
+  virtual void reset() = 0;
+  virtual void update(const uint8_t *data, size_t len) = 0;
+  virtual std::string finishHex() = 0;  // 64 lower-case hex
+};
+
+// What a download from GitHub must also match (empty = not checked — a
+// file picked by hand on the config page).
+struct OtaExpectations {
+  std::string sha256;   // 64 lower-case hex
+  std::string version;  // the release tag, compared with the marker's v=
+};
+
 // One upload, chunk by chunk: start() -> feed()* -> finish() (or abort()).
 // Nothing reaches the writer until the header checks out; finish() only
 // calls writer.end() — which activates the new slot — when the marker was
-// found. On any failure the writer is aborted and the rest is ignored.
+// found (and, for a download, its version and the file's SHA-256 match).
+// On any failure the writer is aborted and the rest is ignored.
 class OtaSession {
  public:
-  OtaSession(OtaWriter &writer, size_t slotBytes) : writer_(writer), slotBytes_(slotBytes) {}
+  OtaSession(OtaWriter &writer, size_t slotBytes, OtaDigest *digest = nullptr)
+      : writer_(writer), slotBytes_(slotBytes), digest_(digest) {}
 
-  void start(size_t declaredBytes);
+  void start(size_t declaredBytes, const OtaExpectations &expect = OtaExpectations());
   void feed(const uint8_t *data, size_t len);
   OtaResult finish();
   void abort();
 
   bool started() const { return started_; }
+  bool inProgress() const { return started_ && !finished_; }
   bool failed() const { return failed_; }
   OtaResult result() const { return result_; }
   size_t received() const { return received_; }
@@ -131,6 +155,8 @@ class OtaSession {
   OtaResult result_ = OtaResult::NoFile;
   std::string header_;  // first bytes, held until there are enough to check
   FirmwareMarkerScanner scanner_;
+  OtaDigest *digest_;
+  OtaExpectations expect_;
 };
 
 // ---- After an update: the bootloader boots the new image "pending
@@ -140,3 +166,12 @@ class OtaSession {
 // deliberately not part of this.
 constexpr uint32_t kOtaValidAfterMs = 30000;
 bool shouldMarkAppValid(bool pendingVerify, uint32_t uptimeMs, bool reachable);
+
+#ifdef ARDUINO
+// The one session that writes to the spare app slot (arduino-esp32 Update +
+// mbedTLS SHA-256), shared by the config page's POST /update and
+// release_check's download — so two updates can never run at once.
+OtaSession &otaFlashSession();
+// Update.errorString() of the last failed write / verify.
+const char *otaFlashError();
+#endif

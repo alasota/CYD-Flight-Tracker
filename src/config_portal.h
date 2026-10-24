@@ -114,3 +114,9 @@ void configPortalSetOtaObserver(const OtaObserver &observer);
 // True between a successful update and the restart it triggers — main.cpp
 // leaves the display (and the network) alone meanwhile.
 bool configPortalRestartPending();
+
+// "Check now" on the Firmware tab needs what main.cpp knows (WiFi, clock,
+// heap, next OpenSky poll) — release_check's CheckGate, supplied on demand.
+struct CheckGate;
+using UpdateGateSource = CheckGate (*)();
+void configPortalSetUpdateGateSource(UpdateGateSource source);

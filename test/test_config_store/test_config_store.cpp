@@ -206,6 +206,26 @@ static void test_web_password_defaults_to_none_and_invalid_ones_are_dropped(void
   TEST_ASSERT_TRUE(sanitizeConfig(c).web_password.empty());
 }
 
+static void test_update_settings_defaults_and_sanitizing(void) {
+  const Config d = defaultConfig();
+  TEST_ASSERT_TRUE(d.update_check_enabled);    // checks by default, never installs by itself
+  TEST_ASSERT_FALSE(d.update_show_prerelease);  // development versions only on request
+  TEST_ASSERT_TRUE(d.update_skipped_tag.empty());
+
+  Config c = defaultConfig();
+  c.update_check_enabled = false;
+  c.update_show_prerelease = true;
+  c.update_skipped_tag = "v1.4.0";
+  Config s = sanitizeConfig(c);
+  TEST_ASSERT_FALSE(s.update_check_enabled);
+  TEST_ASSERT_TRUE(s.update_show_prerelease);
+  TEST_ASSERT_EQUAL_STRING("v1.4.0", s.update_skipped_tag.c_str());
+  for (const char *bad : {"garbage", "v1.4", "v1.4.0-3-gabc1234", "<script>"}) {
+    c.update_skipped_tag = bad;
+    TEST_ASSERT_TRUE_MESSAGE(sanitizeConfig(c).update_skipped_tag.empty(), bad);
+  }
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_web_language_is_independent_and_sanitized);
@@ -228,5 +248,6 @@ int main(int argc, char **argv) {
   RUN_TEST(test_clamp_near_airport_km_floors_and_ceils);
   RUN_TEST(test_clamp_climb_rate_threshold_floors_and_ceils);
   RUN_TEST(test_sanitize_config_clamps_flight_phase_thresholds);
+  RUN_TEST(test_update_settings_defaults_and_sanitizing);
   return UNITY_END();
 }

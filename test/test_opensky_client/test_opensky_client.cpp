@@ -236,6 +236,17 @@ static void test_parse_retry_after_clamps_absurd_values(void) {
   TEST_ASSERT_EQUAL_UINT32(30, parseRetryAfterSeconds("5000", 60, 30));
 }
 
+// ---- msUntilNextPoll (release_check keeps clear of the next poll) --------
+static void test_ms_until_next_poll(void) {
+  TEST_ASSERT_EQUAL_UINT32(0u, msUntilNextPoll(1000, 0, /*ever_polled*/ false, 15000));
+  TEST_ASSERT_EQUAL_UINT32(15000u, msUntilNextPoll(1000, 1000, true, 15000));
+  TEST_ASSERT_EQUAL_UINT32(5000u, msUntilNextPoll(11000, 1000, true, 15000));
+  TEST_ASSERT_EQUAL_UINT32(0u, msUntilNextPoll(16000, 1000, true, 15000));
+  TEST_ASSERT_EQUAL_UINT32(0u, msUntilNextPoll(99000, 1000, true, 15000));
+  // Across a millis() rollover.
+  TEST_ASSERT_EQUAL_UINT32(9996u, msUntilNextPoll(4999u, 0xFFFFFFFFu - 4u, true, 15000));
+}
+
 // ---- shouldPollNow (interval gating, review notes 3.3) ------------------
 
 static void test_should_poll_now_first_call_always_polls(void) {
@@ -331,6 +342,7 @@ static void test_infer_on_ground_rules(void) {
 int main(int argc, char **argv) {
   UNITY_BEGIN();
 
+  RUN_TEST(test_ms_until_next_poll);
   RUN_TEST(test_bbox_default_radius_matches_config_portal_1_credit_tier);
   RUN_TEST(test_bbox_radius_past_1_credit_tier);
   RUN_TEST(test_bbox_clamps_near_north_pole);

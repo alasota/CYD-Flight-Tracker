@@ -178,6 +178,52 @@
     "Not updated: the upload was interrupted.")                                                    \
   X(OtaUnauthorized, "Nie zaktualizowano: wymagane hasło panelu.",                                 \
     "Not updated: the panel password is required.")                                                \
+  X(OtaChecksumMismatch,                                                                            \
+    "Nie zaktualizowano: suma SHA-256 pobranego pliku nie zgadza się z tą z GitHuba.",              \
+    "Not updated: the downloaded file's SHA-256 does not match the one on GitHub.")                 \
+  X(OtaVersionMismatch, "Nie zaktualizowano: pobrany plik ma inną wersję niż wydanie.",             \
+    "Not updated: the downloaded file has a different version than the release.")                   \
+  X(OtaDownloadFailed, "Nie zaktualizowano: pobieranie z GitHuba nie powiodło się.",                \
+    "Not updated: the download from GitHub failed.")                                                \
+  /* Firmware tab: updates from GitHub (release_check) */                                           \
+  X(UpdCardTitle, "Aktualizacje z GitHuba", "Updates from GitHub")                                  \
+  X(UpdLatest, "Najnowsze wydanie", "Latest release")                                               \
+  X(UpdPublished, "opublikowane", "published")                                                      \
+  X(UpdChecked, "sprawdzono", "checked")                                                            \
+  X(UpdCheckNow, "Sprawdź teraz", "Check now")                                                      \
+  X(UpdInstall, "Zainstaluj", "Install")                                                            \
+  X(UpdBackToRelease, "Wróć do wydania", "Go back to release")                                      \
+  X(UpdWhatsNew, "Co nowego", "What is new")                                                        \
+  X(UpdDownloading, "Pobieranie z GitHuba i instalacja — ok. 1 min. Nie wyłączaj zasilania.",       \
+    "Downloading from GitHub and installing — about 1 min. Do not power off.")                      \
+  X(UpdAutoCheck,                                                                                   \
+    "Sprawdzaj nowe wersje na GitHubie raz na dobę (tylko sprawdza — instaluje po potwierdzeniu)",  \
+    "Check GitHub for new versions once a day (only checks — installs after you confirm)")          \
+  X(UpdShowPrerelease, "Pokazuj wersje deweloperskie", "Show development versions")                 \
+  X(UpdLatestPre, "Najnowsza deweloperska", "Latest development version")                           \
+  X(UpdPreWarning, "Wersja testowa — może zawierać błędy. Powrót: zainstaluj wydanie powyżej.",     \
+    "A test version — it may have bugs. To go back, install the release above.")                    \
+  X(UpdInstalledHere, "zainstalowana", "installed")                                                 \
+  X(UpdLastInstallFailed, "Ostatnia instalacja nie powiodła się", "The last install failed")        \
+  X(UpdInstallRefused, "Nie można zainstalować tej wersji — sprawdź jeszcze raz.",                  \
+    "This version cannot be installed — check again.")                                              \
+  X(UpdStatusNeverChecked, "Jeszcze nie sprawdzono.", "Not checked yet.")                           \
+  X(UpdStatusUpToDate, "Masz najnowszą wersję.", "You have the latest version.")                    \
+  X(UpdStatusAvailable, "Dostępna nowsza wersja.", "A newer version is available.")                 \
+  X(UpdStatusBackToRelease, "Masz wersję deweloperską nowszą od najnowszego wydania.",              \
+    "You have a development version newer than the latest release.")                                \
+  X(UpdStatusDevBuild, "Wersja deweloperska — nie da się jej porównać z wydaniem.",                 \
+    "A development build — it cannot be compared with the release.")                                \
+  X(UpdStatusNoRelease, "Na GitHubie nie ma jeszcze wydania.", "There is no release on GitHub yet.")\
+  X(UpdStatusNoAsset, "Wydanie nie ma pliku dla tej płytki.", "The release has no file for this board.")\
+  X(UpdStatusNoChecksum, "Wydanie nie ma sumy SHA-256 — wgraj plik ręcznie poniżej.",               \
+    "The release has no SHA-256 — upload the file by hand below.")                                  \
+  X(UpdStatusCheckFailed,                                                                           \
+    "Nie udało się bezpiecznie połączyć z GitHubem — spróbuj później albo wgraj plik ręcznie.",     \
+    "Could not connect to GitHub securely — try later or upload the file by hand.")                 \
+  X(UpdStatusRateLimited, "GitHub chwilowo ogranicza zapytania — spróbuję później.",                \
+    "GitHub is limiting requests for now — will try later.")                                        \
+  X(UpdStatusDisabled, "Automatyczne sprawdzanie jest wyłączone.", "Automatic checking is off.")    \
   /* Save + messages */                                                                            \
   X(Save, "Zapisz", "Save")                                                                        \
   X(Saved, "Zapisano.", "Saved.")                                                                  \

@@ -72,6 +72,11 @@ constexpr Language kDefaultLanguage = Language::PL;
   X(OtaDontPowerOff, "NIE WYŁĄCZAJ ZASILANIA", "DO NOT POWER OFF")          \
   X(OtaRestarting, "GOTOWE · RESTART…", "DONE · RESTARTING…")               \
   X(OtaFailed, "AKTUALIZACJA NIEUDANA", "UPDATE FAILED")                    \
+  X(OtaFromGithub, "POBIERANIE Z GITHUBA", "DOWNLOADING FROM GITHUB")        \
+  /* new version on GitHub (release_check), asked once per version */        \
+  X(UpdateTitle, "DOSTĘPNA NOWA WERSJA", "NEW VERSION AVAILABLE")            \
+  X(UpdateAsk, "ZAINSTALOWAĆ?", "INSTALL IT?")                               \
+  X(UpdateHint, "ok. 1 min · ustawienia zostaną", "about 1 min · settings stay")\
   /* forgotten web password, reset from the touchscreen at power-up */      \
   X(ResetTitle, "HASŁO PANELU WWW", "WEB PANEL PASSWORD")                   \
   X(ResetHold, "TRZYMAJ PALEC, ABY JE USUNĄĆ", "KEEP HOLDING TO REMOVE IT") \

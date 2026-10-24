@@ -15,6 +15,7 @@
 
 #include "config_store.h"   // Config
 #include "opensky_quota.h"  // OpenSkyQuota
+#include "release_check.h"  // UpdateState
 #include "web_i18n.h"       // WebStr
 
 enum class SettingsTab : uint8_t { Location, OpenSky, General, Backup, Firmware };
@@ -56,6 +57,11 @@ struct ConfigPageModel {
   // A firmware update just succeeded and the board is about to restart: the
   // page says so and reloads itself once the board answers again.
   bool restarting = false;
+  // Updates from GitHub (release_check), for the Firmware tab's first card.
+  UpdateState update;
+  // The version shown as installed; "" = firmwareVersion(). (The demo
+  // screenshot renders a made-up one.)
+  std::string installedVersion;
 };
 
 // Where the Firmware tab sends people for new versions.

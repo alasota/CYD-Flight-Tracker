@@ -1,6 +1,7 @@
 #include <unity.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -284,6 +285,136 @@ static void test_empty_upload_is_no_file(void) {
   TEST_ASSERT_EQUAL_INT(0, w.begins);
 }
 
+// ---- downloads from GitHub: SHA-256 and version (release_check)
+
+namespace {
+// Not SHA-256 — a stand-in that depends on every byte, which is all
+// OtaSession needs to know about its digest.
+struct FakeDigest : OtaDigest {
+  uint64_t sum = 0;
+  size_t bytes = 0;
+  int resets = 0;
+  void reset() override {
+    ++resets;
+    sum = 0;
+    bytes = 0;
+  }
+  void update(const uint8_t *d, size_t len) override {
+    for (size_t i = 0; i < len; ++i) sum = sum * 31 + d[i];
+    bytes += len;
+  }
+  std::string finishHex() override {
+    char buf[65];
+    std::snprintf(buf, sizeof(buf), "%064llx", static_cast<unsigned long long>(sum));
+    return buf;
+  }
+};
+
+std::string digestOf(const std::vector<uint8_t> &img) {
+  FakeDigest d;
+  d.reset();
+  d.update(img.data(), img.size());
+  return d.finishHex();
+}
+
+OtaResult uploadExpecting(OtaSession &s, const std::vector<uint8_t> &img,
+                          const OtaExpectations &e) {
+  s.start(img.size(), e);
+  for (size_t off = 0; off < img.size(); off += 4096) {
+    s.feed(img.data() + off, std::min<size_t>(4096, img.size() - off));
+  }
+  return s.finish();
+}
+}  // namespace
+
+static void test_matching_checksum_and_version_activate(void) {
+  FakeWriter w;
+  FakeDigest d;
+  OtaSession s(w, kSlot, &d);
+  const std::vector<uint8_t> img = fakeImage(700 * 1024);
+  OtaExpectations e;
+  e.sha256 = digestOf(img);
+  e.version = "v1.3.0";  // what kMarker says
+  TEST_ASSERT_TRUE(uploadExpecting(s, img, e) == OtaResult::Ok);
+  TEST_ASSERT_EQUAL_INT(1, w.ends);
+  TEST_ASSERT_EQUAL_UINT32(img.size(), d.bytes);  // every byte, header included
+}
+
+static void test_checksum_mismatch_never_activates(void) {
+  FakeWriter w;
+  FakeDigest d;
+  OtaSession s(w, kSlot, &d);
+  std::vector<uint8_t> img = fakeImage(700 * 1024);
+  OtaExpectations e;
+  e.sha256 = digestOf(img);
+  img[100000] ^= 0x01;  // one bit flipped on the way
+  TEST_ASSERT_TRUE(uploadExpecting(s, img, e) == OtaResult::ChecksumMismatch);
+  TEST_ASSERT_EQUAL_INT(0, w.ends);
+  TEST_ASSERT_EQUAL_INT(1, w.aborts);
+  TEST_ASSERT_EQUAL_INT(400, otaResultHttpStatus(OtaResult::ChecksumMismatch));
+}
+
+static void test_expected_checksum_without_a_digest_fails_safe(void) {
+  FakeWriter w;
+  OtaSession s(w, kSlot);  // no digest to compute it with
+  const std::vector<uint8_t> img = fakeImage(700 * 1024);
+  OtaExpectations e;
+  e.sha256 = std::string(64, 'a');
+  TEST_ASSERT_TRUE(uploadExpecting(s, img, e) == OtaResult::ChecksumMismatch);
+  TEST_ASSERT_EQUAL_INT(0, w.ends);
+}
+
+static void test_version_mismatch_never_activates(void) {
+  FakeWriter w;
+  FakeDigest d;
+  OtaSession s(w, kSlot, &d);
+  const std::vector<uint8_t> img = fakeImage(700 * 1024);
+  OtaExpectations e;
+  e.sha256 = digestOf(img);
+  e.version = "v1.4.0";  // the file says v1.3.0
+  TEST_ASSERT_TRUE(uploadExpecting(s, img, e) == OtaResult::VersionMismatch);
+  TEST_ASSERT_EQUAL_INT(0, w.ends);
+}
+
+static void test_marker_is_checked_before_the_checksum(void) {
+  FakeWriter w;
+  FakeDigest d;
+  OtaSession s(w, kSlot, &d);
+  const std::vector<uint8_t> img = fakeImage(700 * 1024, /*withMarker=*/false);
+  OtaExpectations e;
+  e.sha256 = std::string(64, '0');
+  TEST_ASSERT_TRUE(uploadExpecting(s, img, e) == OtaResult::NotSkyTracker);
+}
+
+static void test_expectations_do_not_leak_into_the_next_upload(void) {
+  FakeWriter w;
+  FakeDigest d;
+  OtaSession s(w, kSlot, &d);
+  const std::vector<uint8_t> img = fakeImage(700 * 1024);
+  OtaExpectations e;
+  e.sha256 = std::string(64, 'f');
+  TEST_ASSERT_TRUE(uploadExpecting(s, img, e) == OtaResult::ChecksumMismatch);
+  // A file picked by hand next: no expectations, accepted.
+  TEST_ASSERT_TRUE(upload(s, img, 4096, img.size()) == OtaResult::Ok);
+  TEST_ASSERT_EQUAL_INT(2, d.resets);
+}
+
+static void test_in_progress(void) {
+  FakeWriter w;
+  OtaSession s(w, kSlot);
+  TEST_ASSERT_FALSE(s.inProgress());
+  const std::vector<uint8_t> img = fakeImage(700 * 1024);
+  s.start(img.size());
+  TEST_ASSERT_TRUE(s.inProgress());
+  s.feed(img.data(), img.size());
+  s.finish();
+  TEST_ASSERT_FALSE(s.inProgress());
+}
+
+static void test_download_failure_is_a_gateway_error(void) {
+  TEST_ASSERT_EQUAL_INT(502, otaResultHttpStatus(OtaResult::DownloadFailed));
+}
+
 // ---- rollback
 
 static void test_mark_valid_only_when_pending_reachable_and_up_long_enough(void) {
@@ -318,5 +449,13 @@ int main(int argc, char **argv) {
   RUN_TEST(test_broken_upload_aborts);
   RUN_TEST(test_empty_upload_is_no_file);
   RUN_TEST(test_mark_valid_only_when_pending_reachable_and_up_long_enough);
+  RUN_TEST(test_matching_checksum_and_version_activate);
+  RUN_TEST(test_checksum_mismatch_never_activates);
+  RUN_TEST(test_expected_checksum_without_a_digest_fails_safe);
+  RUN_TEST(test_version_mismatch_never_activates);
+  RUN_TEST(test_marker_is_checked_before_the_checksum);
+  RUN_TEST(test_expectations_do_not_leak_into_the_next_upload);
+  RUN_TEST(test_in_progress);
+  RUN_TEST(test_download_failure_is_a_gateway_error);
   return UNITY_END();
 }

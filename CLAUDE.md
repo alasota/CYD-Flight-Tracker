@@ -717,6 +717,46 @@ Spec: `spec/01-ota-updates.md` (roadmap #1). Released in v1.1.0, tested on the b
   (needs `collectHeaders({"Content-Type"})`), and handlers take the buffered file with
   `takeUpload()` so a later request can't reuse a stale one.
 
+## New versions from GitHub (release_check)
+
+Spec: `spec/02-github-release-check.md` (built and tested on the board 2026-10-24).
+
+- **Check:** `GET api.github.com/repos/<FW_UPDATE_REPO>/releases/latest` 2 min after boot, then
+  daily (`If-None-Match` ETag -> 304 doesn't count against GitHub's 60/h). Only between OpenSky
+  polls and with heap to spare (`canStartNetworkTask()`: WiFi, clock synced, >= 5 s to the next
+  poll, >= 50 KB free block). Setting `update_check_enabled` (NVS `updchk`, default on) — it only
+  *checks*; installing always needs a YES. A failed connect is retried once.
+- **TLS is verified here** (unlike OpenSky / hexdb.io, still `setInsecure()`): `src/github_ca.h`
+  holds the *root* CAs (Sectigo E46/R46 + USERTrust ECC/RSA for github.com / api.github.com,
+  ISRG X1/X2 for release-assets.githubusercontent.com). `firmware.yml` warns when a host stops
+  verifying against them — then add the new root and release. Every URL and every redirect hop
+  must pass `isAllowedUpdateUrl()` (https, GitHub hosts, our repo's paths) before connecting;
+  redirects are followed by hand. The repo is a compile-time constant, never a setting.
+- **Install:** `browser_download_url` of `releaseAssetName(tag, board)` (`cyd-sky-tracker-<tag>.bin`
+  for `cyd-r`) -> 302 -> release-assets.githubusercontent.com, streamed into the shared
+  `otaFlashSession()` with `OtaExpectations{sha256 (asset "digest", else SHA256SUMS.txt), version
+  (= tag, checked against the marker)}`; `Update.end()` only when all match. No hash = no install.
+  Runs from `loop()` (not inside the HTTP handler), ~20 s for 1.36 MB, OTA screen titled
+  "POBIERANIE Z GITHUBA".
+- **Display prompt:** `shouldShowUpdatePrompt()` — only `Available` (a release newer than a plain
+  release build), once per boot, not for a development build, not over the NOW countdown, not
+  under a finger. YES installs; NO stores `update_skipped_tag` (NVS `updskip`, not in backups);
+  30 s = later (next boot). Screenshot of it: `/screenshot.bmp?screen=3` (demo data,
+  `updateDemoState()`).
+- **Config page** (Firmware tab, first card): installed / latest / status / checked time,
+  *Install*, *Check now* (`POST /update/check`, max once a minute), *Show development versions*
+  (`POST /update/prerelease`, NVS `updpre`, default off) which adds the newest GitHub
+  pre-release above the latest release with *Install* (`POST /update/install tag=…` accepts only
+  the shown tags). Development versions are never offered on the display.
+- **Development versions = tags with a suffix** (`v1.3.0-rc.1`, `-beta.N`, `-dev.N`):
+  `release.yml` marks them pre-release and skips the project page; `build_site.py` gives them no
+  changelog entry. Release one: `git tag v1.3.0-rc.1 && git push origin v1.3.0-rc.1`.
+- Screenshots `update_prompt.png`, `web_firmware*.png`: `python tools/screenshots.py --device
+  <board>` (web pages from `test_config_page` with `SCREENSHOT_OUT`, headless Chrome; the
+  display one from the board — LovyanGFX can't build for the PC without SDL).
+- ⚠️ Windows: a native test run sometimes reports `ERRORED` with no failed assertion — that's
+  application control blocking a fresh test `.exe` (WinError 4551). Rerun that suite.
+
 ## Design language — LCARS-inspired (Star Trek console aesthetic)
 
 Build an **LCARS-inspired** look, not a reproduction of the exact copyrighted LCARS design
@@ -817,6 +857,10 @@ each with a single responsibility:
   across chunk boundaries), `OtaSession` (start/feed/finish/abort over an `OtaWriter`
   interface — `config_portal` plugs in arduino-esp32 `Update`, tests a fake),
   `otaResultMessage()` / `otaResultHttpStatus()`, `shouldMarkAppValid()`.
+- `release_check` — new versions on GitHub (see "New versions from GitHub"): pure version
+  parsing/comparison (`parseFwVersion`, `decideOffer`), release JSON (`parseLatestRelease`,
+  `pickLatestPrerelease`), URL allow-list, schedule, `shouldShowUpdatePrompt()`; adapter (TLS check
+  + download into `otaFlashSession()`) behind `#ifdef ARDUINO`.
 - `service_screen` — full-screen maintenance displays: OTA progress (title, "v1 → v2", bar,
   percent / KB, "do not power off", then restarting / failed) and the password-reset hold +
   YES/NO confirm. Geometry/text pure and tested, drawing behind `#ifdef ARDUINO`.
@@ -1054,6 +1098,7 @@ mistakes here waste hours of debugging later.
 - Upload: `pio run -t upload`
 - Monitor: `pio device monitor -b 115200`
 - Test (native, logic only, no hardware): `pio test -e native`
+- Screenshots of the update feature: `python tools/screenshots.py [--device cyd-sky.local]`
 
 ## Out of scope for MVP
 

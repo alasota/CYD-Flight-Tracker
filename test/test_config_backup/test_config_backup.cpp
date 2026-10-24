@@ -24,6 +24,9 @@ Config sample() {
   c.near_airport_km = 12.5f;
   c.climb_rate_threshold_mps = 2.0f;
   c.home_configured = true;
+  c.update_check_enabled = false;
+  c.update_show_prerelease = true;
+  c.update_skipped_tag = "v1.4.0";  // device state: never in a backup
   return c;
 }
 
@@ -38,7 +41,7 @@ static void test_round_trip_restores_every_setting(void) {
 
   TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(r.invalidFields.size()));
-  TEST_ASSERT_EQUAL_INT(12, r.appliedFields);
+  TEST_ASSERT_EQUAL_INT(14, r.appliedFields);
   const Config &c = r.config;
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, original.home_lat, c.home_lat);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, original.home_lon, c.home_lon);
@@ -53,6 +56,30 @@ static void test_round_trip_restores_every_setting(void) {
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 12.5f, c.near_airport_km);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.0f, c.climb_rate_threshold_mps);
   TEST_ASSERT_TRUE(c.home_configured);
+  TEST_ASSERT_FALSE(c.update_check_enabled);
+  TEST_ASSERT_TRUE(c.update_show_prerelease);
+  TEST_ASSERT_TRUE(c.update_skipped_tag.empty());
+}
+
+static void test_update_settings_in_the_general_group(void) {
+  const std::string json = configToBackupJson(sample(), false, "v1");
+  TEST_ASSERT_TRUE(contains(json, "\"update_check\": false"));
+  TEST_ASSERT_TRUE(contains(json, "\"update_show_prerelease\": true"));
+  TEST_ASSERT_FALSE(contains(json, "v1.4.0"));
+  // An older backup without the keys keeps the current values.
+  Config current = defaultConfig();
+  current.update_check_enabled = false;
+  BackupRestoreResult r = restoreConfigFromBackupJson(
+      "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"general\":{}}", current);
+  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  TEST_ASSERT_FALSE(r.config.update_check_enabled);
+  // A wrong type is skipped and listed.
+  r = restoreConfigFromBackupJson(
+      "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,"
+      "\"general\":{\"update_check\":\"yes\"}}",
+      current);
+  TEST_ASSERT_EQUAL_INT(1, static_cast<int>(r.invalidFields.size()));
+  TEST_ASSERT_EQUAL_STRING("general.update_check", r.invalidFields[0].c_str());
 }
 
 static void test_backup_names_its_format_and_firmware(void) {
@@ -162,7 +189,7 @@ static void test_panel_password_travels_only_with_secrets(void) {
   BackupRestoreResult r = restoreConfigFromBackupJson(configToBackupJson(c, true, "v1"),
                                                       defaultConfig());
   TEST_ASSERT_EQUAL_STRING("hunter22", r.config.web_password.c_str());
-  TEST_ASSERT_EQUAL_INT(13, r.appliedFields);
+  TEST_ASSERT_EQUAL_INT(15, r.appliedFields);
 }
 
 static void test_restore_without_password_keeps_the_devices(void) {
@@ -189,6 +216,7 @@ static void test_invalid_password_in_backup_is_reported_and_skipped(void) {
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_round_trip_restores_every_setting);
+  RUN_TEST(test_update_settings_in_the_general_group);
   RUN_TEST(test_backup_names_its_format_and_firmware);
   RUN_TEST(test_backup_without_secrets_keeps_the_devices_credentials);
   RUN_TEST(test_missing_keys_keep_current_values);

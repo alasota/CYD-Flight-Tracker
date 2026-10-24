@@ -134,6 +134,10 @@ ol.steps li::before {
 .backup-note p { margin: 0; color: #c9cad1; }
 .web-shots { margin: 28px auto 0; max-width: 1100px; align-items: start; grid-template-columns: repeat(5, 1fr); }
 .web-shots img { border-radius: 12px; border: 1px solid var(--line); }
+.update-shot { float: right; margin: 4px 0 12px 20px; width: 320px; max-width: 45%; }
+.update-shot img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); display: block; }
+.update-note p + p { margin-top: 10px; }
+.update-note::after { content: ""; display: block; clear: both; }
 
 /* ---- roadmap */
 .intro { max-width: 620px; margin: -12px auto 28px; }
@@ -197,4 +201,5 @@ ol.steps li::before {
   section.wrap { margin: 64px auto; }
   code { white-space: normal; word-break: break-all; }
   .web-shots { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .update-shot { float: none; width: auto; margin: 0 auto 14px; max-width: 100%; }
 }

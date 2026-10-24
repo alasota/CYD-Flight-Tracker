@@ -60,6 +60,11 @@ bool isBeforeDeadline(uint32_t now_ms, uint32_t until_ms);
 // rather than living only in device-only code — see review notes 3.3.
 bool shouldPollNow(uint32_t now_ms, uint32_t last_poll_ms, bool ever_polled, uint32_t interval_ms);
 
+// Milliseconds until shouldPollNow() turns true (0 = due now) — lets other
+// network work (release_check) keep clear of the next poll.
+uint32_t msUntilNextPoll(uint32_t now_ms, uint32_t last_poll_ms, bool ever_polled,
+                         uint32_t interval_ms);
+
 // False (anonymous access) when either credential is empty — the fallback
 // mode described in CLAUDE.md "Authentication".
 bool shouldUseOAuth(const std::string &client_id, const std::string &client_secret);
@@ -167,3 +172,6 @@ OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const Config &cfg);
 // backing off after a 429 it stays Exhausted (count down with
 // quotaSecondsUntilReset()). Read by the config page.
 OpenSkyQuota openSkyQuota();
+
+// msUntilNextPoll() for the adapter's own schedule and `cfg`.
+uint32_t openSkyMsUntilNextPoll(uint32_t now_ms, const Config &cfg);

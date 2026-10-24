@@ -72,6 +72,7 @@ bool isValidUnsignedIntString(const std::string &s) {
 #include "config_store.h"
 #include "opensky_client.h"  // openSkyQuota() — credits left, shown on the OpenSky tab
 #include "ota_update.h"
+#include "release_check.h"  // updates from GitHub (Firmware tab)
 #include "screenshot.h"
 #include "service_screen.h"  // otaVersionLine()
 #include "version.h"
@@ -148,18 +149,9 @@ bool authorize() {
   }
 }
 
-// ---- Firmware update (POST /update) through arduino-esp32's Update.
-class UpdateWriter : public OtaWriter {
- public:
-  bool begin(size_t size) override { return Update.begin(size > 0 ? size : UPDATE_SIZE_UNKNOWN); }
-  size_t write(const uint8_t *data, size_t len) override {
-    return Update.write(const_cast<uint8_t *>(data), len);
-  }
-  bool end() override { return Update.end(true); }
-  void abort() override { Update.abort(); }
-};
-UpdateWriter updateWriter;
-OtaSession *ota = nullptr;  // created in configPortalBegin(): needs the slot size
+// ---- Firmware update (POST /update): the shared flash session (ota_update).
+OtaSession *ota = nullptr;  // set in configPortalBegin()
+UpdateGateSource updateGateSource = nullptr;  // see configPortalSetUpdateGateSource()
 bool otaAuthorized = false;
 size_t otaLastNotified = 0;
 bool restartPending = false;
@@ -174,6 +166,8 @@ void sendPage(ConfigPageModel model, int status = 200) {
   // The OpenSky tab shows what OpenSky last said about the day's credits.
   model.quota = openSkyQuota();
   model.quotaResetInS = quotaSecondsUntilReset(model.quota, millis());
+  model.update = releaseUpdateState();
+  model.installedVersion = firmwareVersion();
 
   server.sendHeader("Cache-Control", "no-store");
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -279,6 +273,7 @@ void handleSave() {
   // always runs on a full settings-form submit, so a missing arg here
   // genuinely means "unchecked", not "field absent".
   cfg.auto_cycle_enabled = server.hasArg("auto_cycle");
+  cfg.update_check_enabled = server.hasArg("update_check");
 
   if (server.hasArg("auto_cycle_interval")) {
     std::string v = server.arg("auto_cycle_interval").c_str();
@@ -577,7 +572,7 @@ void handleUpdateDone() {
   if (r == OtaResult::Ok) {
     detail = otaVersionLine(firmwareVersion(), ota->marker().version());
   } else if (r == OtaResult::WriteFailed || r == OtaResult::VerifyFailed) {
-    detail = Update.errorString();
+    detail = otaFlashError();
   }
   Serial.printf("[ota] result=%d received=%u new=%s %s\n", static_cast<int>(r),
                 static_cast<unsigned>(ota->received()), ota->marker().version().c_str(),
@@ -600,6 +595,56 @@ void handleUpdateDone() {
   }
 }
 
+// ---- Updates from GitHub (release_check)
+
+// POST /update/check — "check now"; back to the Firmware tab either way.
+void handleUpdateCheck() {
+  if (!authorize()) return;
+  if (updateGateSource != nullptr) releaseCheckNow(updateGateSource());
+  server.sendHeader("Location", "/?tab=firmware");
+  server.send(303, "text/plain", "");
+}
+
+// POST /update/install (tag=...) — queues the install; the download starts in
+// the next loop() pass, after this page has reached the browser.
+void handleUpdateInstall() {
+  if (!authorize()) return;
+  const std::string tag = server.arg("tag").c_str();
+  if (!releaseInstallRequest(tag)) {
+    ConfigPageModel model;
+    model.cfg = loadConfig();
+    model.tab = SettingsTab::Firmware;
+    model.hasMessage = true;
+    model.message = WebStr::UpdInstallRefused;
+    model.isError = true;
+    sendPage(model, 409);
+    return;
+  }
+  Serial.printf("[update] install %s asked for on the config page\n", tag.c_str());
+  ConfigPageModel model;
+  model.cfg = loadConfig();
+  model.tab = SettingsTab::Firmware;
+  model.hasMessage = true;
+  model.message = WebStr::UpdDownloading;
+  model.messageDetail = tag;
+  model.restarting = true;  // the page waits for the board and reloads itself
+  sendPage(model);
+}
+
+// POST /update/prerelease (on=0|1) — "show development versions", saved on
+// its own and followed by a fresh check.
+void handleUpdatePrerelease() {
+  if (!authorize()) return;
+  const bool on = server.arg("on") == "1";
+  saveUpdateShowPrerelease(on);
+  ++saveCount;  // main.cpp reloads the config and hands it to release_check
+  Config cfg = loadConfig();
+  releaseCheckBegin(cfg);
+  if (updateGateSource != nullptr) releaseCheckNow(updateGateSource());
+  server.sendHeader("Location", "/?tab=firmware");
+  server.send(303, "text/plain", "");
+}
+
 }  // namespace
 
 void configPortalBegin() {
@@ -608,9 +653,7 @@ void configPortalBegin() {
   MDNS.begin("cyd-sky");  // -> cyd-sky.local
 
   refreshPassword();
-  const esp_partition_t *slot = esp_ota_get_next_update_partition(nullptr);
-  static OtaSession session(updateWriter, slot != nullptr ? slot->size : 0);
-  ota = &session;
+  ota = &otaFlashSession();
   // Kept per request besides Authorization (always kept): Content-Type, for
   // isMultipartRequest().
   static const char *kHeaders[] = {"Content-Type"};
@@ -624,6 +667,9 @@ void configPortalBegin() {
   server.on("/backup.json", HTTP_GET, handleBackupDownload);
   server.on("/restore", HTTP_POST, handleRestore, handleUploadChunk);
   server.on("/update", HTTP_POST, handleUpdateDone, handleUpdateChunk);
+  server.on("/update/check", HTTP_POST, handleUpdateCheck);
+  server.on("/update/install", HTTP_POST, handleUpdateInstall);
+  server.on("/update/prerelease", HTTP_POST, handleUpdatePrerelease);
   server.onNotFound(handleNotFound);
   server.begin();
 
@@ -649,6 +695,8 @@ uint32_t configPortalSaveCount() { return saveCount; }
 void configPortalSetScreenshotSource(const ScreenshotSource &source) { screenshotSource = source; }
 
 void configPortalSetOtaObserver(const OtaObserver &observer) { otaObserver = observer; }
+
+void configPortalSetUpdateGateSource(UpdateGateSource source) { updateGateSource = source; }
 
 bool configPortalRestartPending() { return restartPending; }
 

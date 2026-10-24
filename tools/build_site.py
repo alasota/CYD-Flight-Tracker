@@ -125,9 +125,12 @@ def git(*args):
 
 
 def releases():
-    """[(tag, date, [commit subjects]), ...], newest first: one entry per v* tag,
-    with the non-merge commits since the previous tag (all history for the first)."""
-    tags = [t for t in git("tag", "--list", "v*", "--sort=-v:refname").splitlines() if t]
+    """[(tag, date, [commit subjects]), ...], newest first: one entry per v* release
+    tag, with the non-merge commits since the previous one (all history for the first).
+    Development versions (v1.3.0-rc.1 — any tag with a "-") get no entry of their
+    own: their commits land in the next release's."""
+    tags = [t for t in git("tag", "--list", "v*", "--sort=-v:refname").splitlines()
+            if t and "-" not in t]
     out = []
     for i, tag in enumerate(tags):
         rng = tag if i == len(tags) - 1 else "%s..%s" % (tags[i + 1], tag)

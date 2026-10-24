@@ -276,22 +276,41 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       zaznaczonym <i>Dołącz dane logowania OpenSky</i> sekret klienta leży w pliku zwykłym
       tekstem, więc traktuj go jak hasło.</p>
   </div>
-  <div class="card backup-note">
-    <h3><span class="en">New: the Firmware tab, or updates without the cable</span><span class="pl">Nowość: zakładka Firmware, czyli aktualizacje bez kabla</span></h3>
-    <p class="en">Download <code>cyd-sky-tracker-&lt;version&gt;.bin</code> from
+  <div class="card backup-note update-note">
+    <h3><span class="en">New: it asks before it updates itself</span><span class="pl">Nowość: sam pyta, zanim się zaktualizuje</span></h3>
+    <figure class="update-shot">
+      <img src="screenshots/update_prompt.png" width="320" height="240" alt="Display: NEW VERSION AVAILABLE, v1.2.0 → v1.3.0, INSTALL IT? with YES and NO buttons" loading="lazy">
+    </figure>
+    <p class="en">Once a day the board asks GitHub whether there's something newer. If there
+      is, the display asks you <b>once</b>: tap <b>YES</b> and a minute later it's running the new
+      version, settings and all; tap <b>NO</b> and it stops bringing that version up. It never
+      installs anything without a YES, and it won't interrupt a plane that's about to pass
+      overhead. The download is checked three ways: a verified HTTPS connection to GitHub only,
+      the file's SHA-256 against the one GitHub lists, and the version inside the file. A
+      version that crashes on start still rolls itself back.</p>
+    <p class="pl">Raz na dobę płytka pyta GitHuba, czy jest coś nowszego. Jeśli jest, wyświetlacz
+      pyta Cię <b>raz</b>: stuknij <b>TAK</b>, a minutę później działa nowa wersja, z wszystkimi
+      ustawieniami; stuknij <b>NIE</b>, a przestanie o tę wersję zagadywać. Nic nie instaluje bez
+      TAK i nie przerwie samolotu, który zaraz przeleci nad głową. Pobrany plik jest sprawdzany
+      na trzy sposoby: zweryfikowane połączenie HTTPS wyłącznie z GitHubem, suma SHA-256 zgodna z
+      tą z GitHuba i wersja zapisana w pliku. Wersja, która wywraca się przy starcie, nadal sama
+      się wycofuje.</p>
+    <p class="en">Prefer clicking? <b>Firmware → Updates from GitHub</b> on the settings page has
+      <i>Check now</i> and <i>Install</i>. Prefer doing it the old way? Download
+      <code>cyd-sky-tracker-&lt;version&gt;.bin</code> from
       <a href="https://github.com/alasota/CYD-Flight-Tracker/releases/latest">the latest release</a>
-      (not the <code>-full.bin</code> one), open the <b>Firmware</b> tab, pick the file, press
-      <b>Update</b>. A progress bar shows on the page and on the display; half a minute later the
-      board restarts with the new version and every setting where you left it. Files that aren't
-      Sky Tracker firmware are refused, a cut connection leaves the old version running, and a
-      version that crashes on start rolls itself back to the previous one.</p>
-    <p class="pl">Pobierz <code>cyd-sky-tracker-&lt;wersja&gt;.bin</code> z
+      and upload it on the same tab. Feeling brave? Tick <i>Show development versions</i> and the
+      page also offers test builds (<code>v1.4.0-rc.1</code> and friends), with a warning, never on
+      the display. The daily check can be switched off on the General tab; all it tells GitHub is
+      your IP and the firmware version.</p>
+    <p class="pl">Wolisz klikać? Na stronie ustawień <b>Firmware → Aktualizacje z GitHuba</b> ma
+      <i>Sprawdź teraz</i> i <i>Zainstaluj</i>. Wolisz po staremu? Pobierz
+      <code>cyd-sky-tracker-&lt;wersja&gt;.bin</code> z
       <a href="https://github.com/alasota/CYD-Flight-Tracker/releases/latest">najnowszego wydania</a>
-      (nie ten z <code>-full.bin</code>), otwórz zakładkę <b>Firmware</b>, wybierz plik, naciśnij
-      <b>Aktualizuj</b>. Pasek postępu widać na stronie i na wyświetlaczu; pół minuty później
-      płytka wstaje z nową wersją, a ustawienia zostają tam, gdzie je zostawiłeś. Pliki, które nie
-      są firmware Sky Trackera, zostaną odrzucone, zerwane połączenie zostawia starą wersję, a
-      wersja, która wywraca się przy starcie, sama wraca do poprzedniej.</p>
+      i wgraj go na tej samej zakładce. Lubisz ryzyko? Zaznacz <i>Pokazuj wersje deweloperskie</i>,
+      a strona zaproponuje też wersje testowe (<code>v1.4.0-rc.1</code> i spółka), z ostrzeżeniem,
+      nigdy na wyświetlaczu. Codzienne sprawdzanie wyłączysz na zakładce Ogólne; GitHub dowiaduje
+      się z niego tylko Twojego IP i wersji firmware.</p>
   </div>
   <div class="card backup-note">
     <h3><span class="en">Set a panel password (recommended)</span><span class="pl">Ustaw hasło do panelu (zalecane)</span></h3>
@@ -316,7 +335,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <img src="screenshots/web_opensky.png" width="1000" height="2320" alt="Settings page, OpenSky client tab" loading="lazy">
     <img src="screenshots/web_general.png" width="1000" height="2813" alt="Settings page, General tab with the panel password" loading="lazy">
     <img src="screenshots/web_backup.png" width="1000" height="1424" alt="Settings page, Backup tab" loading="lazy">
-    <img src="screenshots/web_firmware.png" width="1000" height="1446" alt="Settings page, Firmware tab: update over WiFi" loading="lazy">
+    <img src="screenshots/web_firmware.png" width="1000" height="1981" alt="Settings page, Firmware tab: updates from GitHub and a manual upload" loading="lazy">
   </div>
 </section>
 

@@ -25,6 +25,12 @@ int16_t serviceProgressFillPx(int percent, int16_t barW) {
   return static_cast<int16_t>(static_cast<int32_t>(barW) * percent / 100);
 }
 
+int16_t promptTimerFillPx(uint32_t remainingMs, uint32_t timeoutMs, int16_t barW) {
+  if (timeoutMs == 0 || remainingMs == 0 || barW <= 0) return 0;
+  if (remainingMs >= timeoutMs) return barW;
+  return static_cast<int16_t>(static_cast<uint64_t>(barW) * remainingMs / timeoutMs);
+}
+
 std::string otaProgressText(size_t written, size_t total) {
   char buf[24];
   if (total > 0) {
@@ -42,7 +48,7 @@ std::string otaVersionLine(const std::string &from, const std::string &to) {
   return from + " \xE2\x86\x92 " + to;  // →
 }
 
-Rect resetButtonRect(bool yes, int16_t screenW, int16_t screenH) {
+Rect confirmButtonRect(bool yes, int16_t screenW, int16_t screenH) {
   Rect r;
   r.w = kButtonW;
   r.h = kButtonH;
@@ -52,9 +58,9 @@ Rect resetButtonRect(bool yes, int16_t screenW, int16_t screenH) {
   return r;
 }
 
-ResetChoice resetConfirmHit(int16_t x, int16_t y, int16_t screenW, int16_t screenH) {
-  if (hitTest(x, y, resetButtonRect(true, screenW, screenH))) return ResetChoice::Yes;
-  if (hitTest(x, y, resetButtonRect(false, screenW, screenH))) return ResetChoice::No;
+ResetChoice confirmHit(int16_t x, int16_t y, int16_t screenW, int16_t screenH) {
+  if (hitTest(x, y, confirmButtonRect(true, screenW, screenH))) return ResetChoice::Yes;
+  if (hitTest(x, y, confirmButtonRect(false, screenW, screenH))) return ResetChoice::No;
   return ResetChoice::None;
 }
 
@@ -62,6 +68,7 @@ ResetChoice resetConfirmHit(int16_t x, int16_t y, int16_t screenW, int16_t scree
 
 #include "i18n.h"
 #include "lcars_theme.h"
+#include "release_check.h"  // kUpdatePromptTimeoutMs
 
 namespace {
 
@@ -99,10 +106,11 @@ int16_t barY(LGFX &gfx) {
 
 }  // namespace
 
-void drawOtaScreen(LGFX &gfx, const std::string &fromVersion) {
+void drawOtaScreen(LGFX &gfx, const std::string &fromVersion, bool fromGithub) {
   gfx.fillScreen(LCARS_BLACK);
   const int16_t y = barY(gfx);
-  centred(gfx, tr(Str::OtaTitle), y + kTitleDy, THEME_CHROME_ACCENT);
+  centred(gfx, tr(fromGithub ? Str::OtaFromGithub : Str::OtaTitle), y + kTitleDy,
+          THEME_CHROME_ACCENT);
   centred(gfx, fromVersion.c_str(), y + kVersionDy, THEME_CONTENT_SECONDARY);
   drawBar(gfx, 0);
   centred(gfx, tr(Str::OtaDontPowerOff), y + kFooterDy, THEME_CHROME_INACTIVE);
@@ -147,8 +155,8 @@ void drawResetConfirmScreen(LGFX &gfx) {
   gfx.fillScreen(LCARS_BLACK);
   centred(gfx, tr(Str::ResetTitle), 50, THEME_CHROME_ACCENT);
   centred(gfx, tr(Str::ResetConfirm), 90, THEME_CONTENT_PRIMARY);
-  const Rect yes = resetButtonRect(true, w, h);
-  const Rect no = resetButtonRect(false, w, h);
+  const Rect yes = confirmButtonRect(true, w, h);
+  const Rect no = confirmButtonRect(false, w, h);
   drawPillButton(gfx, yes.x, yes.y, yes.w, yes.h, THEME_ALERT, THEME_ON_FILL, tr(Str::ResetYes));
   drawPillButton(gfx, no.x, no.y, no.w, no.h, THEME_CHROME_ACCENT, THEME_ON_FILL,
                  tr(Str::ResetNo));
@@ -157,6 +165,50 @@ void drawResetConfirmScreen(LGFX &gfx) {
 void drawResetDoneScreen(LGFX &gfx) {
   gfx.fillScreen(LCARS_BLACK);
   centred(gfx, tr(Str::ResetDone), gfx.height() / 2, LCARS_GREEN);
+}
+
+namespace {
+constexpr int16_t kPromptTimerH = 4;
+Rect promptTimerRect(LGFX &gfx) {
+  const int16_t w = static_cast<int16_t>(gfx.width());
+  const int16_t h = static_cast<int16_t>(gfx.height());
+  const Rect yes = confirmButtonRect(true, w, h);
+  const Rect no = confirmButtonRect(false, w, h);
+  Rect r;
+  r.x = yes.x;
+  r.y = static_cast<int16_t>(yes.y + yes.h + 14);
+  r.w = static_cast<int16_t>(no.x + no.w - yes.x);
+  r.h = kPromptTimerH;
+  return r;
+}
+}  // namespace
+
+void drawUpdatePromptScreen(LGFX &gfx, const std::string &fromVersion,
+                            const std::string &toVersion) {
+  const int16_t w = static_cast<int16_t>(gfx.width());
+  const int16_t h = static_cast<int16_t>(gfx.height());
+  gfx.fillScreen(LCARS_BLACK);
+  centred(gfx, tr(Str::UpdateTitle), 36, THEME_CHROME_ACCENT);
+  centred(gfx, otaVersionLine(fromVersion, toVersion).c_str(), 66, THEME_CONTENT_PRIMARY);
+  centred(gfx, tr(Str::UpdateAsk), 98, THEME_CONTENT_SECONDARY);
+  gfx.setFont(LCARS_FONT_SMALL);
+  gfx.setTextDatum(middle_center);
+  gfx.setTextColor(THEME_CONTENT_MUTED, LCARS_BLACK);
+  gfx.drawString(tr(Str::UpdateHint), w / 2, 122);
+  const Rect yes = confirmButtonRect(true, w, h);
+  const Rect no = confirmButtonRect(false, w, h);
+  drawPillButton(gfx, yes.x, yes.y, yes.w, yes.h, THEME_CHROME_ACCENT, THEME_ON_FILL,
+                 tr(Str::ResetYes));
+  drawPillButton(gfx, no.x, no.y, no.w, no.h, THEME_CHROME_INACTIVE, THEME_ON_FILL,
+                 tr(Str::ResetNo));
+  drawUpdatePromptTimer(gfx, kUpdatePromptTimeoutMs);
+}
+
+void drawUpdatePromptTimer(LGFX &gfx, uint32_t remainingMs) {
+  const Rect r = promptTimerRect(gfx);
+  const int16_t fill = promptTimerFillPx(remainingMs, kUpdatePromptTimeoutMs, r.w);
+  gfx.fillRect(r.x, r.y, fill, r.h, THEME_CHROME_INACTIVE);
+  gfx.fillRect(r.x + fill, r.y, r.w - fill, r.h, LCARS_BLACK);
 }
 
 #endif  // ARDUINO

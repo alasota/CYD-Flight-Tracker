@@ -1,5 +1,7 @@
 #include <unity.h>
 
+#include <cstdio>
+#include <cstdlib>
 #include <string>
 
 #include "config_page.h"
@@ -279,6 +281,134 @@ static void test_firmware_tab(void) {
   TEST_ASSERT_TRUE(contains(h, ">Firmware</button>"));
 }
 
+// ---- Updates from GitHub (release_check), first card on the Firmware tab
+
+static ConfigPageModel updateModel(bool withPre) {
+  ConfigPageModel m = baseModel();
+  m.cfg.web_language = Language::EN;
+  m.tab = SettingsTab::Firmware;
+  m.update = updateDemoState(withPre);
+  m.installedVersion = m.update.installed;
+  m.cfg.update_show_prerelease = withPre;
+  return m;
+}
+
+static void test_update_card_offers_the_newer_release(void) {
+  const std::string h = render(updateModel(false));
+  TEST_ASSERT_TRUE(contains(h, "<div class=\"card\" id=\"gh\"><h2>Updates from GitHub</h2>"));
+  TEST_ASSERT_TRUE(contains(h, "Installed version: <b id=\"fwv\">v1.2.0</b>"));
+  TEST_ASSERT_TRUE(contains(h, "Latest release: <b>v1.3.0</b> \xC2\xB7 published 20.10.2026"));
+  TEST_ASSERT_TRUE(contains(h, "href=\"https://github.com/alasota/CYD-Flight-Tracker/releases/tag/v1.3.0\""));
+  TEST_ASSERT_TRUE(contains(h, "<span class=\"pill ok\" id=\"ups\"><span class=\"dot\"></span>"
+                               "A newer version is available.</span>"));
+  TEST_ASSERT_TRUE(contains(h, "checked 24.10.2026 09:11"));
+  TEST_ASSERT_TRUE(contains(h, "<button form=\"ui\" class=\"wide\" id=\"upi\""));
+  TEST_ASSERT_TRUE(contains(h, ">Install v1.3.0</button>"));
+  TEST_ASSERT_TRUE(contains(h, "<form id=\"ui\" method=\"POST\" action=\"/update/install\">"
+                               "<input type=\"hidden\" name=\"tag\" value=\"v1.3.0\"></form>"));
+  TEST_ASSERT_TRUE(contains(h, "<form id=\"uc\" method=\"POST\" action=\"/update/check\">"));
+  TEST_ASSERT_TRUE(contains(h, ">Check now</button>"));
+  TEST_ASSERT_TRUE(contains(h, "version <span id=\"ver\">v1.2.0</span>"));
+  // Development versions: the switch is there, off, and nothing else.
+  TEST_ASSERT_TRUE(contains(h, "name=\"on\" value=\"1\" form=\"upr\" "
+                               "onchange=\"this.form.submit()\"></label>"));
+  TEST_ASSERT_FALSE(contains(h, "id=\"upre\""));
+  TEST_ASSERT_FALSE(contains(h, "id=\"upip\""));
+}
+
+static void test_update_card_install_button_only_when_installable(void) {
+  ConfigPageModel m = updateModel(false);
+  for (UpdateStatus st : {UpdateStatus::UpToDate, UpdateStatus::NoChecksum, UpdateStatus::NoAsset,
+                          UpdateStatus::CheckFailed, UpdateStatus::RateLimited,
+                          UpdateStatus::NeverChecked}) {
+    m.update.status = st;
+    const std::string h = render(m);
+    TEST_ASSERT_FALSE(contains(h, "id=\"upi\""));
+    TEST_ASSERT_TRUE(contains(h, webTr(updateStatusMessage(st), Language::EN)));
+  }
+  m.update.status = UpdateStatus::BackToRelease;
+  TEST_ASSERT_TRUE(contains(render(m), ">Go back to release v1.3.0</button>"));
+  m.update.status = UpdateStatus::DevBuild;
+  TEST_ASSERT_TRUE(contains(render(m), ">Install v1.3.0</button>"));
+  // The installed version is never offered again.
+  m.installedVersion = "v1.3.0";
+  TEST_ASSERT_FALSE(contains(render(m), "id=\"upi\""));
+}
+
+static void test_update_card_development_channel(void) {
+  ConfigPageModel m = updateModel(true);
+  std::string h = render(m);
+  TEST_ASSERT_TRUE(contains(h, "onchange=\"this.form.submit()\" checked></label>"));
+  TEST_ASSERT_TRUE(contains(h, "id=\"upre\""));
+  TEST_ASSERT_TRUE(contains(h, "Latest development version: <b>v1.4.0-rc.1</b>"));
+  TEST_ASSERT_TRUE(contains(h, "A test version"));
+  TEST_ASSERT_TRUE(contains(h, ">Install v1.4.0-rc.1</button>"));
+  TEST_ASSERT_TRUE(contains(h, "<form id=\"uip\" method=\"POST\" action=\"/update/install\">"
+                               "<input type=\"hidden\" name=\"tag\" value=\"v1.4.0-rc.1\">"));
+  // Switch off: the pre-release isn't shown even if the state still has it.
+  m.cfg.update_show_prerelease = false;
+  h = render(m);
+  TEST_ASSERT_FALSE(contains(h, "id=\"upre\""));
+  TEST_ASSERT_FALSE(contains(h, ">Install v1.4.0-rc.1</button>"));
+  // Already running it: no button, a note instead.
+  m = updateModel(true);
+  m.installedVersion = "v1.4.0-rc.1";
+  h = render(m);
+  TEST_ASSERT_FALSE(contains(h, "id=\"upip\""));
+  TEST_ASSERT_TRUE(contains(h, "v1.4.0-rc.1 \xC2\xB7 installed"));
+}
+
+static void test_update_card_shows_a_failed_install(void) {
+  ConfigPageModel m = updateModel(false);
+  m.update.lastInstall = OtaResult::ChecksumMismatch;
+  m.update.lastInstallTag = "v1.3.0";
+  const std::string h = render(m);
+  TEST_ASSERT_TRUE(contains(h, "The last install failed (v1.3.0): Not updated: the downloaded "
+                               "file's SHA-256 does not match"));
+}
+
+static void test_update_card_escapes_what_came_from_the_network(void) {
+  ConfigPageModel m = updateModel(true);
+  m.update.latest.tag = "v1.3.0\"><script>";
+  m.update.latestPre.tag = "<b>";
+  const std::string h = render(m);
+  TEST_ASSERT_FALSE(contains(h, "v1.3.0\"><script>"));
+  TEST_ASSERT_TRUE(contains(h, "<b>v1.3.0&quot;&gt;&lt;script&gt;</b>"));
+}
+
+static void test_update_check_switch_on_general(void) {
+  ConfigPageModel m = baseModel();
+  m.cfg.web_language = Language::EN;
+  TEST_ASSERT_TRUE(contains(render(m), "name=\"update_check\" value=\"1\" checked"));
+  m.cfg.update_check_enabled = false;
+  const std::string h = render(m);
+  TEST_ASSERT_TRUE(contains(h, "name=\"update_check\" value=\"1\">"));
+  TEST_ASSERT_FALSE(contains(h, "name=\"update_check\" value=\"1\" checked"));
+}
+
+// Writes the demo Firmware tab (PL, like the other screenshots) for
+// tools/screenshots.py when SCREENSHOT_OUT names a folder; does nothing in a
+// normal test run.
+static void test_render_firmware_tab_demo(void) {
+  const char *dir = std::getenv("SCREENSHOT_OUT");
+  if (dir == nullptr || *dir == '\0') {
+    TEST_IGNORE_MESSAGE("SCREENSHOT_OUT not set");
+    return;
+  }
+  for (bool withPre : {false, true}) {
+    ConfigPageModel m = updateModel(withPre);
+    m.cfg.web_language = Language::PL;
+    m.cfg.web_password = "demo-password";  // no "no password" warning in the picture
+    const std::string path =
+        std::string(dir) + (withPre ? "/web_firmware_dev.html" : "/web_firmware.html");
+    std::FILE *f = std::fopen(path.c_str(), "wb");
+    TEST_ASSERT_NOT_NULL(f);
+    const std::string h = render(m);
+    std::fwrite(h.data(), 1, h.size(), f);
+    std::fclose(f);
+  }
+}
+
 static void test_restarting_page_reloads_itself(void) {
   ConfigPageModel m = baseModel();
   m.cfg.web_language = Language::EN;
@@ -355,6 +485,13 @@ int main(int argc, char **argv) {
   RUN_TEST(test_auto_cycle_checkbox_state);
   RUN_TEST(test_firmware_tab);
   RUN_TEST(test_restarting_page_reloads_itself);
+  RUN_TEST(test_update_card_offers_the_newer_release);
+  RUN_TEST(test_update_card_install_button_only_when_installable);
+  RUN_TEST(test_update_card_development_channel);
+  RUN_TEST(test_update_card_shows_a_failed_install);
+  RUN_TEST(test_update_card_escapes_what_came_from_the_network);
+  RUN_TEST(test_update_check_switch_on_general);
+  RUN_TEST(test_render_firmware_tab_demo);
   RUN_TEST(test_saved_secret_never_reaches_the_page);
   RUN_TEST(test_panel_password_card);
   return UNITY_END();

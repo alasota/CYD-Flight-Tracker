@@ -98,6 +98,12 @@ WebStr otaResultMessage(OtaResult r) {
       return WebStr::OtaVerifyFailed;
     case OtaResult::Unauthorized:
       return WebStr::OtaUnauthorized;
+    case OtaResult::ChecksumMismatch:
+      return WebStr::OtaChecksumMismatch;
+    case OtaResult::VersionMismatch:
+      return WebStr::OtaVersionMismatch;
+    case OtaResult::DownloadFailed:
+      return WebStr::OtaDownloadFailed;
     case OtaResult::Aborted:
     default:
       return WebStr::OtaAborted;
@@ -115,6 +121,8 @@ int otaResultHttpStatus(OtaResult r) {
       return 500;
     case OtaResult::Unauthorized:
       return 401;
+    case OtaResult::DownloadFailed:
+      return 502;
     default:
       return 400;
   }
@@ -122,7 +130,9 @@ int otaResultHttpStatus(OtaResult r) {
 
 // ---- OtaSession
 
-void OtaSession::start(size_t declaredBytes) {
+void OtaSession::start(size_t declaredBytes, const OtaExpectations &expect) {
+  expect_ = expect;
+  if (digest_ != nullptr) digest_->reset();
   declared_ = declaredBytes;
   received_ = 0;
   started_ = true;
@@ -161,6 +171,7 @@ void OtaSession::feed(const uint8_t *data, size_t len) {
   if (!started_ || failed_ || finished_ || len == 0) return;
   received_ += len;
   scanner_.feed(data, len);
+  if (digest_ != nullptr) digest_->update(data, len);
 
   if (begun_) {
     writeOut(data, len);
@@ -212,6 +223,14 @@ OtaResult OtaSession::finish() {
     fail(OtaResult::NotSkyTracker);
     return result_;
   }
+  if (!expect_.version.empty() && scanner_.version() != expect_.version) {
+    fail(OtaResult::VersionMismatch);
+    return result_;
+  }
+  if (!expect_.sha256.empty() && (digest_ == nullptr || digest_->finishHex() != expect_.sha256)) {
+    fail(OtaResult::ChecksumMismatch);
+    return result_;
+  }
   if (!writer_.end()) {
     failed_ = true;  // end() already gave up; no abort() after it
     result_ = OtaResult::VerifyFailed;
@@ -230,3 +249,60 @@ void OtaSession::abort() {
 bool shouldMarkAppValid(bool pendingVerify, uint32_t uptimeMs, bool reachable) {
   return pendingVerify && reachable && uptimeMs >= kOtaValidAfterMs;
 }
+
+#ifdef ARDUINO
+
+#include <Update.h>
+#include <esp_ota_ops.h>
+#include <mbedtls/sha256.h>
+
+namespace {
+
+class UpdateWriter : public OtaWriter {
+ public:
+  bool begin(size_t size) override { return Update.begin(size > 0 ? size : UPDATE_SIZE_UNKNOWN); }
+  size_t write(const uint8_t *data, size_t len) override {
+    return Update.write(const_cast<uint8_t *>(data), len);
+  }
+  bool end() override { return Update.end(true); }
+  void abort() override { Update.abort(); }
+};
+
+// mbedTLS 2.28 (arduino-esp32 2.0.17); the ESP32's SHA accelerator does the work.
+class MbedSha256 : public OtaDigest {
+ public:
+  MbedSha256() { mbedtls_sha256_init(&ctx_); }
+  void reset() override { mbedtls_sha256_starts_ret(&ctx_, /*is224=*/0); }
+  void update(const uint8_t *data, size_t len) override {
+    mbedtls_sha256_update_ret(&ctx_, data, len);
+  }
+  std::string finishHex() override {
+    uint8_t sum[32];
+    mbedtls_sha256_finish_ret(&ctx_, sum);
+    static const char kHex[] = "0123456789abcdef";
+    std::string out;
+    out.reserve(64);
+    for (uint8_t b : sum) {
+      out += kHex[b >> 4];
+      out += kHex[b & 0x0F];
+    }
+    return out;
+  }
+
+ private:
+  mbedtls_sha256_context ctx_;
+};
+
+}  // namespace
+
+OtaSession &otaFlashSession() {
+  static UpdateWriter writer;
+  static MbedSha256 digest;
+  static const esp_partition_t *slot = esp_ota_get_next_update_partition(nullptr);
+  static OtaSession session(writer, slot != nullptr ? slot->size : 0, &digest);
+  return session;
+}
+
+const char *otaFlashError() { return Update.errorString(); }
+
+#endif  // ARDUINO
