@@ -74,14 +74,20 @@ works**. Implement it like this:
    Response JSON has `access_token` and `expires_in` (~1800s).
 3. Send `Authorization: Bearer <token>` on every `/states/all` call.
 4. Cache the token and refresh **proactively** (e.g. using `millis()`, refresh ~60s before
-   `expires_in` elapses) rather than waiting for a `401`. Treat a `401` as "refresh once and
-   retry", not as a fatal error.
+   `expires_in` elapses) rather than waiting for a `401`. A `401`/`403` on a Bearer request =
+   "refresh once and retry"; still rejected -> `LoginFailed` and **the same poll again,
+   anonymously**. `AuthError` only when an anonymous request is rejected. Wrong credentials
+   never stop the data — see "OpenSky login failure" below.
 5. Anonymous (no credentials) access to `/states/all` still works with lower limits — the
    firmware must work anonymously too, OAuth is an optional upgrade path, same as in micro-radar.
+   A rejected login (400/401/403 from the token endpoint) also runs anonymously, and the login
+   server is asked again only every 30 min (`kLoginRetryMs`), not every poll.
 
 ### Rate limits / credits (check current values if this ever misbehaves — they can change)
 
-- Anonymous: 400 credits/day. Authenticated standard user: 4000/day.
+- Anonymous: 400 credits/day. Authenticated standard user: 4000/day. In `LoginFailed` the board
+  runs anonymously, so `openSkyDailyLimit(auth)` is 400 there (OpenSky tab estimate, budget
+  alert).
 - Cost per `/states/all` call depends on bounding-box area: ≤25 sq° = 1 credit, 25–100 sq° =
   2, 100–400 sq° = 3, >400 sq° = 4.
 - Keep the configurable radius defaulting to something that stays in the 1-credit tier (e.g.
@@ -923,12 +929,55 @@ to fix or to know, even while data flows — anonymous after a failed login: gre
   `minPollIntervalForLimit()`), action and "→ Przejdź do: <tab>". `sendPage()` computes them
   with the same `deviceAlertInputs()`. CSS `--alert:#ff3333; --warn:#ff8000`, the "!" circle is
   `.bang`. (The old red `.alert` box for "no panel password" is now `.nopw`.)
-- **Login state** (`opensky_auth`, first slice of spec 06): `onCredentials()` (other credentials
-  -> `Account`, a fair try), `onTokenResult()` (400/401/403 -> `LoginFailed` + code; no answer /
-  5xx / 200 without a token = unchanged). `opensky_client` logs the change once (`login failed
-  (http=401) — check client_id/secret; using anonymous access` / `login ok — using account`).
-  Still spec 06: 30-min wait before retrying a rejected login (now every poll asks), the OpenSky
-  tab's red pill, the anonymous retry of a poll rejected with a Bearer token.
+- **Login state** comes from `opensky_auth` — see "OpenSky login failure" below. The display's
+  "!" message and the alert card stay generic; the details (HTTP code, since when, next try)
+  are only on the OpenSky tab (owner's decision, spec 06).
+
+## OpenSky login failure — anonymous fallback (opensky_auth)
+
+Spec: `spec/done/06-opensky-login-fallback.md`. Before it, a typo in `client_secret` was silent:
+the token fetch failed, the poll went anonymous with a 200, the panel still said "account", the
+login server got asked every 15 s, and hours later the screen said "credits exhausted" (400
+instead of 4000).
+
+- **State** (`OpenSkyAuthState`, pure, RAM only — a reboot re-learns it with one token request):
+  `mode` `NoCredentials` / `Account` / `LoginFailed`, `lastHttpCode`, `credentialsHash`
+  (FNV-1a of id + secret, no copy of the secret), `failedSinceMs` (first rejection of the
+  series), `nextTokenTryMs`.
+- **Token answer** -> `classifyTokenResponse()`: 200 + `access_token` = `Ok`; 400/401/403 =
+  `Rejected`; anything else (0, -1, 5xx, 200 without a token) = `Transient`. `onTokenResult()`:
+  Ok -> `Account` (failure fields cleared); Rejected -> `LoginFailed`, retry at now + 30 min
+  (`kLoginRetryMs`), `failedSinceMs` kept on a repeated rejection; Transient in `Account` ->
+  unchanged (next poll tries again — a network blip is not a wrong password); Transient in
+  `LoginFailed` -> another 30 min. `NoCredentials` never changes on a token result.
+  `onCredentials()`: other credentials (saved on the page) -> `Account` at once, a fair try.
+- **Around a poll** (`opensky_client::fetchAircraftStates()`, decisions pure):
+  `shouldTryToken()` (LoginFailed: only after `nextTokenTryMs`, wrap-safe) -> token;
+  `planStatesRequest(auth, tokenValid)` = Bearer only in `Account` with a valid token;
+  `afterStatesResponse()`: 401/403 with Bearer -> `RefreshTokenAndRetry` (skipped when the token
+  was fetched this poll), then `RetryAnonymous` (-> `LoginFailed`); 401/403 anonymous ->
+  `AuthError`; anything else -> `Accept`. At most two extra requests per poll; the extra
+  anonymous one only on the transition into `LoginFailed`.
+- The cached token is dropped on `Rejected` and *before* a refresh: a refresh with no answer
+  sends the retry anonymously and keeps `Account`, instead of re-sending a rejected token and
+  landing in `LoginFailed` for 30 min over a network blip.
+- **Log** (`authChangeLogLine()`, once per mode change, not on setting up / removing
+  credentials): `[opensky_client] login failed (http=401) — check client_id/secret; using
+  anonymous access, next try in 30 min` / `[opensky_client] login ok — using account`.
+  A rejected anonymous request: `/states/all rejected (http=401, anonymous)`. On the board,
+  "no token requests for 30 min" = no `token fetch failed` line in that time.
+- **Settings page, OpenSky tab** (`config_page`): the page uses
+  `onCredentials(model.auth, hash(cfg), …)`, so credentials just saved read as `Account`. Pill:
+  grey "Anonymous mode" / green "OpenSky account configured" / red `.pill.err` "Login failed —
+  anonymous mode". In `LoginFailed` a `.stat.quota.warn#loginwarn` line below it
+  (`loginFailedDetailText()`): HTTP code, ", since DD.MM.YYYY HH:MM" (only with a synced clock,
+  `ConfigPageModel::nowEpoch` = `timeSyncNowLocal()`), 400 instead of 4000, "next login attempt
+  in N min" (rounded up, never below 1). The daily estimate compares with
+  `openSkyDailyLimit(auth)`; `#daily` gets `data-lf="1"` so the live JS keeps 400 until the
+  client id or secret is edited. (`openSkyDailyCreditLimit(bool)` is gone.)
+- Display: unchanged code — with wrong credentials the poll now ends `Ok`, so aircraft + green
+  dot + the red "!" from "Device alerts"; "BŁĄD LOGOWANIA OPENSKY" only when even anonymous
+  access is rejected.
 
 ## Design language — LCARS-inspired (Star Trek console aesthetic)
 
@@ -1002,8 +1051,9 @@ each with a single responsibility:
   micro-radar's `microradar.local`.
   The page HTML is rendered by the pure **`config_page`** module (`renderConfigPage(model,
   sink)`, streamed chunk by chunk, native-tested): five tabs — **Location** (lat/lon, radius +
-  credits per request), **OpenSky client** (account status, client id/secret, credentials-file
-  upload, poll interval + estimated credits per day vs. the 400/4000 limit), **General**
+  credits per request), **OpenSky client** (account status pill: anonymous / account / red "login failed" with a
+  warning, client id/secret, credentials-file
+  upload, poll interval + estimated credits per day vs. the 400/4000 limit — 400 in `LoginFailed`), **General**
   (display + web-panel language, auto-cycle, flight-phase thresholds, panel password),
   **Backup** (download / restore, below), **Firmware** (OTA update, see "Firmware updates (OTA)
   & panel password"); one Save for the first three (hidden on Backup and Firmware), the active
@@ -1054,7 +1104,9 @@ each with a single responsibility:
 - `hexdb_http` — device-only: the shared hexdb.io HTTPS GET with keep-alive per batch.
 - `device_alerts` — the "!" alerts (see "Device alerts"): definitions table, `collectAlerts()`,
   texts, badge colours, `minPollIntervalForLimit()`; pure + `deviceAlertInputs()` adapter.
-- `opensky_auth` — did the OpenSky login work (`OpenSkyAuthState`, `openSkyDailyLimit()`); pure.
+- `opensky_auth` — did the OpenSky login work (`OpenSkyAuthState`, `openSkyDailyLimit()`), the
+  30-min wait after a rejected login and the Bearer / refresh / anonymous-retry decisions around
+  a poll (see "OpenSky login failure"); pure.
 - `opensky_client` — token fetch/refresh + `/states/all` polling. Returns a plain struct/array
   of aircraft. **No TFT/drawing code in this module** — must be swappable/testable independently
   of the visualization.

@@ -1,6 +1,6 @@
 # Spec 06 — Błąd logowania OpenSky: tryb anonimowy + komunikat w panelu
 
-Z przeglądu kodu 2026-10-25, punkt 1.2. Status: **w trakcie**.
+Z przeglądu kodu 2026-10-25, punkt 1.2. Status: **zrobione 2026-10-25** (logika i panel; sprawdzenie na płytce — scenariusze `@manual` w PR).
 
 ## 1. Problem
 
@@ -21,7 +21,7 @@ pokazuje, że logowanie się nie udało i że urządzenie pracuje anonimowo.**
 
 - **Wyświetlacz:** samoloty widoczne, kropka stanu zielona (dane płyną), a w nagłówku
   **czerwony wykrzyknik** — ostrzeżenie `OpenSkyLoginFailed` z ogólnego mechanizmu
-  [spec 08](../done/08-device-alerts.md). (`OpenSkyHealth::AuthError` zostaje tylko dla sytuacji,
+  [spec 08](08-device-alerts.md). (`OpenSkyHealth::AuthError` zostaje tylko dla sytuacji,
   w której nawet zapytanie anonimowe dostaje 401/403.)
 - **Panel, strona główna:** nad zakładkami ramka z wykrzyknikiem i wyjaśnieniem, dlaczego się
   pojawił (spec 08 §3.4).
@@ -144,3 +144,43 @@ pominięty.
 2. Log: jedna linia „login failed”, potem **brak** zapytań do serwera logowania przez 30 min.
 3. Poprawne dane zapisane w panelu → następny poll używa konta, pigułka zielona, log „login ok”.
 4. Bez danych logowania zachowanie identyczne jak dziś.
+
+## Wynik (2026-10-25)
+
+Gałąź `spec/06-opensky-login-fallback`, commity 35088c0 (`opensky_auth`), 242e939
+(`opensky_client`), eee9ca6 (panel). `pio test -e native`: 819 przypadków, wszystkie zielone;
+`pio run -e cyd`: flash 1 464 041 B / 1 966 080 (74,5 %); `check_bdd`: 25 scenariuszy, 4 `@manual`.
+
+Kryteria akceptacji (§5):
+
+1. Zły `client_secret` → samoloty + zielona kropka + czerwony „!”, ramka nad zakładkami, czerwona
+   pigułka i ostrzeżenie z HTTP 401 — logika pokryta testami (`afterStatesResponse`,
+   `test_opensky_pill_per_auth_state`, `test_login_failed_warning_with_code_time_and_retry`),
+   zrzut `docs/screenshots/web_alert.png` (wersja demo). **Na płytce: `@manual`.**
+2. Jedna linia „login failed … next try in 30 min”, potem 30 min bez zapytań o token —
+   `test_rejected_login_waits_30_min`, `test_retry_wait_survives_millis_rollover`,
+   `test_auth_log_line_only_on_change`. **Na płytce: `@manual`** (brak linii `token fetch failed`).
+3. Poprawne dane → konto, zielona pigułka, „login ok” — `test_new_credentials_try_at_once`,
+   `test_just_saved_credentials_show_account`, `test_auth_log_line_login_ok`. **Na płytce: `@manual`.**
+4. Bez danych — bez zmian: `test_no_credentials_never_tries_token`. **Na płytce: `@manual`.**
+
+Odstępstwa od specyfikacji i dlaczego:
+
+- `useBearer(s)` z §3.1 nazywa się `planStatesRequest(s, tokenValid)` (jak w §4) — ważność tokenu
+  jest parametrem, a nie częścią stanu.
+- `afterStatesResponse()` zwraca `{StatesStep, auth}` (`Accept` / `RefreshTokenAndRetry` /
+  `RetryAnonymous` / `AuthError`) zamiast `{retryAnonymous, newAuth, health}` — stan zdrowia
+  dalej ustala istniejący kod 429/200.
+- 403 na `/states/all` z Bearerem traktowane jak 401 (odśwież raz, potem anonimowo) — decyzja
+  właściciela.
+- Token pobrany w tym samym pollu nie jest odświeżany drugi raz: 401/403 od razu → anonimowo.
+- Token jest unieważniany przed odświeżeniem: jeśli odświeżenie nie przyniesie odpowiedzi
+  (`Transient`), powtórka idzie anonimowo, a stan zostaje `Account` — chwilowa awaria sieci nie
+  blokuje konta na 30 min.
+- „Następna próba za N min” zaokrąglane w górę, minimum 1 — decyzja właściciela.
+- Komunikat „!” na wyświetlaczu i ramka nad zakładkami bez zmian (bez czasu i następnej próby) —
+  szczegóły tylko na zakładce OpenSky, decyzja właściciela.
+- Na żywo liczony szacunek dzienny (JS) trzyma limit 400, dopóki client_id/secret nie zostaną
+  zmienione w formularzu (`data-lf`) — nie da się tego przetestować natywnie, sprawdzić w panelu.
+- Stan logowania jest tylko w RAM: po restarcie pierwszy poll znów próbuje tokenu (jedno
+  zapytanie).

@@ -191,7 +191,10 @@ The settings page has five tabs; one **Save** button saves the first three at on
    page estimates your daily credit use against the limit (400 anonymous, 4,000 with an
    account) and turns red if you'd run out. Once saved, the secret is never shown again: the
    field stays empty, and leaving it empty keeps the saved one. To go back to anonymous mode,
-   tick *Remove the OpenSky credentials*.
+   tick *Remove the OpenSky credentials*. If OpenSky rejects them, the status pill at the top
+   turns red (*Login failed — anonymous mode*) and a note below it gives the HTTP code, since
+   when, and how many minutes until the board tries again; the daily estimate then counts
+   against the anonymous 400.
 3. **General**: display language, web panel language, screen brightness and night mode (see
    [Brightness and night mode](#brightness-and-night-mode) below), automatic screen cycling,
    the flight-phase thresholds and the settings page's own password — see
@@ -255,7 +258,10 @@ itself after 15 s); the settings page shows the same thing in a *Needs attention
 tabs, with the details and a link to the right tab. Right now it covers:
 
 - **OpenSky login failed** (red): OpenSky rejected the client id / secret. The board keeps going
-  anonymously (400 credits a day instead of 4000). Check them on your OpenSky account page.
+  anonymously (400 credits a day instead of 4000), so the planes keep coming and the dot stays
+  green. It knocks on the login server's door again every 30 minutes rather than every 15
+  seconds (nobody likes a doorbell prankster). Check the credentials on your OpenSky account
+  page and save them again; the board tries them straight away.
 - **OpenSky daily limit reached** (red): the last request got a 429. The box says when the
   credits come back.
 - **Polling too often** (orange): with your interval and radius the board would use more credits
