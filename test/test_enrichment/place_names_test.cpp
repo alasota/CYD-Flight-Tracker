@@ -122,6 +122,7 @@ static void test_place_name_falls_back_to_codes(void) {
 }  // namespace
 
 void run_place_names_tests() {
+  UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
 
   RUN_TEST(test_fold_keeps_plain_ascii);
   RUN_TEST(test_fold_en_dash_to_hyphen);

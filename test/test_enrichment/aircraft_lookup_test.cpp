@@ -163,6 +163,7 @@ static void test_is_cached_reflects_confirmed_results_only(void) {
 }  // namespace
 
 void run_aircraft_lookup_tests() {
+  UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
 
   RUN_TEST(test_parse_found_response);
   RUN_TEST(test_parse_not_found_response);

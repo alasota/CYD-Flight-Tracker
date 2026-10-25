@@ -222,6 +222,7 @@ static void test_airport_is_cached_after_lookup(void) {
 }  // namespace
 
 void run_route_lookup_tests() {
+  UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
 
   RUN_TEST(test_parse_route_splits_origin_dest);
   RUN_TEST(test_parse_route_not_found);

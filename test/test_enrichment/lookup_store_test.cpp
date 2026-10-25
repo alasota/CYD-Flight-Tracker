@@ -106,6 +106,7 @@ static void test_seeded_entries_count_as_cached(void) {
 }  // namespace
 
 void run_lookup_store_tests() {
+  UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
 
   RUN_TEST(test_aircraft_round_trip);
   RUN_TEST(test_confirmed_miss_round_trips_too);

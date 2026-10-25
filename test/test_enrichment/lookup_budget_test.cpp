@@ -116,6 +116,7 @@ static void test_empty_priority_list_is_empty_plan(void) {
 }  // namespace
 
 void run_lookup_budget_tests() {
+  UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
   RUN_TEST(test_new_fetches_are_capped_at_budget);
   RUN_TEST(test_cache_hits_are_always_included_and_free);
   RUN_TEST(test_cache_hits_do_not_consume_budget);

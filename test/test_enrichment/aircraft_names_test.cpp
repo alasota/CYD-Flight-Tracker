@@ -73,6 +73,7 @@ static void test_tables_unique_font_safe_and_short(void) {
 }  // namespace
 
 void run_aircraft_names_tests() {
+  UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
 
   RUN_TEST(test_airline_from_callsign_prefix);
   RUN_TEST(test_airline_needs_a_digit_after_the_prefix);
