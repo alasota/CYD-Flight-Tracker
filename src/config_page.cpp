@@ -90,12 +90,26 @@ std::string lightStateText(const BacklightStatus &s, Language lang) {
   return out;
 }
 
-uint32_t openSkyDailyCreditLimit(bool authenticated) { return authenticated ? 4000u : 400u; }
-
-// TODO(spec 06): stub from test-author
-std::string loginFailedDetailText(const OpenSkyAuthState & /*s*/, uint32_t /*nowMs*/,
-                                  std::time_t /*nowEpoch*/, Language /*lang*/) {
-  return {};
+std::string loginFailedDetailText(const OpenSkyAuthState &s, uint32_t nowMs,
+                                  std::time_t nowEpoch, Language lang) {
+  // "since": the first rejection's millis() turned into wall-clock time —
+  // only with a synced clock (an unsynced one would say 1970).
+  std::string since;
+  if (nowEpoch != 0) {
+    const uint32_t agoS = (nowMs - s.failedSinceMs) / 1000u;  // unsigned: wrap-safe
+    const std::time_t at = nowEpoch - static_cast<std::time_t>(agoS);
+    since = fillTemplate(webTr(WebStr::LoginFailedSince, lang),
+                         {formatDate(at) + " " + formatTime(at)});
+  }
+  // Minutes to the next login attempt, rounded up; "1 min" once it is due
+  // (the poll that retries just hasn't run yet), never 0 or negative.
+  const int32_t leftMs = static_cast<int32_t>(s.nextTokenTryMs - nowMs);
+  uint32_t minutes = 1;
+  if (leftMs > 0) minutes = std::max<uint32_t>(1u, (static_cast<uint32_t>(leftMs) + 59999u) / 60000u);
+  return fillTemplate(webTr(WebStr::LoginFailedDetail, lang),
+                      {std::to_string(s.lastHttpCode), since,
+                       std::to_string(kOpenSkyAnonymousDailyLimit),
+                       std::to_string(kOpenSkyAccountDailyLimit), std::to_string(minutes)});
 }
 
 std::string quotaStatusText(const OpenSkyQuota &q, uint32_t resetInS, Language lang,
@@ -218,6 +232,7 @@ const char kStyle[] =
     "border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-bottom:14px}"
     ".dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}"
     ".pill.ok{color:var(--text)}.pill.ok .dot{background:var(--ok)}"
+    ".pill.err{color:var(--err)}.pill.err .dot{background:var(--err)}"
     ".pw{display:flex;gap:8px}.pw input{flex:1;min-width:0}"
     "button{background:var(--accent);border:0;border-radius:10px;color:var(--on-accent);"
     "font:inherit;font-weight:600;padding:11px 16px;cursor:pointer}"
@@ -255,7 +270,8 @@ const char kStyle[] =
 
 // Tab switching, the language-toggle links following the current tab, and
 // the live credit readouts (mirroring openSkyCreditCost() /
-// openSkyDailyCredits() / openSkyDailyCreditLimit() above).
+// openSkyDailyCredits() / openSkyDailyLimit() above). In LoginFailed (#daily
+// carries data-lf) the limit stays 400 until the credentials are edited.
 const char kScript[] =
     "function $(i){return document.getElementById(i)}"
     "function show(t){"
@@ -269,7 +285,8 @@ const char kScript[] =
     "var c=cost(parseFloat($('radius').value)||0),p=Math.max(parseInt($('poll').value)||0,1),"
     "n=parseInt($('daily').dataset.night)||0,"
     "d=Math.ceil((86400-($('ntp').checked&&$('ntm').value!='off'?n*60:0))/p)*c,"
-    "l=($('cid').value&&($('cs').value||$('cs').dataset.saved))?4000:400;"
+    "lf=$('daily').dataset.lf&&$('cid').value==$('cid').defaultValue&&!$('cs').value,"
+    "l=!lf&&$('cid').value&&($('cs').value||$('cs').dataset.saved)?4000:400;"
     "$('cost').textContent=c;$('ntsv').textContent=Math.ceil(n*60/p);"
     "$('daily').innerHTML='≈ <b>'+d+'</b> '+T.day+' · '+T.lim+' '+l+"
     "(d>l?'<div class=warn>'+T.over+'</div>':'')}"
@@ -742,11 +759,29 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
 
   // ---- OpenSky client
   const bool authed = hasOpenSkyCredentials(c);
+  // The login state for the credentials in this config: other credentials
+  // than the ones the board last tried (just saved) read as Account.
+  const OpenSkyAuthState auth =
+      onCredentials(m.auth, credentialsHash(c.opensky_client_id, c.opensky_client_secret), authed);
+  const bool loginFailed = auth.mode == OpenSkyAuthState::Mode::LoginFailed;
   w.sectionOpen(SettingsTab::OpenSky, m.tab);
-  w.raw(authed ? "<div class=\"card\"><span class=\"pill ok\"><span class=\"dot\"></span>"
-               : "<div class=\"card\"><span class=\"pill\"><span class=\"dot\"></span>");
-  w.t(authed ? WebStr::StatusAccount : WebStr::StatusAnonymous);
-  w.raw("</span><p class=\"intro\">");
+  if (loginFailed) {
+    w.raw("<div class=\"card\"><span class=\"pill err\"><span class=\"dot\"></span>");
+    w.t(WebStr::StatusLoginFailed);
+  } else if (authed) {
+    w.raw("<div class=\"card\"><span class=\"pill ok\"><span class=\"dot\"></span>");
+    w.t(WebStr::StatusAccount);
+  } else {
+    w.raw("<div class=\"card\"><span class=\"pill\"><span class=\"dot\"></span>");
+    w.t(WebStr::StatusAnonymous);
+  }
+  w.raw("</span>");
+  if (loginFailed) {
+    w.raw("<div class=\"stat quota warn\" id=\"loginwarn\">");
+    w.esc(loginFailedDetailText(auth, m.nowMs, m.nowEpoch, lang));
+    w.raw("</div>");
+  }
+  w.raw("<p class=\"intro\">");
   w.t(WebStr::OpenSkyIntro);
   w.raw("</p>");
   w.field("cid", WebStr::ClientId,
@@ -791,8 +826,9 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
           fmtU(c.poll_interval_s));
   const uint32_t daily =
       openSkyDailyCredits(c.radius_deg, c.poll_interval_s, pausedMinutesPerDay(c, m.light));
-  const uint32_t limit = openSkyDailyCreditLimit(authed);
-  w.raw("<div class=\"stat\" id=\"daily\" data-night=\"");
+  const uint32_t limit = openSkyDailyLimit(auth);
+  w.raw(loginFailed ? "<div class=\"stat\" id=\"daily\" data-lf=\"1\" data-night=\""
+                    : "<div class=\"stat\" id=\"daily\" data-night=\"");
   w.uint(nightMinutesToday(c, m.light));
   w.raw("\">\xE2\x89\x88 <b>");
   w.uint(daily);

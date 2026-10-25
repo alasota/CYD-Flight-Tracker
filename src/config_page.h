@@ -53,10 +53,6 @@ uint32_t pausedMinutesPerDay(const Config &cfg, const BacklightStatus &light);
 // woken by a touch / clock not synced, + "fetching paused" when it is.
 std::string lightStateText(const BacklightStatus &s, Language lang);
 
-// OpenSky's daily credit allowance: 4000 with an account, 400 anonymous
-// (CLAUDE.md "Rate limits / credits").
-uint32_t openSkyDailyCreditLimit(bool authenticated);
-
 // &, <, >, " escaped — for user-entered values put into attributes.
 std::string htmlEscape(const std::string &in);
 

@@ -77,6 +77,7 @@ bool isValidUnsignedIntString(const std::string &s) {
 #include "release_check.h"  // updates from GitHub (Firmware tab)
 #include "screenshot.h"
 #include "service_screen.h"  // otaVersionLine()
+#include "time_sync.h"       // timeSyncNowLocal() — "since" in the login warning
 #include "version.h"
 #include "web_auth.h"
 
@@ -176,6 +177,10 @@ void sendPage(ConfigPageModel model, int status = 200) {
   model.alerts = collectAlerts(alertIn);
   model.alertDetails = collectAlertDetails(alertIn);
   model.nowMs = millis();
+  // OpenSky login state (spec 06): the OpenSky tab's pill, warning and limit.
+  // Same core as opensky_client (net_task), so no lock — like openSkyQuota().
+  model.auth = openSkyAuthStatus(model.cfg);
+  model.nowEpoch = timeSyncNowLocal();  // local time, 0 until NTP synced
 
   server.sendHeader("Cache-Control", "no-store");
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
