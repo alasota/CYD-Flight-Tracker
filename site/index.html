@@ -338,6 +338,25 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <p class="pl">Wszystko jest w <b>Ogólne → Ekran</b>, razem z podglądem czujnika na żywo
       i dzisiejszymi godzinami wschodu i zachodu.</p>
   </div>
+  <div class="card backup-note" id="dual-core">
+    <h3><span class="en">New: the screen no longer waits for the internet</span><span class="pl">Nowość: ekran już nie czeka na internet</span></h3>
+    <p class="en">The ESP32 has two CPU cores, and until now one of them was mostly twiddling its
+      thumbs. Now core 0 does all the talking (OpenSky, hexdb.io, GitHub, the settings page,
+      updates) and core 1 only draws and listens to your finger. Before, every data refresh froze
+      the screen for about a second, and up to 5.7 seconds when the settings page or the GitHub
+      check joined in. Now the longest pause is about 0.1 s. The settings page opens in 0.1 s
+      instead of 5, aircraft positions show up right after OpenSky answers (airline and route
+      follow a moment later), and lookups for new planes share one connection, so three of them
+      take 3 seconds instead of 8. Curious how it's doing? <code>cyd-sky.local/perf.json</code>.</p>
+    <p class="pl">ESP32 ma dwa rdzenie, a dotąd jeden z nich głównie się nudził. Teraz rdzeń 0
+      zajmuje się całą komunikacją (OpenSky, hexdb.io, GitHub, strona ustawień, aktualizacje),
+      a rdzeń 1 tylko rysuje i słucha palca. Wcześniej każde odświeżenie danych zamrażało ekran na
+      około sekundę, a z otwartą stroną ustawień albo sprawdzaniem GitHuba nawet na 5,7 s. Teraz
+      najdłuższa przerwa to około 0,1 s. Strona ustawień otwiera się w 0,1 s zamiast 5, pozycje
+      samolotów pojawiają się zaraz po odpowiedzi OpenSky (linia i trasa dochodzą chwilę później),
+      a sprawdzanie nowych samolotów idzie jednym połączeniem, więc trzy trwają 3 sekundy
+      zamiast 8. Ciekawi Cię, jak sobie radzi? <code>cyd-sky.local/perf.json</code>.</p>
+  </div>
   <div class="card backup-note">
     <h3><span class="en">Set a panel password (recommended)</span><span class="pl">Ustaw hasło do panelu (zalecane)</span></h3>
     <p class="en">Out of the box the settings page is open, so the first setup just works. That
@@ -385,6 +404,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         twice and can update itself over the air.</span><span class="pl">Fonty z polskimi
         literami odchudzone z 1 MB do 4 KB, żeby firmware zmieścił się dwa razy i mógł
         aktualizować się bezprzewodowo.</span></li>
+      <li><span class="en">Two CPU cores, two jobs: core 0 argues with the internet, core 1
+        draws. The screen no longer freezes while a server thinks.</span><span class="pl">Dwa
+        rdzenie, dwie role: rdzeń 0 kłóci się z internetem, rdzeń 1 rysuje. Ekran już nie zamiera,
+        kiedy serwer się zastanawia.</span></li>
       <li><span class="en">Hundreds of unit tests. The manager in me demanded KPIs.</span><span class="pl">Setki
         testów jednostkowych. Menedżer we mnie zażądał KPI.</span></li>
       <li><span class="en">Every release is built and published by GitHub Actions. Nobody

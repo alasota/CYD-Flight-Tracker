@@ -119,4 +119,8 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
 void drawFlightCountdown(LGFX &gfx, bool hasNearest, const CpaPrediction &cpa,
                          int16_t screenWidth, OpenSkyHealth health);
 
+// Allocates the countdown sprite now (setup(), before WiFi / net_task) so it
+// doesn't later split the largest free heap block. Safe to call again.
+void flightScreenReserveSprite(int16_t screenWidth);
+
 #endif  // ARDUINO

@@ -1,66 +1,49 @@
-// CYD Sky Tracker — main orchestration.
+// CYD Sky Tracker — main orchestration: the UI on core 1.
+//
+// Two cores, two jobs (spec/04-dual-core.md): net_task on core 0 does all
+// the networking — WiFi, the config web page, OpenSky, hexdb.io, GitHub, OTA
+// — and publishes what the screens need as a NetState snapshot (core_link).
+// This file is loop() on core 1: the display, touch and everything drawn.
+// It never waits for the network, and the network never draws.
 //
 // setup(): initializes LovyanGFX (configured via include/LGFX_CYD.hpp) and
-// its built-in XPT2046 touch driver (read via touch_input), loads the persisted config
-// (config_store) — restoring which of the three screens was last active
-// (last_screen 0/1/2) into screen_nav — connects WiFi (wifi_manager —
-// falls back to its own captive portal if no saved network works), starts
-// NTP (time_sync) and the local config web page (config_portal) at
-// cyd-sky.local in the background.
+// its built-in XPT2046 touch driver (read via touch_input), the backlight,
+// loads the persisted config (config_store) — restoring which of the three
+// screens was last active (last_screen 0/1/2) into screen_nav — offers the
+// forgotten-password reset, paints the first frame (before WiFi is up), then
+// starts net_task.
 //
-// loop(): non-blocking, millis()-based.
+// loop(): one pass, then sleep until the nearest deadline (touch poll, the
+// countdown second, the clock minute) or until net_task publishes.
+//   - New NetState: diffNetState() turns it into redraw events (new poll,
+//     health, language, home location). A failed poll keeps the last good
+//     list (the same DataSnapshot). No heartbeat from net_task for 60 s ->
+//     shown as a network error rather than pretending stale data is fresh.
 //   - Touch (edge-detected, one action per press): screen_nav::navHitTest
-//     classifies the tap — only a bottom-nav button switches screens (it
-//     jumps straight to that screen; no edge-strip swiping); every screen
-//     change persists to config_store (last_screen) and forces a redraw.
-//     Otherwise, on the Flights screen, a tap in the top/bottom row strip
-//     pages the table (swap which 5 rows show — never scroll).
-//   - Once per config_store's poll_interval_s (opensky_client's own
-//     scheduler): fetch Aircraft[] from OpenSky. A failed poll (auth /
-//     rate-limit / network) keeps the last good list on screen and shows a
-//     header block in a warning colour rather than blanking (review notes 1.2-1.4); if
-//     home isn't configured yet a setup prompt is shown instead. On a
-//     clean poll: rank aircraft nearest-first, then enrich only as many as
-//     lookup_budget's planLookups() allows new HTTP calls for this cycle
-//     (kDefaultLookupBudget — review notes 1.1/3.2), annotate distance +
-//     flight phase, sort, look up the nearest aircraft's route airports,
-//     and recompute its closest-point-of-approach time (cpa_predictor).
+//     classifies the tap — only a bottom-nav button switches screens; every
+//     screen change persists to config_store (last_screen) and forces a
+//     redraw. Otherwise, on the Flights screen, a tap in the top/bottom row
+//     strip pages the table (swap which 5 rows show — never scroll).
 //   - The Flight screen's countdown ticks locally every second between
-//     polls: currentCpa() extrapolates lastPolledCpa forward by the
-//     elapsed millis(), and a 1 Hz countdown tick is raised while it's
-//     active (see CLAUDE.md "local ticking") — repainting only the
-//     countdown zone, never the whole screen.
+//     polls: currentCpa() extrapolates the snapshot's CPA by the elapsed
+//     millis() — repainting only the countdown zone, never the whole screen.
 //   - Auto screen cycling (off unless config_store's auto_cycle_enabled):
-//     a millis() timer from the last screen change (manual or automatic);
-//     once it passes auto_cycle_interval_s, advance via nav.next() —
-//     unless screen_nav::shouldDeferAutoSwitch() says an overhead moment
-//     is imminent on the Flight screen, in which case hold and re-check
-//     every loop until it clears. screen_nav::shouldAutoAdvance() is the
-//     pure decision; every screen change resets the timer.
-//   - Firmware updates (spec/01-ota-updates.md): config_portal handles
-//     POST /update and calls back here to draw the progress screen
-//     (service_screen); after a good update the loop only services the web
-//     server until the restart. A freshly updated image is marked valid
-//     (cancelling the bootloader's rollback) once it has run 30 s and can be
-//     reached (ota_update::shouldMarkAppValid()).
+//     screen_nav::shouldAutoAdvance() / shouldDeferAutoSwitch(), every
+//     screen change resets the timer.
+//   - Firmware updates (spec/01, spec/02): net_task reports progress in
+//     NetState::ota and this draws service_screen from it. The update
+//     question ("new version — install it?") is asked here; YES / NO go to
+//     net_task as commands.
 //   - Holding a finger on the screen at power-up offers to remove a
 //     forgotten web panel password (web_auth, service_screen).
-//   - New versions on GitHub (spec/02-github-release-check.md): release_check
-//     asks GitHub once a day, between OpenSky polls; a newer release is
-//     asked about once on the display (YES installs it, NO skips that
-//     version), or installed from the config page's Firmware tab.
-//   - Brightness (spec/03-brightness-night-mode.md): backlight follows the
-//     light sensor (or a fixed level) and the night mode (by the clock or
-//     sunset to sunrise); at night the screen may go dark — the first touch
-//     then only lights it — and, if asked for, OpenSky isn't polled outside
-//     the wake time after a touch. Service screens always get full brightness.
+//   - Brightness (spec/03): backlight follows the light sensor and the night
+//     mode; the "pause polling at night" decision goes to net_task as an
+//     atomic flag.
+//   - /screenshot.bmp: the web handler (core 0) asks for bands of rows; this
+//     loop reads them off the panel (the display belongs to this core).
 //   - Redraw (only what changed — CLAUDE.md "Redraw policy"): loop()
-//     collects RedrawEvents and redraw_policy::computeRedrawMask() picks
-//     the regions. A full clear (fillScreen + header + content + bottom
-//     nav) happens only on first draw / screen change / page change; new
-//     poll data repaints just the content area; a minute rollover or
-//     health change repaints just the header text; the Flight countdown
-//     tick repaints just its own zone (via a sprite).
+//     collects RedrawEvents and redraw_policy::computeRedrawMask() picks the
+//     regions.
 //
 // This file is deliberately thin: all actual logic lives in the modules
 // above — see CLAUDE.md "Testing" for why only this kind of orchestration
@@ -69,28 +52,29 @@
 #include <Arduino.h>
 #include <esp_ota_ops.h>
 
-#include <map>
+#include <atomic>
+#include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "LGFX_CYD.hpp"
-#include "aircraft_lookup.h"
 #include "backlight.h"
 #include "config_portal.h"
 #include "config_store.h"
+#include "core_link.h"
 #include "cpa_predictor.h"
 #include "flight_screen.h"
 #include "i18n.h"
 #include "lcars_theme.h"
-#include "lookup_budget.h"
-#include "lookup_store.h"
-#include "opensky_client.h"
+#include "net_task.h"
 #include "ota_update.h"
+#include "perf_stats.h"
 #include "radar_view.h"
 #include "redraw_policy.h"
 #include "release_check.h"
-#include "route_lookup.h"
 #include "screen_nav.h"
+#include "screenshot.h"
 #include "service_screen.h"
 #include "status_bar.h"
 #include "table_view.h"
@@ -98,13 +82,9 @@
 #include "touch_input.h"
 #include "version.h"
 #include "web_auth.h"
-#include "wifi_manager.h"
 
-// loop() runs everything, including release_check's TLS handshakes with the
-// certificate chain verified (P-384 ECDSA in mbedTLS) — which overflowed the
-// core's default 8 KB loopTask stack on the board (Guru Meditation, "Unhandled
-// debug exception", when an install started). 16 KB costs 8 KB of heap.
-SET_LOOP_TASK_STACK_SIZE(16 * 1024);
+// No SET_LOOP_TASK_STACK_SIZE: the TLS handshakes that needed 16 KB run in
+// net_task now; drawing fits the core's default 8 KB (checked in [perf]).
 
 static LGFX tft;
 
@@ -113,17 +93,9 @@ static LGFX tft;
 // touch changes it.
 static ScreenNav nav;
 
-// Data + paging state for the currently-drawn screen. Persists across
-// loop() iterations so a touch-driven page/screen change can redraw
-// immediately without waiting for the next OpenSky poll.
-static std::vector<AircraftRow> lastRows;
-static float lastRadiusDeg = 2.5f;     // config_store's default — updated every poll
-
-// Whole config, loaded once at boot and refreshed after every poll that
-// actually ran (review notes 4.3) — loop() and openSkyClientPoll() read
-// this instead of hitting NVS every iteration. A config_portal save is
-// picked up within one poll interval.
-static Config cachedCfg;
+// The latest snapshot from net_task, and its sequence number in the box.
+static std::shared_ptr<const NetState> net;
+static uint32_t netSeen = 0;
 
 // lastScreenChangeMs is the auto-cycle timer base, reset by
 // onScreenChanged() on every screen change — manual or auto.
@@ -134,66 +106,58 @@ static int currentPage = 0;
 // mask by computeRedrawMask() at the end of loop(), then cleared.
 static RedrawEvents pendingRedraw;
 
-// last_screen NVS-write debouncing (review notes 5.9): what we last wrote,
-// and when — so an auto-cycle firing every few seconds doesn't rewrite the
-// same key thousands of times a day.
+// last_screen NVS-write debouncing (review notes 5.9).
 static int lastPersistedScreen = 0;
 static uint32_t lastScreenPersistMs = 0;
 
-// OpenSky feed health from the most recent poll — drives the header block colour
-// and whether a failed poll is allowed to blank the aircraft list (it
-// isn't — review notes 1.2).
-static OpenSkyHealth lastHealth = OpenSkyHealth::Ok;
-
-// True once at least one poll succeeded — until then the header block shows
-// "--" rather than claiming "0 flights".
-static bool hasAircraftData = false;
-
-// Closest-point-of-approach for the nearest aircraft, as computed at the
-// last poll, plus the millis() timestamp of that poll — currentCpa()
-// extrapolates between polls so the Flight screen's countdown ticks every
-// second (CLAUDE.md "local ticking between polls").
-static CpaPrediction lastPolledCpa;
-// Which of lastRows Screen 2 shows (pickNowAircraft()), -1 = none.
-static int nowRowIndex = -1;
-static uint32_t lastCpaPollMs = 0;
+// The health the header shows: net_task's, or NetworkError once its
+// heartbeat is stale (core_link::heartbeatStale()).
+static OpenSkyHealth shownHealth = OpenSkyHealth::Ok;
 
 // Height of the table's page-back / page-forward tap strips — table_view's
 // own row height, so the two can't drift apart (review notes 5.5).
 static const int16_t kPageTapZoneHeight = tableRowHeightPx();
 
-// Nearest aircraft's CPA, extrapolated from the last poll to "now"
-// (cpa_predictor owns the math — review notes 3.4).
-static CpaPrediction currentCpa() {
-  return extrapolateCpa(lastPolledCpa, millis() - lastCpaPollMs);
+static const Config &cfg() { return *net->cfg; }
+
+static const std::vector<AircraftRow> &rows() {
+  static const std::vector<AircraftRow> kNone;
+  return net->data != nullptr ? net->data->rows : kNone;
 }
 
-// The active screen's content (y:28..225), drawn over whatever is there —
-// callers clear first.
+// Screen 2's aircraft's CPA, extrapolated from the poll to "now"
+// (cpa_predictor owns the math — review notes 3.4).
+static CpaPrediction currentCpa() {
+  if (net->data == nullptr) return CpaPrediction{};
+  return extrapolateCpa(net->data->cpa, millis() - net->data->polledAtMs);
+}
+
+// The active screen's content, drawn over whatever is there — callers clear first.
 static void drawActiveContent() {
   int16_t screenW = static_cast<int16_t>(tft.width());
 
   switch (nav.current()) {
     case kScreenFlight: {
       static const AircraftRow kNoRow{};
-      const bool hasNow = nowRowIndex >= 0 && nowRowIndex < static_cast<int>(lastRows.size());
-      drawFlightScreen(tft, hasNow ? lastRows[static_cast<size_t>(nowRowIndex)] : kNoRow, hasNow,
-                       currentCpa(), screenW, lastHealth);
+      const int idx = net->data != nullptr ? net->data->nowRowIndex : -1;
+      const bool hasNow = idx >= 0 && idx < static_cast<int>(rows().size());
+      drawFlightScreen(tft, hasNow ? rows()[static_cast<size_t>(idx)] : kNoRow, hasNow,
+                       currentCpa(), screenW, shownHealth);
       break;
     }
     case kScreenRadar:
-      drawRadarView(tft, lastRows, lastRadiusDeg, screenW, lastHealth);
+      drawRadarView(tft, rows(), cfg().radius_deg, screenW, shownHealth);
       break;
     case kScreenFlights:
     default:
-      drawTablePage(tft, lastRows, screenW, currentPage, lastHealth);
+      drawTablePage(tft, rows(), screenW, currentPage, shownHealth);
       break;
   }
 }
 
-// Header bar: aircraft-count block (coloured by feed health) + date/time.
+// Header bar: aircraft count + health dot + date/time.
 static void drawHeader() {
-  drawStatusBar(tft, static_cast<int>(lastRows.size()), hasAircraftData, lastHealth,
+  drawStatusBar(tft, static_cast<int>(rows().size()), net->data != nullptr, shownHealth,
                 timeSyncNowLocal(), isTimeSynced(), static_cast<int16_t>(tft.width()));
 }
 
@@ -224,14 +188,12 @@ static void applyRedraw(uint8_t mask) {
   }
 
   if (mask & kRedrawCountdown) {
-    drawFlightCountdown(tft, !lastRows.empty(), currentCpa(), screenW, lastHealth);
+    drawFlightCountdown(tft, !rows().empty(), currentCpa(), screenW, shownHealth);
   }
 }
 
 // Shown instead of a screen while config_store's home_configured is still
-// false (review notes 1.5/1.6). Redrawn on every full-redraw event (cheap:
-// a fill + two strings), so a stray touch can't permanently dismiss it the
-// way the old draw-once guard let it.
+// false (review notes 1.5/1.6). Redrawn on every full-redraw event.
 static void showSetupPrompt() {
   int16_t screenW = static_cast<int16_t>(tft.width());
   int16_t screenH = static_cast<int16_t>(tft.height());
@@ -244,27 +206,43 @@ static void showSetupPrompt() {
   tft.drawString("http://cyd-sky.local", screenW / 2, screenH / 2 + 10);
 }
 
-// Re-reads the config from NVS (after a config_portal save, or at a poll)
-// and applies what affects the display right away: the language and the
-// setup-prompt <-> real-screens switch both need a full repaint.
-static void reloadConfig() {
-  const bool wasHomeConfigured = cachedCfg.home_configured;
-  const Language previousLanguage = cachedCfg.language;
+// The table page can't point past the last page of a fresh list.
+static void clampPage() {
+  FeaturedSplit split = splitFeaturedAndRest(rows());
+  int pageCount = getPageCount(static_cast<int>(split.rest.size()), tableRowsPerPage());
+  if (currentPage >= pageCount) currentPage = pageCount > 0 ? pageCount - 1 : 0;
+}
 
-  cachedCfg = loadConfig();
-  lastRadiusDeg = cachedCfg.radius_deg;
+// A new snapshot from net_task (if there is one) -> redraw events.
+static void takeNetState() {
+  std::shared_ptr<const NetState> next;
+  if (!core_link::netState.takeIfNewer(netSeen, next)) return;
+  const RedrawEvents e = diffNetState(net.get(), *next);
+  if (next->cfg->language != net->cfg->language) i18nSetLanguage(next->cfg->language);
+  net = std::move(next);
+  pendingRedraw.firstDraw |= e.firstDraw;
+  pendingRedraw.languageChanged |= e.languageChanged;
+  pendingRedraw.newPoll |= e.newPoll;
+  pendingRedraw.minuteChanged |= e.minuteChanged;
+  if (e.newPoll) clampPage();
+}
 
-  if (cachedCfg.home_configured != wasHomeConfigured) pendingRedraw.firstDraw = true;
-  if (cachedCfg.language != previousLanguage) {
-    i18nSetLanguage(cachedCfg.language);
-    pendingRedraw.languageChanged = true;
-  }
+// The header's health: net_task's, unless it stopped answering altogether.
+static void updateShownHealth() {
+  const bool stalled =
+      heartbeatStale(millis(), core_link::netBeatMs.load(), kNetStallLimitMs);
+  const OpenSkyHealth h = stalled ? OpenSkyHealth::NetworkError : net->health;
+  if (h == shownHealth) return;
+  if (stalled) Serial.println("[main] network task silent for 60 s");
+  shownHealth = h;
+  pendingRedraw.healthChanged = true;
+  // An empty screen says why it is empty (emptyStateText()).
+  if (rows().empty()) pendingRedraw.newPoll = true;
 }
 
 // Persist (debounced) + redraw after screen_nav reports the active screen
 // changed. `userInitiated` is true for a touch, false for an auto-cycle
-// advance — auto-cycle screen writes are rate-limited so a short cycle
-// interval doesn't wear the flash (review notes 5.9).
+// advance — auto-cycle screen writes are rate-limited (review notes 5.9).
 static void onScreenChanged(bool userInitiated) {
   currentPage = 0;
   lastScreenChangeMs = millis();  // any change resets the auto-cycle timer
@@ -295,7 +273,7 @@ static void handleTap(int16_t x, int16_t y) {
   // Anywhere else: only the Flights table reacts (page the rows).
   if (nav.current() != kScreenFlights) return;
 
-  FeaturedSplit split = splitFeaturedAndRest(lastRows);
+  FeaturedSplit split = splitFeaturedAndRest(rows());
   int pageCount = getPageCount(static_cast<int>(split.rest.size()), tableRowsPerPage());
 
   Rect prevZone;
@@ -319,52 +297,58 @@ static void handleTap(int16_t x, int16_t y) {
   }
 }
 
-// --- Firmware update over WiFi (config_portal's POST /update) -----------
+// --- Firmware update: drawn from NetState::ota ------------------------------
 
 // The arduino-esp32 core marks a freshly updated image valid right at boot
-// unless this says "later" — we do it ourselves once the board has proven
-// it runs (see markAppValidWhenStable()).
+// unless this says "later" — net_task does it once the board has proven it
+// runs (ota_update::shouldMarkAppValid(), including "this UI loop is alive").
 extern "C" bool verifyRollbackLater() { return true; }
 
-static bool appPendingVerify = false;  // running image still on probation
-static uint32_t otaFailedAtMs = 0;     // != 0: "update failed" on screen since then
+static uint32_t otaSeenSeq = 0;
+static bool otaScreenDrawn = false;
+static uint32_t otaFailedAtMs = 0;  // != 0: "update failed" on screen since then
 static constexpr uint32_t kOtaFailedShowMs = 5000;  // long enough to read on the board
 
-static void otaOnStart(size_t total) {
-  backlightFullNow(tft);
-  drawOtaScreen(tft, firmwareVersion());
-  drawOtaProgress(tft, firmwareVersion(), "", 0, total);
+// True while the OTA screens own the display (running, done, a failure on show).
+static bool serviceOtaScreen() {
+  const OtaProgress &o = net->ota;
+  if (o.seq != otaSeenSeq) {
+    otaSeenSeq = o.seq;
+    if (o.phase == OtaProgress::Phase::Running && o.written == 0) otaScreenDrawn = false;
+    if (!otaScreenDrawn) {
+      backlightFullNow(tft);
+      drawOtaScreen(tft, firmwareVersion(), o.fromGithub);
+      otaScreenDrawn = true;
+    }
+    switch (o.phase) {
+      case OtaProgress::Phase::Running:
+        drawOtaProgress(tft, firmwareVersion(), o.newVersion.c_str(), o.written, o.total);
+        break;
+      case OtaProgress::Phase::Done:
+        drawOtaResult(tft, true);  // net_task restarts the board in a moment
+        break;
+      case OtaProgress::Phase::Failed:
+        drawOtaResult(tft, false);
+        otaFailedAtMs = millis() | 1;
+        break;
+      default:
+        break;
+    }
+  }
+  if (o.phase == OtaProgress::Phase::Running || o.phase == OtaProgress::Phase::Done ||
+      net->restartPending) {
+    return true;
+  }
+  if (otaFailedAtMs != 0) {
+    if (millis() - otaFailedAtMs < kOtaFailedShowMs) return true;
+    otaFailedAtMs = 0;  // back to the normal screens
+    otaScreenDrawn = false;
+    pendingRedraw.firstDraw = true;
+  }
+  return false;
 }
 
-static void otaOnProgress(size_t written, size_t total, const char *newVersion) {
-  drawOtaProgress(tft, firmwareVersion(), newVersion, written, total);
-}
-
-static void otaOnEnd(bool ok) {
-  drawOtaResult(tft, ok);
-  if (!ok) otaFailedAtMs = millis() | 1;  // back to the normal screens in a moment
-}
-
-// The same screen for an install from GitHub (release_check), titled so.
-static void githubOtaOnStart(size_t total) {
-  backlightFullNow(tft);
-  drawOtaScreen(tft, firmwareVersion(), /*fromGithub=*/true);
-  drawOtaProgress(tft, firmwareVersion(), "", 0, total);
-}
-
-// --- New version on GitHub (release_check) ---------------------------------
-
-// What release_check needs to know before it may open a TLS connection.
-static CheckGate updateGate() {
-  CheckGate g;
-  g.enabled = cachedCfg.update_check_enabled;
-  g.wifi = wifiManagerStatus() == WifiStatus::Connected;
-  g.timeSynced = isTimeSynced();
-  g.otaBusy = otaFlashSession().inProgress() || configPortalRestartPending();
-  g.msUntilNextPoll = openSkyMsUntilNextPoll(millis(), cachedCfg);
-  g.maxFreeBlock = ESP.getMaxAllocHeap();
-  return g;
-}
+// --- New version on GitHub: the question on the display ------------------------
 
 // "NEW VERSION AVAILABLE — INSTALL IT?" — shown at most once per boot, over
 // the normal screens, until YES / NO / 30 s.
@@ -375,16 +359,17 @@ static bool promptWasPressed = false;
 static uint32_t promptShownAtMs = 0;
 static uint32_t promptTimerDrawnMs = 0;
 static std::string promptTag;
+static constexpr uint32_t kPromptTimerStepMs = 250;
 
 static void maybeShowUpdatePrompt(bool touchPressed) {
-  const UpdateState &u = releaseUpdateState();
+  const UpdateSummary &u = net->update;
   PromptGate g;
   g.status = u.status;
-  g.latestTag = u.latest.tag;
-  g.skippedTag = cachedCfg.update_skipped_tag;
+  g.latestTag = u.latestTag;
+  g.skippedTag = cfg().update_skipped_tag;
   g.installedIsDev = isDevelopmentBuild(parseFwVersion(u.installed));
   g.alreadyPromptedThisBoot = promptShownThisBoot;
-  g.homeConfigured = cachedCfg.home_configured;
+  g.homeConfigured = cfg().home_configured;
   g.currentScreen = nav.current();
   const CpaPrediction cpa = currentCpa();
   g.cpaFound = cpa.found;
@@ -399,7 +384,7 @@ static void maybeShowUpdatePrompt(bool touchPressed) {
   promptWasPressed = true;
   promptShownAtMs = millis();
   promptTimerDrawnMs = promptShownAtMs;
-  promptTag = u.latest.tag;
+  promptTag = u.latestTag;
   Serial.printf("[update] asking on the display: %s -> %s\n", u.installed.c_str(),
                 promptTag.c_str());
   drawUpdatePromptScreen(tft, u.installed, promptTag);
@@ -415,17 +400,16 @@ static void serviceUpdatePrompt() {
                                      static_cast<int16_t>(tft.height()));
     if (c == ResetChoice::Yes) {
       promptActive = false;
-      if (releaseInstallRequest(promptTag)) {
-        Serial.printf("[update] YES on the display, installing %s\n", promptTag.c_str());
-      } else {
-        pendingRedraw.firstDraw = true;
+      // net_task starts the install; its OTA screen follows. If it can't
+      // (no longer on offer), the normal screens come back.
+      if (!core_link::sendCommand(makeNetCommand(NetCommandType::InstallTag, promptTag))) {
+        Serial.println("[update] command queue full");
       }
+      pendingRedraw.firstDraw = true;
       return;
     }
     if (c == ResetChoice::No) {
-      Serial.printf("[update] NO on the display, %s skipped\n", promptTag.c_str());
-      saveUpdateSkippedTag(promptTag);
-      cachedCfg.update_skipped_tag = promptTag;
+      core_link::sendCommand(makeNetCommand(NetCommandType::SkipTag, promptTag));
       promptActive = false;
       pendingRedraw.firstDraw = true;
       return;
@@ -437,29 +421,17 @@ static void serviceUpdatePrompt() {
     pendingRedraw.firstDraw = true;
     return;
   }
-  if (millis() - promptTimerDrawnMs >= 250) {
+  if (millis() - promptTimerDrawnMs >= kPromptTimerStepMs) {
     promptTimerDrawnMs = millis();
     drawUpdatePromptTimer(tft, kUpdatePromptTimeoutMs - shownFor);
   }
 }
 
-static void markAppValidWhenStable() {
-  if (!appPendingVerify) return;
-  const WifiStatus ws = wifiManagerStatus();
-  const bool reachable =
-      (ws == WifiStatus::Connected && configPortalIsActive()) || ws == WifiStatus::PortalActive;
-  if (shouldMarkAppValid(appPendingVerify, millis(), reachable)) {
-    esp_ota_mark_app_valid_cancel_rollback();
-    appPendingVerify = false;
-    Serial.printf("[ota] %s marked valid after %u s, rollback cancelled\n", firmwareVersion(),
-                  static_cast<unsigned>(millis() / 1000));
-  }
-}
-
 // --- Forgotten web panel password: hold a finger on the screen at power-up
+// (runs in setup(), before net_task exists — the delay() loops are fine here).
 
-static void offerWebPasswordReset() {
-  if (cachedCfg.web_password.empty() || !touchInputRead(tft).pressed) return;
+static void offerWebPasswordReset(Config &bootCfg) {
+  if (bootCfg.web_password.empty() || !touchInputRead(tft).pressed) return;
 
   const int16_t w = static_cast<int16_t>(tft.width());
   const int16_t h = static_cast<int16_t>(tft.height());
@@ -493,9 +465,9 @@ static void offerWebPasswordReset() {
     if (t.pressed && !wasPressed) {
       const ResetChoice c = confirmHit(t.x, t.y, w, h);
       if (c == ResetChoice::Yes) {
-        cachedCfg.web_password.clear();
-        saveConfig(cachedCfg);
-        cachedCfg = loadConfig();
+        bootCfg.web_password.clear();
+        saveConfig(bootCfg);
+        bootCfg = loadConfig();
         Serial.println("[auth] web password cleared from the touchscreen");
         drawResetDoneScreen(tft);
         delay(1500);
@@ -509,13 +481,74 @@ static void offerWebPasswordReset() {
   tft.fillScreen(LCARS_BLACK);
 }
 
-// --- /screenshot.bmp support (config_portal streams, we read pixels) ---
+// --- /screenshot.bmp: the web handler (core 0) asks, this loop reads -------
+//
+// One request at a time. The handler waits by polling `state` (1 ms steps);
+// a timed-out request is cancelled under the lock, so the UI never writes
+// into a buffer the handler has already freed.
 
-// ?screen=N: switch to that screen and repaint it right now, so the
-// capture shows it (same path as a tap on its nav button).
-// One more index after the real screens: the update question, drawn from
-// release_check's demo data — what docs/screenshots/update_prompt.png is
-// taken from (tools/screenshots.py). The normal screen comes back right after.
+namespace shot {
+
+enum State : int { Idle = 0, BeginAsked, BeginDone, BandAsked, BandDone };
+
+std::atomic<int> state{Idle};
+SpinLock lock;
+bool cancelled = false;  // under `lock`
+int screen = -1;
+int y0 = 0, rows = 0;
+uint32_t stride = 0;
+uint8_t *out = nullptr;
+bool capturing = false;  // UI side: no drawing until end() (a consistent image)
+uint32_t lastActivityMs = 0;
+constexpr uint32_t kCaptureIdleMs = 5000;  // the client went away: draw again
+
+bool waitFor(int wanted, uint32_t timeoutMs) {
+  const uint32_t t0 = millis();
+  while (state.load() != wanted) {
+    if (millis() - t0 > timeoutMs) {
+      lock.lock();
+      cancelled = true;
+      lock.unlock();
+      state.store(Idle);
+      return false;
+    }
+    vTaskDelay(1);
+  }
+  return true;
+}
+
+// ---- called on core 0 (config_portal's handler)
+
+bool begin(int screenIndex, uint32_t timeoutMs) {
+  lock.lock();
+  cancelled = false;
+  screen = screenIndex;
+  lock.unlock();
+  state.store(BeginAsked);
+  core_link::wakeUi();
+  return waitFor(BeginDone, timeoutMs);
+}
+
+void requestBand(int bandY0, int bandRows, uint32_t rowStride, uint8_t *dst) {
+  lock.lock();
+  y0 = bandY0;
+  rows = bandRows;
+  stride = rowStride;
+  out = dst;
+  lock.unlock();
+  state.store(BandAsked);
+  core_link::wakeUi();
+}
+
+bool waitBand(uint32_t timeoutMs) { return waitFor(BandDone, timeoutMs); }
+
+void end() { state.store(Idle); }
+
+}  // namespace shot
+
+// ?screen=N: switch to that screen and repaint it right now, so the capture
+// shows it. One more index after the real screens: the update question,
+// drawn from release_check's demo data (docs/screenshots/update_prompt.png).
 static constexpr int kScreenshotUpdatePrompt = kScreenCount;
 
 static void screenshotPrepare(int screenIndex) {
@@ -527,23 +560,101 @@ static void screenshotPrepare(int screenIndex) {
     pendingRedraw.firstDraw = true;  // repaints the real screen once the capture is out
     return;
   }
-  if (nav.set(screenIndex)) onScreenChanged(/*userInitiated=*/true);
-  if (cachedCfg.home_configured) {
-    applyRedraw(computeRedrawMask(pendingRedraw, nav.current()));
-  }
+  if (screenIndex >= 0 && nav.set(screenIndex)) onScreenChanged(/*userInitiated=*/true);
+  const uint8_t mask = computeRedrawMask(pendingRedraw, nav.current());
+  if (mask != 0 && cfg().home_configured) applyRedraw(mask);
   pendingRedraw = RedrawEvents{};
 }
 
-// One screen row read back from the panel (LovyanGFX readRect) as B,G,R.
-static void screenshotReadRow(int y, uint8_t *bgr) {
-  static lgfx::rgb888_t line[320];
-  const int w = static_cast<int>(tft.width());
-  tft.readRect(0, y, w, 1, line);
-  for (int x = 0; x < w; ++x) {
-    bgr[3 * x + 0] = line[x].b;
-    bgr[3 * x + 1] = line[x].g;
-    bgr[3 * x + 2] = line[x].r;
+// UI side: answers whatever the handler asked for. True while a capture runs.
+static bool serviceScreenshot() {
+  const int st = shot::state.load();
+  if (st == shot::BeginAsked) {
+    screenshotPrepare(shot::screen);
+    shot::capturing = true;
+    shot::lastActivityMs = millis();
+    shot::state.store(shot::BeginDone);
+  } else if (st == shot::BandAsked) {
+    static lgfx::rgb888_t line[320];
+    static uint8_t bgr[320 * 3];
+    const int w = static_cast<int>(tft.width());
+    for (int i = 0; i < shot::rows; ++i) {
+      const int y = shot::y0 + shot::rows - 1 - i;  // bottom row of the band first (BMP)
+      tft.readRect(0, y, w, 1, line);
+      for (int x = 0; x < w; ++x) {
+        bgr[3 * x + 0] = line[x].b;
+        bgr[3 * x + 1] = line[x].g;
+        bgr[3 * x + 2] = line[x].r;
+      }
+      shot::lock.lock();
+      if (!shot::cancelled) std::memcpy(shot::out + i * shot::stride, bgr, 3 * w);
+      shot::lock.unlock();
+    }
+    shot::lastActivityMs = millis();
+    shot::state.store(shot::BandDone);
+  } else if (st == shot::Idle && shot::capturing) {
+    shot::capturing = false;  // end(): draw again
   }
+  if (shot::capturing && millis() - shot::lastActivityMs > shot::kCaptureIdleMs) {
+    shot::capturing = false;
+  }
+  return shot::capturing;
+}
+
+// --- Perf: UI loop gaps (perf_stats), handed to net_task once a minute --------
+//
+// The "gap" is how much later than planned this pass started: the time since
+// the previous pass minus the sleep that pass asked for — i.e. its own drawing
+// time plus any oversleep. A responsive UI keeps it at a few ms; a full
+// repaint shows up as ~100 ms.
+
+static GapStats uiWindow;
+static UiPerfShare uiShare;
+static uint32_t uiWindowStartMs = 0;
+static uint32_t lastLoopMs = 0;
+static uint32_t plannedSleepMs = 0;  // what the previous pass asked to sleep
+
+static void perfLoopTick() {
+  const uint32_t now = millis();
+  if (lastLoopMs != 0) {
+    const uint32_t since = now - lastLoopMs;
+    const uint32_t gap = since > plannedSleepMs ? since - plannedSleepMs : 0;
+    uiWindow.add(gap);
+    if (gap > uiShare.maxEverMs) uiShare.maxEverMs = gap;
+    if (gap >= kPerfGapBucketMs[3]) ++uiShare.slowEver;
+  }
+  lastLoopMs = now;
+  if (uiWindowStartMs == 0) uiWindowStartMs = now;
+  if (now - uiWindowStartMs >= kPerfWindowMs) {
+    uiShare.windowCount = uiWindow.count;
+    uiShare.windowMaxMs = uiWindow.maxMs;
+    for (int i = 0; i < kPerfGapBuckets; ++i) uiShare.buckets[i] = uiWindow.buckets[i];
+    uiShare.stackFree = uxTaskGetStackHighWaterMark(nullptr);
+    core_link::uiPerf.set(uiShare);
+    uiWindow = GapStats{};
+    uiWindowStartMs = now;
+  }
+}
+
+// --- Sleep until the next thing to do --------------------------------------------
+
+static uint32_t lastFlightTickMs = 0;
+
+static void sleepUntilNextDeadline() {
+  const uint32_t now = millis();
+  UiWake w;
+  if (nav.current() == kScreenFlight) {
+    w.untilCountdownMs = msUntilPeriod(now, lastFlightTickMs, 1000);
+  }
+  if (isTimeSynced()) {
+    const std::time_t local = timeSyncNowLocal();
+    w.untilMinuteMs = msUntilNextMinute(static_cast<int>(local % 60), 0);
+  }
+  if (promptActive) {
+    w.untilPromptTimerMs = msUntilPeriod(now, promptTimerDrawnMs, kPromptTimerStepMs);
+  }
+  plannedSleepMs = uiSleepMs(w);
+  ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(plannedSleepMs));
 }
 
 void setup() {
@@ -554,10 +665,11 @@ void setup() {
   tft.setRotation(1);  // landscape, 320x240
   tft.fillScreen(LCARS_BLACK);
 
-  cachedCfg = loadConfig();
-  i18nSetLanguage(cachedCfg.language);  // before anything is drawn
+  Config bootCfg = loadConfig();
+  i18nSetLanguage(bootCfg.language);  // before anything is drawn
 
   Serial.printf("[ota] %s\n", firmwareMarker());
+  bool appPendingVerify = false;
   {
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_ota_img_states_t state;
@@ -568,81 +680,79 @@ void setup() {
                   appPendingVerify ? "pending verify (rollback armed)" : "valid");
   }
 
-  offerWebPasswordReset();  // finger on the screen at power-up + a password set
-  nav.set(cachedCfg.last_screen);  // restore the last-active screen
+  // The NOW screen's countdown sprite (~30 KB), before WiFi and net_task start
+  // allocating — created later it split the largest free block (spec/04 §10).
+  flightScreenReserveSprite(static_cast<int16_t>(tft.width()));
+
+  offerWebPasswordReset(bootCfg);  // finger on the screen at power-up + a password set
+  nav.set(bootCfg.last_screen);    // restore the last-active screen
   lastPersistedScreen = nav.current();
-  lastRadiusDeg = cachedCfg.radius_deg;
   lastScreenChangeMs = millis();
   lastScreenPersistMs = millis();
 
-  wifiManagerBegin();  // tries the saved network; falls back to its own captive portal
+  // The first snapshot: the settings, no data yet — the chrome and "--" go on
+  // screen right away, before WiFi is even up.
+  auto cfgPtr = std::make_shared<const Config>(bootCfg);
+  auto first = std::make_shared<NetState>();
+  first->cfg = cfgPtr;
+  net = first;
 
-  timeSyncBegin();  // NTP (Europe/Warsaw), after WiFi; header shows --:-- until it lands
+  ScreenshotSource shotSrc;
+  shotSrc.width = static_cast<int>(tft.width());
+  shotSrc.height = static_cast<int>(tft.height());
+  shotSrc.screenCount = kScreenCount + 1;  // + the update prompt demo
+  shotSrc.begin = shot::begin;
+  shotSrc.requestBand = shot::requestBand;
+  shotSrc.waitBand = shot::waitBand;
+  shotSrc.end = shot::end;
+  configPortalSetScreenshotSource(shotSrc);
 
-  // Starts mDNS + the config WebServer right away, non-blocking. In the
-  // common case (a saved network that's reachable) wifiManagerBegin()
-  // above has already connected by the time we get here; in the portal
-  // fallback case cyd-sky.local won't resolve until the device later joins
-  // a real network — the captive portal covers initial setup then.
-  configPortalBegin();
-
-  ScreenshotSource shot;
-  shot.width = static_cast<int>(tft.width());
-  shot.height = static_cast<int>(tft.height());
-  shot.screenCount = kScreenCount + 1;  // + the update prompt demo
-  shot.prepare = screenshotPrepare;
-  shot.readRow = screenshotReadRow;
-  configPortalSetScreenshotSource(shot);
-
-  OtaObserver otaObs;
-  otaObs.onStart = otaOnStart;
-  otaObs.onProgress = otaOnProgress;
-  otaObs.onEnd = otaOnEnd;
-  configPortalSetOtaObserver(otaObs);
-  otaObs.onStart = githubOtaOnStart;
-  releaseSetOtaObserver(otaObs);
-  releaseCheckBegin(cachedCfg);
-  configPortalSetUpdateGateSource(updateGate);
+  core_link::begin(xTaskGetCurrentTaskHandle());
+  core_link::uiBeatMs.store(millis());
+  core_link::netBeatMs.store(millis());
+  netTaskStart(cfgPtr, appPendingVerify);
 
   pendingRedraw.firstDraw = true;  // paint the (empty) active screen + chrome immediately
 }
 
 void loop() {
-  wifiManagerLoop();
-  configPortalLoop();
+  perfLoopTick();
+  core_link::uiBeatMs.store(millis());
+
+  takeNetState();
+  updateShownHealth();
 
   // Backlight: sensor, night mode, ramps. Service screens get full brightness.
-  backlightLoop(tft, cachedCfg,
-                promptActive || otaFailedAtMs != 0 || configPortalRestartPending() ||
-                    releaseInstallPending());
+  const bool otaOnScreen = net->ota.phase == OtaProgress::Phase::Running ||
+                           net->ota.phase == OtaProgress::Phase::Done || otaFailedAtMs != 0 ||
+                           net->restartPending;
+  backlightLoop(tft, cfg(), promptActive || otaOnScreen);
+  core_link::pollingAllowed.store(
+      shouldPollOpenSky(backlightDecision(), cfg().night_pause_polling));
 
-  // A good firmware update restarts the board in a moment: keep the
-  // "restarting" screen and stay off the network until then.
-  if (configPortalRestartPending()) return;
-  markAppValidWhenStable();
-
-  // A failed update: show "update failed" briefly, then the normal screens.
-  if (otaFailedAtMs != 0) {
-    if (millis() - otaFailedAtMs < kOtaFailedShowMs) return;
-    otaFailedAtMs = 0;
-    pendingRedraw.firstDraw = true;
+  // --- Firmware update in progress (or just failed): its screen only ---------
+  if (serviceOtaScreen()) {
+    pendingRedraw = RedrawEvents{};
+    sleepUntilNextDeadline();
+    return;
   }
 
-  // --- Settings saved on the config page: apply them now ---------------
-  static uint32_t lastSeenSaveCount = 0;
-  if (configPortalSaveCount() != lastSeenSaveCount) {
-    lastSeenSaveCount = configPortalSaveCount();
-    reloadConfig();
-    releaseCheckBegin(cachedCfg);
+  // --- A screenshot is being taken: hold still ---------------------------------
+  if (serviceScreenshot()) {
+    sleepUntilNextDeadline();
+    return;
   }
 
   // --- The update question owns the screen until it's answered ----------
-  if (promptActive && releaseInstallPending()) {
+  if (promptActive && net->update.installPending) {
     promptActive = false;  // installed from the config page meanwhile: the OTA screen follows
   }
   if (promptActive) {
     serviceUpdatePrompt();
-    if (promptActive) return;
+    if (promptActive) {
+      sleepUntilNextDeadline();
+      return;
+    }
   }
 
   // --- Touch: edge-detected, one handleTap() per press --------------------
@@ -656,7 +766,7 @@ void loop() {
                   static_cast<int>(navHitTest(touch.x, touch.y, static_cast<int16_t>(tft.width()),
                                               static_cast<int16_t>(tft.height()))
                                        .action));
-    if (backlightHandleTouch(cachedCfg)) {
+    if (backlightHandleTouch(cfg())) {
       lastScreenChangeMs = millis();  // only woke a dark screen: no tap, a fresh auto-cycle
     } else {
       handleTap(touch.x, touch.y);
@@ -664,175 +774,15 @@ void loop() {
   }
   wasTouchPressed = touch.pressed;
 
-  // --- OpenSky polling (only meaningful once connected) -------------------
-  // Paused at night when asked for (outside the wake time after a touch).
-  const bool pollingAllowed =
-      shouldPollOpenSky(backlightDecision(), cachedCfg.night_pause_polling);
-  static bool pollingWasAllowed = true;
-  if (pollingAllowed != pollingWasAllowed) {
-    pollingWasAllowed = pollingAllowed;
-    const char *why = !pollingAllowed                ? "paused (night)"
-                      : backlightDecision().woken ? "resumed (touch)"
-                                                  : "resumed";
-    Serial.printf("[light] polling %s\n", why);
-  }
-  if (wifiManagerStatus() == WifiStatus::Connected && pollingAllowed) {
-    OpenSkyPollResult poll = openSkyClientPoll(millis(), cachedCfg);
-
-    if (poll.status != OpenSkyPollStatus::NotDue) {
-      // A poll actually ran — refresh the cached config (config_portal
-      // saves are also picked up immediately above; this is the backstop)
-      // and update the feed health (header block colour).
-      reloadConfig();
-
-      const OpenSkyHealth previousHealth = lastHealth;
-      switch (poll.status) {
-        case OpenSkyPollStatus::Ok:
-          lastHealth = OpenSkyHealth::Ok;
-          break;
-        case OpenSkyPollStatus::RateLimited:
-          lastHealth = OpenSkyHealth::RateLimited;
-          break;
-        case OpenSkyPollStatus::AuthError:
-          lastHealth = OpenSkyHealth::AuthError;
-          break;
-        default:
-          lastHealth = OpenSkyHealth::NetworkError;
-          break;
-      }
-      if (lastHealth != previousHealth) {
-        pendingRedraw.healthChanged = true;
-        // An empty screen says why it is empty (emptyStateText()), so it has
-        // to be repainted when the reason changes, not only the header dot.
-        if (lastRows.empty()) pendingRedraw.newPoll = true;
-      }
-
-      Serial.printf("[main] poll status=%d aircraft=%u home_configured=%d free_heap=%u\n",
-                    static_cast<int>(poll.status), static_cast<unsigned>(poll.aircraft.size()),
-                    cachedCfg.home_configured ? 1 : 0, static_cast<unsigned>(ESP.getFreeHeap()));
-
-      // Only a clean poll updates the aircraft list — a failure keeps the
-      // last good data on screen rather than blanking it (review notes 1.2).
-      if (poll.status == OpenSkyPollStatus::Ok && cachedCfg.home_configured) {
-        const std::vector<Aircraft> &aircraft = poll.aircraft;
-
-        // Rank aircraft (airborne nearest-first, then ground) so the limited per-poll lookup
-        // budget is spent on the ones the user actually sees first.
-        lastRows = buildEnrichedRecords(aircraft, {}, {});
-        annotateDistances(lastRows, cachedCfg.home_lat, cachedCfg.home_lon);
-        sortRowsForDisplay(lastRows);  // airborne first, then ground traffic (#9)
-
-        std::vector<LookupKeys> byPriority;
-        byPriority.reserve(lastRows.size());
-        for (const AircraftRow &r : lastRows) {
-          byPriority.push_back({r.aircraft.icao24, r.aircraft.callsign});
-        }
-        // "Cached" = in RAM or persisted in NVS (lookup_store) — neither costs
-        // a hexdb.io request, so neither should use up the per-poll budget.
-        auto aircraftKnown = [](const std::string &k) {
-          return aircraftLookupIsCached(k) || storeHasAircraft(k);
-        };
-        auto routeKnown = [](const std::string &k) {
-          return routeLookupIsCached(k) || storeHasRoute(k);
-        };
-        auto airportKnown = [](const std::string &k) {
-          return airportLookupIsCached(k) || storeHasAirport(k);
-        };
-        LookupPlan plan = planLookups(byPriority, aircraftKnown, routeKnown, kDefaultLookupBudget);
-
-        std::map<std::string, AircraftInfo> infoByIcao24;
-        for (const std::string &hex : plan.icao24) {
-          infoByIcao24[hex] = lookupAircraft(hex);
-        }
-        std::map<std::string, RouteInfo> routeByCallsign;
-        for (const std::string &cs : plan.callsigns) {
-          routeByCallsign[cs] = lookupRoute(cs);
-        }
-
-        // Fold the enrichment into the already-sorted rows in place —
-        // it doesn't change distance, so no re-sort needed.
-        // A key the budget didn't reach this cycle is *pending* ("..."),
-        // not unknown ("--") — it'll be fetched in a later poll.
-        for (AircraftRow &r : lastRows) {
-          auto info = infoByIcao24.find(r.aircraft.icao24);
-          if (info != infoByIcao24.end()) {
-            r.info = info->second;
-          } else {
-            r.info_pending = !r.aircraft.icao24.empty();
-          }
-          auto route = routeByCallsign.find(r.aircraft.callsign);
-          if (route != routeByCallsign.end()) {
-            r.route = route->second;
-          } else {
-            r.route_pending = !r.aircraft.callsign.empty();
-          }
-        }
-        classifyPhases(lastRows, cachedCfg.near_airport_km, cachedCfg.climb_rate_threshold_mps);
-
-        // Route-endpoint airports for *every* row with a route, so the whole
-        // UI shows IATA codes. Cache hits are free; new hexdb.io lookups are
-        // budgeted per poll (planLookups, airport codes in the icao24 slot),
-        // nearest rows first — the rest stay pending and fill in over the
-        // next polls.
-        std::vector<LookupKeys> airportKeys;
-        for (const AircraftRow &r : lastRows) {
-          if (!r.route.found) continue;
-          airportKeys.push_back({r.route.origin_icao, ""});
-          airportKeys.push_back({r.route.dest_icao, ""});
-        }
-        LookupPlan airportPlan =
-            planLookups(airportKeys, airportKnown, routeKnown, kDefaultAirportLookupBudget);
-        std::map<std::string, AirportInfo> airportByCode;
-        for (const std::string &code : airportPlan.icao24) {
-          airportByCode[code] = lookupAirportCountry(code);
-        }
-        for (AircraftRow &r : lastRows) {
-          if (!r.route.found) continue;
-          auto o = airportByCode.find(r.route.origin_icao);
-          if (o != airportByCode.end()) r.origin_airport = o->second;
-          else r.origin_airport_pending = true;
-          auto d = airportByCode.find(r.route.dest_icao);
-          if (d != airportByCode.end()) r.dest_airport = d->second;
-          else r.dest_airport_pending = true;
-        }
-
-        // Screen 2 ("TERAZ" / "NOW"): predict every aircraft's closest point of
-        // approach and show the one that will be overhead soonest (not just
-        // the nearest). currentCpa() ticks its countdown between polls.
-        std::vector<CpaPrediction> cpas(lastRows.size());
-        for (size_t i = 0; i < lastRows.size(); ++i) {
-          const Aircraft &ac = lastRows[i].aircraft;
-          if (!ac.has_position) continue;
-          cpas[i] = predictCpa(cachedCfg.home_lat, cachedCfg.home_lon, ac.lat, ac.lon,
-                               ac.velocity, ac.true_track);
-        }
-        const NowPick now = pickNowAircraft(lastRows, cpas, kOverheadRadiusKm);
-        nowRowIndex = now.index;
-        lastPolledCpa = now.cpa;
-        lastCpaPollMs = millis();
-
-        FeaturedSplit split = splitFeaturedAndRest(lastRows);
-        int pageCount = getPageCount(static_cast<int>(split.rest.size()), tableRowsPerPage());
-        if (currentPage >= pageCount) {
-          currentPage = pageCount > 0 ? pageCount - 1 : 0;
-        }
-
-        hasAircraftData = true;
-        pendingRedraw.newPoll = true;  // content + header count; bottom nav untouched
-      }
-    }
-  }
-
-  // --- New version on GitHub: a due check / an asked-for install --------
-  releaseCheckLoop(updateGate());
-  if (!promptActive && !releaseInstallPending()) maybeShowUpdatePrompt(touch.pressed);
+  // --- New version on GitHub: ask once ------------------------------------
+  if (!promptActive && !net->update.installPending) maybeShowUpdatePrompt(touch.pressed);
   if (promptActive) {
     pendingRedraw = RedrawEvents{};
+    sleepUntilNextDeadline();
     return;
   }
 
   // --- Flight screen: tick the countdown ~1 Hz between polls --------------
-  static uint32_t lastFlightTickMs = 0;
   if (nav.current() == kScreenFlight && (millis() - lastFlightTickMs) >= 1000) {
     lastFlightTickMs = millis();
     pendingRedraw.countdownTick = true;
@@ -848,13 +798,13 @@ void loop() {
   }
 
   // --- Auto screen cycling (CLAUDE.md "Auto screen cycling") ------------
-  if (cachedCfg.auto_cycle_enabled && cachedCfg.home_configured &&
+  if (cfg().auto_cycle_enabled && cfg().home_configured &&
       !backlightDecision().screen_off) {  // nobody sees a dark screen change
     CpaPrediction cpa = currentCpa();
     bool deferHold = shouldDeferAutoSwitch(nav.current(), cpa.found, cpa.t_cpa_seconds);
-    if (shouldAutoAdvance(millis() - lastScreenChangeMs, cachedCfg.auto_cycle_interval_s,
+    if (shouldAutoAdvance(millis() - lastScreenChangeMs, cfg().auto_cycle_interval_s,
                           deferHold)) {
-      nav.next();                        // 3 distinct screens, wraps — always a real change
+      nav.next();                                // 3 distinct screens, wraps
       onScreenChanged(/*userInitiated=*/false);  // resets the timer + page, forces redraw
     }
   }
@@ -862,11 +812,13 @@ void loop() {
   // --- Redraw only what changed (CLAUDE.md "Redraw policy") -------------
   const uint8_t mask = computeRedrawMask(pendingRedraw, nav.current());
   if (mask != 0) {
-    if (cachedCfg.home_configured) {
+    if (cfg().home_configured) {
       applyRedraw(mask);
     } else if (mask & kRedrawFull) {
       showSetupPrompt();  // "set your home location" until config_portal is used
     }
   }
   pendingRedraw = RedrawEvents{};
+
+  sleepUntilNextDeadline();
 }

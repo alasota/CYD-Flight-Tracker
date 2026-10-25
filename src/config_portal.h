@@ -87,23 +87,34 @@ bool configPortalIsActive();
 uint32_t configPortalSaveCount();
 
 // Where GET /screenshot.bmp gets its pixels — supplied by main.cpp, so this
-// module stays free of display code. `readRow(y, bgr)` fills `width * 3`
-// bytes (B,G,R per pixel) for screen row `y`; `prepare(screen)` is called
-// first when the request has ?screen=N (switch to that screen and redraw).
-// Until set, the endpoint answers 503.
+// module stays free of display code. The display belongs to the UI core
+// (spec/04-dual-core.md §5.7), so these are requests to it, made from the web
+// handler on the network core:
+//   begin(screen)  the UI switches to `screen` (-1 = keep) and stops drawing
+//                  until end(); false = the UI didn't answer in `timeoutMs`
+//   requestBand    the UI fills `rows` BMP rows of `stride` bytes into `out`,
+//                  bottom row of the band first (BMP is bottom-up)
+//   waitBand       ... and this waits for it; false on timeout — the request
+//                  is then cancelled, so `out` may be freed
+//   end()          drawing resumes
+// requestBand returns at once, so the next band is read off the panel while
+// the previous one goes out over TCP. Until set, the endpoint answers 503.
 struct ScreenshotSource {
   int width = 0;
   int height = 0;
   int screenCount = 0;
-  void (*prepare)(int screenIndex) = nullptr;
-  void (*readRow)(int y, uint8_t *bgr) = nullptr;
+  bool (*begin)(int screenIndex, uint32_t timeoutMs) = nullptr;
+  void (*requestBand)(int y0, int rows, uint32_t stride, uint8_t *out) = nullptr;
+  bool (*waitBand)(uint32_t timeoutMs) = nullptr;
+  void (*end)() = nullptr;
 };
 void configPortalSetScreenshotSource(const ScreenshotSource &source);
 
 // POST /update (firmware over WiFi, ota_update) reports what it's doing so
-// main.cpp can show it on the display — this module draws nothing. All
-// callbacks run inside configPortalLoop() (the upload is handled there in
-// one go). `newVersion` is "" until the firmware marker has been seen.
+// the display can show it — this module draws nothing. All callbacks run
+// inside configPortalLoop() on the network core (the upload is handled there
+// in one go); net_task turns them into OtaProgress for the UI. `newVersion`
+// is "" until the firmware marker has been seen.
 struct OtaObserver {
   void (*onStart)(size_t totalOrZero) = nullptr;
   void (*onProgress)(size_t written, size_t totalOrZero, const char *newVersion) = nullptr;
@@ -120,3 +131,7 @@ bool configPortalRestartPending();
 struct CheckGate;
 using UpdateGateSource = CheckGate (*)();
 void configPortalSetUpdateGateSource(UpdateGateSource source);
+
+// GET /perf.json — perf_stats' JSON, supplied by net_task (503 until set).
+using PerfJsonSource = std::string (*)();
+void configPortalSetPerfSource(PerfJsonSource source);

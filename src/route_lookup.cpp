@@ -122,44 +122,27 @@ void airportLookupClearCacheForTesting() { airportCache.clear(); }
 #ifdef ARDUINO
 
 #include <Arduino.h>
-#include <HTTPClient.h>
-#include <WiFiClientSecure.h>
-
 #include <cstdio>
 
+#include "hexdb_http.h"    // hexdbGet() — shared hexdb.io session (keep-alive)
 #include "lookup_store.h"  // NVS-persisted cache (storeLoad*/storeSave*)
-#include "net_config.h"    // shared HTTP timeouts (review notes 5.1)
 
 namespace {
 
 // Both hexdb.io endpoints used here return a genuine HTTP 404 for "not
 // found" (verified against the live API) — that's just as confirmed an
 // answer as a 200, so both count as a definitive response worth caching.
-bool isDefinitiveResponse(int code) { return code == HTTP_CODE_OK || code == HTTP_CODE_NOT_FOUND; }
+bool isDefinitiveResponse(int code) { return code == 200 || code == 404; }
 
 HexdbFetchResult httpGet(const char *url) {
   HexdbFetchResult result;
-
-  WiFiClientSecure client;
-  // No CA bundle pinned — same rationale as aircraft_lookup/opensky_client:
-  // acceptable for a hobby device, not hardened.
-  client.setInsecure();
-
-  HTTPClient http;
-  http.setConnectTimeout(kHttpConnectTimeoutMs);
-  http.setTimeout(kHexdbHttpTimeoutMs);
-  if (!http.begin(client, url)) {
-    return result;
-  }
-
-  int code = http.GET();
-  if (isDefinitiveResponse(code)) {
+  const HexdbHttpResult r = hexdbGet(url);
+  if (isDefinitiveResponse(r.code)) {
     result.response_ok = true;
-    result.body = std::string(http.getString().c_str());  // may be empty for a 404
+    result.body = r.body;  // may be empty for a 404
   } else {
-    Serial.printf("[route_lookup] request failed for %s (http=%d)\n", url, code);
+    Serial.printf("[route_lookup] request failed for %s (http=%d)\n", url, r.code);
   }
-  http.end();
   return result;
 }
 

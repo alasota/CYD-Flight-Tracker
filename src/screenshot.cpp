@@ -52,3 +52,17 @@ int parseScreenshotScreenArg(const char *arg, int screenCount) {
   }
   return value;
 }
+
+int screenshotBandCount(int height, int bandRows) {
+  if (height <= 0 || bandRows <= 0) return 0;
+  return (height + bandRows - 1) / bandRows;
+}
+
+ScreenshotBand screenshotBand(int height, int bandRows, int index) {
+  ScreenshotBand b;
+  if (index < 0 || index >= screenshotBandCount(height, bandRows)) return b;
+  const int top = height - (index + 1) * bandRows;  // may run past row 0 on the last band
+  b.y0 = top < 0 ? 0 : top;
+  b.rows = height - index * bandRows - b.y0;
+  return b;
+}

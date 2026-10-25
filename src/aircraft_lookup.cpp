@@ -71,13 +71,10 @@ void aircraftLookupClearCacheForTesting() { cache.clear(); }
 #ifdef ARDUINO
 
 #include <Arduino.h>
-#include <HTTPClient.h>
-#include <WiFiClientSecure.h>
-
 #include <cstdio>
 
+#include "hexdb_http.h"    // hexdbGet() — shared hexdb.io session (keep-alive)
 #include "lookup_store.h"  // NVS-persisted cache (storeLoad*/storeSave*)
-#include "net_config.h"    // shared HTTP timeouts (review notes 5.1)
 
 namespace {
 
@@ -94,33 +91,20 @@ FetchResult httpFetchAircraftJson(const std::string &icao24) {
     return result;
   }
 
-  WiFiClientSecure client;
-  // No CA bundle pinned — same rationale as opensky_client: acceptable for
-  // a hobby device, not hardened.
-  client.setInsecure();
-
-  HTTPClient http;
-  http.setConnectTimeout(kHttpConnectTimeoutMs);
-  http.setTimeout(kHexdbHttpTimeoutMs);
-  if (!http.begin(client, url)) {
-    return result;
-  }
-
-  int code = http.GET();
+  const HexdbHttpResult r = hexdbGet(url);
   // hexdb.io's aircraft endpoint returns a genuine HTTP 404 for a missing
   // aircraft (verified against the live API) — that's just as definitive
   // an answer as a 200, and must be cached the same way (see
   // lookupAircraftWithFetcher()'s header comment); a 404 is NOT a
   // transient failure. Anything else (timeout, 5xx, connection failure)
   // is not a confirmed answer and correctly falls through uncached.
-  if (code == HTTP_CODE_OK || code == HTTP_CODE_NOT_FOUND) {
+  if (r.code == 200 || r.code == 404) {
     result.response_ok = true;
-    result.body = std::string(http.getString().c_str());
+    result.body = r.body;
   } else {
     Serial.printf("[aircraft_lookup] hexdb.io request failed for %s (http=%d)\n", icao24.c_str(),
-                  code);
+                  r.code);
   }
-  http.end();
   return result;
 }
 

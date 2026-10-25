@@ -164,6 +164,7 @@ void backlightFullNow(LGFX &tft);
 const BacklightDecision &backlightDecision();
 // A new touch: true = swallowed (it only woke a dark screen).
 bool backlightHandleTouch(const Config &cfg);
+// Safe from either core: a copy taken at the end of the last backlightLoop().
 BacklightStatus backlightStatus(const Config &cfg);
 
 #endif  // ARDUINO

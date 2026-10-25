@@ -242,9 +242,19 @@ std::string lightStatusJson(const BacklightStatus &s) {
 
 #include "LGFX_CYD.hpp"
 #include "config_store.h"
+#include "core_link.h"  // Guarded<T>
 #include "time_sync.h"
 
 namespace {
+
+// backlightLoop() runs on the UI core; the config page (GET /light.json, the
+// General tab) reads the status on the network core — through this copy,
+// refreshed every pass (a few dozen bytes under a spinlock).
+struct SharedLight {
+  BacklightStatus status;
+  BacklightDecision decision;
+};
+Guarded<SharedLight> shared;
 
 constexpr int kLightPin = 34;
 
@@ -360,6 +370,20 @@ void backlightLoop(LGFX &tft, const Config &cfg, bool serviceScreen) {
                   nightModeCode(cfg.night_mode), static_cast<unsigned>(decision.target_pct),
                   decision.screen_off ? ", backlight off" : "");
   }
+  SharedLight snap;
+  snap.status.raw = filter.last();
+  snap.status.avg = filter.average();
+  snap.status.pct = decision.target_pct;
+  snap.status.pwm = pwmNow;
+  snap.status.night = decision.night;
+  snap.status.woken = decision.woken;
+  snap.status.screen_off = decision.screen_off;
+  snap.status.synced = in.time_synced;
+  snap.status.sun_known = sunKnown;
+  snap.status.sun_local = sunLocal;
+  snap.decision = decision;
+  shared.set(snap);
+
   if (!serviceScreen && decision.target_pct != loggedPct) {
     loggedPct = decision.target_pct;
     Serial.printf("[light] raw=%u avg=%.0f -> %u%% (pwm %u)\n", filter.last(), filter.average(),
@@ -380,18 +404,9 @@ bool backlightHandleTouch(const Config &cfg) {
 }
 
 BacklightStatus backlightStatus(const Config &cfg) {
-  BacklightStatus s;
-  s.raw = filter.last();
-  s.avg = filter.average();
-  s.pct = decision.target_pct;
-  s.pwm = pwmNow;
-  s.night = decision.night;
-  s.woken = decision.woken;
-  s.screen_off = decision.screen_off;
-  s.polling = shouldPollOpenSky(decision, cfg.night_pause_polling);
-  s.synced = isTimeSynced();
-  s.sun_known = sunKnown;
-  s.sun_local = sunLocal;
+  const SharedLight snap = shared.get();
+  BacklightStatus s = snap.status;
+  s.polling = shouldPollOpenSky(snap.decision, cfg.night_pause_polling);
   return s;
 }
 

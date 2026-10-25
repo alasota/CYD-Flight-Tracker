@@ -417,30 +417,72 @@ void handleSave() {
 // GET /screenshot.bmp[?screen=N] — the current screen as a 24-bit BMP,
 // streamed row by row (bottom-up, as BMP stores it) so no full frame buffer
 // is needed: one 960-byte row at a time.
+// The pixels come from the UI core in bands (ScreenshotSource), two buffers:
+// while band k is sent, the UI reads band k+1 off the panel.
 void handleScreenshot() {
   if (!authorize()) return;
   const ScreenshotSource &src = screenshotSource;
-  if (src.readRow == nullptr || src.width <= 0 || src.height <= 0) {
+  if (src.begin == nullptr || src.width <= 0 || src.height <= 0) {
     server.send(503, "text/plain", "Screenshot not available");
+    return;
+  }
+  constexpr uint32_t kUiAnswerMs = 2000;
+  const uint32_t stride = bmpRowStride(src.width);
+  // 2 x 16 rows (30 KB for 320 px) if the heap allows, else 2 x 4.
+  int bandRows = 16;
+  if (ESP.getMaxAllocHeap() < 2 * stride * bandRows + 32 * 1024) bandRows = 4;
+  uint8_t *bufs[2] = {static_cast<uint8_t *>(calloc(stride * bandRows, 1)),
+                      static_cast<uint8_t *>(calloc(stride * bandRows, 1))};
+  auto release = [&]() {
+    free(bufs[0]);
+    free(bufs[1]);
+  };
+  if (bufs[0] == nullptr || bufs[1] == nullptr) {
+    release();
+    server.send(503, "text/plain", "Not enough memory for a screenshot");
     return;
   }
 
   const int screen = parseScreenshotScreenArg(server.arg("screen").c_str(), src.screenCount);
-  if (screen >= 0 && src.prepare != nullptr) src.prepare(screen);
+  if (!src.begin(screen, kUiAnswerMs)) {
+    release();
+    server.send(503, "text/plain", "The display did not answer");
+    return;
+  }
 
   uint8_t header[kBmpHeaderSize];
   writeBmpHeader(header, src.width, src.height);
-
-  const uint32_t stride = bmpRowStride(src.width);
-  std::vector<uint8_t> row(stride, 0);  // trailing padding bytes stay 0
-
   server.setContentLength(bmpFileSize(src.width, src.height));
   server.send(200, "image/bmp", "");
   server.sendContent(reinterpret_cast<const char *>(header), kBmpHeaderSize);
-  for (int y = src.height - 1; y >= 0; --y) {
-    src.readRow(y, row.data());
-    server.sendContent(reinterpret_cast<const char *>(row.data()), stride);
+
+  const int bands = screenshotBandCount(src.height, bandRows);
+  ScreenshotBand b = screenshotBand(src.height, bandRows, 0);
+  src.requestBand(b.y0, b.rows, stride, bufs[0]);
+  for (int i = 0; i < bands; ++i) {
+    if (!src.waitBand(kUiAnswerMs)) break;  // cancelled: the client gets a short file
+    const int rows = b.rows;
+    if (i + 1 < bands) {
+      b = screenshotBand(src.height, bandRows, i + 1);
+      src.requestBand(b.y0, b.rows, stride, bufs[(i + 1) % 2]);
+    }
+    server.sendContent(reinterpret_cast<const char *>(bufs[i % 2]), stride * rows);
   }
+  src.end();
+  release();
+}
+
+// GET /perf.json — responsiveness numbers (perf_stats, spec/04 §5.9).
+PerfJsonSource perfSource = nullptr;
+
+void handlePerf() {
+  if (!authorize()) return;
+  if (perfSource == nullptr) {
+    server.send(503, "text/plain", "Not available");
+    return;
+  }
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json", perfSource().c_str());
 }
 
 // GET /light.json — light sensor + backlight right now (the General tab's
@@ -717,6 +759,7 @@ void configPortalBegin() {
   server.on("/lang", HTTP_GET, handleLang);
   server.on("/screenshot.bmp", HTTP_GET, handleScreenshot);
   server.on("/light.json", HTTP_GET, handleLight);
+  server.on("/perf.json", HTTP_GET, handlePerf);
   server.on("/upload_credentials", HTTP_POST, handleCredentialsUpload, handleUploadChunk);
   server.on("/backup.json", HTTP_GET, handleBackupDownload);
   server.on("/restore", HTTP_POST, handleRestore, handleUploadChunk);
@@ -751,6 +794,8 @@ void configPortalSetScreenshotSource(const ScreenshotSource &source) { screensho
 void configPortalSetOtaObserver(const OtaObserver &observer) { otaObserver = observer; }
 
 void configPortalSetUpdateGateSource(UpdateGateSource source) { updateGateSource = source; }
+
+void configPortalSetPerfSource(PerfJsonSource source) { perfSource = source; }
 
 bool configPortalRestartPending() { return restartPending; }
 

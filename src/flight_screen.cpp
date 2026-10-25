@@ -231,7 +231,11 @@ void renderCountdown(lgfx::LovyanGFX &gfx, const CountdownDisplay &cd, int16_t o
 }
 
 // Off-screen buffer for the countdown zone + status strip (y:82..225),
-// created on first use and kept for the life of the program. 8-bit colour
+// created once — at boot via flightScreenReserveSprite(), before WiFi and the
+// network task start allocating — and kept for the life of the program.
+// Created on the first visit to the NOW screen instead, it landed in the
+// middle of the largest free block and split it (110 KB -> 41 KB), below the
+// 50 KB release_check needs for a verified TLS session. 8-bit colour
 // (RGB332) halves it to ~45 KB at 320px wide — the palette colours are
 // quantized but stay recognisable on a black background — which matters
 // once WiFi + TLS have taken their share of the heap.
@@ -240,20 +244,22 @@ bool countdownSpriteTried = false;
 
 }  // namespace
 
+void flightScreenReserveSprite(int16_t screenWidth) {
+  if (countdownSpriteTried) return;
+  countdownSpriteTried = true;
+  const int16_t zoneH = static_cast<int16_t>(kStatusTop + kStatusHeight - kCountdownTop);
+  countdownSprite.setColorDepth(8);
+  if (countdownSprite.createSprite(screenWidth, zoneH) == nullptr) {
+    Serial.printf("[flight_screen] countdown sprite alloc failed (free heap %u) - drawing direct\n",
+                  static_cast<unsigned>(ESP.getFreeHeap()));
+  }
+}
+
 void drawFlightCountdown(LGFX &gfx, bool hasNearest, const CpaPrediction &cpa,
                          int16_t screenWidth, OpenSkyHealth health) {
   const CountdownDisplay cd = computeCountdownDisplay(hasNearest ? cpa : CpaPrediction{},
                                                       i18nLanguage(), hasNearest, health);
-  const int16_t zoneH = static_cast<int16_t>(kStatusTop + kStatusHeight - kCountdownTop);
-
-  if (!countdownSpriteTried) {
-    countdownSpriteTried = true;
-    countdownSprite.setColorDepth(8);
-    if (countdownSprite.createSprite(screenWidth, zoneH) == nullptr) {
-      Serial.printf("[flight_screen] countdown sprite alloc failed (free heap %u) - drawing direct\n",
-                    static_cast<unsigned>(ESP.getFreeHeap()));
-    }
-  }
+  flightScreenReserveSprite(screenWidth);  // no-op after boot
 
   if (countdownSprite.getBuffer() != nullptr) {
     renderCountdown(countdownSprite, cd, 0, screenWidth);

@@ -1,9 +1,10 @@
-// net_config — shared bounds on a single blocking HTTP request. loop() is
-// non-blocking cooperative (touch, config_portal, wifi_manager all run in
-// it), so every HTTPClient call it can trigger must have a hard deadline
-// rather than inheriting HTTPClient's untuned default — see CLAUDE.md
-// review notes 1.1 / 5.1. One definition here instead of a private copy in
-// opensky_client, aircraft_lookup and route_lookup.
+// net_config — shared bounds on a single blocking HTTP request. All of them
+// run in net_task on core 0 (spec/04-dual-core.md), so they no longer freeze
+// the screen — but the web page, the OpenSky schedule and the GitHub check
+// share that one task, so every HTTPClient call still has a hard deadline
+// rather than inheriting HTTPClient's untuned default — see CLAUDE.md review
+// notes 1.1 / 5.1. One definition here instead of a private copy in
+// opensky_client, aircraft_lookup, route_lookup and hexdb_http.
 #pragma once
 
 #include <cstdint>

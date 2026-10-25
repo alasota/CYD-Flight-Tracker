@@ -1,9 +1,10 @@
 // lookup_budget — decides which hexdb.io enrichment lookups (airline/type
-// by icao24, route by callsign) main.cpp performs on a given poll cycle.
+// by icao24, route by callsign) poll_pipeline performs on a given poll cycle.
 //
-// Each *new* (uncached) lookup is a blocking HTTPS round trip; several
-// back-to-back can freeze the cooperative loop() for seconds (touch,
-// config_portal, wifi_manager all stall) — see CLAUDE.md review notes 1.1.
+// Each *new* (uncached) lookup is a blocking HTTPS round trip of a few
+// seconds. They run in net_task now (spec/04-dual-core.md), so the screen no
+// longer stalls, but the network task does — the web page and the next poll
+// wait — see CLAUDE.md review notes 1.1.
 // So a cycle is allowed all its free cache hits plus a small number of new
 // fetches, spent on the aircraft that matter most (nearest home first).
 // Aircraft past the budget render as "--" and get their turn on a later

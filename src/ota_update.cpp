@@ -246,8 +246,12 @@ void OtaSession::abort() {
   finished_ = true;
 }
 
-bool shouldMarkAppValid(bool pendingVerify, uint32_t uptimeMs, bool reachable) {
-  return pendingVerify && reachable && uptimeMs >= kOtaValidAfterMs;
+bool shouldMarkAppValid(bool pendingVerify, uint32_t uptimeMs, bool reachable, bool uiAlive) {
+  return pendingVerify && reachable && uiAlive && uptimeMs >= kOtaValidAfterMs;
+}
+
+bool shouldRestartForRollback(bool pendingVerify, uint32_t uptimeMs, bool uiAlive) {
+  return pendingVerify && !uiAlive && uptimeMs >= kOtaValidAfterMs;
 }
 
 #ifdef ARDUINO

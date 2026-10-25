@@ -418,10 +418,17 @@ static void test_download_failure_is_a_gateway_error(void) {
 // ---- rollback
 
 static void test_mark_valid_only_when_pending_reachable_and_up_long_enough(void) {
-  TEST_ASSERT_FALSE(shouldMarkAppValid(true, 29999, true));
-  TEST_ASSERT_TRUE(shouldMarkAppValid(true, 30000, true));
-  TEST_ASSERT_FALSE(shouldMarkAppValid(true, 60000, false));
-  TEST_ASSERT_FALSE(shouldMarkAppValid(false, 60000, true));
+  TEST_ASSERT_FALSE(shouldMarkAppValid(true, 29999, true, true));
+  TEST_ASSERT_TRUE(shouldMarkAppValid(true, 30000, true, true));
+  TEST_ASSERT_FALSE(shouldMarkAppValid(true, 60000, false, true));
+  TEST_ASSERT_FALSE(shouldMarkAppValid(false, 60000, true, true));
+  // The network works but the display loop hangs: not valid -> rollback.
+  TEST_ASSERT_FALSE(shouldMarkAppValid(true, 60000, true, false));
+  // ...and is restarted into the previous image.
+  TEST_ASSERT_TRUE(shouldRestartForRollback(true, 30000, false));
+  TEST_ASSERT_FALSE(shouldRestartForRollback(true, 29999, false));  // a fair start first
+  TEST_ASSERT_FALSE(shouldRestartForRollback(true, 60000, true));   // UI fine
+  TEST_ASSERT_FALSE(shouldRestartForRollback(false, 60000, false)); // already valid
 }
 
 int main(int argc, char **argv) {

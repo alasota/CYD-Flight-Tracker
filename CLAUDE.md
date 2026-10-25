@@ -208,7 +208,7 @@ Answers "kierunek" for aircraft near the airport — pure logic, no I/O, lives i
 Needed because every screen now shows a real clock, not just uptime — this is a new
 requirement, the firmware didn't sync wall-clock time before.
 
-- **NTP sync**: after WiFi connects (in `wifi_manager` or right after in `main.cpp`), call
+- **NTP sync**: after WiFi connects (`net_task`, right after `wifiManagerBegin()`), call
   `configTzTime(TZ_WARSAW, "pool.ntp.org", "time.nist.gov")` where
   `TZ_WARSAW = "CET-1CEST,M3.5.0,M10.5.0/3"` — the standard POSIX TZ rule for Europe/Warsaw
   (correctly handles CEST DST switches). This is a stable, long-standing EU DST rule, but
@@ -697,15 +697,22 @@ Spec: `spec/01-ota-updates.md` (roadmap #1). Released in v1.1.0, tested on the b
   (`version.cpp`, `firmwareMarker()`; `FW_BOARD` defaults to `cyd-r` — roadmap #4 will set it
   per env and reject a mismatch). `firmware.yml` greps the built `.bin` for it. Builds older
   than this feature have no marker, so going back to them needs USB / the web installer.
-- **Display:** `config_portal` draws nothing; `configPortalSetOtaObserver()` hands start /
-  progress (every 16 KB) / end to `main.cpp`, which draws `service_screen`. Success: answer page,
-  ~1.5 s, `ESP.restart()` (`configPortalRestartPending()` keeps `loop()` off the network
-  meanwhile). Failure: "update failed" for 5 s, then a full redraw.
+- **Display:** `config_portal` and `release_check` draw nothing; their `OtaObserver` callbacks
+  (start / every 16 KB / end, on core 0) go to `net_task`, which publishes them as
+  `NetState::ota` (`OtaProgress`, phase + seq); the UI on core 1 draws `service_screen` from it
+  (see "Concurrency — two cores"). The 16 KB callback also does `vTaskDelay(1)` (core 0's task
+  watchdog). Success: answer page, ~1.5 s, `ESP.restart()` (`configPortalRestartPending()` keeps
+  the network task off the network meanwhile). Failure: "update failed" for 5 s, then a full
+  redraw.
 - **Rollback:** `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` in this arduino-esp32 (2.0.17).
-  `main.cpp` overrides `verifyRollbackLater()` -> true and calls
+  `main.cpp` overrides `verifyRollbackLater()` -> true; `net_task` calls
   `esp_ota_mark_app_valid_cancel_rollback()` once `shouldMarkAppValid()` (pending verify, ≥ 30 s
-  up, settings page reachable or WiFi setup hotspot up). OpenSky trouble never rolls back.
-  Verified with an image that `abort()`s after 8 s: the board came back on the previous slot.
+  up, settings page reachable or WiFi setup hotspot up, **and the UI loop alive** — its heartbeat
+  `core_link::uiBeatMs` < 2 s old). A new image whose UI loop stops while still on probation is
+  restarted (`shouldRestartForRollback()`), so the bootloader goes back to the previous slot
+  instead of the board sitting on a frozen screen. OpenSky trouble never rolls back.
+  Verified with an image that `abort()`s after 8 s, and (spec 04) with one whose UI loop hangs
+  after 8 s: both times the board came back on the previous slot.
 - **Password:** `Config::web_password` (NVS `wpass`), optional (default none). When set, *every*
   route calls `authorize()` first: HTTP Digest (`WebServer::authenticate`, realm
   `CYD Sky Tracker`, user `admin` — Basic is accepted too), `AuthThrottle` lockout -> 429 +
@@ -737,7 +744,7 @@ Spec: `spec/02-github-release-check.md` (built and tested on the board 2026-10-2
   for `cyd-r`) -> 302 -> release-assets.githubusercontent.com, streamed into the shared
   `otaFlashSession()` with `OtaExpectations{sha256 (asset "digest", else SHA256SUMS.txt), version
   (= tag, checked against the marker)}`; `Update.end()` only when all match. No hash = no install.
-  Runs from `loop()` (not inside the HTTP handler), ~20 s for 1.36 MB, OTA screen titled
+  Runs in `net_task`'s loop (not inside the HTTP handler), ~20 s for 1.36 MB, OTA screen titled
   "POBIERANIE Z GITHUBA".
 - **Display prompt:** `shouldShowUpdatePrompt()` — only `Available` (a release newer than a plain
   release build), once per boot, not for a development build, not over the NOW countdown, not
@@ -757,6 +764,68 @@ Spec: `spec/02-github-release-check.md` (built and tested on the board 2026-10-2
   display one from the board — LovyanGFX can't build for the PC without SDL).
 - ⚠️ Windows: a native test run sometimes reports `ERRORED` with no failed assertion — that's
   application control blocking a fresh test `.exe` (WinError 4551). Rerun that suite.
+
+## Concurrency — two cores (core_link, net_task)
+
+Spec: `spec/04-dual-core.md`. Before it, one `loop()` did everything and every HTTPS request froze
+the screen (measured: ~0.8 s per OpenSky poll, up to 5.7 s with the settings page or the GitHub
+check). Now:
+
+- **Core 0 — `net_task`** (FreeRTOS task, 16 KB stack, priority 1, next to WiFi and lwIP which
+  already run there): `wifi_manager`, `time_sync` (NTP), `config_portal` (WebServer + mDNS),
+  `opensky_client`, hexdb.io lookups with their caches (`aircraft_lookup`, `route_lookup`,
+  `lookup_store`, `hexdb_http`), `poll_pipeline`, `release_check`, both OTA paths, marking the
+  image valid. It owns the `Config` in memory (reloads it after a config-page save,
+  `configPortalSaveCount()`; no more NVS read every poll). Each pass ends with
+  `vTaskDelay(kNetIdleSleepMs = 5)`.
+- **Core 1 — `loop()` in `main.cpp`** (the Arduino loopTask, default 8 KB stack — the 16 KB
+  `SET_LOOP_TASK_STACK_SIZE` was only for TLS and is gone): `tft`, touch, `screen_nav`, redraw,
+  `backlight`, the update question, service screens. It **sleeps** between passes
+  (`ulTaskNotifyTake`, `uiSleepMs()`: touch poll every 20 ms — one GPIO read without a finger,
+  LovyanGFX checks the XPT2046 IRQ pin first — the countdown second, the clock minute, the
+  prompt timer); `net_task` wakes it when it publishes.
+- **Share nothing, three channels** (`core_link`):
+  1. `NetState` net -> UI: an immutable snapshot (`shared_ptr<const NetState>`) in a
+     `LatestBox` — latest wins, the lock only swaps a pointer, the old value is freed *after*
+     unlocking (tested). Rows live in a `DataSnapshot` shared between consecutive NetStates, so
+     a health / update / OTA change never copies them. `net_task` publishes only when
+     `netStateDiffers()`. The UI turns a new one into redraw events with `diffNetState()`.
+  2. `NetCommand` UI -> net: a FreeRTOS queue of 8 POD commands (`InstallTag` = YES on the
+     update question, `SkipTag` = NO); never blocks.
+  3. Atomics / `Guarded<T>` (a POD copied under a spinlock): `uiBeatMs`, `netBeatMs`,
+     `pollingAllowed` (spec 03's night pause, decided by the UI), UI perf numbers, and the
+     backlight status that `/light.json` reads (`backlight.cpp`).
+- **Rules:** code on core 0 never calls LovyanGFX; code on core 1 never does network I/O. Never
+  allocate, free, log or do I/O while holding a `SpinLock` (it is a FreeRTOS critical section).
+  `/screenshot.bmp` is the one place the web handler needs the panel: it asks the UI for bands of
+  16 rows into two buffers (`ScreenshotSource::begin/requestBand/waitBand/end`, `shot::` in
+  `main.cpp`) — the UI reads band k+1 while band k goes out; a timed-out request is cancelled
+  under the lock so the UI never writes into a freed buffer. The UI doesn't draw while a capture
+  runs.
+- **Poll -> two snapshots** (`poll_pipeline`, pure, `buildDataSnapshot()`): phase A right after
+  `/states/all` with no lookup budget (cache only, the rest `...`), phase B with the budgets; B
+  is published only if it fetched something (`DataSnapshot::fetches`). Results are memoised per
+  poll so B doesn't repeat A's lookups.
+- **hexdb.io keep-alive** (`hexdb_http`): one TLS session per phase B (`hexdbSessionEnd()`
+  after it); a request on a connection the server closed is retried once, fresh. HTTPClient's
+  destructor `stop()`s the socket — the HTTPClient has to live as long as the session.
+- **Liveness:** no `netBeatMs` for 60 s -> the header shows a network error (stale data isn't
+  presented as fresh); no `uiBeatMs` for 2 s -> a new image isn't marked valid (and is restarted,
+  see "Firmware updates").
+- ⚠️ **Core 0's task watchdog panics** (`CONFIG_ESP_TASK_WDT_PANIC=1`, 5 s, idle task of CPU0
+  checked): nothing in `net_task` may keep the CPU for seconds without yielding. Blocking socket
+  waits are fine (they yield); a tight loop is not.
+- **Heap:** ~143 KB free, largest block 57 KB (with ~8 aircraft). The NOW screen's countdown
+  sprite (~30 KB) is created in `setup()` (`flightScreenReserveSprite()`) before WiFi and
+  `net_task` allocate — created on the first visit to NOW it split the largest block to 41 KB,
+  below the 50 KB `release_check` needs for verified TLS (checks silently stopped until reboot).
+  Allocate long-lived buffers at boot, not on first use.
+- ⚠️ **Flash writes stall both cores** (cache off during erase/write): OTA, NVS (`lookup_store`,
+  `saveLastScreen`) — a few ms to tens of ms on the UI, visible in `[perf]`.
+- **Perf** (`perf_stats`, pure): the UI measures how much later than planned each pass starts
+  (its drawing time + oversleep); `net_task` logs once a minute
+  `[perf] ui gap max=85ms p99<20ms slow=0 | net busy 20.3% max=807ms | stack ui=… net=… | heap …`
+  and serves the same as `GET /perf.json`.
 
 ## Brightness & night mode (backlight, sun_times)
 
@@ -785,7 +854,8 @@ Spec: `spec/03-brightness-night-mode.md` (built and tested on the board 2026-10-
   synced clock, and the night never brightens the screen (min of day and night level). At
   night with `night_pct` 0 the backlight is off: the first tap only lights it (`max(min, 10 %)`)
   for `night_wake_s` and is **not** passed to `handleTap()`. A tap at night always restarts
-  the wake time. `night_pause_polling` (default **off**) skips `openSkyClientPoll()` during
+  the wake time. `night_pause_polling` (default **off**) skips `openSkyClientPoll()` (in `net_task`, via the
+  `core_link::pollingAllowed` flag the UI sets) during
   the night window except within the wake time. Auto-cycle stops and the update question
   isn't shown while the screen is dark (`PromptGate::screenOff`).
 - **Settings** (General tab, "Display" card; backup group `display`): `brightness_auto`
@@ -886,9 +956,11 @@ each with a single responsibility:
   thin borders, the display's peach `#ff9966` as the only accent (active tab, buttons, focus)
   with dark text on it.
   Also serves `GET /screenshot.bmp[?screen=N]`: the panel read back (LovyanGFX `readRect`,
-  panel `readable = true`) and streamed as a 24-bit BMP row by row — for UX reviews without a
-  camera. Pixels come from `main.cpp` via `configPortalSetScreenshotSource()`; BMP header/row math
-  is the pure `screenshot` module (native-tested). `?screen=N` switches to that screen first.
+  panel `readable = true`) and streamed as a 24-bit BMP — for UX reviews without a camera.
+  Pixels come from the UI core in bands (`configPortalSetScreenshotSource()`, see "Concurrency —
+  two cores"); BMP header/row math and the bottom-up band order are the pure `screenshot` module
+  (native-tested). `?screen=N` switches to that screen first. `GET /perf.json`: `perf_stats`.
+  Runs on core 0 (`net_task`).
 - `web_auth` — the panel password, pure: `validateWebPassword()` (8–64 printable ASCII, "" =
   none), `decidePasswordChange()` (the General tab's two fields + "remove"), `decideAuth()`
   (allow / 401 challenge / 429 locked), `AuthThrottle` (5 wrong in a row -> 60 s lock), the
@@ -905,6 +977,18 @@ each with a single responsibility:
 - `service_screen` — full-screen maintenance displays: OTA progress (title, "v1 → v2", bar,
   percent / KB, "do not power off", then restarting / failed) and the password-reset hold +
   YES/NO confirm. Geometry/text pure and tested, drawing behind `#ifdef ARDUINO`.
+- `core_link` — what crosses between the cores: `LatestBox`, `Guarded<T>`, `SpinLock`,
+  `NetState` / `DataSnapshot` / `OtaProgress`, `NetCommand`, `diffNetState()`,
+  `netStateDiffers()`, `uiSleepMs()`, `heartbeatStale()`; device globals behind `#ifdef ARDUINO`.
+  See "Concurrency — two cores".
+- `net_task` — the network task on core 0 (device-only): owns WiFi, web page, OpenSky,
+  hexdb.io, GitHub, OTA, the in-memory Config; publishes `NetState`, takes `NetCommand`s.
+- `poll_pipeline` — pure: one `/states/all` answer -> `DataSnapshot` (sort, budgeted lookups via
+  injected `LookupPorts`, phases, airports, CPA + Screen 2's pick); phase A = `cacheOnly()`.
+  This used to be ~100 untested lines in `main.cpp`.
+- `perf_stats` — pure: `GapStats` (UI pass lateness, buckets, p99), `BusyStats`, the `[perf]`
+  line and `/perf.json`.
+- `hexdb_http` — device-only: the shared hexdb.io HTTPS GET with keep-alive per batch.
 - `opensky_client` — token fetch/refresh + `/states/all` polling. Returns a plain struct/array
   of aircraft. **No TFT/drawing code in this module** — must be swappable/testable independently
   of the visualization.
@@ -949,7 +1033,8 @@ each with a single responsibility:
 - `redraw_policy` — pure `computeRedrawMask(events, currentScreen)`: turns "what happened"
   (first draw, screen/page change, new poll, minute rollover, health change, countdown tick)
   into which regions to repaint (full / content / header text / countdown). See "Redraw policy".
-  No TFT code — `main.cpp` acts on the mask.
+  No TFT code — `main.cpp` acts on the mask (the events come from `diffNetState()` and the UI's
+  own timers).
 - `lcars_theme` — shared color palette, panel/elbow/pill drawing helpers, fonts, plus the WiFi
   signal-bars and bottom-nav-segment primitives. All view/screen modules call into this rather
   than defining their own colors/shapes.

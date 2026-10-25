@@ -70,6 +70,43 @@ static void test_parse_screen_arg(void) {
   TEST_ASSERT_EQUAL_INT(-1, parseScreenshotScreenArg("1a", 3));
 }
 
+// ---- bands, bottom-up ---------------------------------------------------------
+
+static void test_band_count(void) {
+  TEST_ASSERT_EQUAL_INT(15, screenshotBandCount(240, 16));
+  TEST_ASSERT_EQUAL_INT(30, screenshotBandCount(240, 8));
+  TEST_ASSERT_EQUAL_INT(4, screenshotBandCount(50, 16));  // 16+16+16+2
+  TEST_ASSERT_EQUAL_INT(0, screenshotBandCount(0, 16));
+  TEST_ASSERT_EQUAL_INT(0, screenshotBandCount(240, 0));
+}
+
+static void test_bands_start_at_the_bottom(void) {
+  ScreenshotBand b = screenshotBand(240, 16, 0);
+  TEST_ASSERT_EQUAL_INT(224, b.y0);
+  TEST_ASSERT_EQUAL_INT(16, b.rows);
+  b = screenshotBand(240, 16, 14);
+  TEST_ASSERT_EQUAL_INT(0, b.y0);
+  TEST_ASSERT_EQUAL_INT(16, b.rows);
+}
+
+static void test_short_last_band_and_full_cover(void) {
+  ScreenshotBand last = screenshotBand(50, 16, 3);
+  TEST_ASSERT_EQUAL_INT(0, last.y0);
+  TEST_ASSERT_EQUAL_INT(2, last.rows);
+  // Every row exactly once, contiguous, from the bottom up.
+  int expectedEnd = 50;
+  int total = 0;
+  for (int i = 0; i < screenshotBandCount(50, 16); ++i) {
+    const ScreenshotBand b = screenshotBand(50, 16, i);
+    TEST_ASSERT_EQUAL_INT(expectedEnd, b.y0 + b.rows);
+    expectedEnd = b.y0;
+    total += b.rows;
+  }
+  TEST_ASSERT_EQUAL_INT(0, expectedEnd);
+  TEST_ASSERT_EQUAL_INT(50, total);
+  TEST_ASSERT_EQUAL_INT(0, screenshotBand(50, 16, 4).rows);  // out of range
+}
+
 int main(int, char **) {
   UNITY_BEGIN();
 
@@ -79,6 +116,9 @@ int main(int, char **) {
   RUN_TEST(test_header_fields);
   RUN_TEST(test_header_size_constant);
   RUN_TEST(test_parse_screen_arg);
+  RUN_TEST(test_band_count);
+  RUN_TEST(test_bands_start_at_the_bottom);
+  RUN_TEST(test_short_last_band_and_full_cover);
 
   return UNITY_END();
 }

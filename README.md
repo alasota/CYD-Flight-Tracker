@@ -92,6 +92,9 @@ answer to "what plane is that." Think of it as the away-team variant with better
   dark room. From sunset to sunrise (worked out on the board for your location) or between set
   hours it goes down to a night level, or fully dark until you tap it. It can also pause
   OpenSky requests at night to save credits.
+- ⚡ **A screen that never waits for the internet**: the ESP32 has two cores, so one talks to
+  OpenSky, hexdb.io and GitHub while the other draws and listens to your finger. Taps and the
+  countdown keep going while a slow server thinks (it used to freeze for up to 5 seconds).
 - 🖖 **LCARS-inspired chrome** — black background, chunky color blocks, folder-tab navigation. An homage,
   not a photocopy. All shapes hand-drawn with LovyanGFX, zero ripped assets.
 - 📡 Lives entirely on the ESP32 — no server, no phone app, no subscription, no away mission
@@ -360,17 +363,27 @@ Firmware tabs nag until you set one:
 ## How it works, briefly
 
 ```
-WiFi/config portal → opensky_client (OAuth2 + /states/all)
-                            │
-                            ▼
-              aircraft_lookup (icao24 → airline + type, cached)
-                            │
-                            ▼
-              table_view / radar_view (shared LCARS chrome)
+ core 0 · net_task                               core 1 · loop() (UI)
+ ───────────────────────────────────            ──────────────────────────────
+ WiFi · NTP · settings page · OTA                touch → screen_nav
+ opensky_client (OAuth2 + /states/all)
+        │                                        table / now / radar views
+        ▼                                        (LovyanGFX, LCARS chrome)
+ poll_pipeline ── hexdb.io lookups                         ▲
+ (sort, airline/type/route, CPA)  (cached, keep-alive)     │
+        │                                                  │
+        └──────── NetState snapshot (pointer swap) ────────┘
+                  ◀──── commands (install / skip) ────
 ```
 
-Networking and rendering are kept firmly separated, so nobody has to relive the trauma of
-untangling API calls from `tft.drawPixel()` at 2am.
+Networking and rendering are kept firmly separated — now even on separate CPU cores — so
+nobody has to relive the trauma of untangling API calls from `tft.drawPixel()` at 2am, and the
+screen no longer holds its breath while a server thinks. The two halves share nothing but a
+snapshot of the data (handed over by swapping one pointer) and a few small commands.
+
+For the curious (and for bug reports): `http://cyd-sky.local/perf.json` and the `[perf]` line
+in the serial log, once a minute, show how responsive the screen is (`ui gap max` — the
+longest the display waited, in ms), how busy the network side is, and the free memory.
 
 ## Roadmap
 

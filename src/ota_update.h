@@ -162,10 +162,18 @@ class OtaSession {
 // ---- After an update: the bootloader boots the new image "pending
 // verify"; if it restarts before the image is marked valid it rolls back.
 // Mark it valid once it has run kOtaValidAfterMs and can be reached to
-// flash a fix (web page up, or the WiFi setup hotspot). OpenSky trouble is
-// deliberately not part of this.
+// flash a fix (web page up, or the WiFi setup hotspot) — and the UI loop on
+// the other core is alive (`uiAlive`: its heartbeat is fresh), so an image
+// whose display hangs while the network works still rolls back
+// (spec/04-dual-core.md). OpenSky trouble is deliberately not part of this.
 constexpr uint32_t kOtaValidAfterMs = 30000;
-bool shouldMarkAppValid(bool pendingVerify, uint32_t uptimeMs, bool reachable);
+bool shouldMarkAppValid(bool pendingVerify, uint32_t uptimeMs, bool reachable, bool uiAlive);
+
+// A new image whose UI loop has stopped (no heartbeat) while still on
+// probation: restart it, so the bootloader rolls back right away instead of
+// the board sitting on a frozen screen until someone pulls the plug. Only
+// after kOtaValidAfterMs (the UI gets a fair start) and never once valid.
+bool shouldRestartForRollback(bool pendingVerify, uint32_t uptimeMs, bool uiAlive);
 
 #ifdef ARDUINO
 // The one session that writes to the spare app slot (arduino-esp32 Update +
