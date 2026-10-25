@@ -134,10 +134,21 @@ ol.steps li::before {
 .backup-note p { margin: 0; color: #c9cad1; }
 .web-shots { margin: 28px auto 0; max-width: 1100px; align-items: start; grid-template-columns: repeat(5, 1fr); }
 .web-shots img { border-radius: 12px; border: 1px solid var(--line); }
-.update-shot { float: right; margin: 4px 0 12px 20px; width: 320px; max-width: 45%; }
-.update-shot img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); display: block; }
-.update-note p + p { margin-top: 10px; }
-.update-note::after { content: ""; display: block; clear: both; }
+
+/* ---- what else it does: 2x2 tiles, the long story under "More" */
+.features { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.tile p { margin: 0 0 12px; color: #c9cad1; }
+.tile-shot { margin: 0 0 14px; }
+.tile-shot img {
+  width: 320px; max-width: 100%; image-rendering: pixelated;
+  border-radius: 10px; border: 1px solid var(--line);
+}
+.tile details > summary { cursor: pointer; color: var(--accent-soft); font-size: .9rem; list-style: none; }
+.tile details > summary::-webkit-details-marker { display: none; }
+.tile details > summary::after { content: " +"; color: var(--accent); }
+.tile details[open] > summary::after { content: " –"; }
+.tile details[open] > summary { margin-bottom: 10px; }
+.tile details p { font-size: .95rem; }
 
 /* ---- roadmap */
 .intro { max-width: 620px; margin: -12px auto 28px; }
@@ -214,11 +225,10 @@ ol.steps li::before {
 /* ---- narrow screens */
 @media (max-width: 860px) {
   section.hero { grid-template-columns: 1fr; margin-top: 32px; }
-  .grid2, .grid3 { grid-template-columns: 1fr; }
+  .grid2, .grid3, .features { grid-template-columns: minmax(0, 1fr); }
   .links { display: none; }
   .lang { margin-left: auto; }
   section.wrap { margin: 64px auto; }
   code { white-space: normal; word-break: break-all; }
   .web-shots { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .update-shot { float: none; width: auto; margin: 0 auto 14px; max-width: 100%; }
 }
