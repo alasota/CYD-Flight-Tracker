@@ -10,11 +10,13 @@
 #pragma once
 
 #include <cstdint>
+#include <ctime>
 #include <functional>
 #include <string>
 
 #include "config_store.h"   // Config
 #include "device_alerts.h"  // AlertSet, AlertDetails
+#include "opensky_auth.h"   // OpenSkyAuthState
 #include "opensky_quota.h"  // OpenSkyQuota
 #include "release_check.h"  // UpdateState
 #include "web_i18n.h"       // WebStr
@@ -87,7 +89,23 @@ struct ConfigPageModel {
   AlertSet alerts;
   AlertDetails alertDetails;
   uint32_t nowMs = 0;
+  // OpenSky login state (spec 06), from openSkyAuthStatus(): the OpenSky tab's
+  // pill, the "login failed" warning and the daily limit. The page uses it as
+  // onCredentials(auth, <cfg's credentials>) — so a default model with
+  // credentials in cfg reads as Account, and just-saved other credentials too.
+  OpenSkyAuthState auth;
+  // Wall clock now, already in local time (formatDate()/formatTime()); 0 =
+  // clock not synced -> the warning leaves out "since".
+  std::time_t nowEpoch = 0;
 };
+
+// The OpenSky tab's warning in LoginFailed, plain text (no HTML), in `lang`:
+// "OpenSky rejected ... (HTTP 401, since 25.10.2026 14:32). ... a limit of 400
+// credits a day instead of 4000. ... Next login attempt in 27 min." — "since"
+// only when nowEpoch != 0; minutes rounded up from nextTokenTryMs - nowMs
+// (wrap-safe), at least 1.
+std::string loginFailedDetailText(const OpenSkyAuthState &s, uint32_t nowMs,
+                                  std::time_t nowEpoch, Language lang);
 
 // Where the Firmware tab sends people for new versions.
 constexpr const char *kReleasesUrl = "https://github.com/alasota/CYD-Flight-Tracker/releases/latest";
