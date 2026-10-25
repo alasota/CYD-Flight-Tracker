@@ -4,6 +4,7 @@
 #include "i18n.h"
 #include "lcars_theme.h"
 #include "service_screen.h"
+#include "test_support.h"
 
 namespace {
 
@@ -46,10 +47,10 @@ static void test_reset_buttons_fit_and_do_not_overlap(void) {
 static void test_reset_hit_test(void) {
   const Rect yes = confirmButtonRect(true, 320, 240);
   const Rect no = confirmButtonRect(false, 320, 240);
-  TEST_ASSERT_TRUE(confirmHit(yes.x + 5, yes.y + 5, 320, 240) == ResetChoice::Yes);
-  TEST_ASSERT_TRUE(confirmHit(no.x + 5, no.y + 5, 320, 240) == ResetChoice::No);
-  TEST_ASSERT_TRUE(confirmHit(160, 20, 320, 240) == ResetChoice::None);
-  TEST_ASSERT_TRUE(confirmHit(yes.x + yes.w + 5, yes.y + 5, 320, 240) == ResetChoice::None);
+  ASSERT_ENUM_EQ(ResetChoice::Yes, confirmHit(yes.x + 5, yes.y + 5, 320, 240));
+  ASSERT_ENUM_EQ(ResetChoice::No, confirmHit(no.x + 5, no.y + 5, 320, 240));
+  ASSERT_ENUM_EQ(ResetChoice::None, confirmHit(160, 20, 320, 240));
+  ASSERT_ENUM_EQ(ResetChoice::None, confirmHit(yes.x + yes.w + 5, yes.y + 5, 320, 240));
 }
 
 static void test_screen_texts_fit_one_line(void) {

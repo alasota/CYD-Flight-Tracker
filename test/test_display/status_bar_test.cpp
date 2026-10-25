@@ -6,6 +6,7 @@
 #include "screen_nav.h"  // kScreen* indices
 #include "status_bar.h"
 #include "lcars_theme.h"  // palette constants
+#include "test_support.h"
 #include "time_sync.h"
 
 namespace {
@@ -152,17 +153,17 @@ static void test_count_is_centred_in_the_free_space(void) {
 
 static void test_empty_state_says_why_it_is_empty(void) {
   // Ok: the sky really is empty.
-  TEST_ASSERT_TRUE(emptyStateText(OpenSkyHealth::Ok, false) == Str::NoFlightsInRange);
-  TEST_ASSERT_TRUE(emptyStateText(OpenSkyHealth::Ok, true) == Str::NoFlight);
+  ASSERT_ENUM_EQ(Str::NoFlightsInRange, emptyStateText(OpenSkyHealth::Ok, false));
+  ASSERT_ENUM_EQ(Str::NoFlight, emptyStateText(OpenSkyHealth::Ok, true));
   // Feed problems must not read "no flights".
   TEST_ASSERT_EQUAL_STRING("LIMIT OPENSKY WYCZERPANY",
                            tr(emptyStateText(OpenSkyHealth::RateLimited, false), Language::PL));
   TEST_ASSERT_EQUAL_STRING("OPENSKY LIMIT REACHED",
                            tr(emptyStateText(OpenSkyHealth::RateLimited, false), Language::EN));
-  TEST_ASSERT_TRUE(emptyStateText(OpenSkyHealth::AuthError, false) == Str::FeedAuthError);
-  TEST_ASSERT_TRUE(emptyStateText(OpenSkyHealth::NetworkError, false) == Str::FeedUnreachable);
-  TEST_ASSERT_TRUE(emptyStateText(OpenSkyHealth::RateLimited, true) == Str::FeedQuotaShort);
-  TEST_ASSERT_TRUE(emptyStateText(OpenSkyHealth::AuthError, true) == Str::FeedErrorShort);
+  ASSERT_ENUM_EQ(Str::FeedAuthError, emptyStateText(OpenSkyHealth::AuthError, false));
+  ASSERT_ENUM_EQ(Str::FeedUnreachable, emptyStateText(OpenSkyHealth::NetworkError, false));
+  ASSERT_ENUM_EQ(Str::FeedQuotaShort, emptyStateText(OpenSkyHealth::RateLimited, true));
+  ASSERT_ENUM_EQ(Str::FeedErrorShort, emptyStateText(OpenSkyHealth::AuthError, true));
 }
 
 static void test_empty_state_texts_fit_their_slots(void) {

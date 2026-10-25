@@ -3,6 +3,7 @@
 
 #include "aircraft_summary.h"
 #include "table_view.h"  // AircraftRow
+#include "test_support.h"
 
 namespace {
 
@@ -56,10 +57,10 @@ static void test_airline_dashes_when_lookup_found_but_string_empty(void) {
 
 static void test_identity_contains_all_fields_and_phase(void) {
   std::string line = formatSummaryIdentity(makeRow());
-  TEST_ASSERT_TRUE(line.find("LOT281") != std::string::npos);
-  TEST_ASSERT_TRUE(line.find("LOT Polish Airlines") != std::string::npos);
-  TEST_ASSERT_TRUE(line.find("B738") != std::string::npos);
-  TEST_ASSERT_TRUE(line.find(phaseIcon(Phase::TAKEOFF)) != std::string::npos);
+  ASSERT_CONTAINS(line, "LOT281");
+  ASSERT_CONTAINS(line, "LOT Polish Airlines");
+  ASSERT_CONTAINS(line, "B738");
+  ASSERT_CONTAINS(line, phaseIcon(Phase::TAKEOFF));
 }
 
 static void test_identity_phase_icon_varies(void) {
@@ -122,7 +123,7 @@ static void test_fit_identity_unchanged_when_it_fits(void) {
 static void test_fit_identity_excludes_phase_icon(void) {
   // The icon is drawn separately at a fixed right-aligned spot.
   std::string line = fitSummaryIdentity(makeRow(), 200, kOnePx);
-  TEST_ASSERT_TRUE(line.find(phaseIcon(Phase::TAKEOFF)) == std::string::npos);
+  ASSERT_NOT_CONTAINS(line, phaseIcon(Phase::TAKEOFF));
 }
 
 static void test_fit_identity_truncates_airline_first(void) {
@@ -275,7 +276,7 @@ static void test_city_route_drops_country_codes_first(void) {
 static void test_city_route_then_shortens_both_names(void) {
   std::string s = formatRowRouteCities(rowWawFco(), Language::PL, 14, kOnePx);
   TEST_ASSERT_TRUE(onePx(s) <= 14);
-  TEST_ASSERT_TRUE(s.find(" -> ") != std::string::npos);
+  ASSERT_CONTAINS(s, " -> ");
 }
 
 static void test_city_route_pending_and_unknown(void) {

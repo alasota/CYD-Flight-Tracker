@@ -2,6 +2,7 @@
 #include <unity.h>
 
 #include "lcars_theme.h"
+#include "test_support.h"
 
 namespace {
 
@@ -203,13 +204,13 @@ static const PhaseIconKind kDrawnIcons[] = {PhaseIconKind::TAKEOFF, PhaseIconKin
                                             PhaseIconKind::OVERFLIGHT, PhaseIconKind::GROUND};
 
 static void test_phase_icon_kind_mapping(void) {
-  TEST_ASSERT_TRUE(phaseIconKind(Phase::TAKEOFF, false) == PhaseIconKind::TAKEOFF);
-  TEST_ASSERT_TRUE(phaseIconKind(Phase::LANDING, false) == PhaseIconKind::LANDING);
-  TEST_ASSERT_TRUE(phaseIconKind(Phase::OVERFLIGHT, false) == PhaseIconKind::OVERFLIGHT);
-  TEST_ASSERT_TRUE(phaseIconKind(Phase::NONE, false) == PhaseIconKind::NONE);
+  ASSERT_ENUM_EQ(PhaseIconKind::TAKEOFF, phaseIconKind(Phase::TAKEOFF, false));
+  ASSERT_ENUM_EQ(PhaseIconKind::LANDING, phaseIconKind(Phase::LANDING, false));
+  ASSERT_ENUM_EQ(PhaseIconKind::OVERFLIGHT, phaseIconKind(Phase::OVERFLIGHT, false));
+  ASSERT_ENUM_EQ(PhaseIconKind::NONE, phaseIconKind(Phase::NONE, false));
   // On the ground always gets the top-view icon, whatever the phase says.
-  TEST_ASSERT_TRUE(phaseIconKind(Phase::NONE, true) == PhaseIconKind::GROUND);
-  TEST_ASSERT_TRUE(phaseIconKind(Phase::OVERFLIGHT, true) == PhaseIconKind::GROUND);
+  ASSERT_ENUM_EQ(PhaseIconKind::GROUND, phaseIconKind(Phase::NONE, true));
+  ASSERT_ENUM_EQ(PhaseIconKind::GROUND, phaseIconKind(Phase::OVERFLIGHT, true));
 }
 
 static void test_phase_icons_are_well_formed(void) {
@@ -221,7 +222,7 @@ static void test_phase_icons_are_well_formed(void) {
       TEST_ASSERT_EQUAL_size_t(static_cast<size_t>(kPhaseIconW), std::string(rows[y]).size());
       for (int x = 0; x < kPhaseIconW; ++x) {
         const char c = rows[y][x];
-        TEST_ASSERT_TRUE(c == '.' || c == '#' || c == 'd' || c == 'k' || c == 'g');
+        ASSERT_CONTAINS(std::string(".#dkg"), c);
         if (c == '#') ++bodyPixels;
       }
     }

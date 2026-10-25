@@ -2,6 +2,7 @@
 #include <unity.h>
 
 #include "screen_nav.h"
+#include "test_support.h"
 
 namespace {
 
@@ -103,7 +104,7 @@ static void test_screen_nav_set_to_same_screen_reports_no_change(void) {
 
 static void test_screen_nav_set_wraps_garbage(void) {
   ScreenNav nav;
-  TEST_ASSERT_TRUE(nav.set(7));  // 7 % 3 == 1
+  TEST_ASSERT_TRUE(nav.set(7));  // 7 % 3 is 1
   TEST_ASSERT_EQUAL_INT(kScreenFlight, nav.current());
 }
 
@@ -114,29 +115,29 @@ static void test_screen_nav_set_wraps_garbage(void) {
 // for screen-specific handling (e.g. Screen 1's table paging).
 
 static void test_left_edge_does_not_navigate(void) {
-  TEST_ASSERT_TRUE(navHitTest(5, 120, kW, kH).action == NavAction::None);
-  TEST_ASSERT_TRUE(navHitTest(0, 30, kW, kH).action == NavAction::None);
+  ASSERT_ENUM_EQ(NavAction::None, navHitTest(5, 120, kW, kH).action);
+  ASSERT_ENUM_EQ(NavAction::None, navHitTest(0, 30, kW, kH).action);
 }
 
 static void test_right_edge_does_not_navigate(void) {
-  TEST_ASSERT_TRUE(navHitTest(kW - 5, 120, kW, kH).action == NavAction::None);
-  TEST_ASSERT_TRUE(navHitTest(kW - 1, 200, kW, kH).action == NavAction::None);
+  ASSERT_ENUM_EQ(NavAction::None, navHitTest(kW - 5, 120, kW, kH).action);
+  ASSERT_ENUM_EQ(NavAction::None, navHitTest(kW - 1, 200, kW, kH).action);
 }
 
 static void test_middle_of_content_is_none(void) {
   NavHit h = navHitTest(kW / 2, 120, kW, kH);
-  TEST_ASSERT_TRUE(h.action == NavAction::None);
+  ASSERT_ENUM_EQ(NavAction::None, h.action);
 }
 
 static void test_tap_in_header_is_none(void) {
   NavHit h = navHitTest(5, 10, kW, kH);
-  TEST_ASSERT_TRUE(h.action == NavAction::None);
+  ASSERT_ENUM_EQ(NavAction::None, h.action);
 }
 
 static void test_nothing_above_the_nav_band_navigates(void) {
   for (int16_t y = 0; y < kNavTouchTop; y += 7) {
     for (int16_t x = 0; x < kW; x += 13) {
-      TEST_ASSERT_TRUE(navHitTest(x, y, kW, kH).action == NavAction::None);
+      ASSERT_ENUM_EQ(NavAction::None, navHitTest(x, y, kW, kH).action);
     }
   }
 }
@@ -147,15 +148,15 @@ static void test_nav_bar_touch_band_extends_above_the_visual_bar(void) {
   // visually still the content area above the bar, yet hits a nav segment.
   for (int16_t y = kNavTouchTop; y < kContentBottom; ++y) {
     NavHit mid = navHitTest(160, y, kW, kH);
-    TEST_ASSERT_TRUE(mid.action == NavAction::JumpTo);
+    ASSERT_ENUM_EQ(NavAction::JumpTo, mid.action);
     TEST_ASSERT_EQUAL_INT(1, mid.target);  // centre column -> screen 1
   }
   // ...including at the far left (x=5) — the band covers the full width.
   NavHit corner = navHitTest(5, static_cast<int16_t>(kNavTouchTop + 3), kW, kH);
-  TEST_ASSERT_TRUE(corner.action == NavAction::JumpTo);
+  ASSERT_ENUM_EQ(NavAction::JumpTo, corner.action);
   TEST_ASSERT_EQUAL_INT(0, corner.target);
   // Just below the header, well above the band, the middle is still None.
-  TEST_ASSERT_TRUE(navHitTest(160, 120, kW, kH).action == NavAction::None);
+  ASSERT_ENUM_EQ(NavAction::None, navHitTest(160, 120, kW, kH).action);
 }
 
 // ---- touch hit-testing: bottom nav segments -------------------------
@@ -164,15 +165,15 @@ static void test_bottom_nav_segments_jump_to_each_screen(void) {
   int16_t navY = static_cast<int16_t>(kH - LCARS_BOTTOM_NAV_HEIGHT / 2);  // inside the visual bar
 
   NavHit s0 = navHitTest(50, navY, kW, kH);
-  TEST_ASSERT_TRUE(s0.action == NavAction::JumpTo);
+  ASSERT_ENUM_EQ(NavAction::JumpTo, s0.action);
   TEST_ASSERT_EQUAL_INT(0, s0.target);
 
   NavHit s1 = navHitTest(160, navY, kW, kH);
-  TEST_ASSERT_TRUE(s1.action == NavAction::JumpTo);
+  ASSERT_ENUM_EQ(NavAction::JumpTo, s1.action);
   TEST_ASSERT_EQUAL_INT(1, s1.target);
 
   NavHit s2 = navHitTest(290, navY, kW, kH);
-  TEST_ASSERT_TRUE(s2.action == NavAction::JumpTo);
+  ASSERT_ENUM_EQ(NavAction::JumpTo, s2.action);
   TEST_ASSERT_EQUAL_INT(2, s2.target);
 }
 

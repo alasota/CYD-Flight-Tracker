@@ -2,6 +2,7 @@
 #include <unity.h>
 
 #include "backlight.h"
+#include "test_support.h"
 
 namespace {
 
@@ -106,7 +107,7 @@ static void test_window_for_each_mode(void) {
   sun.sunrise_min = 7 * 60 + 17;
   sun.sunset_min = 17 * 60 + 23;
   NightWindow w = nightWindowFor(NightMode::Off, 1380, 390, sun, true);
-  TEST_ASSERT_TRUE(w.kind == NightWindow::Kind::Never);
+  ASSERT_ENUM_EQ(NightWindow::Kind::Never, w.kind);
   TEST_ASSERT_EQUAL_INT(0, nightWindowMinutes(w));
 
   w = nightWindowFor(NightMode::Schedule, 1380, 390, sun, true);
@@ -122,33 +123,30 @@ static void test_window_for_each_mode(void) {
   TEST_ASSERT_EQUAL_INT(1440 - (17 * 60 + 23) + 7 * 60 + 17, nightWindowMinutes(w));
 
   // Sun unknown (no location / clock) -> never; polar day / night.
-  TEST_ASSERT_TRUE(nightWindowFor(NightMode::Sun, 0, 0, sun, false).kind ==
-                   NightWindow::Kind::Never);
+  ASSERT_ENUM_EQ(NightWindow::Kind::Never, nightWindowFor(NightMode::Sun, 0, 0, sun, false).kind);
   sun.kind = SunTimes::Kind::PolarDay;
-  TEST_ASSERT_TRUE(nightWindowFor(NightMode::Sun, 0, 0, sun, true).kind ==
-                   NightWindow::Kind::Never);
+  ASSERT_ENUM_EQ(NightWindow::Kind::Never, nightWindowFor(NightMode::Sun, 0, 0, sun, true).kind);
   sun.kind = SunTimes::Kind::PolarNight;
   w = nightWindowFor(NightMode::Sun, 0, 0, sun, true);
   TEST_ASSERT_TRUE(isNight(w, 12 * 60));
   TEST_ASSERT_EQUAL_INT(1440, nightWindowMinutes(w));
 
-  TEST_ASSERT_TRUE(nightWindowFor(NightMode::Schedule, 600, 600, sun, true).kind ==
-                   NightWindow::Kind::Never);
+  ASSERT_ENUM_EQ(NightWindow::Kind::Never, nightWindowFor(NightMode::Schedule, 600, 600, sun, true).kind);
 }
 
 static void test_night_mode_codes(void) {
   NightMode m = NightMode::Off;
   TEST_ASSERT_TRUE(nightModeFromCode("sun", &m));
-  TEST_ASSERT_TRUE(m == NightMode::Sun);
+  ASSERT_ENUM_EQ(NightMode::Sun, m);
   TEST_ASSERT_TRUE(nightModeFromCode("schedule", &m));
-  TEST_ASSERT_TRUE(m == NightMode::Schedule);
+  ASSERT_ENUM_EQ(NightMode::Schedule, m);
   TEST_ASSERT_TRUE(nightModeFromCode("off", &m));
-  TEST_ASSERT_TRUE(m == NightMode::Off);
+  ASSERT_ENUM_EQ(NightMode::Off, m);
   TEST_ASSERT_FALSE(nightModeFromCode("dark", &m));
-  TEST_ASSERT_TRUE(m == NightMode::Off);
+  ASSERT_ENUM_EQ(NightMode::Off, m);
   TEST_ASSERT_EQUAL_STRING("schedule", nightModeCode(NightMode::Schedule));
-  TEST_ASSERT_TRUE(clampNightMode(7) == kDefaultNightMode);
-  TEST_ASSERT_TRUE(clampNightMode(1) == NightMode::Schedule);
+  ASSERT_ENUM_EQ(kDefaultNightMode, clampNightMode(7));
+  ASSERT_ENUM_EQ(NightMode::Schedule, clampNightMode(1));
 }
 
 static void test_clock_minutes(void) {
@@ -338,9 +336,8 @@ static void test_status_json(void) {
   s.sun_local.kind = SunTimes::Kind::PolarNight;
   s.polling = false;
   const std::string j = lightStatusJson(s);
-  TEST_ASSERT_TRUE(j.find("\"sun\":\"polar_night\",\"sunrise\":\"\",\"sunset\":\"\"") !=
-                   std::string::npos);
-  TEST_ASSERT_TRUE(j.find("\"polling\":false") != std::string::npos);
+  ASSERT_CONTAINS(j, "\"sun\":\"polar_night\",\"sunrise\":\"\",\"sunset\":\"\"");
+  ASSERT_CONTAINS(j, "\"polling\":false");
 }
 
 }  // namespace

@@ -4,6 +4,7 @@
 #include "cpa_predictor.h"
 #include "flight_screen.h"
 #include "table_view.h"  // AircraftRow
+#include "test_support.h"
 
 #include <vector>
 
@@ -39,7 +40,7 @@ static void test_zones_do_not_overlap_and_fit_on_screen(void) {
 
 static void test_empty_when_not_found(void) {
   CountdownDisplay cd = computeCountdownDisplay(CpaPrediction{}, Language::PL, false);  // found == false
-  TEST_ASSERT_TRUE(cd.mode == CountdownDisplay::Mode::Empty);
+  ASSERT_ENUM_EQ(CountdownDisplay::Mode::Empty, cd.mode);
   TEST_ASSERT_EQUAL_STRING("--", cd.bigText.c_str());
   TEST_ASSERT_EQUAL_STRING("BRAK LOTÓW W ZASIĘGU", cd.statusLabel.c_str());
   TEST_ASSERT_FALSE(cd.colorCoded);
@@ -47,13 +48,13 @@ static void test_empty_when_not_found(void) {
 
 static void test_empty_when_more_than_10s_past(void) {
   CountdownDisplay cd = computeCountdownDisplay(cpaAt(-10.001f), Language::PL, true);
-  TEST_ASSERT_TRUE(cd.mode == CountdownDisplay::Mode::Empty);
+  ASSERT_ENUM_EQ(CountdownDisplay::Mode::Empty, cd.mode);
   TEST_ASSERT_FALSE(cd.colorCoded);
 }
 
 static void test_passed_zone_orange(void) {
   CountdownDisplay cd = computeCountdownDisplay(cpaAt(-3.0f), Language::PL, true);
-  TEST_ASSERT_TRUE(cd.mode == CountdownDisplay::Mode::Seconds);
+  ASSERT_ENUM_EQ(CountdownDisplay::Mode::Seconds, cd.mode);
   TEST_ASSERT_EQUAL_HEX16(LCARS_PEACH, cd.color);
   TEST_ASSERT_EQUAL_STRING("-3", cd.bigText.c_str());
   TEST_ASSERT_EQUAL_STRING("s", cd.suffixText.c_str());
@@ -63,7 +64,7 @@ static void test_passed_zone_orange(void) {
 
 static void test_passed_zone_includes_exactly_minus_10(void) {
   CountdownDisplay cd = computeCountdownDisplay(cpaAt(-10.0f), Language::PL, true);
-  TEST_ASSERT_TRUE(cd.mode == CountdownDisplay::Mode::Seconds);
+  ASSERT_ENUM_EQ(CountdownDisplay::Mode::Seconds, cd.mode);
   TEST_ASSERT_EQUAL_HEX16(LCARS_PEACH, cd.color);
   TEST_ASSERT_EQUAL_STRING("-10", cd.bigText.c_str());
 }
@@ -82,13 +83,13 @@ static void test_approaching_zone_cyan(void) {
   CountdownDisplay at_60 = computeCountdownDisplay(cpaAt(60.0f), Language::PL, true);  // 60 is inclusive-cyan
   TEST_ASSERT_EQUAL_HEX16(LCARS_SKY, just_over.color);
   TEST_ASSERT_EQUAL_HEX16(LCARS_SKY, at_60.color);
-  TEST_ASSERT_TRUE(at_60.mode == CountdownDisplay::Mode::Seconds);
+  ASSERT_ENUM_EQ(CountdownDisplay::Mode::Seconds, at_60.mode);
   TEST_ASSERT_EQUAL_STRING("ZBLIŻA SIĘ", just_over.statusLabel.c_str());
 }
 
 static void test_minutes_mode_magenta_over_60(void) {
   CountdownDisplay cd = computeCountdownDisplay(cpaAt(60.001f), Language::PL, true);
-  TEST_ASSERT_TRUE(cd.mode == CountdownDisplay::Mode::Minutes);
+  ASSERT_ENUM_EQ(CountdownDisplay::Mode::Minutes, cd.mode);
   TEST_ASSERT_EQUAL_HEX16(LCARS_LILAC, cd.color);
   TEST_ASSERT_EQUAL_STRING("MIN", cd.suffixText.c_str());
   TEST_ASSERT_EQUAL_STRING("SZACOWANY CZAS", cd.statusLabel.c_str());
@@ -116,7 +117,7 @@ static void test_the_four_preview_values(void) {
 
   CountdownDisplay d = computeCountdownDisplay(cpaAt(240.0f), Language::PL, true);
   TEST_ASSERT_EQUAL_HEX16(LCARS_LILAC, d.color);
-  TEST_ASSERT_TRUE(d.mode == CountdownDisplay::Mode::Minutes);
+  ASSERT_ENUM_EQ(CountdownDisplay::Mode::Minutes, d.mode);
 }
 
 static void test_rounding_to_nearest_second(void) {

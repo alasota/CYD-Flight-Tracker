@@ -1,7 +1,9 @@
 // table_view: Screen 1 table: columns, rows, sorting, distance. CLAUDE.md "Screen 1 — Flights".
 #include <unity.h>
 
+#include "fixtures.h"
 #include "table_view.h"
+#include "test_support.h"
 
 namespace {
 
@@ -154,7 +156,7 @@ static void test_classify_phases_fills_phase_from_distance_and_vertical_rate(voi
   std::vector<AircraftRow> rows = {row};
   classifyPhases(rows, /*near_airport_km=*/5.0f, /*climb_threshold_mps=*/3.0f);
 
-  TEST_ASSERT_TRUE(rows[0].phase == Phase::TAKEOFF);
+  ASSERT_ENUM_EQ(Phase::TAKEOFF, rows[0].phase);
 }
 
 static void test_classify_phases_no_distance_forces_none(void) {
@@ -165,7 +167,7 @@ static void test_classify_phases_no_distance_forces_none(void) {
   std::vector<AircraftRow> rows = {row};
   classifyPhases(rows, 5.0f, 3.0f);
 
-  TEST_ASSERT_TRUE(rows[0].phase == Phase::NONE);
+  ASSERT_ENUM_EQ(Phase::NONE, rows[0].phase);
 }
 
 // ---- splitFeaturedAndRest ---------------------------------------------------
@@ -299,21 +301,11 @@ static void test_sort_empty_array_does_not_crash(void) {
 
 // ---- sortRowsForDisplay: airborne first (improvement #9) -------------------
 
-static AircraftRow displayRow(const char *callsign, float km, bool onGround, bool hasPos = true) {
-  AircraftRow r;
-  r.aircraft.callsign = callsign;
-  r.aircraft.on_ground = onGround;
-  r.aircraft.has_position = hasPos;
-  r.has_distance = hasPos;
-  r.distance_km = km;
-  return r;
-}
-
 static void test_display_order_puts_airborne_before_ground_traffic(void) {
   // The plane taxiing at the airport 3 km away must not take the featured
   // slot from one flying 9 km away.
-  std::vector<AircraftRow> rows = {displayRow("TAXI1", 3.0f, true), displayRow("AIR2", 9.0f, false),
-                                   displayRow("AIR1", 5.0f, false), displayRow("TAXI2", 6.0f, true)};
+  std::vector<AircraftRow> rows = {makeRow("TAXI1", 3.0f, true), makeRow("AIR2", 9.0f, false),
+                                   makeRow("AIR1", 5.0f, false), makeRow("TAXI2", 6.0f, true)};
   sortRowsForDisplay(rows);
   TEST_ASSERT_EQUAL_STRING("AIR1", rows[0].aircraft.callsign.c_str());
   TEST_ASSERT_EQUAL_STRING("AIR2", rows[1].aircraft.callsign.c_str());
@@ -322,8 +314,8 @@ static void test_display_order_puts_airborne_before_ground_traffic(void) {
 }
 
 static void test_display_order_puts_positionless_last(void) {
-  std::vector<AircraftRow> rows = {displayRow("NOPOS", 0.0f, false, false),
-                                   displayRow("TAXI", 2.0f, true), displayRow("AIR", 20.0f, false)};
+  std::vector<AircraftRow> rows = {makeRow("NOPOS", 0.0f, false, false),
+                                   makeRow("TAXI", 2.0f, true), makeRow("AIR", 20.0f, false)};
   sortRowsForDisplay(rows);
   TEST_ASSERT_EQUAL_STRING("AIR", rows[0].aircraft.callsign.c_str());
   TEST_ASSERT_EQUAL_STRING("TAXI", rows[1].aircraft.callsign.c_str());
@@ -331,7 +323,7 @@ static void test_display_order_puts_positionless_last(void) {
 }
 
 static void test_display_order_all_on_ground_still_nearest_first(void) {
-  std::vector<AircraftRow> rows = {displayRow("B", 4.0f, true), displayRow("A", 1.0f, true)};
+  std::vector<AircraftRow> rows = {makeRow("B", 4.0f, true), makeRow("A", 1.0f, true)};
   sortRowsForDisplay(rows);
   TEST_ASSERT_EQUAL_STRING("A", rows[0].aircraft.callsign.c_str());
 }

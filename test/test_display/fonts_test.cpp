@@ -12,8 +12,6 @@
 
 namespace {
 
-namespace {
-
 struct Font {
   const char *name;
   const uint8_t *data;
@@ -21,8 +19,6 @@ struct Font {
 const Font kFonts[] = {{"efont_16", lcars_efont_16},
                        {"efont_14", lcars_efont_14},
                        {"efont_10", lcars_efont_10}};
-
-}  // namespace
 
 static void test_every_allowed_character_has_a_glyph_in_every_font(void) {
   int allowed = 0;
