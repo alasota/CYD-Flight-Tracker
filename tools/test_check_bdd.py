@@ -19,6 +19,27 @@ void run_x_tests() {
 }
 """
 
+TEST_PY = """\
+import unittest
+
+
+class XTest(unittest.TestCase):
+    def test_a(self):
+        self.assertTrue(True)
+
+    def helper(self):
+        pass
+
+
+class OtherTest(unittest.TestCase):
+    def test_b(self):
+        pass
+
+
+if __name__ == "__main__":
+    unittest.main()
+"""
+
 
 class CheckBddTest(unittest.TestCase):
     def setUp(self):
@@ -147,6 +168,69 @@ class CheckBddTest(unittest.TestCase):
         table = check_bdd.markdown_list(p)
         self.assertIn("| Auto | `test_enrichment/cache_test.cpp` `test_evicts_oldest` |", table)
         self.assertIn("| By hand | on the board (manual) |", table)
+
+    # ---- Python tests (spec 13): @test=tools/<file>.py:<Class>.<method>
+
+    def python_test_file(self):
+        (self.root / "tools").mkdir(exist_ok=True)
+        (self.root / "tools" / "test_x.py").write_text(TEST_PY)
+
+    def test_python_test_tag_backed(self):
+        self.python_test_file()
+        p = self.feature("""\
+            Feature: F
+              @test=tools/test_x.py:XTest.test_a
+              Scenario: Python-backed
+                Then a
+              @test=tools/test_x.py:OtherTest.test_b
+              @test=test_enrichment/cache_test.cpp:test_evicts_oldest
+              Scenario: Both kinds
+                Then b
+            """)
+        self.assertEqual([], self.problems(p))
+        table = check_bdd.markdown_list(p)
+        self.assertIn("`tools/test_x.py`", table)
+        self.assertIn("XTest.test_a", table)
+        self.assertNotIn("**nothing**", table)
+
+    def test_python_test_tag_missing_class_or_method(self):
+        self.python_test_file()
+        p = self.feature("""\
+            Feature: F
+              @test=tools/test_nope.py:XTest.test_a
+              Scenario: A
+                Then a
+              @test=tools/test_x.py:NopeTest.test_a
+              Scenario: B
+                Then b
+              @test=tools/test_x.py:XTest.test_b
+              Scenario: C
+                Then c
+              @test=tools/test_x.py:XTest.helper
+              Scenario: D
+                Then d
+            """)
+        msgs = self.problems(p)
+        self.assertEqual(4, len(msgs), msgs)
+        self.assertIn("does not exist", msgs[0])
+        self.assertIn("has no class NopeTest", msgs[1])
+        self.assertIn("has no method test_b", msgs[2])  # test_b is OtherTest's, not XTest's
+        self.assertIn("helper", msgs[3])  # unittest never runs a method not named test*
+        self.assertFalse(any("malformed tag" in m for m in msgs), msgs)
+
+    def test_python_tag_outside_tools_or_without_method_is_malformed(self):
+        self.python_test_file()
+        p = self.feature("""\
+            Feature: F
+              @test=tools/test_x.py:XTest
+              Scenario: No method
+                Then a
+              @test=test_enrichment/test_x.py:XTest.test_a
+              Scenario: Not under tools
+                Then b
+            """)
+        msgs = self.problems(p)
+        self.assertEqual(2, sum("malformed tag" in m for m in msgs), msgs)
 
     def test_main_over_a_tree(self):
         self.feature("""\
