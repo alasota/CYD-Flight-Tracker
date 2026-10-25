@@ -1,7 +1,7 @@
 # Spec 13 — Strona projektu: historia zmian, zrzuty panelu, opis funkcji
 
-Z przeglądu strony (https://alasota.github.io/CYD-Flight-Tracker/) 2026-10-25. Status: **do
-zrobienia**. Dotyczy tylko strony projektu (`site/`, `tools/build_site.py`) — firmware bez zmian,
+Z przeglądu strony (https://alasota.github.io/CYD-Flight-Tracker/) 2026-10-25. Status: **w trakcie**.
+Dotyczy tylko strony projektu (`site/`, `tools/build_site.py`) — firmware bez zmian,
 żadnego wpływu na płytkę.
 
 ## Problem
