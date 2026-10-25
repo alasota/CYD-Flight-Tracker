@@ -4,6 +4,7 @@
 #include <string>
 
 #include "perf_stats.h"
+#include "test_support.h"
 
 namespace {
 
@@ -102,11 +103,11 @@ static void test_log_line(void) {
 
 static void test_json(void) {
   const std::string s = perfJson(sampleReport());
-  TEST_ASSERT_TRUE(s.find("\"uptime_s\":125") != std::string::npos);
-  TEST_ASSERT_TRUE(s.find("\"gap_max_ms\":14") != std::string::npos);
-  TEST_ASSERT_TRUE(s.find("\"buckets\":[11,0,0,0,0,0]") != std::string::npos);
-  TEST_ASSERT_TRUE(s.find("\"max_busy_ms\":1840") != std::string::npos);
-  TEST_ASSERT_TRUE(s.find("\"stack_free\":{\"ui\":3120,\"net\":5480}") != std::string::npos);
+  ASSERT_CONTAINS(s, "\"uptime_s\":125");
+  ASSERT_CONTAINS(s, "\"gap_max_ms\":14");
+  ASSERT_CONTAINS(s, "\"buckets\":[11,0,0,0,0,0]");
+  ASSERT_CONTAINS(s, "\"max_busy_ms\":1840");
+  ASSERT_CONTAINS(s, "\"stack_free\":{\"ui\":3120,\"net\":5480}");
   TEST_ASSERT_EQUAL_CHAR('{', s.front());
   TEST_ASSERT_EQUAL_CHAR('}', s.back());
 }

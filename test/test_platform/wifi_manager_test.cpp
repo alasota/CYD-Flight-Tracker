@@ -1,21 +1,22 @@
 // wifi_manager: WiFi status derivation. CLAUDE.md "Code conventions" (wifi_manager).
 #include <unity.h>
 
+#include "test_support.h"
 #include "wifi_manager.h"
 
 namespace {
 
 static void test_derive_status_prefers_connected(void) {
-  TEST_ASSERT_TRUE(deriveWifiStatus(true, true) == WifiStatus::Connected);
-  TEST_ASSERT_TRUE(deriveWifiStatus(true, false) == WifiStatus::Connected);
+  ASSERT_ENUM_EQ(WifiStatus::Connected, deriveWifiStatus(true, true));
+  ASSERT_ENUM_EQ(WifiStatus::Connected, deriveWifiStatus(true, false));
 }
 
 static void test_derive_status_portal_active_when_not_connected(void) {
-  TEST_ASSERT_TRUE(deriveWifiStatus(false, true) == WifiStatus::PortalActive);
+  ASSERT_ENUM_EQ(WifiStatus::PortalActive, deriveWifiStatus(false, true));
 }
 
 static void test_derive_status_connecting_when_neither(void) {
-  TEST_ASSERT_TRUE(deriveWifiStatus(false, false) == WifiStatus::Connecting);
+  ASSERT_ENUM_EQ(WifiStatus::Connecting, deriveWifiStatus(false, false));
 }
 
 static void test_status_label_matches_status(void) {

@@ -5,6 +5,7 @@
 #include <cstdlib>
 
 #include "sun_times.h"
+#include "test_support.h"
 
 namespace {
 
@@ -22,7 +23,7 @@ static void assertNear(int expected, int actual) {
 
 static void test_warsaw_midsummer(void) {
   const SunTimes s = computeSunTimes(2026, 6, 21, 52.2297f, 21.0122f);
-  TEST_ASSERT_TRUE(s.kind == SunTimes::Kind::Normal);
+  ASSERT_ENUM_EQ(SunTimes::Kind::Normal, s.kind);
   assertNear(hm(2, 14), s.sunrise_min);
   assertNear(hm(19, 1), s.sunset_min);
 }
@@ -65,10 +66,8 @@ static void test_southern_hemisphere(void) {
 }
 
 static void test_polar_day_and_night(void) {
-  TEST_ASSERT_TRUE(computeSunTimes(2026, 6, 21, 69.6492f, 18.9553f).kind ==
-                   SunTimes::Kind::PolarDay);  // Tromsø
-  TEST_ASSERT_TRUE(computeSunTimes(2026, 12, 21, 69.6492f, 18.9553f).kind ==
-                   SunTimes::Kind::PolarNight);
+  ASSERT_ENUM_EQ(SunTimes::Kind::PolarDay, computeSunTimes(2026, 6, 21, 69.6492f, 18.9553f).kind);  // Tromsø
+  ASSERT_ENUM_EQ(SunTimes::Kind::PolarNight, computeSunTimes(2026, 12, 21, 69.6492f, 18.9553f).kind);
 }
 
 static void test_shift_wraps_both_ways(void) {
