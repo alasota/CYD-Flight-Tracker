@@ -137,7 +137,8 @@ enum class OpenSkyPollStatus {
   NotDue,        // interval hasn't elapsed — `aircraft` is empty, ignore it
   Ok,            // fresh data in `aircraft` (may legitimately be empty)
   RateLimited,   // 429 — credits exhausted; still inside the backoff window
-  AuthError,     // 401 persisted through a token refresh — check credentials
+  AuthError,     // even an anonymous request got 401/403 (a rejected token
+                 // falls back to anonymous — spec 06 — and reads as Ok)
   NetworkError,  // transport failure or an unexpected HTTP status
 };
 
@@ -156,8 +157,12 @@ struct Config;  // config_store.h — full type only needed by the .cpp
 // home, using `cfg` for home/radius/credentials (no internal loadConfig()
 // — the caller owns config now, see review notes 4.3). Ensures a fresh
 // OAuth token first when credentials are set (falls back to anonymous
-// otherwise), retries once on 401, and reports 429/auth/transport failures
-// distinctly rather than collapsing them all to "empty".
+// otherwise). A 401/403 with a token gets one token refresh + retry; if the
+// fresh token is rejected too, the login state goes LoginFailed and the same
+// poll is repeated anonymously (opensky_auth decides each step). After a
+// rejected login the login server isn't asked again for 30 min
+// (kLoginRetryMs). Reports 429/auth/transport failures distinctly rather
+// than collapsing them all to "empty".
 OpenSkyPollResult fetchAircraftStates(const Config &cfg);
 
 // Non-blocking poll scheduler: call every loop() iteration with the

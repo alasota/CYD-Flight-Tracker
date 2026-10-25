@@ -31,19 +31,6 @@ OpenSkyAuthState onCredentials(const OpenSkyAuthState &s, uint32_t hash, bool ha
   return out;
 }
 
-OpenSkyAuthState onTokenResult(const OpenSkyAuthState &s, int httpCode, bool gotToken) {
-  OpenSkyAuthState out = s;
-  if (s.mode == OpenSkyAuthState::Mode::NoCredentials) return out;
-  if (httpCode == 200 && gotToken) {
-    out.mode = OpenSkyAuthState::Mode::Account;
-    out.lastHttpCode = 0;
-  } else if (httpCode == 400 || httpCode == 401 || httpCode == 403) {
-    out.mode = OpenSkyAuthState::Mode::LoginFailed;
-    out.lastHttpCode = httpCode;
-  }
-  return out;
-}
-
 TokenOutcome classifyTokenResponse(int httpCode, bool hasAccessToken) {
   if (httpCode == 200 && hasAccessToken) return TokenOutcome::Ok;
   if (httpCode == 400 || httpCode == 401 || httpCode == 403) return TokenOutcome::Rejected;
