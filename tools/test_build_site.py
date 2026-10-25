@@ -4,7 +4,7 @@
 No git, no network: releases() (the git part) is not called; the grouping, the roadmap
 assignment and the HTML are pure functions on lists. The HTML is checked through a small
 tree built with the standard library's html.parser (CI has no extra Python packages).
-Scenarios: spec/planned/13-project-page-layout.feature.
+Scenarios: spec/done/13-project-page-layout.feature.
 """
 
 import re

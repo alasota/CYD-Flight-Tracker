@@ -52,7 +52,9 @@ left, anything that needs the owner's decision — short.
 - Pure logic in its own module, hardware/SDK only in thin `#ifdef ARDUINO` adapters; everything
   pure gets a native Unity test in the suite of its context (`test/README.md` table).
 - BDD: each Scenario in the spec's `.feature` is verified by a test
-  (`@test=<suite>/<file>.cpp:<function>`) or by hand on the board (`@manual`). Gherkin keywords
+  (`@test=<suite>/<file>.cpp:<function>`; for Python tooling `@test=tools/<file>.py:<Class>.<method>`,
+  a `unittest` method `test*` in a top-level class) or by hand on the board / in a browser
+  (`@manual`). Gherkin keywords
   in English (`Feature/Scenario/Given/When/Then/And/But`), scenario text in the spec's language.
   A scenario's test is named after it (`test_<scenario_in_snake_case>`, shortened if needed) and
   checks the scenario's Then — not something easier.

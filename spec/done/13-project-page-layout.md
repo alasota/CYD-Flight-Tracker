@@ -1,6 +1,6 @@
 # Spec 13 — Strona projektu: historia zmian, zrzuty panelu, opis funkcji
 
-Z przeglądu strony (https://alasota.github.io/CYD-Flight-Tracker/) 2026-10-25. Status: **w trakcie**.
+Z przeglądu strony (https://alasota.github.io/CYD-Flight-Tracker/) 2026-10-25. Status: **zrobione** 2026-10-25, wydane w vNEXT.
 Dotyczy tylko strony projektu (`site/`, `tools/build_site.py`) — firmware bez zmian,
 żadnego wpływu na płytkę.
 
@@ -174,3 +174,49 @@ testowane w Pythonie. **Decyzja właściciela przed implementacją:**
 
 Wygląd (§2, §3, kryteria 3–5) jest i tak `@manual`: sprawdzany na zbudowanej stronie w
 przeglądarce, ze zrzutami w PR.
+
+## Wynik
+
+Zrobione 2026-10-25 na gałęzi `spec/13-project-page-layout`. Pomiary: `measure_site.py`
+(headless Edge, jak w „Problem”), zrzuty całej strony przed/po w PR.
+
+Kryteria akceptacji:
+
+1. ✅ `test_build_site.py` (42 testy), `test_release_plan.py`, `test_check_bdd.py`,
+   `check_bdd.py` zielone; `firmware.yml` uruchamia `test_build_site.py`.
+2. ✅ `build_site.py --out _site` na pełnej historii: 7 grup v1.6 … v1.0 (20 wydań), pozycje z
+   roadmapy 1, 1, 3, 1, 1, 1 dla v1.6 … v1.1, v1.0 tylko commity; commity zwinięte w „Commity (N)”,
+   commity zza kulis wyszarzone (`is_chore()`), nie ukryte.
+3. ✅ Wysokość przy 1280 px: **9 092 px** (przed: 12 389). Po krokach: 10 755 (krótsza tabela
+   Done + historia), 9 913 (kafelki), 9 092 (przeglądarka panelu).
+4. ✅ 375 px: szerokość przewijania 375 = szerokość okna (przed: 897 — strona jechała w bok),
+   zakładki zawijają się w dwie linie, ramka przewija się w środku. Wysokość 14 473 px (przed:
+   18 794).
+5. ✅ Bez JS: kopia zbudowanej strony bez `<script>` — brak rzędu zakładek, wszystkie 6 zrzutów
+   z podpisami jeden pod drugim; „Więcej” to natywny `<details>`.
+6. ✅ PL/EN: przełączanie PL → EN → PL zmienia zakładki, podpisy, „Więcej” i podsumowania
+   historii, `<html>` zostaje `js pl` / `js en`, dalej widać jeden panel. Treść dawnych kart
+   „Nowość” przeniesiona dosłownie do `<details>`; karta o dwóch rdzeniach → punkt w „Dla
+   dociekliwych” (z liczbami: najdłuższa przerwa ~0,1 s zamiast do 5,7 s).
+7. ✅ CLAUDE.md „Versioning & CI” → „Project page”: grupowanie historii, tabela Done z wersją,
+   sekcje `#features` / `#panel`, `test_build_site.py`; BDD z tagiem Pythona w „Spec → PR harness”
+   i `.claude/harness/conventions.md`.
+
+Decyzje i odstępstwa:
+
+- §7: wariant (a) — `check_bdd.py` przyjmuje `@test=tools/<plik>.py:<Klasa>.<metoda>` (metoda
+  `test*` w klasie najwyższego poziomu); ścieżka C++ bez zmian.
+- Grupa bez pozycji z roadmapy (v1.0): po rozwinięciu commity od razu, bez zagnieżdżonego
+  „Commity (N)” (decyzja właściciela).
+- ROADMAP.md dostał wiersz Done dla tego speca (decyzja właściciela), żeby po wydaniu miał
+  własny nagłówek w historii zmian.
+- `minmax(0, 1fr)` także w siatce historii zmian i w `.grid2/.grid3` (plan mówił tylko o
+  roadmapie) — zwinięte podsumowania historii (`nowrap`) też rozpychały stronę na 375 px.
+- Miniatury w kafelkach w skali 1:1 (320×240): pomniejszone pikselowo gubiły rzędy pikseli i
+  tekst ekranu był nieczytelny.
+- Kotwica `#dual-core` usunięta (nic do niej nie linkowało), `#night-mode` została (kafelek 3).
+
+Zostaje `@manual` (sprawdzone sondami w headless Edge, do obejrzenia w prawdziwej przeglądarce):
+budowa z pełnej historii, wysokość ≤ 9 500 px, 375 px bez przewijania w bok, zakładki (klik,
+strzałki, Home/End), bez JS, przełącznik PL/EN. Dla człowieka: wygląd obwódki fokusu, klik w zrzut
+otwiera PNG w nowej karcie (znaczniki sprawdza test).
