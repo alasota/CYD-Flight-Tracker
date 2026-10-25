@@ -1,2 +1,5 @@
 .pio
 _site
+.claude/work/
+.claude/settings.local.json
+__pycache__/

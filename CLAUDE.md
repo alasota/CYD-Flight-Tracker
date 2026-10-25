@@ -766,6 +766,9 @@ Spec: `spec/done/02-github-release-check.md` (built and tested on the board 2026
 - **Development versions = tags with a suffix** (`v1.3.0-rc.1`, `-beta.N`, `-dev.N`):
   `release.yml` marks them pre-release and skips the project page; `build_site.py` gives them no
   changelog entry. Release one: `git tag v1.3.0-rc.1 && git push origin v1.3.0-rc.1`.
+  Every PR gets one automatically (`pr.yml`, see "Versioning & CI"). The board parses only
+  `vX.Y.Z-dev.N` with **one** number (uint16), so PR builds use the workflow run number as N and
+  put the PR number in the release *title*.
 - Screenshots `update_prompt.png`, `web_firmware*.png`: `python tools/screenshots.py --device
   <board>` (web pages from `config_page_test.cpp` in `test_admin` with `SCREENSHOT_OUT`, headless Chrome; the
   display one from the board — LovyanGFX can't build for the PC without SDL).
@@ -1276,9 +1279,10 @@ mistakes here waste hours of debugging later.
   in the config web page footer — not on the display.
 - The script also writes `.pio/build/cyd/cyd-sky-tracker-<version>.bin` (copy of firmware.bin)
   and `version.txt`.
-- **GitHub Actions — three workflows** (`.github/workflows/`):
-  - `firmware.yml` — push to main / PRs / manual, and reusable (`workflow_call`): runs
-    `pio test -e native` and `pio test -e native-asan`, builds, uploads artifact `cyd-sky-tracker-<version>` with
+- **GitHub Actions — four workflows** (`.github/workflows/`):
+  - `firmware.yml` — push to main / manual, and reusable (`workflow_call`, inputs `version` =
+    forced `FW_VERSION`, `ref` = commit): runs `pio test -e native`, `pio test -e native-asan`,
+    the BDD check (`tools/test_check_bdd.py`, `tools/check_bdd.py`), builds, uploads artifact `cyd-sky-tracker-<version>` with
     `cyd-sky-tracker-<version>.bin` (app, OTA or 0x10000), `…-full.bin` (merged image, 0x0),
     `bootloader.bin`, `partitions.bin`, `boot_app0.bin`, `version.txt`, `SHA256SUMS.txt`.
   - `site.yml` — changes under `site/`, `docs/screenshots`, `docs/icons` on main / manual, and
@@ -1287,6 +1291,11 @@ mistakes here waste hours of debugging later.
     called with `firmware-artifact` it uses that artifact.
   - `release.yml` — tags `v*`: calls `firmware.yml`, creates the GitHub Release with its files,
     then calls `site.yml` with the same artifact.
+  - `pr.yml` — every push to a PR against main: version = next patch after the latest release +
+    `-dev.<run number>` (`v1.4.2` -> `v1.4.3-dev.57`), `firmware.yml` on the PR's head commit with
+    it, then (same-repo PRs only) a pre-release `v1.4.3-dev.57 · PR #12` (the PR's previous one is
+    deleted first) and one PR comment kept up to date. Closing the PR deletes its dev releases
+    and tags. Tags made with `GITHUB_TOKEN` don't trigger `release.yml` — on purpose.
   Platform and library versions are pinned in `platformio.ini` so CI and local builds match —
   bump them deliberately (and rerun `tools/subset_efont.py` after a LovyanGFX bump).
 - Release: `git tag v1.2.0 && git push origin v1.2.0`.
@@ -1311,6 +1320,23 @@ mistakes here waste hours of debugging later.
   are (not translated) — write them so they read well in a changelog.
   `site/img/device.jpg` is a placeholder for a real photo: 1600×1000 px JPG, ≤ ~300 KB.
 
+## Spec → PR harness (`/implement`)
+
+One spec (`spec/planned/NN-*.md`) or one GitHub issue -> its own branch -> a PR, done by agents:
+`/implement 05` / `/implement #12` (`.claude/skills/implement/SKILL.md`, the orchestrator) runs
+`spec-analyst` (plan + BDD `.feature`, then **stops for the owner's approval**) -> `test-author`
+(failing tests first) -> `implementer` -> `docs-writer` (docs, screenshots, spec to `done/`) ->
+`reviewer` (up to two fix rounds) -> PR from `.github/pull_request_template.md`. Shared rules:
+`.claude/harness/conventions.md`; hand-over files in `.claude/work/<slug>/` (git-ignored).
+- **BDD:** `spec/**/NN-name.feature` next to its spec; every Scenario is tagged
+  `@test=<suite>/<file>.cpp:<function>` (a Unity test that must exist and be `RUN_TEST`ed) or
+  `@manual` (checked on the board, listed in the PR). `tools/check_bdd.py` enforces it in CI;
+  `--list` / `--manual <feature>` print the PR tables.
+- Branches `spec/NN-name` / `issue/N-name`; the agents never commit to main or merge — merging
+  and tagging releases stay with the owner.
+- PR creation uses `gh` (not installed on this machine yet: `winget install GitHub.cli`,
+  `gh auth login`); without it the orchestrator leaves a compare link + `pr.md`.
+
 ## Commands
 
 - Build: `pio run`
@@ -1318,6 +1344,8 @@ mistakes here waste hours of debugging later.
 - Monitor: `pio device monitor -b 115200`
 - Test (native, logic only, no hardware): `pio test -e native` — one suite:
   `pio test -e native -f test_display`; with sanitizers (Linux): `pio test -e native-asan`
+- BDD check: `python tools/check_bdd.py` (its own tests: `python tools/test_check_bdd.py`)
+- Implement a spec / issue on a branch up to a PR: `/implement 05`, `/implement #12`
 - Screenshots of the config page (General, OpenSky, Firmware tabs) and the update question:
   `python tools/screenshots.py [--device cyd-sky.local]`
 

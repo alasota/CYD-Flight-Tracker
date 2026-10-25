@@ -1,0 +1,140 @@
+# Pull request: every push to a PR against main
+#   1. picks a development version: next patch after the latest release +
+#      "-dev.<run number>" (v1.4.2 -> v1.4.3-dev.57). The board's release_check
+#      reads exactly vX.Y.Z-dev.N (one number), so the PR number goes into the
+#      release title, not the tag; run numbers only grow, so the newest push of
+#      any PR is the "latest development version".
+#   2. runs firmware.yml on the PR's head commit with that version: native
+#      tests, native-asan, BDD check, build, OTA marker.
+#   3. publishes it as a GitHub pre-release "v1.4.3-dev.57 · PR #12" (the PR's
+#      previous dev release is deleted first) and keeps one comment on the PR
+#      up to date. A board whose settings page has "Show development versions"
+#      ticked offers it on the Firmware tab — test a PR without a cable.
+# When the PR is closed (merged or not) its dev releases and their tags go.
+# PRs from forks get the tests and the build, not the release (no write token).
+name: Pull request
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Development version
+        id: v
+        run: |
+          set -euo pipefail
+          latest=$(git tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+          latest=${latest:-v0.0.0}
+          IFS=. read -r major minor patch <<< "${latest#v}"
+          version="v${major}.${minor}.$((patch + 1))-dev.${{ github.run_number }}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Development version: **$version** (after $latest)" >> "$GITHUB_STEP_SUMMARY"
+
+  firmware:
+    needs: version
+    uses: ./.github/workflows/firmware.yml
+    permissions:
+      contents: read
+    with:
+      version: ${{ needs.version.outputs.version }}
+      ref: ${{ github.event.pull_request.head.sha }}
+
+  dev-release:
+    needs: [version, firmware]
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.firmware.outputs.artifact }}
+          path: dist
+
+      - name: Drop this PR's previous development release
+        run: |
+          set -euo pipefail
+          gh release list --repo "$REPO" --limit 200 --json tagName,name,isPrerelease \
+            --jq ".[] | select(.isPrerelease and (.name | endswith(\" · PR #$PR\"))) | .tagName" |
+          while read -r tag; do
+            echo "deleting $tag"
+            gh release delete "$tag" --repo "$REPO" --cleanup-tag --yes
+          done
+
+      - name: Publish the development release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.VERSION }}
+          target_commitish: ${{ github.event.pull_request.head.sha }}
+          name: "${{ env.VERSION }} · PR #${{ env.PR }}"
+          prerelease: true
+          files: dist/*
+          body: |
+            Development build of PR #${{ env.PR }} (${{ github.event.pull_request.title }}),
+            commit ${{ github.event.pull_request.head.sha }}. Deleted when the PR is closed.
+
+            On the board: settings page → Firmware → tick *Show development versions* →
+            *Install ${{ env.VERSION }}*. Or upload `cyd-sky-tracker-${{ env.VERSION }}.bin` on the
+            Firmware tab.
+
+      - name: Comment on the PR
+        run: |
+          set -euo pipefail
+          marker="<!-- cyd-dev-build -->"
+          url="https://github.com/$REPO/releases/tag/$VERSION"
+          body="$marker
+          **Development build: [\`$VERSION\`]($url)** — commit ${{ github.event.pull_request.head.sha }}, tests and BDD check passed.
+
+          Install on the board: settings page → *Firmware* → tick *Show development versions* → *Install $VERSION* (or upload \`cyd-sky-tracker-$VERSION.bin\` from the release)."
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+                 --jq ".[] | select(.body | contains(\"$marker\")) | .id" | head -n 1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/$id" -f body="$body" > /dev/null
+          else
+            gh api --method POST "repos/$REPO/issues/$PR/comments" -f body="$body" > /dev/null
+          fi
+
+  cleanup:
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Delete this PR's development releases and tags
+        run: |
+          set -euo pipefail
+          gh release list --repo "$REPO" --limit 200 --json tagName,name,isPrerelease \
+            --jq ".[] | select(.isPrerelease and (.name | endswith(\" · PR #$PR\"))) | .tagName" |
+          while read -r tag; do
+            echo "deleting $tag"
+            gh release delete "$tag" --repo "$REPO" --cleanup-tag --yes
+          done
