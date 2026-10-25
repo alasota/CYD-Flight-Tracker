@@ -654,6 +654,15 @@ static void test_render_alert_demo(void) {
   ConfigPageModel m = alertModel(Language::PL);
   m.cfg.web_password = "demo-password";
   m.tab = SettingsTab::OpenSky;
+  // The demo's login alert, also on the OpenSky tab: red pill + warning.
+  m.cfg.opensky_client_id = "demo-client";
+  m.cfg.opensky_client_secret = "demo-secret";
+  m.auth = onCredentials(OpenSkyAuthState{}, credentialsHash("demo-client", "demo-secret"), true);
+  m.auth.mode = OpenSkyAuthState::Mode::LoginFailed;
+  m.auth.lastHttpCode = 401;
+  m.auth.failedSinceMs = m.nowMs - 3u * 60000u;  // wraps if nowMs is 0: wrap-safe
+  m.auth.nextTokenTryMs = m.auth.failedSinceMs + kLoginRetryMs;
+  m.nowEpoch = 1792938720 + 180;  // 25.10.2026 14:35 local
   std::FILE *f = std::fopen((std::string(dir) + "/web_alert.html").c_str(), "wb");
   TEST_ASSERT_NOT_NULL(f);
   const std::string h = render(m);
