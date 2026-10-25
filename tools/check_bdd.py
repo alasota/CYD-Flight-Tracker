@@ -8,6 +8,10 @@ say how it is verified:
   @test=test_enrichment/lookup_cache_test.cpp:test_evicts_least_recently_used
       a native Unity test: path relative to test/, then the test function. The
       file must define the function and RUN_TEST() it. Several @test tags are fine.
+  @test=tools/test_build_site.py:ChangelogHtmlTest.test_text_is_escaped
+      a Python unittest under tools/: path relative to the repo root, then
+      <Class>.<method>. The class must define the method and its name must start
+      with "test" (unittest runs only those). Both kinds may back one scenario.
   @manual
       checked by hand on the board (listed in the PR's checklist, see --manual).
 
@@ -29,6 +33,7 @@ REPO = Path(__file__).resolve().parent.parent
 STEP = re.compile(r"^(Given|When|Then|And|But|\*)\b")
 SCENARIO = re.compile(r"^(Scenario|Scenario Outline|Scenario Template|Example):\s*(.+)$")
 TEST_TAG = re.compile(r"^@test=([\w./-]+\.cpp):(\w+)$")
+PY_TEST_TAG = re.compile(r"^@test=(tools/[\w./-]+\.py):(\w+)\.(\w+)$")
 
 
 class Scenario:
@@ -40,7 +45,17 @@ class Scenario:
 
     @property
     def tests(self):
-        return [m.groups() for m in (TEST_TAG.match(t) for t in self.tags) if m]
+        """[(file, name)]: (suite/file.cpp, function) or (tools/file.py, "Class.method")."""
+        out = []
+        for t in self.tags:
+            m = TEST_TAG.match(t)
+            if m:
+                out.append(m.groups())
+                continue
+            m = PY_TEST_TAG.match(t)
+            if m:
+                out.append((m.group(1), f"{m.group(2)}.{m.group(3)}"))
+        return out
 
     @property
     def manual(self):
@@ -98,6 +113,26 @@ def test_defined(test_root, rel, func):
     return ""
 
 
+def py_test_defined(repo_root, rel, name):
+    """'' if <repo_root>/<rel> has class Class with a test* method, else the reason."""
+    cls, method = name.split(".", 1)
+    path = repo_root / rel
+    if not path.is_file():
+        return f"test file {rel} does not exist"
+    src = path.read_text(encoding="utf-8", errors="replace")
+    m = re.search(r"^class\s+%s\b.*:[ \t]*$" % re.escape(cls), src, re.M)
+    if not m:
+        return f"{rel} has no class {cls}"
+    # The class body runs until the next top-level line (class, def, if __name__ ...).
+    end = re.search(r"^\S", src[m.end():], re.M)
+    body = src[m.end():m.end() + end.start()] if end else src[m.end():]
+    if not re.search(r"^[ \t]+def\s+%s\s*\(\s*self\b" % re.escape(method), body, re.M):
+        return f"{rel} has no method {method} in class {cls}"
+    if not method.startswith("test"):
+        return f"{rel}: {cls}.{method} isn't named test*, unittest never runs it"
+    return ""
+
+
 def check_file(feature_path, test_root):
     problems = []
     rel = feature_path.relative_to(REPO) if feature_path.is_relative_to(REPO) else feature_path
@@ -120,12 +155,16 @@ def check_file(feature_path, test_root):
         if not sc.tests and not sc.manual:
             bad(sc.line, f"scenario '{sc.title}' has neither @test=<file>:<function> nor @manual")
         for t in sc.tags:
-            if t.startswith("@test") and not TEST_TAG.match(t):
-                bad(sc.line, f"malformed tag {t} (expected @test=<suite>/<file>.cpp:<function>)")
+            if t.startswith("@test") and not (TEST_TAG.match(t) or PY_TEST_TAG.match(t)):
+                bad(sc.line, f"malformed tag {t} (expected @test=<suite>/<file>.cpp:<function> "
+                             f"or @test=tools/<file>.py:<Class>.<method>)")
         if "Then" not in sc.steps:
             bad(sc.line, f"scenario '{sc.title}' has no Then step")
         for f, func in sc.tests:
-            why = test_defined(test_root, f, func)
+            if f.endswith(".py"):  # Python paths are relative to the repo root, not test/
+                why = py_test_defined(test_root.parent, f, func)
+            else:
+                why = test_defined(test_root, f, func)
             if why:
                 bad(sc.line, f"scenario '{sc.title}': {why}")
     return problems
