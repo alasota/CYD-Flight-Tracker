@@ -25,6 +25,7 @@ parts NVS is only erased when the user ticks "erase device" (first install).
 """
 
 import argparse
+import collections
 import html
 import json
 import os
@@ -145,6 +146,57 @@ def both(en, pl):
     return '<span class="en">%s</span><span class="pl">%s</span>' % (en, pl)
 
 
+# ---- spec 13: changelog grouped by minor version (pure, tools/test_build_site.py)
+
+# One changelog entry per minor version. minor "v1.6"; tags newest first; date = the
+# newest release's (ISO, as git gives it); subjects = all its releases' commits, newest
+# release first; prev_tag = the newest tag of the next-older group, or None.
+Group = collections.namedtuple("Group", "minor tags date subjects prev_tag")
+
+
+def parse_version(tag):
+    """'v1.10.2' -> (1, 10, 2); anything else (dev tags, 'v1.6', '1.6.0') -> None."""
+    return None  # TODO(spec 13): stub from test-author
+
+
+def release_ranges(tags):
+    """All v* tags (any order) -> [(tag, git range)], newest first, stable tags only;
+    the oldest gets the tag alone (all history)."""
+    return []  # TODO(spec 13): stub from test-author
+
+
+def group_by_minor(rels):
+    """[(tag, date, subjects)] -> [Group], newest minor first (numeric order)."""
+    return []  # TODO(spec 13): stub from test-author
+
+
+def roadmap_done_by_version(sections):
+    """parse_roadmap() output -> {"v1.4": [(version, (item_en, item_pl)), ...]}: rows of
+    the Done section whose verdict starts with "Done in vX.Y.Z", sorted by version."""
+    return {}  # TODO(spec 13): stub from test-author
+
+
+def is_chore(subject):
+    """True for behind-the-scenes commits (tests, docs, specs, harness, release)."""
+    return False  # TODO(spec 13): stub from test-author
+
+
+def format_date(iso):
+    """'2026-10-25' -> '25.10.2026'; '' stays ''."""
+    return ""  # TODO(spec 13): stub from test-author
+
+
+def done_version(verdict_en, verdict_pl):
+    """'Done in v1.6.0: …' -> 'v1.6.0'; an unreleased (vNEXT) row -> ('the next release',
+    'następna wersja'); no version -> None."""
+    return None  # TODO(spec 13): stub from test-author
+
+
+def changelog_html(groups, done_by_minor=None):
+    """HTML of the changelog: one <details> per Group (see the plan)."""
+    return ""  # TODO(spec 13): stub from test-author
+
+
 def version_html(rels):
     if not rels:
         return ""
@@ -153,7 +205,9 @@ def version_html(rels):
         both("Current version", "Aktualna wersja"), html.escape(tag), html.escape(date))
 
 
-def changelog_html(rels):
+def legacy_changelog_html(rels):
+    # TODO(spec 13): the pre-spec-13 changelog, kept so the site still builds until
+    # changelog_html(groups, done_by_minor) is implemented — remove then.
     if not rels:
         return '<p class="muted center">%s</p>' % both("No releases yet.", "Jeszcze nic nie wydano.")
     blocks = []
@@ -187,7 +241,7 @@ def fill_releases(out):
             raise SystemExit("index.html has no %s marker" % marker)
     rels = releases()
     page = page.replace(VERSION_MARKER, version_html(rels))
-    page = page.replace(CHANGELOG_MARKER, changelog_html(rels))
+    page = page.replace(CHANGELOG_MARKER, legacy_changelog_html(rels))
     with open(index, "w", encoding="utf-8", newline="\n") as f:
         f.write(page)
     print("changelog: %d release(s)%s" % (len(rels), ", current " + rels[0][0] if rels else ""))

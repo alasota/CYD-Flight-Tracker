@@ -79,6 +79,7 @@ jobs:
         run: |
           python tools/test_check_bdd.py
           python tools/test_release_plan.py
+          python tools/test_build_site.py
           python tools/check_bdd.py
 
       - name: Build firmware
