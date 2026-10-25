@@ -95,6 +95,20 @@ def spec_number(head):
     return m.group(1) if m else None
 
 
+def unreleased(prs, is_released):
+    """PRs whose merge commit isn't in the latest release yet. is_released(sha) -> bool; a PR
+    without a known merge commit is kept (better listed twice than missed)."""
+    return [p for p in prs if not (p.get("merge_commit") and is_released(p["merge_commit"]))]
+
+
+def search_since(iso_utc):
+    """The merged-PR search starts a day before the tagged commit: a rebase merge's commit time
+    can be a second *before* the PR's merged_at, so the date alone can't tell what's released
+    (that was PR #4 showing up again after v1.6.1). unreleased() decides by ancestry."""
+    t = datetime.datetime.strptime(iso_utc, "%Y-%m-%dT%H:%M:%SZ") - datetime.timedelta(days=1)
+    return t.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 DONE_STATUS = re.compile(r"Status:\s*\*\*(zrobione|zaimplementowane|done)", re.I)
 
 
@@ -119,6 +133,13 @@ def git(*args):
                           text=True, encoding="utf-8").stdout.strip()
 
 
+def is_ancestor(sha, ref):
+    """True if commit sha is already in ref; False if not or if sha isn't known locally."""
+    r = subprocess.run(["git", "merge-base", "--is-ancestor", sha, ref], cwd=REPO_DIR,
+                       capture_output=True)
+    return r.returncode == 0
+
+
 def find_gh():
     found = shutil.which("gh")
     if found:
@@ -134,12 +155,13 @@ def merged_prs_since(iso_date):
         out = subprocess.run(
             [gh, "pr", "list", "--repo", GITHUB_REPO, "--state", "merged", "--base", "main",
              "--limit", "100", "--search", f"merged:>{iso_date}",
-             "--json", "number,title,headRefName,labels,mergedAt,url"],
+             "--json", "number,title,headRefName,labels,mergedAt,url,mergeCommit"],
             check=True, capture_output=True, text=True, encoding="utf-8").stdout
         prs = json.loads(out)
         return [{"number": p["number"], "title": p["title"], "head": p["headRefName"],
                  "labels": [l["name"] for l in p["labels"]], "merged_at": p["mergedAt"],
-                 "url": p["url"]} for p in prs]
+                 "url": p["url"], "merge_commit": (p.get("mergeCommit") or {}).get("oid")}
+                for p in prs]
     req = urllib.request.Request(
         f"https://api.github.com/repos/{GITHUB_REPO}/pulls?state=closed&base=main"
         "&sort=updated&direction=desc&per_page=100",
@@ -151,7 +173,7 @@ def merged_prs_since(iso_date):
         prs = json.load(r)
     return [{"number": p["number"], "title": p["title"], "head": p["head"]["ref"],
              "labels": [l["name"] for l in p["labels"]], "merged_at": p["merged_at"],
-             "url": p["html_url"]}
+             "url": p["html_url"], "merge_commit": p.get("merge_commit_sha")}
             for p in prs if p["merged_at"] and p["merged_at"] > iso_date]
 
 
@@ -184,7 +206,9 @@ def build_plan(bump_override=None, from_tag=None):
     latest = from_tag or latest_release(tags)
     # The tagged commit's time; a PR merged at that second is already in it.
     since_utc = utc_iso(git("log", "-1", "--format=%ct", latest)) if latest else "1970-01-01T00:00:00Z"
-    prs = merged_prs_since(since_utc)
+    prs = merged_prs_since(search_since(since_utc)) if latest else merged_prs_since(since_utc)
+    if latest:
+        prs = unreleased(prs, lambda sha: is_ancestor(sha, latest))
     for p in prs:
         p["kind"] = classify_pr(p["head"], p["labels"])
     bump = bump_override or choose_bump([p["kind"] for p in prs])

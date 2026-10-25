@@ -70,6 +70,22 @@ class SpecsToMoveTest(unittest.TestCase):
                           "spec/planned/11-clean.md"], moved)
 
 
+class UnreleasedTest(unittest.TestCase):
+    def test_pr_whose_merge_commit_is_in_the_latest_tag_is_not_listed_again(self):
+        # Regression: v1.6.2's plan listed PR #4, already in v1.6.1 — a rebase merge's commit
+        # time (18:37:46) is a second before the PR's merged_at (18:37:47), so a date window
+        # can't tell them apart; ancestry of the merge commit can.
+        prs = [{"number": 5, "merge_commit": "a0bd0df"},
+               {"number": 4, "merge_commit": "7e87f8c"},
+               {"number": 3, "merge_commit": None}]  # not known (API gave none) -> keep it
+        released = {"7e87f8c"}
+        kept = rp.unreleased(prs, lambda sha: sha in released)
+        self.assertEqual([5, 3], [p["number"] for p in kept])
+
+    def test_search_window_starts_a_day_before_the_tag(self):
+        self.assertEqual("2026-10-24T18:37:46Z", rp.search_since("2026-10-25T18:37:46Z"))
+
+
 class PlaceholderTest(unittest.TestCase):
     def test_only_bare_vnext_is_a_placeholder(self):
         self.assertTrue(rp.has_placeholder("| 5 | x | ⭐ | Done in vNEXT: y |"))
