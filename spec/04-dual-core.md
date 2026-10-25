@@ -643,7 +643,7 @@ z commita b8051e5 z samym `perf_stats` w `loop()` (krok 1); „po” = ten proje
 | Najdłuższa przerwa UI z ruchem webowym + „Sprawdź teraz” | **5,7 s** | **≤ 0,11 s** (pełne przerysowanie) |
 | Przerwy ≥ 250 ms („slow”) przez ~40 min | 2–5 na minutę | **0** |
 | p99 opóźnienia przebiegu UI | — | < 20 ms |
-| Strona ustawień `/` | 5,0 s | 0,13 s |
+| Strona ustawień `/` (każda zakładka) | 5,0 s | 0,27–0,32 s (po poprawce v1.4.1, §10.3.9) |
 | Zakładka Firmware | 4,95 s | 0,08 s |
 | `/backup.json` | 0,43 s | 0,08 s |
 | `/screenshot.bmp` (230 KB) | 3,46 s | 0,76–0,94 s (raz 3,2 s, gdy trwał polling) |
@@ -708,3 +708,14 @@ surowy odstęp zawsze byłby ≥ 20 ms (pierwsza wersja metryki tak liczyła i p
    do 41 KB na stałe, czyli poniżej 50 KB, przy których `release_check` w ogóle otwiera TLS do
    GitHuba (sprawdzanie i instalacja z GitHuba po cichu przestawały działać do restartu).
    Problem istniał już przed tym projektem; teraz blok ma stałe 57 KB od startu.
+9. **Błąd w v1.4.0, poprawiony po wydaniu: strona ustawień restartowała płytkę.** Renderer
+   strony wysyła setki drobnych kawałków HTML, a każde `sendContent()` w trybie chunked to trzy
+   zapisy TCP. Na jednym rdzeniu było to tylko wolne (~5 s na stronę — widać w pomiarze
+   „przed”). Na rdzeniu 0 te same tysiąc zapisów, plus `tiT` (lwIP) i `wifi`, które każdy z nich
+   budzi, zajmowały rdzeń bez przerwy przez ~8 s, więc watchdog (5 s, panic) restartował płytkę
+   przy każdym otwarciu panelu — u użytkownika wyglądało to jak „przyciski działają z dużym
+   opóźnieniem”. Pierwszy pomiar po zmianie (0,13 s) trafił na moment bez tego efektu i go
+   nie wychwycił. Poprawka: `sendPage()` zbiera HTML w kawałki ~1,4 KB (jeden segment TCP).
+   Wynik: każda zakładka 0,27–0,32 s; 144 zapytania do panelu w 100 s (mediana 129 ms, max
+   1,35 s w trakcie pollingu), zero błędów i zero restartów watchdoga. Wnioski: test na
+   płytce musi obejmować każdą zakładkę panelu i dłuższe klikanie, nie jedno zapytanie.

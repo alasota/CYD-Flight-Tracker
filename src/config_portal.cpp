@@ -174,7 +174,22 @@ void sendPage(ConfigPageModel model, int status = 200) {
   server.sendHeader("Cache-Control", "no-store");
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(status, "text/html; charset=utf-8", "");
-  renderConfigPage(model, [](const char *chunk) { server.sendContent(chunk, std::strlen(chunk)); });
+  // The renderer emits hundreds of small pieces; each sendContent() is three
+  // TCP writes (chunk size, data, CRLF). Sent one by one they kept core 0 —
+  // where this, lwIP and WiFi all run — busy for ~8 s per page, long enough
+  // for the task watchdog to restart the board. Collected into ~1.4 KB
+  // chunks (one TCP segment each) the page goes out in a few dozen writes.
+  static constexpr size_t kChunkBytes = 1400;
+  std::string pending;
+  pending.reserve(kChunkBytes + 512);
+  renderConfigPage(model, [&pending](const char *piece) {
+    pending.append(piece);
+    if (pending.size() >= kChunkBytes) {
+      server.sendContent(pending.data(), pending.size());
+      pending.clear();
+    }
+  });
+  if (!pending.empty()) server.sendContent(pending.data(), pending.size());
   server.sendContent("");  // 0-length chunk closes the chunked response
 }
 

@@ -814,7 +814,11 @@ check). Now:
   see "Firmware updates").
 - ⚠️ **Core 0's task watchdog panics** (`CONFIG_ESP_TASK_WDT_PANIC=1`, 5 s, idle task of CPU0
   checked): nothing in `net_task` may keep the CPU for seconds without yielding. Blocking socket
-  waits are fine (they yield); a tight loop is not.
+  waits are fine (they yield); a tight loop is not — and neither is a flood of tiny TCP writes:
+  each one wakes lwIP (`tiT`) and the WiFi task, all on core 0. v1.4.0 streamed the settings page
+  as hundreds of tiny `sendContent()` calls (3 TCP writes each): ~8 s of a fully busy core 0
+  per page, and the watchdog restarted the board whenever the page was opened. `sendPage()` now
+  collects ~1.4 KB per chunk (0.3 s per page). Send in large pieces.
 - **Heap:** ~143 KB free, largest block 57 KB (with ~8 aircraft). The NOW screen's countdown
   sprite (~30 KB) is created in `setup()` (`flightScreenReserveSprite()`) before WiFi and
   `net_task` allocate — created on the first visit to NOW it split the largest block to 41 KB,
