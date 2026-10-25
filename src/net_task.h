@@ -1,4 +1,4 @@
-// net_task — the network task on core 0 (spec/04-dual-core.md §5.6).
+// net_task — the network task on core 0 (spec/done/04-dual-core.md §5.6).
 //
 // Owns everything that talks to the network: WiFi (wifi_manager), NTP
 // (time_sync), the config web page + mDNS (config_portal), OpenSky polling

@@ -88,7 +88,7 @@ uint32_t configPortalSaveCount();
 
 // Where GET /screenshot.bmp gets its pixels — supplied by main.cpp, so this
 // module stays free of display code. The display belongs to the UI core
-// (spec/04-dual-core.md §5.7), so these are requests to it, made from the web
+// (spec/done/04-dual-core.md §5.7), so these are requests to it, made from the web
 // handler on the network core:
 //   begin(screen)  the UI switches to `screen` (-1 = keep) and stops drawing
 //                  until end(); false = the UI didn't answer in `timeoutMs`

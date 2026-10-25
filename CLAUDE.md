@@ -686,7 +686,7 @@ language / Jezyk wyswietlacza" select, values `pl` / `en`). Default: Polish.
 
 ## Firmware updates (OTA) & panel password
 
-Spec: `spec/01-ota-updates.md` (roadmap #1). Released in v1.1.0, tested on the board 2026-10-24.
+Spec: `spec/done/01-ota-updates.md` (roadmap #1). Released in v1.1.0, tested on the board 2026-10-24.
 
 - **Upload:** `POST /update[?size=N]` (multipart field `firmware`) on the config page —
   Firmware tab (XHR with a progress bar; a plain form post works too) or
@@ -727,7 +727,7 @@ Spec: `spec/01-ota-updates.md` (roadmap #1). Released in v1.1.0, tested on the b
 
 ## New versions from GitHub (release_check)
 
-Spec: `spec/02-github-release-check.md` (built and tested on the board 2026-10-24).
+Spec: `spec/done/02-github-release-check.md` (built and tested on the board 2026-10-24).
 
 - **Check:** `GET api.github.com/repos/<FW_UPDATE_REPO>/releases/latest` 2 min after boot, then
   daily (`If-None-Match` ETag -> 304 doesn't count against GitHub's 60/h). Only between OpenSky
@@ -767,7 +767,7 @@ Spec: `spec/02-github-release-check.md` (built and tested on the board 2026-10-2
 
 ## Concurrency — two cores (core_link, net_task)
 
-Spec: `spec/04-dual-core.md`. Before it, one `loop()` did everything and every HTTPS request froze
+Spec: `spec/done/04-dual-core.md`. Before it, one `loop()` did everything and every HTTPS request froze
 the screen (measured: ~0.8 s per OpenSky poll, up to 5.7 s with the settings page or the GitHub
 check). Now:
 
@@ -833,7 +833,7 @@ check). Now:
 
 ## Brightness & night mode (backlight, sun_times)
 
-Spec: `spec/03-brightness-night-mode.md` (built and tested on the board 2026-10-24).
+Spec: `spec/done/03-brightness-night-mode.md` (built and tested on the board 2026-10-24).
 
 - **Backlight:** `tft.setBrightness()` (LovyanGFX `Light_PWM`, GPIO21). LovyanGFX starts at
   127. Before this feature the board ran at half brightness all the time; `backlightBegin()`

@@ -1,6 +1,6 @@
 // backlight — automatic brightness from the CYD's light sensor (LDR on
 // GPIO34) and the night mode (by the clock, or sunset to sunrise), driving
-// the PWM backlight on GPIO21. See spec/03-brightness-night-mode.md.
+// the PWM backlight on GPIO21. See spec/done/03-brightness-night-mode.md.
 //
 // Split per CLAUDE.md "Testing": the sensor filter, the light -> brightness
 // curve, the night decision, touch wake-up and "may we poll OpenSky" are

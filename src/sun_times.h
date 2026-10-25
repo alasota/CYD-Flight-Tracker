@@ -1,5 +1,5 @@
 // sun_times — sunrise / sunset for a date and a place, computed on the board
-// (no network): the "sunset to sunrise" night mode (spec/03-brightness-night-mode.md).
+// (no network): the "sunset to sunrise" night mode (spec/done/03-brightness-night-mode.md).
 //
 // Pure — no Arduino / clock dependency (the date comes in as year / month /
 // day, the time zone is the caller's business) — tested under

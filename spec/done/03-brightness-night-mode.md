@@ -1,6 +1,6 @@
 # Spec 03 — Automatyczna jasność i tryb nocny
 
-Pozycja #1 z „Planned” w [ROADMAP.md](../ROADMAP.md) („Quick win: the CYD has a light sensor on
+Pozycja #1 z „Planned” w [ROADMAP.md](../../ROADMAP.md) („Quick win: the CYD has a light sensor on
 GPIO34 and a PWM backlight”). Status: **zrobione — wydane w v1.3.0** (przetestowane na płytce 2026-10-24) (decyzje
 właściciela: §8, wyniki i odstępstwa: §10).
 

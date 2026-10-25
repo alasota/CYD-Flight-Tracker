@@ -1,6 +1,6 @@
 // CYD Sky Tracker — main orchestration: the UI on core 1.
 //
-// Two cores, two jobs (spec/04-dual-core.md): net_task on core 0 does all
+// Two cores, two jobs (spec/done/04-dual-core.md): net_task on core 0 does all
 // the networking — WiFi, the config web page, OpenSky, hexdb.io, GitHub, OTA
 // — and publishes what the screens need as a NetState snapshot (core_link).
 // This file is loop() on core 1: the display, touch and everything drawn.

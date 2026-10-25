@@ -1,5 +1,5 @@
 // core_link — everything that crosses between the two ESP32 cores
-// (spec/04-dual-core.md §5.1-§5.3).
+// (spec/done/04-dual-core.md §5.1-§5.3).
 //
 // Core 0 runs the network task (net_task: WiFi, web page, OpenSky, hexdb.io,
 // GitHub, OTA); core 1 runs loop() = the UI (display, touch). They share

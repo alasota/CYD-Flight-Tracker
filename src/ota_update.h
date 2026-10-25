@@ -1,4 +1,4 @@
-// ota_update — firmware updates over WiFi (spec/01-ota-updates.md): checks
+// ota_update — firmware updates over WiFi (spec/done/01-ota-updates.md): checks
 // that an uploaded file really is this project's app image before the new
 // slot is activated, drives the write through a small OtaWriter interface
 // (config_portal plugs in arduino-esp32's Update), and decides when a freshly
@@ -165,7 +165,7 @@ class OtaSession {
 // flash a fix (web page up, or the WiFi setup hotspot) — and the UI loop on
 // the other core is alive (`uiAlive`: its heartbeat is fresh), so an image
 // whose display hangs while the network works still rolls back
-// (spec/04-dual-core.md). OpenSky trouble is deliberately not part of this.
+// (spec/done/04-dual-core.md). OpenSky trouble is deliberately not part of this.
 constexpr uint32_t kOtaValidAfterMs = 30000;
 bool shouldMarkAppValid(bool pendingVerify, uint32_t uptimeMs, bool reachable, bool uiAlive);
 

@@ -1,5 +1,5 @@
 // service_screen — the full-screen "maintenance" displays that replace the
-// normal screens for a moment (spec/01-ota-updates.md):
+// normal screens for a moment (spec/done/01-ota-updates.md):
 //   - firmware update in progress: title, "v1.2.0 -> v1.3.0", progress bar,
 //     percent (or KB when the size isn't known), "do not power off";
 //   - resetting the web panel password from the touchscreen at power-up:

@@ -2,7 +2,7 @@
 // by icao24, route by callsign) poll_pipeline performs on a given poll cycle.
 //
 // Each *new* (uncached) lookup is a blocking HTTPS round trip of a few
-// seconds. They run in net_task now (spec/04-dual-core.md), so the screen no
+// seconds. They run in net_task now (spec/done/04-dual-core.md), so the screen no
 // longer stalls, but the network task does — the web page and the next poll
 // wait — see CLAUDE.md review notes 1.1.
 // So a cycle is allowed all its free cache hits plus a small number of new

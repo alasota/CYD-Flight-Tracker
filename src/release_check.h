@@ -1,4 +1,4 @@
-// release_check — "is there a newer version on GitHub?" (spec/02-github-release-check.md):
+// release_check — "is there a newer version on GitHub?" (spec/done/02-github-release-check.md):
 // asks GitHub's API for the latest release once a day, says so on the config
 // page and once on the display, and after one confirmation downloads
 // cyd-sky-tracker-<tag>.bin from the release and installs it through

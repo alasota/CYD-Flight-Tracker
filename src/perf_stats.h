@@ -1,4 +1,4 @@
-// perf_stats — how responsive the firmware is (spec/04-dual-core.md §5.9).
+// perf_stats — how responsive the firmware is (spec/done/04-dual-core.md §5.9).
 //
 // GapStats: the time between two passes of the UI loop — the "freeze" a user
 // feels (a tap that isn't answered, a countdown that skips). BusyStats: how

@@ -1,6 +1,6 @@
 # Spec 04 — Dwa rdzenie: sieć na rdzeniu 0, ekran i dotyk na rdzeniu 1
 
-Pozycja #2 z „Planned” w [ROADMAP.md](../ROADMAP.md) („Fixes the 1–3 s UI freezes during HTTPS
+Pozycja #2 z „Planned” w [ROADMAP.md](../../ROADMAP.md) („Fixes the 1–3 s UI freezes during HTTPS
 requests (and the 3–4 s daily GitHub check); worth doing before more data sources”). Status:
 **zrobione i przetestowane na płytce 2026-10-25** (wyniki i odstępstwa: §10; decyzje
 właściciela: §8).

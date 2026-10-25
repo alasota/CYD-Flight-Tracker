@@ -84,7 +84,7 @@ jobs:
                  | grep -q "Verify return code: 0 (ok)"; then
               echo "$host: ok"
             else
-              echo "::warning title=GitHub CA changed::$host no longer verifies against src/github_ca.h — add its new root CA (spec/02-github-release-check.md)"
+              echo "::warning title=GitHub CA changed::$host no longer verifies against src/github_ca.h — add its new root CA (spec/done/02-github-release-check.md)"
             fi
           done
 

@@ -1,6 +1,6 @@
 # Spec 01 — Aktualizacje OTA (Over-The-Air)
 
-Pozycja #1 z [ROADMAP.md](../ROADMAP.md) („Do it first: the two OTA slots are already there, only
+Pozycja #1 z [ROADMAP.md](../../ROADMAP.md) („Do it first: the two OTA slots are already there, only
 the code is missing”). Status: **zrobione — wydane w v1.1.0** (przetestowane na płytce 2026-10-24).
 Wyniki i odstępstwa od pierwotnego projektu: §10.
 

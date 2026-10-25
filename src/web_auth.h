@@ -1,4 +1,4 @@
-// web_auth — the config web page's optional password (spec/01-ota-updates.md
+// web_auth — the config web page's optional password (spec/done/01-ota-updates.md
 // §5.7): password rules, what a settings-form submit does to the password,
 // whether a request is let through, a lockout after repeated wrong
 // passwords, and the "reset the password from the touchscreen" gesture.

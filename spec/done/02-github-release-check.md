@@ -4,7 +4,7 @@ Kontynuacja [spec 01](01-ota-updates.md) (§3 „Poza zakresem”: *„Automatyc
 Releases z urządzenia („jest nowa wersja v1.4.0 — zainstalować?”). Wymaga TLS do
 `api.github.com` + przekierowania na `objects.githubusercontent.com`; dobry kolejny krok, ale
 osobna specyfikacja.”*). Status: **zrobione i przetestowane na płytce 2026-10-24** (wyniki i
-odstępstwa: §10). W [ROADMAP.md](../ROADMAP.md) jako pozycja #2 w „Done”.
+odstępstwa: §10). W [ROADMAP.md](../../ROADMAP.md) jako pozycja #2 w „Done”.
 
 ## 1. Cel
 

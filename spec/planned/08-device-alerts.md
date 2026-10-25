@@ -233,7 +233,7 @@ tym samym `collectAlerts()` z bieżących danych, żeby panel zgadzał się z ek
   językach, bez znaków zabronionych przez `test_web_i18n`.
 - Link „Przejdź do: …” = `/?tab=<id>`. Brak ostrzeżeń = brak ramki (zero zmian w wyglądzie).
 
-## 4. Testy (po spec 07: `test_platform`, `test_ui`, `test_web`)
+## 4. Testy (po spec 07: `test_admin`, `test_display`, `test_platform`)
 
 - `device_alerts`: każda reguła z §2 osobno, w obie strony; kombinacje (login + limit naraz);
   `displaySeverity()`: tylko ostrzeżenie → Warning, ostrzeżenie + błąd → Error, nic → None;

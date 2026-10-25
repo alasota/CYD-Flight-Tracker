@@ -4,7 +4,7 @@ Z przeglądu kodu 2026-10-25, punkt 1.2. Status: **do zrobienia**.
 
 ## 1. Problem
 
-[opensky_client.cpp](../src/opensky_client.cpp) `fetchAircraftStates()`: gdy pobranie tokenu
+[opensky_client.cpp](../../src/opensky_client.cpp) `fetchAircraftStates()`: gdy pobranie tokenu
 OAuth się nie uda, kod **po cichu** przechodzi na zapytanie anonimowe. Anonimowe `/states/all`
 zwraca 200, więc stan to `Ok`. Skutki:
 
@@ -119,7 +119,7 @@ pominięty.
 
 ## 4. Testy
 
-`test_opensky_auth` (albo `test_net` po spec 07):
+`test_opensky` po spec 07, plik `opensky_auth_test.cpp`:
 
 - `classifyTokenResponse`: 200 + token → Ok; 200 bez tokenu → Transient; 400/401/403 → Rejected;
   0 / -1 / 500 / 503 → Transient.

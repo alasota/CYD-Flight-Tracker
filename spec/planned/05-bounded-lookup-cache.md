@@ -5,8 +5,8 @@ Z przeglądu kodu 2026-10-25, punkt 1.1. Status: **do zrobienia**.
 ## 1. Problem
 
 Cache wyników hexdb.io w RAM to trzy zwykłe `std::map` bez limitu i bez usuwania:
-`cache` w [aircraft_lookup.cpp](../src/aircraft_lookup.cpp) (po `icao24`), `routeCache` i
-`airportCache` w [route_lookup.cpp](../src/route_lookup.cpp). Każdy samolot widziany od startu
+`cache` w [aircraft_lookup.cpp](../../src/aircraft_lookup.cpp) (po `icao24`), `routeCache` i
+`airportCache` w [route_lookup.cpp](../../src/route_lookup.cpp). Każdy samolot widziany od startu
 zostaje w RAM-ie na zawsze (wpis `AircraftInfo` = 4 × `std::string` + węzeł mapy ≈ 150–250 B).
 
 Nad Warszawą to kilkaset nowych `icao24` na dobę. Przy ~143 KB wolnego heapu i największym
@@ -77,7 +77,7 @@ mniej (krótkie stringi mieszczą się w SSO). Jeśli pomiar na płytce (§5) po
 - Memo per poll w `net_task.cpp` (`memoAircraft` itd.) zostaje: jest czyszczone po każdym pollu,
   więc nie rośnie.
 
-## 4. Testy (`test/test_lookup_cache/` — albo `test_net` po spec 07)
+## 4. Testy (`test_enrichment` po spec 07, plik `lookup_cache_test.cpp`)
 
 - `put` / `find` / `contains` podstawowe; `put` istniejącego klucza nadpisuje bez wzrostu `size`.
 - Przepełnienie usuwa **najdawniej użyty**, nie najdawniej dodany (`find` odświeża).

@@ -29,7 +29,7 @@ void writeBmpHeader(uint8_t out[kBmpHeaderSize], int width, int height);
 int parseScreenshotScreenArg(const char *arg, int screenCount);
 
 // The capture is read in bands of rows (the UI reads band k+1 off the panel
-// while band k goes out over TCP — spec/04-dual-core.md §5.7). BMP is
+// while band k goes out over TCP — spec/done/04-dual-core.md §5.7). BMP is
 // bottom-up, so bands run from the bottom of the screen: band `index`
 // (0-based) covers rows y0..y0+rows-1, and they are sent from the last row of
 // the band to the first. bandCount = ceil(height / bandRows).

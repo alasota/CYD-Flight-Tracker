@@ -1,5 +1,5 @@
 // poll_pipeline — turns one /states/all answer into what the screens show
-// (spec/04-dual-core.md §5.4). Moved out of main.cpp's loop(), where it had no
+// (spec/done/04-dual-core.md §5.4). Moved out of main.cpp's loop(), where it had no
 // test at all.
 //
 // Steps (unchanged from the single-core firmware): rows nearest-first

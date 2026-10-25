@@ -1,5 +1,5 @@
 // net_config — shared bounds on a single blocking HTTP request. All of them
-// run in net_task on core 0 (spec/04-dual-core.md), so they no longer freeze
+// run in net_task on core 0 (spec/done/04-dual-core.md), so they no longer freeze
 // the screen — but the web page, the OpenSky schedule and the GitHub check
 // share that one task, so every HTTPClient call still has a hard deadline
 // rather than inheriting HTTPClient's untuned default — see CLAUDE.md review

@@ -1,5 +1,5 @@
 // hexdb_http — the one HTTPS GET to hexdb.io shared by aircraft_lookup and
-// route_lookup (spec/04-dual-core.md §5.8).
+// route_lookup (spec/done/04-dual-core.md §5.8).
 //
 // With keep-alive one TLS session serves a whole batch of lookups (one poll's
 // phase B) instead of a fresh handshake per request; hexdbSessionEnd() closes
