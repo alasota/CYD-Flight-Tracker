@@ -10,9 +10,9 @@
             "includePath": [
                 "C:/iot/CYD-Flight-Tracker/include",
                 "C:/iot/CYD-Flight-Tracker/src",
-                "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src",
                 "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/HTTPClient/src",
                 "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
+                "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src",
                 "C:/iot/CYD-Flight-Tracker/.pio/libdeps/cyd/ArduinoJson/src",
                 "C:/iot/CYD-Flight-Tracker/.pio/libdeps/cyd/WiFiManager",
                 "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
@@ -250,9 +250,9 @@
                 "path": [
                     "C:/iot/CYD-Flight-Tracker/include",
                     "C:/iot/CYD-Flight-Tracker/src",
-                    "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src",
                     "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/HTTPClient/src",
                     "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
+                    "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src",
                     "C:/iot/CYD-Flight-Tracker/.pio/libdeps/cyd/ArduinoJson/src",
                     "C:/iot/CYD-Flight-Tracker/.pio/libdeps/cyd/WiFiManager",
                     "C:/Users/artur/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
