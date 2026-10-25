@@ -92,6 +92,12 @@ std::string lightStateText(const BacklightStatus &s, Language lang) {
 
 uint32_t openSkyDailyCreditLimit(bool authenticated) { return authenticated ? 4000u : 400u; }
 
+// TODO(spec 06): stub from test-author
+std::string loginFailedDetailText(const OpenSkyAuthState & /*s*/, uint32_t /*nowMs*/,
+                                  std::time_t /*nowEpoch*/, Language /*lang*/) {
+  return {};
+}
+
 std::string quotaStatusText(const OpenSkyQuota &q, uint32_t resetInS, Language lang,
                             bool *exhausted) {
   *exhausted = false;

@@ -43,3 +43,33 @@ OpenSkyAuthState onTokenResult(const OpenSkyAuthState &s, int httpCode, bool got
   }
   return out;
 }
+
+// TODO(spec 06): stub from test-author
+TokenOutcome classifyTokenResponse(int /*httpCode*/, bool /*hasAccessToken*/) {
+  return TokenOutcome::Transient;
+}
+
+// TODO(spec 06): stub from test-author
+OpenSkyAuthState onTokenResult(const OpenSkyAuthState &s, TokenOutcome /*o*/, int /*httpCode*/,
+                               uint32_t /*nowMs*/) {
+  return s;
+}
+
+// TODO(spec 06): stub from test-author
+bool shouldTryToken(const OpenSkyAuthState & /*s*/, uint32_t /*nowMs*/) { return false; }
+
+// TODO(spec 06): stub from test-author
+bool planStatesRequest(const OpenSkyAuthState & /*s*/, bool /*tokenValid*/) { return false; }
+
+// TODO(spec 06): stub from test-author
+StatesDecision afterStatesResponse(const OpenSkyAuthState &s, int /*httpCode*/,
+                                   bool /*usedBearer*/, bool /*tokenRefreshedThisPoll*/,
+                                   uint32_t /*nowMs*/) {
+  return StatesDecision{StatesStep::Accept, s};
+}
+
+// TODO(spec 06): stub from test-author
+std::string authChangeLogLine(const OpenSkyAuthState & /*prev*/,
+                              const OpenSkyAuthState & /*next*/) {
+  return {};
+}

@@ -45,6 +45,17 @@
     "raises the limit to 4000.")                                                                   \
   X(StatusAccount, "Konto OpenSky skonfigurowane", "OpenSky account configured")                   \
   X(StatusAnonymous, "Tryb anonimowy", "Anonymous mode")                                           \
+  X(StatusLoginFailed, "Błąd logowania — tryb anonimowy", "Login failed — anonymous mode")         \
+  /* spec 06: below the red pill. {}: HTTP code, LoginFailedSince or "", anonymous */              \
+  /* limit, account limit, minutes to the next login attempt (fillTemplate()). */                  \
+  X(LoginFailedDetail,                                                                             \
+    "OpenSky odrzucił client_id / client_secret (HTTP {}{}). Urządzenie działa w trybie "          \
+    "anonimowym: limit {} kredytów dziennie zamiast {}. Sprawdź dane na stronie konta OpenSky "    \
+    "i zapisz je ponownie. Następna próba logowania za {} min.",                                   \
+    "OpenSky rejected the client_id / client_secret (HTTP {}{}). The device runs anonymously: "    \
+    "a limit of {} credits a day instead of {}. Check them on your OpenSky account page and "      \
+    "save them again. Next login attempt in {} min.")                                              \
+  X(LoginFailedSince, ", od {}", ", since {}")                                                     \
   X(ClientId, "Client ID", "Client ID")                                                            \
   X(ClientSecret, "Client secret", "Client secret")                                                \
   X(ShowSecret, "Pokaż", "Show")                                                                   \

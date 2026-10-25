@@ -1,4 +1,4 @@
-// config_page: config page HTML, tabs, credits readouts. CLAUDE.md "Code conventions" (config_portal / config_page).
+// config_page: config page HTML, tabs, credits readouts, OpenSky login state (spec 06). CLAUDE.md "Code conventions" (config_portal / config_page).
 #include <unity.h>
 
 #include <cstdio>
@@ -144,11 +144,6 @@ static void test_display_card(void) {
   h = render(m);
   ASSERT_CONTAINS(h, "<div id=\"ntopt\" hidden>");
   ASSERT_CONTAINS(h, "Set the location to work out sunrise and sunset.");
-}
-
-static void test_daily_limits(void) {
-  TEST_ASSERT_EQUAL_UINT32(400u, openSkyDailyCreditLimit(false));
-  TEST_ASSERT_EQUAL_UINT32(4000u, openSkyDailyCreditLimit(true));
 }
 
 static void test_credentials_need_both_fields(void) {
@@ -666,6 +661,187 @@ static void test_render_alert_demo(void) {
   std::fclose(f);
 }
 
+
+// ---- OpenSky login state on the OpenSky tab (spec 06 §3.3, §3.4) ---------------
+
+constexpr std::time_t kSince = 1792938720;  // 25.10.2026 14:32 (local, as formatDate() takes it)
+constexpr uint32_t kNowMs = 5000000u;
+
+// Credentials in cfg and an auth state for exactly these credentials.
+static ConfigPageModel authModel(OpenSkyAuthState::Mode mode, Language lang) {
+  ConfigPageModel m = baseModel();
+  m.cfg.web_language = lang;
+  m.tab = SettingsTab::OpenSky;
+  m.nowMs = kNowMs;
+  if (mode == OpenSkyAuthState::Mode::NoCredentials) return m;
+  m.cfg.opensky_client_id = "id";
+  m.cfg.opensky_client_secret = "secret";
+  m.auth = onCredentials(OpenSkyAuthState{}, credentialsHash("id", "secret"), true);
+  if (mode == OpenSkyAuthState::Mode::LoginFailed) {
+    // Rejected with 401 three minutes ago (14:32), the clock now says 14:35.
+    m.auth.mode = OpenSkyAuthState::Mode::LoginFailed;
+    m.auth.lastHttpCode = 401;
+    m.auth.failedSinceMs = kNowMs - 3u * 60000u;
+    m.auth.nextTokenTryMs = m.auth.failedSinceMs + kLoginRetryMs;  // 27 min from now
+    m.nowEpoch = kSince + 180;
+  }
+  return m;
+}
+
+// The opening tag of the #daily estimate div.
+static std::string dailyTag(const std::string &h) {
+  const size_t at = h.find("id=\"daily\"");
+  if (at == std::string::npos) return "";
+  const size_t start = h.rfind('<', at);
+  return h.substr(start, h.find('>', at) - start + 1);
+}
+
+// Scenario Outline: Pigułka na zakładce OpenSky odpowiada stanowi logowania
+static void test_opensky_pill_per_auth_state(void) {
+  using Mode = OpenSkyAuthState::Mode;
+  struct Row {
+    Mode mode;
+    Language lang;
+    const char *cls;
+    const char *text;
+  };
+  const Row rows[] = {
+      {Mode::NoCredentials, Language::PL, "pill", "Tryb anonimowy"},
+      {Mode::NoCredentials, Language::EN, "pill", "Anonymous mode"},
+      {Mode::Account, Language::PL, "pill ok", "Konto OpenSky skonfigurowane"},
+      {Mode::Account, Language::EN, "pill ok", "OpenSky account configured"},
+      {Mode::LoginFailed, Language::PL, "pill err", "Błąd logowania — tryb anonimowy"},
+      {Mode::LoginFailed, Language::EN, "pill err", "Login failed — anonymous mode"},
+  };
+  for (const Row &r : rows) {
+    const std::string h = render(authModel(r.mode, r.lang));
+    ASSERT_CONTAINS(h, std::string("<span class=\"") + r.cls + "\"><span class=\"dot\"></span>" +
+                           r.text + "</span>");
+  }
+}
+
+// Scenario: W stanie LoginFailed pod pigułką jest ostrzeżenie z kodem HTTP, czasem i następną próbą
+static void test_login_failed_warning_with_code_time_and_retry(void) {
+  const ConfigPageModel m = authModel(OpenSkyAuthState::Mode::LoginFailed, Language::PL);
+  const std::string h = render(m);
+  ASSERT_CONTAINS(h,
+                  "<div class=\"stat quota warn\" id=\"loginwarn\">OpenSky odrzucił client_id / "
+                  "client_secret (HTTP 401, od 25.10.2026 14:32). Urządzenie działa w trybie "
+                  "anonimowym: limit 400 kredytów dziennie zamiast 4000. Sprawdź dane na stronie "
+                  "konta OpenSky i zapisz je ponownie. Następna próba logowania za 27 min.</div>");
+  // Right below the pill, before the client id field.
+  const size_t pill = h.find("class=\"pill err\"");
+  const size_t warn = h.find("id=\"loginwarn\"");
+  const size_t cid = h.find("name=\"client_id\"");
+  TEST_ASSERT_TRUE(pill != std::string::npos && warn != std::string::npos && pill < warn &&
+                   warn < cid);
+
+  ASSERT_STR_EQ("OpenSky rejected the client_id / client_secret (HTTP 401, since 25.10.2026 "
+                "14:32). The device runs anonymously: a limit of 400 credits a day instead of "
+                "4000. Check them on your OpenSky account page and save them again. Next login "
+                "attempt in 27 min.",
+                loginFailedDetailText(m.auth, m.nowMs, m.nowEpoch, Language::EN));
+}
+
+// Scenario: Bez zsynchronizowanego zegara ostrzeżenie pomija czas „od”
+static void test_login_failed_warning_without_clock(void) {
+  for (Language lang : {Language::PL, Language::EN}) {
+    ConfigPageModel m = authModel(OpenSkyAuthState::Mode::LoginFailed, lang);
+    m.nowEpoch = 0;
+    const std::string text = loginFailedDetailText(m.auth, m.nowMs, 0, lang);
+    ASSERT_CONTAINS(text, "(HTTP 401).");
+    ASSERT_NOT_CONTAINS(text, "2026");
+    ASSERT_NOT_CONTAINS(text, "1970");
+    ASSERT_NOT_CONTAINS(text, ":32");
+    const std::string h = render(m);
+    ASSERT_CONTAINS(h, "id=\"loginwarn\">" + text + "</div>");
+  }
+}
+
+// Scenario: Ostrzeżenia o logowaniu nie ma w stanach Account i NoCredentials
+static void test_no_login_warning_unless_failed(void) {
+  for (OpenSkyAuthState::Mode mode :
+       {OpenSkyAuthState::Mode::Account, OpenSkyAuthState::Mode::NoCredentials}) {
+    for (Language lang : {Language::PL, Language::EN}) {
+      const std::string h = render(authModel(mode, lang));
+      ASSERT_NOT_CONTAINS(h, "loginwarn");
+      ASSERT_NOT_CONTAINS(h, "class=\"pill err\"");
+      ASSERT_NOT_CONTAINS(h, "OpenSky odrzucił");
+      ASSERT_NOT_CONTAINS(h, "OpenSky rejected");
+    }
+  }
+}
+
+// Scenario: W stanie LoginFailed szacunek kredytów dziennie porównywany jest z limitem 400
+static void test_daily_limit_is_anonymous_when_login_failed(void) {
+  ConfigPageModel m = authModel(OpenSkyAuthState::Mode::LoginFailed, Language::EN);
+  m.cfg.poll_interval_s = 30;  // 2880 credits a day
+  std::string h = render(m);
+  ASSERT_CONTAINS(h, "<b>2880</b> credits a day");
+  ASSERT_CONTAINS(h, "limit 400<div class=\"warn\">");
+
+  m = authModel(OpenSkyAuthState::Mode::Account, Language::EN);
+  m.cfg.poll_interval_s = 30;
+  h = render(m);
+  ASSERT_CONTAINS(h, "<b>2880</b> credits a day");
+  ASSERT_CONTAINS(h, "limit 4000</div>");
+  ASSERT_NOT_CONTAINS(h, "<div class=\"warn\">");
+}
+
+// Scenario: Świeżo zapisane inne dane logowania od razu pokazują zieloną pigułkę
+static void test_just_saved_credentials_show_account(void) {
+  ConfigPageModel m = authModel(OpenSkyAuthState::Mode::LoginFailed, Language::EN);
+  m.auth.credentialsHash = credentialsHash("old-id", "old-secret");  // learnt for the old ones
+  m.cfg.poll_interval_s = 30;
+  const std::string h = render(m);
+  ASSERT_CONTAINS(h, "<span class=\"pill ok\"><span class=\"dot\"></span>OpenSky account configured");
+  ASSERT_CONTAINS(h, "limit 4000</div>");
+  ASSERT_NOT_CONTAINS(h, "loginwarn");
+  ASSERT_NOT_CONTAINS(h, "class=\"pill err\"");
+  ASSERT_NOT_CONTAINS(dailyTag(h), "data-lf");
+}
+
+// Edge case: minutes to the next try round up and never go below 1.
+static void test_login_failed_detail_minutes_round_up(void) {
+  OpenSkyAuthState s = authModel(OpenSkyAuthState::Mode::LoginFailed, Language::PL).auth;
+  s.nextTokenTryMs = kNowMs + 26u * 60000u + 1000u;  // 26 min 1 s left
+  ASSERT_CONTAINS(loginFailedDetailText(s, kNowMs, 0, Language::PL), "logowania za 27 min.");
+  s.nextTokenTryMs = kNowMs + 60000u;  // exactly 1 min
+  ASSERT_CONTAINS(loginFailedDetailText(s, kNowMs, 0, Language::EN), "attempt in 1 min.");
+  s.nextTokenTryMs = kNowMs;  // due right now
+  ASSERT_CONTAINS(loginFailedDetailText(s, kNowMs, 0, Language::EN), "attempt in 1 min.");
+  s.nextTokenTryMs = kNowMs - 5000u;  // already past (the poll that retries hasn't run yet)
+  ASSERT_CONTAINS(loginFailedDetailText(s, kNowMs, 0, Language::EN), "attempt in 1 min.");
+}
+
+// Edge case: millis() wrapped between the rejection and now — "since" and the minutes stay right.
+static void test_login_failed_detail_across_millis_rollover(void) {
+  OpenSkyAuthState s = authModel(OpenSkyAuthState::Mode::LoginFailed, Language::EN).auth;
+  const uint32_t now = 2u * 60000u;                    // 2 min after the wrap
+  s.failedSinceMs = UINT32_MAX - 60000u + 1u;          // 1 min before the wrap -> 3 min ago
+  s.nextTokenTryMs = s.failedSinceMs + kLoginRetryMs;  // 27 min from now
+  const std::string text = loginFailedDetailText(s, now, kSince + 180, Language::EN);
+  ASSERT_CONTAINS(text, "(HTTP 401, since 25.10.2026 14:32).");
+  ASSERT_CONTAINS(text, "attempt in 27 min.");
+}
+
+// Edge case: the live estimate's script learns about LoginFailed through data-lf.
+static void test_login_failed_marks_live_estimate(void) {
+  ASSERT_CONTAINS(dailyTag(render(authModel(OpenSkyAuthState::Mode::LoginFailed, Language::PL))),
+                  "data-lf=\"1\"");
+  for (OpenSkyAuthState::Mode mode :
+       {OpenSkyAuthState::Mode::Account, OpenSkyAuthState::Mode::NoCredentials}) {
+    ASSERT_NOT_CONTAINS(dailyTag(render(authModel(mode, Language::PL))), "data-lf");
+  }
+}
+
+// Edge case: the red pill has its own colour rule.
+static void test_login_failed_pill_style(void) {
+  const std::string h = render(baseModel());
+  ASSERT_CONTAINS(h, ".pill.err{color:var(--err)}");
+  ASSERT_CONTAINS(h, ".pill.err .dot{background:var(--err)}");
+}
+
 }  // namespace
 
 void run_config_page_tests() {
@@ -677,7 +853,6 @@ void run_config_page_tests() {
   RUN_TEST(test_tab_ids_round_trip);
   RUN_TEST(test_daily_credits);
   RUN_TEST(test_daily_credits_rounding_and_zero_interval);
-  RUN_TEST(test_daily_limits);
   RUN_TEST(test_daily_credits_with_a_night_pause);
   RUN_TEST(test_paused_minutes_follow_the_settings);
   RUN_TEST(test_light_state_text);
@@ -711,4 +886,14 @@ void run_config_page_tests() {
   RUN_TEST(test_alert_card_errors_first_and_worst_colour);
   RUN_TEST(test_alert_card_is_above_the_tabs_on_every_tab);
   RUN_TEST(test_render_alert_demo);
+  RUN_TEST(test_opensky_pill_per_auth_state);
+  RUN_TEST(test_login_failed_warning_with_code_time_and_retry);
+  RUN_TEST(test_login_failed_warning_without_clock);
+  RUN_TEST(test_no_login_warning_unless_failed);
+  RUN_TEST(test_daily_limit_is_anonymous_when_login_failed);
+  RUN_TEST(test_just_saved_credentials_show_account);
+  RUN_TEST(test_login_failed_detail_minutes_round_up);
+  RUN_TEST(test_login_failed_detail_across_millis_rollover);
+  RUN_TEST(test_login_failed_marks_live_estimate);
+  RUN_TEST(test_login_failed_pill_style);
 }
