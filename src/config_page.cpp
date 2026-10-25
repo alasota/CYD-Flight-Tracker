@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <vector>
 
 #include "config_portal.h"  // openSkyCreditCost()
 #include "time_sync.h"      // formatDate() / formatTime() — "checked" time
@@ -29,6 +30,22 @@ SettingsTab settingsTabFromArg(const std::string &arg) {
   if (arg == "backup") return SettingsTab::Backup;
   if (arg == "firmware") return SettingsTab::Firmware;
   return SettingsTab::Location;
+}
+
+WebStr settingsTabLabel(SettingsTab tab) {
+  switch (tab) {
+    case SettingsTab::OpenSky:
+      return WebStr::TabOpenSky;
+    case SettingsTab::General:
+      return WebStr::TabGeneral;
+    case SettingsTab::Backup:
+      return WebStr::TabBackup;
+    case SettingsTab::Firmware:
+      return WebStr::TabFirmware;
+    case SettingsTab::Location:
+    default:
+      return WebStr::TabLocation;
+  }
 }
 
 bool hasOpenSkyCredentials(const Config &cfg) {
@@ -150,7 +167,7 @@ const char kStyle[] =
     "<style>"
     ":root{--accent:#ff9966;--accent-soft:#ffcc99;--on-accent:#17181c;--bg:#17181c;"
     "--card:#1d1f24;--field:#22242a;--line:#33353d;--text:#e7e7eb;--muted:#9a9ca6;"
-    "--ok:#7bd37b;--err:#ff7a7a;color-scheme:dark}"
+    "--ok:#7bd37b;--err:#ff7a7a;--alert:#ff3333;--warn:#ff8000;color-scheme:dark}"
     "*{box-sizing:border-box}"
     "body{margin:0;background:var(--bg);color:var(--text);"
     "font:15px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif}"
@@ -211,8 +228,20 @@ const char kStyle[] =
     ".msg.err{color:var(--err);border-color:#553030;background:#271b1b}"
     "progress{width:100%;height:10px;margin:4px 0 6px;accent-color:var(--accent)}"
     "button:disabled{opacity:.5;cursor:default}"
-    ".alert{color:var(--err);border:1px solid #553030;background:#271b1b;border-radius:10px;"
+    ".nopw{color:var(--err);border:1px solid #553030;background:#271b1b;border-radius:10px;"
     "padding:11px 13px;margin-bottom:16px;font-size:.875rem}"
+    // Device alerts: the display's "!" badge (a filled circle, black "!") in
+    // the alert's colour, the card above the tabs.
+    ".bang{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;"
+    "width:22px;height:22px;border-radius:50%;background:var(--alert);color:#000;"
+    "font-weight:800;font-size:.85rem;line-height:1}"
+    ".bang.warn{background:var(--warn)}"
+    ".card.alert{border-color:#553030}.card.alert.warn{border-color:#5a3a14}"
+    ".card.alert .ah,.card.alert .ai{display:flex;gap:12px;align-items:flex-start}"
+    ".card.alert .ah{margin-bottom:6px}.card.alert .ah b{font-size:1rem}"
+    ".card.alert .ai{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}"
+    ".card.alert .ai p{margin:4px 0 0;font-size:.875rem;color:var(--muted)}"
+    ".card.alert .ai .go{display:block;text-align:right;font-size:.85rem;margin-top:6px}"
     "footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:32px}"
     "a{color:var(--accent-soft)}"
     "[hidden]{display:none!important}"
@@ -578,6 +607,41 @@ void displayCard(Writer &w, const ConfigPageModel &m, Language lang) {
   w.raw("</div></div>");
 }
 
+// Above the tabs, on every tab: what the display's "!" means and each active
+// alert with why, what to do and a link to its tab (spec 08 §3.6).
+void alertCard(Writer &w, const ConfigPageModel &m, Language lang) {
+  const std::vector<AlertId> ids = alertsInOrder(m.alerts, /*displayOnly=*/false);
+  if (ids.empty()) return;
+  AlertSeverity worst = AlertSeverity::None;
+  for (AlertId id : ids) worst = std::max(worst, alertDef(id).severity);
+  const std::string worstClass = alertWebClass(worst);
+  w.raw("<div class=\"card alert " + worstClass + "\" id=\"alerts\"><div class=\"ah\">"
+        "<span class=\"bang " + worstClass + "\">!</span><div><b>");
+  w.t(WebStr::AlertCardTitle);
+  w.raw("</b><div class=\"hint\">");
+  w.t(WebStr::AlertCardIntro);
+  w.raw("</div></div></div>");
+  for (AlertId id : ids) {
+    const AlertDef &def = alertDef(id);
+    const std::string cls = alertWebClass(def.severity);
+    w.raw("<div class=\"ai " + cls + "\" id=\"alert-" + def.code + "\"><span class=\"bang " +
+          cls + "\">!</span><div><b>");
+    w.t(def.webTitle);
+    w.raw("</b><p>");
+    w.esc(alertWebWhy(id, m.alertDetails, m.nowMs, lang));
+    w.raw("</p><p>");
+    w.t(def.webAction);
+    w.raw("</p><a class=\"go\" href=\"/?tab=");
+    w.raw(settingsTabId(def.tab));
+    w.raw("\">→ ");
+    w.t(WebStr::AlertGoTo);
+    w.raw(" ");
+    w.t(settingsTabLabel(def.tab));
+    w.raw("</a></div></div>");
+  }
+  w.raw("</div>");
+}
+
 // <form id=ID ... action=/update/install><input type=hidden name=tag value=TAG></form>
 void installForm(Writer &w, const char *id, const std::string &tag) {
   w.raw("<form id=\"");
@@ -628,19 +692,18 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
     w.raw("</div>");
   }
 
+  alertCard(w, m, lang);
+
   // ---- tab bar
   w.raw("<div class=\"tabs\" role=\"tablist\">");
   const SettingsTab tabs[kSettingsTabCount] = {SettingsTab::Location, SettingsTab::OpenSky,
                                                SettingsTab::General, SettingsTab::Backup,
                                                SettingsTab::Firmware};
-  const WebStr tabLabels[kSettingsTabCount] = {WebStr::TabLocation, WebStr::TabOpenSky,
-                                               WebStr::TabGeneral, WebStr::TabBackup,
-                                               WebStr::TabFirmware};
   for (int i = 0; i < kSettingsTabCount; ++i) {
     w.raw("<button type=\"button\" data-t=\"");
     w.raw(settingsTabId(tabs[i]));
     w.raw(tabs[i] == m.tab ? "\" class=\"on\">" : "\">");
-    w.t(tabLabels[i]);
+    w.t(settingsTabLabel(tabs[i]));
     w.raw("</button>");
   }
   w.raw("</div>");
@@ -792,7 +855,7 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
     w.t(WebStr::AccessPasswordSet);
     w.raw("</span>");
   } else {
-    w.raw("<div class=\"alert\">");
+    w.raw("<div class=\"nopw\">");
     w.t(WebStr::AccessNoPassword);
     w.raw("</div>");
   }
@@ -840,7 +903,7 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   // ---- Firmware: OTA update. Its controls belong to the #fw form.
   w.sectionOpen(SettingsTab::Firmware, m.tab);
   if (!hasPassword) {
-    w.raw("<div class=\"alert\">");
+    w.raw("<div class=\"nopw\">");
     w.t(WebStr::AccessNoPassword);
     w.raw("</div>");
   }

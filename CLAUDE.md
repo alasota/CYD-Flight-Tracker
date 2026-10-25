@@ -281,6 +281,8 @@ switching feels like changing a mode on one console, not jumping between apps.
   `SKY TRACKER          ● 7 LOTÓW          18.10.2026 09:11`
   - **Left:** app name `kStatusBarAppName` ("SKY TRACKER"), small font, dim lavender
     (`THEME_CHROME_DIM`).
+  - **Device-alert "!"** (only when an alert is active): 13 px red / orange circle 4 px right of
+    the name — see "Device alerts". Tapping it opens the message screen.
   - **Centre:** a **health dot** (`statusBarHealthColor()`: green = data OK, yellow =
     rate-limited / backing off, red = auth or network error, i.e. the list may be stale) and the
     **number of aircraft in range** in white, with the correct plural (PL `1 LOT` / `3 LOTY` /
@@ -880,6 +882,51 @@ Spec: `spec/done/03-brightness-night-mode.md` (built and tested on the board 202
   sunrise 07:17, sunset 17:25`, `[light] touch at night: awake for 60 s (screen lit)`,
   `[light] polling paused (night)` / `resumed (touch)`.
 
+## Device alerts — the "!" (device_alerts)
+
+Spec: `spec/done/08-device-alerts.md`. One way for the device to say "this needs your
+attention", separate from the health dot (the dot = the data feed right now; the "!" = something
+to fix or to know, even while data flows — anonymous after a failed login: green dot, red "!").
+
+- **Derived, never remembered** (`collectAlerts(AlertInputs)`, pure): an alert disappears by
+  itself when its cause does; nothing to acknowledge, closing the message doesn't clear it.
+  v1: `OpenSkyLoginFailed` (error, `OpenSkyAuthState::Mode::LoginFailed`),
+  `OpenSkyQuotaExhausted` (error, last answer a 429), `OpenSkyBudgetOverLimit` (warning,
+  `openSkyDailyCredits()` > `openSkyDailyLimit(auth)` — 400 anonymous / in LoginFailed, 4000
+  with an account; shown right after saving such settings, before the credits run out).
+- **A new alert** = a row in `kAlertDefs[]` (severity, `onDisplay`, settings tab, `Str` title,
+  `WebStr` title + action, log code) + a rule in `collectAlerts()` + texts in `i18n.h` /
+  `web_i18n.h` (PL + EN; numbers via `fillTemplate()` "{}" placeholders) + the body/why case in
+  `alertDisplayBody()` / `alertWebWhy()`. Drawing code doesn't change.
+- **Flow:** `net_task` derives them every pass (`deviceAlertInputs(cfg)` = `openSkyAuthStatus()`,
+  `openSkyQuota()`, the night pause) into `NetState::alerts` / `alertDetails`; logs each change
+  once (`[alert] + opensky_budget_over_limit`). `netStateDiffers()` ignores `quotaObservedMs`;
+  `diffNetState()` sets `RedrawEvents::alertsChanged` only when the badge
+  (`displaySeverity()`) changes -> `kRedrawHeader`.
+- **Header badge:** 13 px circle (`alertBadgeColor()`: red `THEME_ALERT`, orange
+  `THEME_WARNING` = `LCARS_ORANGE`) with a black "!", y:1..13, 4 px right of `SKY TRACKER`
+  (`statusBarZones(..., badge)` -> `alert_x`; the count re-centres between badge and date).
+- **Tap -> message screen** (`service_screen`): `alertBadgeHit()` (screen_nav) = x 0 .. badge +
+  8 px, y 0..24, checked first in `handleTap()`. Full screen: "UWAGA", up to 3 entries
+  (errors first; more -> "+ N więcej — zobacz panel WWW"), "Szczegóły: http://cyd-sky.local",
+  **ZAMKNIJ 15 s** button (36 px tall). Pure state machine `alertScreenStep()`: closes on a
+  fresh tap on the button (after the opening finger lifted, `acceptPromptTap()`), after exactly
+  15 s, or at once when no display alert is left; the 1 Hz countdown repaints only the button.
+  While open: no auto-cycle (restarts on close), no update question
+  (`PromptGate::alertScreenOpen`); OTA closes it. At night with the screen off the first tap
+  only wakes it (backlight rule). `/screenshot.bmp?screen=4` = demo with all three alerts.
+- **Web panel:** `.card.alert` above the tab bar (on every tab) when `alerts.any()`: what the
+  "!" means, then per alert title, `alertWebWhy()` (HTTP code, renewal time, minimum interval
+  `minPollIntervalForLimit()`), action and "→ Przejdź do: <tab>". `sendPage()` computes them
+  with the same `deviceAlertInputs()`. CSS `--alert:#ff3333; --warn:#ff8000`, the "!" circle is
+  `.bang`. (The old red `.alert` box for "no panel password" is now `.nopw`.)
+- **Login state** (`opensky_auth`, first slice of spec 06): `onCredentials()` (other credentials
+  -> `Account`, a fair try), `onTokenResult()` (400/401/403 -> `LoginFailed` + code; no answer /
+  5xx / 200 without a token = unchanged). `opensky_client` logs the change once (`login failed
+  (http=401) — check client_id/secret; using anonymous access` / `login ok — using account`).
+  Still spec 06: 30-min wait before retrying a rejected login (now every poll asks), the OpenSky
+  tab's red pill, the anonymous retry of a poll rejected with a Bearer token.
+
 ## Design language — LCARS-inspired (Star Trek console aesthetic)
 
 Build an **LCARS-inspired** look, not a reproduction of the exact copyrighted LCARS design
@@ -898,7 +945,8 @@ execution should be original, built from LovyanGFX primitives.
   | `THEME_CHROME_TEXT` — header date/time | light peach `#FFCC99` | `0xFE73` |
   | `THEME_CHROME_INACTIVE` — inactive nav buttons | lavender `#9977AA` | `0x9BB5` |
   | `THEME_ON_FILL` — text on any filled bar/button | black | `0x0000` |
-  | `THEME_ALERT` — header block on auth/network error | red `#FF3333` | `0xF986` |
+  | `THEME_ALERT` — health dot on auth/network error, error "!" | red `#FF3333` | `0xF986` |
+  | `THEME_WARNING` — warning "!" (device alerts) | orange `#FF8000` | `0xFC00` |
   | header block while rate-limited | `LCARS_YELLOW` | `0xFFE0` |
   | `THEME_CONTENT_PRIMARY` — callsigns, odd table rows | white | `0xFFFF` |
   | `THEME_CONTENT_SECONDARY` — airline/type/route, even rows, radar blips | sky `#99CCFF` | `0x9E7F` |
@@ -1001,6 +1049,9 @@ each with a single responsibility:
 - `perf_stats` — pure: `GapStats` (UI pass lateness, buckets, p99), `BusyStats`, the `[perf]`
   line and `/perf.json`.
 - `hexdb_http` — device-only: the shared hexdb.io HTTPS GET with keep-alive per batch.
+- `device_alerts` — the "!" alerts (see "Device alerts"): definitions table, `collectAlerts()`,
+  texts, badge colours, `minPollIntervalForLimit()`; pure + `deviceAlertInputs()` adapter.
+- `opensky_auth` — did the OpenSky login work (`OpenSkyAuthState`, `openSkyDailyLimit()`); pure.
 - `opensky_client` — token fetch/refresh + `/states/all` polling. Returns a plain struct/array
   of aircraft. **No TFT/drawing code in this module** — must be swappable/testable independently
   of the visualization.
@@ -1130,7 +1181,7 @@ Test-first is the default here, not a cleanup pass bolted on at the end:
   grouped by the contexts of spec 12 — `test_airspace` (phase, CPA, poll pipeline),
   `test_enrichment` (hexdb.io lookups, caches, name tables), `test_opensky`, `test_display`
   (views, theme, nav, touch, backlight, i18n), `test_admin` (config page / store / backup, web
-  auth, OTA, release check, version, screenshot), `test_platform` (core_link, perf, WiFi, time,
+  auth, OTA, release check, version, screenshot, device alerts), `test_platform` (core_link, perf, WiFi, time,
   sun). A module's tests are `test/test_<suite>/<module>_test.cpp`: an anonymous namespace plus
   one `run_<module>_tests()`; the suite's `main.cpp` calls them and is the only place with
   `setUp()` (-> `resetAllForTesting()`; new global state gets its reset there). One module:

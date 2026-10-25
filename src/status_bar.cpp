@@ -89,10 +89,12 @@ int clockFontWidthEstimate(const std::string &s) {
 
 HeaderZones statusBarZones(int screenWidth, const std::string &appName,
                            const std::string &countLabel, const std::string &date,
-                           const std::string &clock) {
+                           const std::string &clock, bool badge) {
   HeaderZones z;
   z.name_x = kMargin;
   z.name_end = z.name_x + static_cast<int>(utf8Length(appName)) * LCARS_FONT_SMALL_CHAR_PX;
+  if (badge) z.alert_x = z.name_end + kAlertBadgeGap;
+  const int leftEnd = badge ? z.alert_x + kAlertBadgeDiameter : z.name_end;
 
   z.right_end = screenWidth - kMargin;
   const int clockW = clockFontWidthEstimate(clock);
@@ -106,7 +108,7 @@ HeaderZones statusBarZones(int screenWidth, const std::string &appName,
   // wide clock-font date left it glued to the date at screen centre).
   const int countW =
       kDotDiameter + kDotGap + static_cast<int>(utf8Length(countLabel)) * LCARS_FONT_SMALL_CHAR_PX;
-  z.count_start = (z.name_end + z.right_start) / 2 - countW / 2;
+  z.count_start = (leftEnd + z.right_start) / 2 - countW / 2;
   z.count_end = z.count_start + countW;
   return z;
 }
@@ -114,7 +116,8 @@ HeaderZones statusBarZones(int screenWidth, const std::string &appName,
 #ifdef ARDUINO
 
 void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, OpenSkyHealth health,
-                   std::time_t localEpoch, bool timeSynced, int16_t screenWidth) {
+                   AlertSeverity badge, std::time_t localEpoch, bool timeSynced,
+                   int16_t screenWidth) {
   // Black strip + a 1px lilac rule along its bottom edge — no filled block,
   // so nothing up here looks like the (peach) active nav button.
   gfx.fillRect(0, 0, screenWidth, LCARS_HEADER_HEIGHT, LCARS_BLACK);
@@ -137,7 +140,21 @@ void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, OpenSkyHealth hea
   gfx.setFont(LCARS_FONT_SMALL);
   gfx.setTextColor(THEME_CHROME_DIM, LCARS_BLACK);
   gfx.drawString(kStatusBarAppName, static_cast<int16_t>(z.name_x), midY);
-  const int nameEnd = z.name_x + static_cast<int>(gfx.textWidth(kStatusBarAppName));
+  int leftEnd = z.name_x + static_cast<int>(gfx.textWidth(kStatusBarAppName));
+
+  // The device-alert "!" right after the name (spec 08 §3.4); the touch zone
+  // in screen_nav (alertBadgeHit()) follows statusBarZones()' alert_x.
+  if (badge != AlertSeverity::None) {
+    const int x = leftEnd + kAlertBadgeGap;
+    const int r = kAlertBadgeDiameter / 2;
+    const int16_t cx = static_cast<int16_t>(x + r);
+    const int16_t cy = static_cast<int16_t>(kAlertBadgeTop + r);
+    gfx.fillCircle(cx, cy, r, alertBadgeColor(badge));
+    // The "!" by hand (2 px wide, crisp at any font): a bar and a dot.
+    gfx.fillRect(static_cast<int16_t>(cx - 1), static_cast<int16_t>(cy - 4), 2, 6, THEME_ON_FILL);
+    gfx.fillRect(static_cast<int16_t>(cx - 1), static_cast<int16_t>(cy + 3), 2, 2, THEME_ON_FILL);
+    leftEnd = x + kAlertBadgeDiameter;
+  }
   const int countW = kDotDiameter + kDotGap + static_cast<int>(gfx.textWidth(count.c_str()));
 
   // Right: date + clock, both in the clock font (crisp dots — review #9).
@@ -153,7 +170,7 @@ void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, OpenSkyHealth hea
   gfx.drawString(clock.c_str(), static_cast<int16_t>(z.right_end), midY);
 
   // Centre: health dot + flight count, centred in the gap between the two.
-  const int countX = (nameEnd + dateX) / 2 - countW / 2;
+  const int countX = (leftEnd + dateX) / 2 - countW / 2;
   gfx.fillCircle(static_cast<int16_t>(countX + kDotDiameter / 2), midY, kDotDiameter / 2,
                  statusBarHealthColor(health));
   gfx.setFont(LCARS_FONT_SMALL);

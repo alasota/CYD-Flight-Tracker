@@ -28,6 +28,7 @@
 
 #include "config_store.h"   // Config
 #include "cpa_predictor.h"  // CpaPrediction
+#include "device_alerts.h"  // AlertSet, AlertDetails
 #include "redraw_policy.h"  // RedrawEvents
 #include "release_check.h"  // UpdateStatus
 #include "status_bar.h"     // OpenSkyHealth
@@ -164,16 +165,21 @@ struct NetState {
   bool restartPending = false;  // a good upload: the board restarts in a moment
   UpdateSummary update;
   OtaProgress ota;
+  // Device alerts (spec 08): the header's "!" and the message screen.
+  AlertSet alerts;
+  AlertDetails alertDetails;
 };
 
 // True when `b` differs from `a` in anything the UI uses — the network task
 // publishes only then (no allocation in a quiet loop). Pointers for data and
-// config, values for the rest; OTA progress by its seq.
+// config, values for the rest; OTA progress by its seq. Alert details
+// without quotaObservedMs (it moves with every 429 without changing a text).
 bool netStateDiffers(const NetState &a, const NetState &b);
 
 // What changed between two snapshots, as redraw events. `prev` == nullptr =
 // the first snapshot. Rows are compared by pointer (a new DataSnapshot = a
-// new poll); health, language, home location and radius by value.
+// new poll); health, language, home location and radius by value; alerts
+// by the header badge they show (displaySeverity()).
 RedrawEvents diffNetState(const NetState *prev, const NetState &next);
 
 // ---- UI -> net commands ----------------------------------------------------
@@ -215,6 +221,7 @@ struct UiWake {
   uint32_t untilMinuteMs = kNoDeadline;       // header clock
   uint32_t untilPromptTimerMs = kNoDeadline;  // update question's countdown bar
   uint32_t untilBacklightMs = kNoDeadline;    // light sensor sample / ramp step
+  uint32_t untilAlertTimerMs = kNoDeadline;   // alert screen's CLOSE countdown second
 };
 
 // How long loop() may block before its next pass: the nearest deadline,

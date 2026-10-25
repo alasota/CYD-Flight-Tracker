@@ -27,7 +27,7 @@ constexpr uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b) {
 // (Screen 1/2/3) refers to these names, so they are the canonical set;
 // define colors once here rather than scattering raw hex literals.
 constexpr uint16_t LCARS_BLACK = 0x0000;    // background
-constexpr uint16_t LCARS_ORANGE = 0xFC00;   // (original palette — no longer used on screen)
+constexpr uint16_t LCARS_ORANGE = 0xFC00;   // (original palette — now only THEME_WARNING)
 constexpr uint16_t LCARS_MAGENTA = 0xF81F;  // (original palette — no longer used on screen)
 constexpr uint16_t LCARS_CYAN = 0x07FF;     // (original palette — no longer used on screen)
 constexpr uint16_t LCARS_YELLOW = 0xFFE0;   // radar home crosshair, "imminent" countdown, rate-limit
@@ -54,6 +54,9 @@ constexpr uint16_t THEME_CHROME_INACTIVE = LCARS_LAVENDER;   // inactive nav tab
 constexpr uint16_t THEME_CHROME_DIM = LCARS_LAVENDER;        // header app name (quiet label)
 constexpr uint16_t THEME_ON_FILL = LCARS_BLACK;              // text on any filled chrome/table bar
 constexpr uint16_t THEME_ALERT = LCARS_RED;                  // header block: auth/network error
+// Device alerts' "!" (device_alerts): a warning, not an error. Saturated and
+// darker than the peach accent, so the two don't get mixed up on black.
+constexpr uint16_t THEME_WARNING = LCARS_ORANGE;
 // Content (flight data):
 constexpr uint16_t THEME_CONTENT_PRIMARY = LCARS_WHITE;      // callsigns, odd table rows
 constexpr uint16_t THEME_CONTENT_SECONDARY = LCARS_SKY;      // airline / type / route, even rows

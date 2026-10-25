@@ -11,6 +11,7 @@
 #include <cstdint>
 
 #include "lcars_theme.h"  // LCARS_HEADER_HEIGHT, LCARS_BOTTOM_NAV_HEIGHT
+#include "status_bar.h"   // HeaderZones — the "!" badge's position
 #include "touch_input.h"  // Rect, hitTest
 
 // Screen order (also the persisted `last_screen` value in config_store):
@@ -167,3 +168,18 @@ struct NavHit {
 // Classifies a tap: JumpTo the segment's screen inside the bottom nav touch
 // band (y:210..240), None everywhere else.
 NavHit navHitTest(int16_t x, int16_t y, int16_t screenWidth, int16_t screenHeight);
+
+// ---- The device-alert "!" in the header (spec 08 §3.5) ---------------------
+//
+// Tapping it opens the message screen. The zone is more generous than the
+// 13 px badge — resistive touch is imprecise at the edge (see "Touch
+// calibration"): from the left screen edge to kAlertBadgeTouchSlackX px past
+// the badge, and from the top down to y = kAlertBadgeTouchBottom (the header
+// + 9 px). Far from the bottom nav (y >= 210) and the table's paging strip
+// (first row at y:116). Checked in handleTap() before anything else.
+constexpr int kAlertBadgeTouchSlackX = 8;
+constexpr int kAlertBadgeTouchBottom = 24;  // inclusive
+
+// True for a tap on the badge's zone; false whenever no badge is drawn
+// (zones.alert_x < 0).
+bool alertBadgeHit(int16_t x, int16_t y, const HeaderZones &zones);

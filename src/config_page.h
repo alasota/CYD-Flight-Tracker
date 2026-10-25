@@ -14,6 +14,7 @@
 #include <string>
 
 #include "config_store.h"   // Config
+#include "device_alerts.h"  // AlertSet, AlertDetails
 #include "opensky_quota.h"  // OpenSkyQuota
 #include "release_check.h"  // UpdateState
 #include "web_i18n.h"       // WebStr
@@ -25,6 +26,8 @@ constexpr int kSettingsTabCount = 5;
 const char *settingsTabId(SettingsTab tab);
 // Inverse of settingsTabId(); anything unknown -> Location.
 SettingsTab settingsTabFromArg(const std::string &arg);
+// The tab's name on the tab bar (and in the alert card's "Go to:" link).
+WebStr settingsTabLabel(SettingsTab tab);
 
 // True when both OpenSky OAuth fields are set (else the firmware polls
 // anonymously).
@@ -78,6 +81,12 @@ struct ConfigPageModel {
   // Light sensor / backlight right now (General tab; refreshed live from
   // GET /light.json by the page's script).
   BacklightStatus light;
+  // Device alerts (spec 08): a card above the tabs when any is active —
+  // computed with the same collectAlerts() as the display's "!". `nowMs`
+  // counts the quota's renewal down (alertWebWhy()).
+  AlertSet alerts;
+  AlertDetails alertDetails;
+  uint32_t nowMs = 0;
 };
 
 // Where the Firmware tab sends people for new versions.

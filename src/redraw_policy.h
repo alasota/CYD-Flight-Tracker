@@ -26,6 +26,7 @@ struct RedrawEvents {
   bool newPoll = false;        // fresh aircraft data
   bool minuteChanged = false;  // header "HH:MM" would read differently (incl. first NTP sync)
   bool healthChanged = false;  // OpenSky health tag changed
+  bool alertsChanged = false;  // the header's "!" badge changed (device_alerts)
   bool countdownTick = false;  // 1 Hz Screen 2 tick
 };
 
@@ -35,7 +36,8 @@ struct RedrawEvents {
 //                                             -> kRedrawFull, nothing else.
 //   - newPoll                                 -> kRedrawContent + kRedrawHeader
 //                                                (the header block shows the aircraft count).
-//   - minuteChanged / healthChanged           -> kRedrawHeader (health = block colour).
+//   - minuteChanged / healthChanged / alertsChanged
+//                                             -> kRedrawHeader (health dot, "!" badge).
 //   - countdownTick on kScreenFlight          -> kRedrawCountdown, unless
 //     kRedrawContent is already set (it covers the countdown zone).
 //     Ignored on other screens.

@@ -21,7 +21,7 @@ pokazuje, że logowanie się nie udało i że urządzenie pracuje anonimowo.**
 
 - **Wyświetlacz:** samoloty widoczne, kropka stanu zielona (dane płyną), a w nagłówku
   **czerwony wykrzyknik** — ostrzeżenie `OpenSkyLoginFailed` z ogólnego mechanizmu
-  [spec 08](08-device-alerts.md). (`OpenSkyHealth::AuthError` zostaje tylko dla sytuacji,
+  [spec 08](../done/08-device-alerts.md). (`OpenSkyHealth::AuthError` zostaje tylko dla sytuacji,
   w której nawet zapytanie anonimowe dostaje 401/403.)
 - **Panel, strona główna:** nad zakładkami ramka z wykrzyknikiem i wyjaśnieniem, dlaczego się
   pojawił (spec 08 §3.4).

@@ -12,6 +12,7 @@
 #include "config_portal.h"
 #include "config_store.h"
 #include "core_link.h"
+#include "device_alerts.h"
 #include "hexdb_http.h"
 #include "lookup_budget.h"
 #include "lookup_store.h"
@@ -40,6 +41,20 @@ bool everPublished = false;
 
 // ---- Publishing -----------------------------------------------------------
 
+// Device alerts (spec 08), derived from the current state on every pass —
+// cheap (no allocation), and a publish happens only when they change. Each
+// change is logged once.
+void refreshAlerts() {
+  const AlertInputs in = deviceAlertInputs(*cfg);
+  const AlertSet next = collectAlerts(in);
+  if (next != state.alerts) {
+    const std::string log = alertChangeLog(state.alerts, next);
+    if (!log.empty()) Serial.println(log.c_str());
+  }
+  state.alerts = next;
+  state.alertDetails = collectAlertDetails(in);
+}
+
 void refreshSummary() {
   state.cfg = cfg;
   state.cfgSeq = cfgSeq;
@@ -50,6 +65,7 @@ void refreshSummary() {
   state.update.installed = u.installed;
   state.update.latestTag = u.latest.tag;
   state.update.installPending = releaseInstallPending();
+  refreshAlerts();
 }
 
 // Hands the UI a new snapshot if anything it uses changed, and wakes it.

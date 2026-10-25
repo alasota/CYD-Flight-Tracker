@@ -115,6 +115,15 @@ static void test_independent_regions_combine(void) {
                           computeRedrawMask(e, kScreenFlight));
 }
 
+
+static void test_alerts_changed_redraws_header_only(void) {
+  RedrawEvents e;
+  e.alertsChanged = true;
+  for (int screen = 0; screen < kScreenCount; ++screen) {
+    TEST_ASSERT_EQUAL_HEX8(kRedrawHeader, computeRedrawMask(e, screen));
+  }
+}
+
 }  // namespace
 
 void run_redraw_policy_tests() {
@@ -137,5 +146,5 @@ void run_redraw_policy_tests() {
   RUN_TEST(test_minute_change_redraws_header_text_only);
   RUN_TEST(test_health_change_redraws_header_text_only);
   RUN_TEST(test_independent_regions_combine);
-
+  RUN_TEST(test_alerts_changed_redraws_header_only);
 }

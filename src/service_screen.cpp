@@ -2,6 +2,9 @@
 
 #include <cstdio>
 
+#include "i18n.h"
+#include "release_check.h"  // acceptPromptTap(), kUpdatePromptTimeoutMs
+
 namespace {
 constexpr int16_t kBarW = 240;
 constexpr int16_t kBarH = 14;
@@ -64,11 +67,110 @@ ResetChoice confirmHit(int16_t x, int16_t y, int16_t screenW, int16_t screenH) {
   return ResetChoice::None;
 }
 
+// ---- Device-alert message screen ----------------------------------------------
+
+namespace {
+constexpr int16_t kAlertMargin = 8;
+constexpr int16_t kAlertTitleY = 8;
+constexpr int16_t kAlertTitleH = 28;
+constexpr int16_t kAlertFirstEntryY = 44;
+constexpr int16_t kAlertEntryH = 40;     // title row (16 px font) + body row (10 px)
+constexpr int16_t kAlertEntryStep = 42;
+constexpr int16_t kAlertHintH = 18;
+constexpr int16_t kAlertButtonW = 160;
+constexpr int16_t kAlertButtonBottomGap = 8;
+
+Rect makeRect(int x, int y, int w, int h) {
+  Rect r;
+  r.x = static_cast<int16_t>(x);
+  r.y = static_cast<int16_t>(y);
+  r.w = static_cast<int16_t>(w);
+  r.h = static_cast<int16_t>(h);
+  return r;
+}
+}  // namespace
+
+AlertScreenLayout alertScreenLayout(int16_t w, int16_t h, int count) {
+  AlertScreenLayout l;
+  l.title = makeRect(kAlertMargin, kAlertTitleY, w - 2 * kAlertMargin, kAlertTitleH);
+  if (count < 0) count = 0;
+  if (count > kAlertScreenMaxRows) {
+    l.shown = kAlertScreenMaxRows - 1;
+    l.more = count - l.shown;
+  } else {
+    l.shown = count;
+  }
+  for (int i = 0; i < kAlertScreenMaxRows; ++i) {
+    l.entries[i] = makeRect(kAlertMargin, kAlertFirstEntryY + i * kAlertEntryStep,
+                            w - 2 * kAlertMargin, kAlertEntryH);
+  }
+  if (l.more > 0) l.moreRow = l.entries[kAlertScreenMaxRows - 1];
+  l.button = makeRect((w - kAlertButtonW) / 2, h - kAlertButtonBottomGap - kAlertCloseButtonMinH,
+                      kAlertButtonW, kAlertCloseButtonMinH);
+  const Rect &last = l.entries[kAlertScreenMaxRows - 1];
+  const int hintY = last.y + last.h + (l.button.y - (last.y + last.h) - kAlertHintH) / 2;
+  l.hint = makeRect(kAlertMargin, hintY, w - 2 * kAlertMargin, kAlertHintH);
+  return l;
+}
+
+AlertScreen openAlertScreen(uint32_t nowMs) {
+  AlertScreen s;
+  s.open = true;
+  s.openedMs = nowMs;
+  s.released = false;
+  s.wasPressed = true;
+  s.secondsShown = alertScreenSecondsLeft(s, nowMs);
+  return s;
+}
+
+uint32_t alertScreenSecondsLeft(const AlertScreen &s, uint32_t nowMs) {
+  const uint32_t elapsed = nowMs - s.openedMs;  // unsigned: rollover-safe
+  if (elapsed >= kAlertScreenTimeoutMs) return 0;
+  return (kAlertScreenTimeoutMs - elapsed + 999) / 1000;
+}
+
+uint32_t alertScreenMsToNextSecond(const AlertScreen &s, uint32_t nowMs) {
+  const uint32_t elapsed = nowMs - s.openedMs;
+  if (elapsed >= kAlertScreenTimeoutMs) return 0;
+  const uint32_t rest = (kAlertScreenTimeoutMs - elapsed) % 1000;  // ms until it ticks
+  return rest == 0 ? 1000 : rest;
+}
+
+AlertScreenStepResult alertScreenStep(const AlertScreen &s, const AlertScreenInput &in) {
+  AlertScreenStepResult r;
+  r.state = s;
+  if (!s.open) return r;
+  const uint32_t elapsed = in.nowMs - s.openedMs;
+  if (!in.anyDisplayAlerts || elapsed >= kAlertScreenTimeoutMs) {
+    r.state.open = false;
+    r.close = true;
+    return r;
+  }
+  if (!in.pressed) r.state.released = true;
+  if (in.pressed && !s.wasPressed && acceptPromptTap(r.state.released, elapsed)) {
+    const AlertScreenLayout l = alertScreenLayout(in.screenW, in.screenH, 1);
+    if (hitTest(in.x, in.y, l.button)) {
+      r.state.open = false;
+      r.close = true;
+      return r;
+    }
+  }
+  r.state.wasPressed = in.pressed;
+  const uint32_t secs = alertScreenSecondsLeft(s, in.nowMs);
+  if (secs != s.secondsShown) {
+    r.state.secondsShown = secs;
+    r.redrawTimer = true;
+  }
+  return r;
+}
+
+std::string alertCloseLabel(uint32_t secondsLeft, Language lang) {
+  return std::string(tr(Str::AlertClose, lang)) + "  " + std::to_string(secondsLeft) + " s";
+}
+
 #ifdef ARDUINO
 
-#include "i18n.h"
 #include "lcars_theme.h"
-#include "release_check.h"  // kUpdatePromptTimeoutMs
 
 namespace {
 
@@ -209,6 +311,81 @@ void drawUpdatePromptTimer(LGFX &gfx, uint32_t remainingMs) {
   const int16_t fill = promptTimerFillPx(remainingMs, kUpdatePromptTimeoutMs, r.w);
   gfx.fillRect(r.x, r.y, fill, r.h, THEME_CHROME_INACTIVE);
   gfx.fillRect(r.x + fill, r.y, r.w - fill, r.h, LCARS_BLACK);
+}
+
+namespace {
+
+// The header's badge, larger: a filled circle with a black "!".
+void alertIcon(LGFX &gfx, int16_t cx, int16_t cy, int16_t r, uint16_t color) {
+  gfx.fillCircle(cx, cy, r, color);
+  const int16_t bar = static_cast<int16_t>(r <= 7 ? 2 : 3);
+  gfx.fillRect(static_cast<int16_t>(cx - bar / 2), static_cast<int16_t>(cy - r * 2 / 3), bar,
+               r, THEME_ON_FILL);
+  gfx.fillRect(static_cast<int16_t>(cx - bar / 2), static_cast<int16_t>(cy + r / 2), bar, bar,
+               THEME_ON_FILL);
+}
+
+TextMeasure measureWith(LGFX &gfx) {
+  return [&gfx](const std::string &t) { return static_cast<int>(gfx.textWidth(t.c_str())); };
+}
+
+}  // namespace
+
+void drawAlertScreen(LGFX &gfx, AlertSet alerts, const AlertDetails &details, uint32_t nowMs,
+                     uint32_t secondsLeft) {
+  const int16_t w = static_cast<int16_t>(gfx.width());
+  const int16_t h = static_cast<int16_t>(gfx.height());
+  const std::vector<AlertId> ids = alertsInOrder(alerts, /*displayOnly=*/true);
+  const AlertScreenLayout l = alertScreenLayout(w, h, static_cast<int>(ids.size()));
+  gfx.fillScreen(LCARS_BLACK);
+
+  // Title in the colour of the worst alert.
+  const uint16_t worst = alertBadgeColor(alerts.displaySeverity());
+  const int16_t titleMid = static_cast<int16_t>(l.title.y + l.title.h / 2);
+  alertIcon(gfx, static_cast<int16_t>(l.title.x + 11), titleMid, 11, worst);
+  gfx.setFont(LCARS_FONT_BODY);
+  gfx.setTextDatum(middle_left);
+  gfx.setTextColor(worst, LCARS_BLACK);
+  gfx.drawString(tr(Str::AlertScreenTitle), l.title.x + 30, titleMid);
+
+  constexpr int16_t kTextX = 26;  // right of the entry icon
+  for (int i = 0; i < l.shown; ++i) {
+    const Rect &e = l.entries[i];
+    const AlertDef &def = alertDef(ids[static_cast<size_t>(i)]);
+    const uint16_t c = alertBadgeColor(def.severity);
+    alertIcon(gfx, static_cast<int16_t>(e.x + 8), static_cast<int16_t>(e.y + 9), 7, c);
+    const int maxW = e.w - kTextX;
+    gfx.setFont(LCARS_FONT_BODY);
+    gfx.setTextDatum(middle_left);
+    gfx.setTextColor(c, LCARS_BLACK);
+    gfx.drawString(fitToWidth(tr(def.displayTitle), maxW, measureWith(gfx)).c_str(),
+                   e.x + kTextX, e.y + 9);
+    gfx.setFont(LCARS_FONT_SMALL);
+    gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
+    const std::string body = alertDisplayBody(def.id, details, nowMs, i18nLanguage());
+    gfx.drawString(fitToWidth(body, maxW, measureWith(gfx)).c_str(), e.x + kTextX, e.y + 28);
+  }
+  if (l.more > 0) {
+    gfx.setFont(LCARS_FONT_SMALL);
+    gfx.setTextDatum(middle_left);
+    gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);
+    const std::string more = fillTemplate(tr(Str::AlertMore), {std::to_string(l.more)});
+    gfx.drawString(more.c_str(), l.moreRow.x + kTextX, l.moreRow.y + 9);
+  }
+
+  gfx.setFont(LCARS_FONT_SMALL);
+  gfx.setTextDatum(middle_center);
+  gfx.setTextColor(THEME_CONTENT_MUTED, LCARS_BLACK);
+  gfx.drawString(tr(Str::AlertDetailsHint), w / 2, l.hint.y + l.hint.h / 2);
+  drawAlertCloseButton(gfx, static_cast<int>(ids.size()), secondsLeft);
+}
+
+void drawAlertCloseButton(LGFX &gfx, int count, uint32_t secondsLeft) {
+  const AlertScreenLayout l = alertScreenLayout(static_cast<int16_t>(gfx.width()),
+                                                static_cast<int16_t>(gfx.height()), count);
+  const Rect &b = l.button;
+  drawPillButton(gfx, b.x, b.y, b.w, b.h, THEME_CHROME_ACCENT, THEME_ON_FILL,
+                 alertCloseLabel(secondsLeft, i18nLanguage()).c_str());
 }
 
 #endif  // ARDUINO

@@ -36,6 +36,9 @@
 //     net_task as commands.
 //   - Holding a finger on the screen at power-up offers to remove a
 //     forgotten web panel password (web_auth, service_screen).
+//   - Device alerts (spec 08): net_task derives them (device_alerts) into
+//     NetState::alerts; the header shows a "!" and tapping it opens the
+//     message screen (service_screen's AlertScreen) for up to 15 s.
 //   - Brightness (spec/03): backlight follows the light sensor and the night
 //     mode; the "pause polling at night" decision goes to net_task as an
 //     atomic flag.
@@ -64,6 +67,7 @@
 #include "config_store.h"
 #include "core_link.h"
 #include "cpa_predictor.h"
+#include "device_alerts.h"
 #include "flight_screen.h"
 #include "i18n.h"
 #include "lcars_theme.h"
@@ -155,10 +159,22 @@ static void drawActiveContent() {
   }
 }
 
-// Header bar: aircraft count + health dot + date/time.
+// Header bar: aircraft count + health dot + device-alert "!" + date/time.
 static void drawHeader() {
   drawStatusBar(tft, static_cast<int>(rows().size()), net->data != nullptr, shownHealth,
-                timeSyncNowLocal(), isTimeSynced(), static_cast<int16_t>(tft.width()));
+                net->alerts.displaySeverity(), timeSyncNowLocal(), isTimeSynced(),
+                static_cast<int16_t>(tft.width()));
+}
+
+// The header's layout as drawn now — where the "!" badge sits (alert_x).
+static HeaderZones headerZones() {
+  const bool synced = isTimeSynced();
+  const std::time_t local = timeSyncNowLocal();
+  return statusBarZones(
+      static_cast<int>(tft.width()), kStatusBarAppName,
+      statusBarBlockLabel(static_cast<int>(rows().size()), net->data != nullptr, i18nLanguage()),
+      statusBarDate(local, synced), statusBarClock(local, synced),
+      net->alerts.displaySeverity() != AlertSeverity::None);
 }
 
 // Repaints exactly the regions in `mask` (redraw_policy bits).
@@ -224,6 +240,7 @@ static void takeNetState() {
   pendingRedraw.languageChanged |= e.languageChanged;
   pendingRedraw.newPoll |= e.newPoll;
   pendingRedraw.minuteChanged |= e.minuteChanged;
+  pendingRedraw.alertsChanged |= e.alertsChanged;
   if (e.newPoll) clampPage();
 }
 
@@ -258,10 +275,66 @@ static void onScreenChanged(bool userInitiated) {
   pendingRedraw.screenChanged = true;
 }
 
+// --- Device alerts: the message screen behind the header's "!" (spec 08) -----
+
+static AlertScreen alertScreen;
+static AlertSet alertScreenDrawn;  // what its list shows
+
+static void openAlertMessage() {
+  alertScreen = openAlertScreen(millis());
+  alertScreenDrawn = net->alerts;
+  Serial.printf("[alert] message screen opened (%u alert(s))\n",
+                static_cast<unsigned>(alertsInOrder(net->alerts, true).size()));
+  drawAlertScreen(tft, net->alerts, net->alertDetails, millis(),
+                  alertScreenSecondsLeft(alertScreen, millis()));
+}
+
+// Back to the normal screens: same screen and table page, a full repaint, a
+// fresh auto-cycle interval.
+static void closeAlertMessage() {
+  alertScreen.open = false;
+  lastScreenChangeMs = millis();
+  pendingRedraw.firstDraw = true;
+}
+
+// While it's open it owns the touchscreen.
+static void serviceAlertScreen() {
+  const TouchPoint t = touchInputRead(tft);
+  AlertScreenInput in;
+  in.nowMs = millis();
+  in.pressed = t.pressed;
+  in.x = t.x;
+  in.y = t.y;
+  in.anyDisplayAlerts = net->alerts.displaySeverity() != AlertSeverity::None;
+  in.screenW = static_cast<int16_t>(tft.width());
+  in.screenH = static_cast<int16_t>(tft.height());
+  const AlertScreenStepResult r = alertScreenStep(alertScreen, in);
+  alertScreen = r.state;
+  if (r.close) {
+    closeAlertMessage();
+    return;
+  }
+  if (net->alerts != alertScreenDrawn) {
+    // One came or went: the list again, the countdown runs on.
+    alertScreenDrawn = net->alerts;
+    drawAlertScreen(tft, net->alerts, net->alertDetails, millis(),
+                    alertScreenSecondsLeft(alertScreen, millis()));
+  } else if (r.redrawTimer) {
+    drawAlertCloseButton(tft, static_cast<int>(alertsInOrder(net->alerts, true).size()),
+                         alertScreen.secondsShown);
+  }
+}
+
 // Dispatches one touch tap (edge-detected in loop(), once per press).
 static void handleTap(int16_t x, int16_t y) {
   int16_t screenW = static_cast<int16_t>(tft.width());
   int16_t screenH = static_cast<int16_t>(tft.height());
+
+  // The "!" first: its zone reaches a little into the content area.
+  if (cfg().home_configured && alertBadgeHit(x, y, headerZones())) {
+    openAlertMessage();
+    return;
+  }
 
   // Screens switch only via the bottom nav buttons.
   NavHit hit = navHitTest(x, y, screenW, screenH);
@@ -337,6 +410,7 @@ static bool serviceOtaScreen() {
   }
   if (o.phase == OtaProgress::Phase::Running || o.phase == OtaProgress::Phase::Done ||
       net->restartPending) {
+    alertScreen.open = false;  // the OTA screen comes first
     return true;
   }
   if (otaFailedAtMs != 0) {
@@ -376,6 +450,7 @@ static void maybeShowUpdatePrompt(bool touchPressed) {
   g.tCpaSeconds = static_cast<int>(cpa.t_cpa_seconds);
   g.touchActive = touchPressed;
   g.screenOff = backlightDecision().screen_off;
+  g.alertScreenOpen = alertScreen.open;
   if (!shouldShowUpdatePrompt(g)) return;
 
   promptActive = true;
@@ -547,19 +622,28 @@ void end() { state.store(Idle); }
 }  // namespace shot
 
 // ?screen=N: switch to that screen and repaint it right now, so the capture
-// shows it. One more index after the real screens: the update question,
-// drawn from release_check's demo data (docs/screenshots/update_prompt.png).
+// shows it. Two more indices after the real screens, drawn from demo data:
+// the update question (release_check, docs/screenshots/update_prompt.png)
+// and the alert message screen (device_alerts, docs/screenshots/alert_screen.png).
 static constexpr int kScreenshotUpdatePrompt = kScreenCount;
+static constexpr int kScreenshotAlertScreen = kScreenCount + 1;
 
 static void screenshotPrepare(int screenIndex) {
-  if (screenIndex == kScreenshotUpdatePrompt) {
-    const UpdateState demo = updateDemoState(/*withPrerelease=*/false);
-    drawUpdatePromptScreen(tft, demo.installed, demo.latest.tag);
-    drawUpdatePromptTimer(tft, kUpdatePromptTimeoutMs * 2 / 3);
+  if (screenIndex == kScreenshotUpdatePrompt || screenIndex == kScreenshotAlertScreen) {
+    if (screenIndex == kScreenshotUpdatePrompt) {
+      const UpdateState demo = updateDemoState(/*withPrerelease=*/false);
+      drawUpdatePromptScreen(tft, demo.installed, demo.latest.tag);
+      drawUpdatePromptTimer(tft, kUpdatePromptTimeoutMs * 2 / 3);
+    } else {
+      const AlertDemo demo = alertDemoState();
+      drawAlertScreen(tft, demo.alerts, demo.details, demo.details.quotaObservedMs, 12);
+    }
+    alertScreen.open = false;
     pendingRedraw = RedrawEvents{};
     pendingRedraw.firstDraw = true;  // repaints the real screen once the capture is out
     return;
   }
+  if (alertScreen.open) closeAlertMessage();  // a normal screen was asked for
   if (screenIndex >= 0 && nav.set(screenIndex)) onScreenChanged(/*userInitiated=*/true);
   const uint8_t mask = computeRedrawMask(pendingRedraw, nav.current());
   if (mask != 0 && cfg().home_configured) applyRedraw(mask);
@@ -653,6 +737,7 @@ static void sleepUntilNextDeadline() {
   if (promptActive) {
     w.untilPromptTimerMs = msUntilPeriod(now, promptTimerDrawnMs, kPromptTimerStepMs);
   }
+  if (alertScreen.open) w.untilAlertTimerMs = alertScreenMsToNextSecond(alertScreen, now);
   plannedSleepMs = uiSleepMs(w);
   ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(plannedSleepMs));
 }
@@ -700,7 +785,7 @@ void setup() {
   ScreenshotSource shotSrc;
   shotSrc.width = static_cast<int>(tft.width());
   shotSrc.height = static_cast<int>(tft.height());
-  shotSrc.screenCount = kScreenCount + 1;  // + the update prompt demo
+  shotSrc.screenCount = kScreenCount + 2;  // + the update prompt and alert screen demos
   shotSrc.begin = shot::begin;
   shotSrc.requestBand = shot::requestBand;
   shotSrc.waitBand = shot::waitBand;
@@ -755,8 +840,20 @@ void loop() {
     }
   }
 
-  // --- Touch: edge-detected, one handleTap() per press --------------------
+  // --- The alert message screen owns the screen while it's open --------------
   static bool wasTouchPressed = false;
+  if (alertScreen.open) {
+    serviceAlertScreen();
+    if (alertScreen.open) {
+      wasTouchPressed = true;  // whatever the finger does here isn't a tap below
+      pendingRedraw = RedrawEvents{};
+      sleepUntilNextDeadline();
+      return;
+    }
+    wasTouchPressed = touchInputRead(tft).pressed;  // the CLOSE tap isn't one either
+  }
+
+  // --- Touch: edge-detected, one handleTap() per press --------------------
   TouchPoint touch = touchInputRead(tft);
   if (touch.pressed && !wasTouchPressed) {
     // One line per tap: raw XPT2046 values + where they mapped to — what
@@ -773,6 +870,12 @@ void loop() {
     }
   }
   wasTouchPressed = touch.pressed;
+
+  if (alertScreen.open) {  // the tap opened the "!" message
+    pendingRedraw = RedrawEvents{};
+    sleepUntilNextDeadline();
+    return;
+  }
 
   // --- New version on GitHub: ask once ------------------------------------
   if (!promptActive && !net->update.installPending) maybeShowUpdatePrompt(touch.pressed);

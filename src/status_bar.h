@@ -16,7 +16,8 @@
 #include <cstdint>
 #include <string>
 
-#include "i18n.h"  // Language
+#include "device_alerts.h"  // AlertSeverity
+#include "i18n.h"           // Language
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
@@ -77,15 +78,23 @@ constexpr const char *kStatusBarAppName = "SKY TRACKER";
 //   left, small, dim     centred, white     right, light peach (clock larger)
 // x ranges (px) computed from the strings and the fonts' fixed advances, so
 // a test can prove the zones never overlap for the longest texts.
+// With `badge` the device-alert "!" (spec 08 §3.4) sits kAlertBadgeGap px
+// right of the name and the count is centred between the badge and the date.
 struct HeaderZones {
   int name_x = 0, name_end = 0;        // app name
+  int alert_x = -1;                    // left edge of the "!" badge; -1 = no badge
   int count_start = 0, count_end = 0;  // status dot + count label
   int right_start = 0, right_end = 0;  // date + clock
   int date_x = 0;                      // left edge of the date
 };
+// The "!" badge: a filled circle in alertBadgeColor() with a black "!",
+// y:1..13 — inside the 15 px header, above its 1 px rule.
+constexpr int kAlertBadgeDiameter = 13;
+constexpr int kAlertBadgeGap = 4;
+constexpr int kAlertBadgeTop = 1;
 HeaderZones statusBarZones(int screenWidth, const std::string &appName,
                            const std::string &countLabel, const std::string &date,
-                           const std::string &clock);
+                           const std::string &clock, bool badge = false);
 
 // ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme. Not
 // covered by Unity (see CLAUDE.md "Testing"). Guarded here in the header
@@ -104,7 +113,9 @@ HeaderZones statusBarZones(int screenWidth, const std::string &appName,
 // placeholder. Repaints its own black background first and touches nothing
 // below the header, so it's safe to call on its own (CLAUDE.md "Redraw
 // policy": minute rollover, health change, new poll).
+// `badge` != None adds the device-alert "!" right of the app name.
 void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, OpenSkyHealth health,
-                   std::time_t localEpoch, bool timeSynced, int16_t screenWidth);
+                   AlertSeverity badge, std::time_t localEpoch, bool timeSynced,
+                   int16_t screenWidth);
 
 #endif  // ARDUINO

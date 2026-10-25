@@ -192,6 +192,7 @@ struct PromptGate {
   int tCpaSeconds = 0;
   bool touchActive = false;        // never pop up under a finger
   bool screenOff = false;          // night, backlight off (backlight) — nobody would see it
+  bool alertScreenOpen = false;    // the device-alert message is up (spec 08) — not over it
 };
 bool shouldShowUpdatePrompt(const PromptGate &g);
 constexpr uint32_t kUpdatePromptTimeoutMs = 30000;

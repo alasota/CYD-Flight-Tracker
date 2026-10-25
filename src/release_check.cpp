@@ -412,7 +412,7 @@ bool preReleaseWorthShowing(const ReleaseInfo &pre, const ReleaseInfo &latest) {
 bool shouldShowUpdatePrompt(const PromptGate &g) {
   if (g.status != UpdateStatus::Available || g.latestTag.empty()) return false;
   if (g.installedIsDev || g.alreadyPromptedThisBoot || !g.homeConfigured || g.touchActive ||
-      g.screenOff) {
+      g.screenOff || g.alertScreenOpen) {
     return false;
   }
   if (!g.skippedTag.empty() &&
