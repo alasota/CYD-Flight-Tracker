@@ -74,10 +74,11 @@ jobs:
         # Same suites, built with -fsanitize=address,undefined (platformio.ini).
         run: pio test -e native-asan
 
-      - name: BDD scenarios are backed by tests
+      - name: BDD scenarios are backed by tests, harness tools tested
         # Every Scenario in spec/**/*.feature names its Unity test or is @manual.
         run: |
           python tools/test_check_bdd.py
+          python tools/test_release_plan.py
           python tools/check_bdd.py
 
       - name: Build firmware
