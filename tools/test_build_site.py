@@ -65,13 +65,20 @@ class Node:
     def element_children(self):
         return [c for c in self.children if isinstance(c, Node)]
 
-    def text(self, lang=None):
-        """Visible text, whitespace collapsed; lang="en" skips .pl elements and vice versa."""
+    def text(self, lang=None, spoken=False):
+        """Visible text, whitespace collapsed; lang="en" skips .pl elements and vice versa.
+
+        spoken=False skips .sr-only elements (what the eye sees), spoken=True skips
+        aria-hidden="true" ones instead (what a screen reader announces)."""
         other = {"en": "pl", "pl": "en"}.get(lang)
         parts = []
 
         def walk(n):
             if other and other in n.classes:
+                return
+            if spoken and n.attrs.get("aria-hidden") == "true":
+                return
+            if not spoken and "sr-only" in n.classes:
                 return
             for c in n.children:
                 if isinstance(c, Node):
@@ -696,6 +703,11 @@ class SiteHtmlTest(unittest.TestCase):
             return tab.text(lang).strip("„”“\"' ")
         self.assertEqual([en for en, _, _ in PANEL_TABS], [label(t, "en") for t in tabs])
         self.assertEqual([pl for _, pl, _ in PANEL_TABS], [label(t, "pl") for t in tabs])
+        # A screen reader must not announce just "exclamation mark": the "!" tab (and its
+        # tabpanel, labelled by it) carries a spoken name in both languages.
+        alert = tabs[-1]
+        self.assertEqual("Needs attention", alert.text("en", spoken=True))
+        self.assertEqual("Wymaga uwagi", alert.text("pl", spoken=True))
         for tab, (en, _, png) in zip(tabs, PANEL_TABS):
             with self.subTest(tab=en):
                 target = tab.attrs.get("aria-controls")
