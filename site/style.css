@@ -141,7 +141,9 @@ ol.steps li::before {
 
 /* ---- roadmap */
 .intro { max-width: 620px; margin: -12px auto 28px; }
-.roadmap { max-width: 1000px; margin: 0 auto 16px; display: grid; gap: 12px; }
+/* minmax(0, …): without it a grid item is at least as wide as its table, so on a phone the
+   tables pushed the cards (and the page) to ~900 px instead of scrolling in .table-scroll */
+.roadmap { max-width: 1000px; margin: 0 auto 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .governance { max-width: 760px; margin: 0 auto 20px; border-left: 3px solid var(--accent); }
 .governance p { margin: 0; color: #c9cad1; }
 .table-scroll { overflow-x: auto; margin: 0 -8px; }
@@ -157,6 +159,7 @@ ol.steps li::before {
 .roadmap-table td.c-value, .roadmap-table td.c-effort, .roadmap-table td.c-risk { white-space: nowrap; }
 .roadmap-table td.c-rating { white-space: nowrap; letter-spacing: -1px; }
 .roadmap-table td.c-verdict { min-width: 260px; font-size: .85rem; }
+.roadmap-table td.c-version { white-space: nowrap; font-size: .85rem; }
 
 /* ---- version badge + changelog */
 .version-badge {
@@ -165,7 +168,7 @@ ol.steps li::before {
 }
 .version-badge b { color: var(--accent); font-weight: 600; }
 .version-badge:hover { border-color: var(--accent); }
-.changelog { max-width: 760px; margin: 0 auto; display: grid; gap: 12px; }
+.changelog { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .changelog details { padding: 0; }
 .changelog summary {
   cursor: pointer; padding: 16px 22px; list-style: none; display: flex; flex-wrap: wrap;

@@ -107,13 +107,31 @@ def roadmap_html(sections):
         return '<span class="en">%s</span><span class="pl">%s</span>' % (
             html.escape(en), html.escape(pl))
 
+    def col_class(c):
+        return re.sub(r"\W", "", c.lower()) or "n"
+
+    def version_cell(en, pl):
+        """Done table: the release a verdict names, linked to the changelog (whose entry
+        already says what changed); the verdict itself when it names no release."""
+        v = done_version(en, pl)
+        if isinstance(v, str):
+            return '<a href="#changelog">%s</a>' % html.escape(v)
+        return both(*v) if v else both(en, pl)
+
     blocks = []
     for name, columns, rows in sections:
+        cells = [(c, both(c, COLUMN_PL.get(c, c)), lambda en, pl: both(en, pl)) for c in columns]
+        if name == "Done" and "Verdict" in columns:
+            # Only #, Item and the version: the verdict's prose is in the changelog now.
+            cells = [cell for cell in cells if cell[0] in ("#", "Item")]
+            cells.append(("Verdict", both("Version", "Wersja"), version_cell))
         head = "".join('<th class="c-%s">%s</th>' % (
-            re.sub(r"\W", "", c.lower()) or "n", both(c, COLUMN_PL.get(c, c))) for c in columns)
+            "version" if render is version_cell else col_class(c), label)
+            for c, label, render in cells)
         body = "".join("<tr>%s</tr>" % "".join(
-            '<td class="c-%s">%s</td>' % (re.sub(r"\W", "", c.lower()) or "n", both(en, pl))
-            for c, (en, pl) in zip(columns, row)) for row in rows)
+            '<td class="c-%s">%s</td>' % ("version" if render is version_cell else col_class(c),
+                                          render(*row[columns.index(c)]))
+            for c, _, render in cells if columns.index(c) < len(row)) for row in rows)
         blocks.append('<div class="card"><h3>%s</h3><div class="table-scroll">'
                       '<table class="roadmap-table"><thead><tr>%s</tr></thead>'
                       '<tbody>%s</tbody></table></div></div>' % (
