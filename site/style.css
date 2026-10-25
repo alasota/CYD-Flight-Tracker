@@ -129,11 +129,8 @@ ol.steps li::before {
   background: var(--accent); color: var(--on-accent); font-weight: 700; text-align: center; line-height: 28px;
 }
 .steps-cards p { margin: 0; color: #c9cad1; }
-.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .backup-note { max-width: 860px; margin: 28px auto 0; }
 .backup-note p { margin: 0; color: #c9cad1; }
-.web-shots { margin: 28px auto 0; max-width: 1100px; align-items: start; grid-template-columns: repeat(5, 1fr); }
-.web-shots img { border-radius: 12px; border: 1px solid var(--line); }
 
 /* ---- what else it does: 2x2 tiles, the long story under "More" */
 .features { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
@@ -149,6 +146,31 @@ ol.steps li::before {
 .tile details[open] > summary::after { content: " –"; }
 .tile details[open] > summary { margin-bottom: 10px; }
 .tile details p { font-size: .95rem; }
+
+/* ---- settings-page viewer (#panel): tabs like the panel's own, one screenshot at a time in a
+   fixed-height frame that scrolls inside. Without JS (no html.js) there are no tabs and every
+   screenshot is shown, one under another. */
+.panel-viewer { max-width: 920px; margin: 0 auto; }
+.panel-viewer > p { margin: -8px 0 20px; }
+.panel-tabs { display: none; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+html.js .panel-tabs { display: flex; }
+.panel-tabs [role="tab"] {
+  background: var(--field); border: 1px solid var(--line); border-radius: 999px; color: var(--muted);
+  font: inherit; font-size: .9rem; font-weight: 600; padding: 6px 16px; cursor: pointer;
+}
+.panel-tabs [role="tab"]:hover { color: var(--text); }
+.panel-tabs [role="tab"][aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.panel-tabs [role="tab"]:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
+.panel-page { display: grid; grid-template-columns: minmax(0, 520px) minmax(0, 1fr); gap: 28px; align-items: start; }
+.panel-page + .panel-page { margin-top: 28px; }
+html.js .panel-page { margin-top: 0; }
+html.js .panel-page:not(.active) { display: none; }
+.panel-frame {
+  max-height: 640px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card);
+}
+.panel-frame img { width: 100%; }
+.panel-caption p { margin: 0 0 12px; color: #c9cad1; }
 
 /* ---- roadmap */
 .intro { max-width: 620px; margin: -12px auto 28px; }
@@ -230,5 +252,6 @@ ol.steps li::before {
   .lang { margin-left: auto; }
   section.wrap { margin: 64px auto; }
   code { white-space: normal; word-break: break-all; }
-  .web-shots { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .panel-page { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .panel-frame { max-height: 70vh; }
 }

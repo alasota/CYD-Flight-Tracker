@@ -24,7 +24,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     var l = null;
     try { l = localStorage.getItem('lang'); } catch (e) {}
     if (l !== 'pl' && l !== 'en') l = /^pl\b/i.test(navigator.language || '') ? 'pl' : 'en';
-    document.documentElement.className = l;
+    document.documentElement.classList.remove('en', 'pl');
+    document.documentElement.classList.add(l);
     document.documentElement.lang = l;
   })();
 </script>
@@ -45,6 +46,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <nav class="links">
       <a href="#screens"><span class="en">Screens</span><span class="pl">Ekrany</span></a>
       <a href="#features"><span class="en">Features</span><span class="pl">Funkcje</span></a>
+      <a href="#panel">Panel</a>
       <a href="#install"><span class="en">Install</span><span class="pl">Instalacja</span></a>
       <a href="#setup"><span class="en">Setup</span><span class="pl">Konfiguracja</span></a>
       <a href="#roadmap"><span class="en">Roadmap</span><span class="pl">Roadmapa</span></a>
@@ -292,6 +294,79 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </details>
     </article>
   </div>
+  <!-- settings-page viewer: one screenshot at a time (site.js); without JS all six, one under another -->
+  <div class="panel-viewer" id="panel">
+    <h3 class="sub" id="panel-title"><span class="en">The settings page</span><span class="pl">Panel ustawień</span></h3>
+    <p class="muted center small">
+      <span class="en">At <code>http://cyd-sky.local</code>, from any phone or computer on your WiFi.
+        Click a screenshot for the full size.</span>
+      <span class="pl">Pod <code>http://cyd-sky.local</code>, z każdego telefonu albo komputera w
+        Twoim WiFi. Kliknij zrzut, żeby zobaczyć go w pełnym rozmiarze.</span>
+    </p>
+    <div class="panel-tabs" role="tablist" aria-labelledby="panel-title">
+      <button type="button" role="tab" id="tab-location" aria-controls="panel-location" aria-selected="true"><span class="en">Location</span><span class="pl">Lokalizacja</span></button>
+      <button type="button" role="tab" id="tab-opensky" aria-controls="panel-opensky" aria-selected="false" tabindex="-1">OpenSky</button>
+      <button type="button" role="tab" id="tab-general" aria-controls="panel-general" aria-selected="false" tabindex="-1"><span class="en">General</span><span class="pl">Ogólne</span></button>
+      <button type="button" role="tab" id="tab-backup" aria-controls="panel-backup" aria-selected="false" tabindex="-1"><span class="en">Backup</span><span class="pl">Kopia</span></button>
+      <button type="button" role="tab" id="tab-firmware" aria-controls="panel-firmware" aria-selected="false" tabindex="-1">Firmware</button>
+      <button type="button" role="tab" id="tab-alert" aria-controls="panel-alert" aria-selected="false" tabindex="-1">!</button>
+    </div>
+    <div class="panel-page active" role="tabpanel" id="panel-location" aria-labelledby="tab-location">
+      <div class="panel-frame"><a href="screenshots/web_location.png" target="_blank" rel="noopener"><img src="screenshots/web_location.png" width="1000" height="1465" alt="Settings page, Location tab" loading="lazy"></a></div>
+      <div class="panel-caption">
+        <p class="en">Where home is: latitude, longitude and how far around it to look. Each radius
+          shows what it costs in OpenSky credits, so the trade-off is right there.</p>
+        <p class="pl">Gdzie jest dom: szerokość, długość i jak daleko wokół niego patrzeć. Przy
+          promieniu widać, ile kosztuje w kredytach OpenSky, więc wiesz, na co się piszesz.</p>
+      </div>
+    </div>
+    <div class="panel-page" role="tabpanel" id="panel-opensky" aria-labelledby="tab-opensky">
+      <div class="panel-frame"><a href="screenshots/web_opensky.png" target="_blank" rel="noopener"><img src="screenshots/web_opensky.png" width="1000" height="2270" alt="Settings page, OpenSky client tab: credits per day with the night pause" loading="lazy"></a></div>
+      <div class="panel-caption">
+        <p class="en">Your OpenSky account (optional) and how often to ask for planes, with an
+          estimate of the credits that uses per day against your daily limit.</p>
+        <p class="pl">Konto OpenSky (opcjonalne) i jak często pytać o samoloty, z szacunkiem
+          dziennego zużycia kredytów na tle Twojego limitu.</p>
+      </div>
+    </div>
+    <div class="panel-page" role="tabpanel" id="panel-general" aria-labelledby="tab-general">
+      <div class="panel-frame"><a href="screenshots/web_general.png" target="_blank" rel="noopener"><img src="screenshots/web_general.png" width="1000" height="4512" alt="Settings page, General tab: screen brightness and night mode, panel password" loading="lazy"></a></div>
+      <div class="panel-caption">
+        <p class="en">Display and page language, screen auto-cycling, brightness and night mode,
+          the update check and the panel password. It's the long one: scroll inside the frame.</p>
+        <p class="pl">Język wyświetlacza i strony, automatyczne przełączanie ekranów, jasność i
+          tryb nocny, sprawdzanie aktualizacji i hasło do panelu. Najdłuższa zakładka: przewiń w
+          ramce.</p>
+      </div>
+    </div>
+    <div class="panel-page" role="tabpanel" id="panel-backup" aria-labelledby="tab-backup">
+      <div class="panel-frame"><a href="screenshots/web_backup.png" target="_blank" rel="noopener"><img src="screenshots/web_backup.png" width="1000" height="1424" alt="Settings page, Backup tab" loading="lazy"></a></div>
+      <div class="panel-caption">
+        <p class="en">Download every setting as one JSON file and restore it later, with the
+          OpenSky credentials and the panel password only if you ask for them.</p>
+        <p class="pl">Pobierz wszystkie ustawienia jako jeden plik JSON i przywróć je później;
+          dane logowania OpenSky i hasło do panelu tylko wtedy, gdy o nie poprosisz.</p>
+      </div>
+    </div>
+    <div class="panel-page" role="tabpanel" id="panel-firmware" aria-labelledby="tab-firmware">
+      <div class="panel-frame"><a href="screenshots/web_firmware.png" target="_blank" rel="noopener"><img src="screenshots/web_firmware.png" width="1000" height="1981" alt="Settings page, Firmware tab: updates from GitHub and a manual upload" loading="lazy"></a></div>
+      <div class="panel-caption">
+        <p class="en">Updates from GitHub (<i>Check now</i>, <i>Install</i>) and a manual upload of
+          a <code>.bin</code> file, with a progress bar on the page and on the display.</p>
+        <p class="pl">Aktualizacje z GitHuba (<i>Sprawdź teraz</i>, <i>Zainstaluj</i>) i ręczne
+          wgranie pliku <code>.bin</code>, z paskiem postępu na stronie i na wyświetlaczu.</p>
+      </div>
+    </div>
+    <div class="panel-page" role="tabpanel" id="panel-alert" aria-labelledby="tab-alert">
+      <div class="panel-frame"><a href="screenshots/web_alert.png" target="_blank" rel="noopener"><img src="screenshots/web_alert.png" width="1000" height="4028" alt="Settings page with the Needs attention box above the tabs (OpenSky login failed, daily limit reached, polling too often) and the OpenSky tab showing the red login-failed pill and warning" loading="lazy"></a></div>
+      <div class="panel-caption">
+        <p class="en">When the display shows a "!", the page has a box above the tabs saying what's
+          wrong, why (HTTP code, when the credits come back) and which tab fixes it.</p>
+        <p class="pl">Gdy wyświetlacz pokazuje „!”, strona ma nad zakładkami ramkę: co jest nie
+          tak, dlaczego (kod HTTP, kiedy wrócą kredyty) i na której zakładce to naprawisz.</p>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- ============================== install -->
@@ -420,14 +495,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       5 sekund i stuknij <b>TAK</b>. Strona to wciąż zwykłe HTTP, więc hasło trzyma z dala
       domowników, a nie zdeterminowanego podsłuchiwacza w sieci: użyj hasła, którego nie używasz
       nigdzie indziej.</p>
-  </div>
-  <div class="grid4 web-shots">
-    <img src="screenshots/web_location.png" width="1000" height="1465" alt="Settings page, Location tab" loading="lazy">
-    <img src="screenshots/web_opensky.png" width="1000" height="2270" alt="Settings page, OpenSky client tab: credits per day with the night pause" loading="lazy">
-    <img src="screenshots/web_general.png" width="1000" height="4512" alt="Settings page, General tab: screen brightness and night mode, panel password" loading="lazy">
-    <img src="screenshots/web_backup.png" width="1000" height="1424" alt="Settings page, Backup tab" loading="lazy">
-    <img src="screenshots/web_firmware.png" width="1000" height="1981" alt="Settings page, Firmware tab: updates from GitHub and a manual upload" loading="lazy">
-    <img src="screenshots/web_alert.png" width="1000" height="4028" alt="Settings page with the Needs attention box above the tabs (OpenSky login failed, daily limit reached, polling too often) and the OpenSky tab showing the red login-failed pill and warning" loading="lazy">
   </div>
 </section>
 
