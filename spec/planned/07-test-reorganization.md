@@ -1,6 +1,7 @@
 # Spec 07 — Reorganizacja i poprawa testów natywnych
 
-Z przeglądu kodu 2026-10-25, sekcja 4. Status: **w trakcie** (implementacja rozpoczęta 2026-10-25).
+Z przeglądu kodu 2026-10-25, sekcja 4. Status: **zaimplementowane 2026-10-25**, czeka tylko na zielone CI z `native-asan` (kryterium 6,
+§9); potem `git mv` do `spec/done/`.
 
 ## 1. Problem
 
@@ -87,9 +88,11 @@ do `shared`).
 
 - Wszystko: `pio test -e native` (6 binarek zamiast 41).
 - Jedna grupa: `pio test -e native -f test_opensky`.
-- Jeden moduł: `run_<moduł>_tests()` można wywołać selektywnie przez `-DTEST_ONLY=opensky_client`
-  (makro w `main.cpp`: `#if !defined(TEST_ONLY) || TEST_ONLY_IS(opensky_client)`). Opisane w
-  `test/README.md`; nie jest wymagane do akceptacji.
+- Jeden moduł: `run_<moduł>_tests()` można wywołać selektywnie przez
+  `-DTEST_MODULE=opensky_client` (w `main.cpp`: `if (RUN_MODULE(opensky_client)) …`). Opisane w
+  `test/README.md`; nie jest wymagane do akceptacji. *Zmiana przy implementacji:* miało być
+  `TEST_ONLY`, ale `unity.h` sam definiuje makro `TEST_ONLY()` (znacznik dla generatora
+  runnerów), więc `#ifdef TEST_ONLY` było zawsze prawdziwe i suite uruchamiał 0 testów.
 - `tools/screenshots.py`: `-f test_config_page` → `-f test_admin` (renderowanie z
   `SCREENSHOT_OUT` przenosi się razem z `config_page_test.cpp`). Do tego referencje w
   CLAUDE.md (sekcje „Testing”, „Commands”, „New versions from GitHub”).
@@ -161,3 +164,31 @@ niewymagane.
   `LatestBox` na `std::thread` + TSan. Ta specyfikacja tylko porządkuje i poprawia to, co już jest.
 - Przeniesienie `src/` do podkatalogów — [spec 12](12-code-reorganization-ddd.md).
 - Raport pokrycia (`gcov`).
+
+## 9. Wynik (2026-10-25)
+
+1. 6 suite'ów, wszystkie PASSED. Pełny przebieg na Windowsie: **34 s** od czystego buildu,
+   **~27 s** przyrostowo (przed: **179 s**, w tym 3 z 41 suite'ów ERRORED przez WinError 4551).
+   4551 nadal się zdarza (średnio ~1 suite na przebieg), ale ponowienie to jeden suite.
+2. `RUN_TEST`: **727** przed i po (`grep -rh` liczy linie, a `test_version.cpp` był dla grepa
+   plikiem binarnym — stąd „725”; `grep -rah` daje 727); listy nazw identyczne.
+3. `grep -rnE "TEST_ASSERT_TRUE\([^&|]*==" test --include='*.cpp'` = pusto (całe `test/`
+   znajduje tylko przykłady „przed” w tabeli `test/README.md`); lokalnych `contains()` brak.
+   Zamienionych asercji: 374 (skryptem + ~15 ręcznie). `std::vector` porównywane przez
+   `TEST_ASSERT_EQUAL_UINT8_ARRAY`.
+4. Każdy helper zepsuty celowo raz — komunikaty w tabeli `test/README.md` to faktyczne wyjście.
+5. `python tools/screenshots.py` z `-f test_admin`: renderuje, PNG bajtowo identyczne z
+   poprzednimi.
+6. CI: **do potwierdzenia po pushu.** Lokalnie ASan się nie da (MinGW, brak WSL); UBSan w trybie
+   trap (`-fsanitize=undefined -fsanitize-trap=all`) — wszystkie 6 suite'ów zielone.
+
+Uwagi z implementacji:
+- Unity bierze nazwę pliku z `UNITY_BEGIN()` (czyli `main.cpp`), więc każdy `run_…_tests()`
+  zaczyna się od `UnitySetTestFile(__FILE__)` — inaczej błąd pokazywał `main.cpp:<linia z innego
+  pliku>`.
+- `-Wall -Wextra -Werror`: `src/` był czysty; tylko nieużywane parametry stubów w testach.
+- `-fsanitize*` SCons przekazuje też do linkera, więc `native-asan` nie potrzebuje
+  `link_flags` ani skryptu.
+- `fixtures.h` zastąpił duplikaty tam, gdzie były identyczne (`plane()` w poll_pipeline,
+  `displayRow()` w table_view, początek `sample()` w config_backup); pozostałe buildery wierszy
+  ustawiają celowo inne pola dla swoich testów i zostały.

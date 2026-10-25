@@ -661,9 +661,9 @@ language / Jezyk wyswietlacza" select, values `pl` / `en`). Default: Polish.
   `src/fonts/lcars_efont.c` (~4.4 KB; keeps the efont BSD notice) — same pixels, same layout.
   The set is printable ASCII + ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ + `° ± × · – — … →`, defined once in
   `lcars_theme` (`isFontCodepoint()` / `isFontSafeText()`); the script's `CODEPOINTS` must
-  match it, and `test_fonts` checks every allowed character has a glyph in all three fonts.
+  match it, and `fonts_test.cpp` checks every allowed character has a glyph in all three fonts.
   A character outside the set simply isn't drawn, so every on-screen string must be
-  `isFontSafeText()` — `test_i18n`, the city table and the type/airline tables are checked
+  `isFontSafeText()` — `i18n_test.cpp`, the city table and the type/airline tables are checked
   against it. To add a character: extend both lists, rerun the script, run the tests. This is
   what lets the ~1.3 MB firmware fit two OTA slots (`min_spiffs.csv`). `fitToWidth()` cuts only on UTF-8
   character boundaries; layout maths uses `utf8Length()` and the fonts' fixed advance
@@ -681,7 +681,7 @@ language / Jezyk wyswietlacza" select, values `pl` / `en`). Default: Polish.
 - **The config web page has its own language** (`Config::web_language`, NVS key `wlang`,
   default PL), independent of the display's: PL/EN switch in the page header (`GET /lang?l=`)
   and a select on the General tab. Its strings are a separate X-macro table, `web_i18n`
-  (`WEB_I18N_STRINGS`, `webTr()`); they go into HTML/JS raw, so `test_web_i18n` forbids
+  (`WEB_I18N_STRINGS`, `webTr()`); they go into HTML/JS raw, so `web_i18n_test.cpp` forbids
   `" < > \ &` in them.
 
 ## Firmware updates (OTA) & panel password
@@ -760,10 +760,11 @@ Spec: `spec/done/02-github-release-check.md` (built and tested on the board 2026
   `release.yml` marks them pre-release and skips the project page; `build_site.py` gives them no
   changelog entry. Release one: `git tag v1.3.0-rc.1 && git push origin v1.3.0-rc.1`.
 - Screenshots `update_prompt.png`, `web_firmware*.png`: `python tools/screenshots.py --device
-  <board>` (web pages from `test_config_page` with `SCREENSHOT_OUT`, headless Chrome; the
+  <board>` (web pages from `config_page_test.cpp` in `test_admin` with `SCREENSHOT_OUT`, headless Chrome; the
   display one from the board — LovyanGFX can't build for the PC without SDL).
 - ⚠️ Windows: a native test run sometimes reports `ERRORED` with no failed assertion — that's
-  application control blocking a fresh test `.exe` (WinError 4551). Rerun that suite.
+  application control blocking a fresh test `.exe` (WinError 4551). Rerun that suite
+  (`pio test -e native -f test_<suite>`).
 
 ## Concurrency — two cores (core_link, net_task)
 
@@ -1111,6 +1112,22 @@ Test-first is the default here, not a cleanup pass bolted on at the end:
 - Before considering any milestone from the step plan "done," run `pio test -e native` and
   confirm the new logic introduced in that milestone has coverage — not just that the firmware
   compiles and uploads. Compiling is not the same as correct.
+- **Layout** (spec 07, details in `test/README.md`): **six suites**, one executable each,
+  grouped by the contexts of spec 12 — `test_airspace` (phase, CPA, poll pipeline),
+  `test_enrichment` (hexdb.io lookups, caches, name tables), `test_opensky`, `test_display`
+  (views, theme, nav, touch, backlight, i18n), `test_admin` (config page / store / backup, web
+  auth, OTA, release check, version, screenshot), `test_platform` (core_link, perf, WiFi, time,
+  sun). A module's tests are `test/test_<suite>/<module>_test.cpp`: an anonymous namespace plus
+  one `run_<module>_tests()`; the suite's `main.cpp` calls them and is the only place with
+  `setUp()` (-> `resetAllForTesting()`; new global state gets its reset there). One module:
+  `PLATFORMIO_BUILD_FLAGS="-DTEST_MODULE=<module>"`.
+- **Assertions that print values** (`test/support/test_support.h`): `ASSERT_ENUM_EQ`,
+  `ASSERT_STR_EQ`, `ASSERT_CONTAINS` / `ASSERT_NOT_CONTAINS` (string or vector of strings), and
+  for JSON `json_assert.h` (`assertJsonBool(doc, "general.update_check", false)`) — never
+  `TEST_ASSERT_TRUE(a == b)` for one value or a hand-written `contains()`. Test data:
+  `fixtures.h` (`makeAircraft()`, `makeRow()`, `makeConfig()`, `stubPorts()`).
+- The `native` env builds with `-Wall -Wextra -Werror` (tests and `src/`); CI also runs
+  `native-asan` (AddressSanitizer + UBSan, Linux only — MinGW has no sanitizer runtime).
 
 ## platformio.ini starting point
 
@@ -1171,7 +1188,10 @@ above depends on `pio test -e native` existing:
 platform = native
 test_framework = unity
 build_flags =
-    -std=c++17
+    -std=gnu++17
+    -DUNIT_TEST
+    -I test/support          ; shared assertions + fixtures (test/README.md)
+    -Wall -Wextra -Werror
 ; No LovyanGFX/Arduino.h here on purpose — this env only compiles modules whose testable
 ; logic is plain C++ (structs, functions), which is exactly what "Code conventions" and
 ; "Testing" above require. If a file won't compile under `native`, that's a signal it still
@@ -1193,7 +1213,7 @@ mistakes here waste hours of debugging later.
   and `version.txt`.
 - **GitHub Actions — three workflows** (`.github/workflows/`):
   - `firmware.yml` — push to main / PRs / manual, and reusable (`workflow_call`): runs
-    `pio test -e native`, builds, uploads artifact `cyd-sky-tracker-<version>` with
+    `pio test -e native` and `pio test -e native-asan`, builds, uploads artifact `cyd-sky-tracker-<version>` with
     `cyd-sky-tracker-<version>.bin` (app, OTA or 0x10000), `…-full.bin` (merged image, 0x0),
     `bootloader.bin`, `partitions.bin`, `boot_app0.bin`, `version.txt`, `SHA256SUMS.txt`.
   - `site.yml` — changes under `site/`, `docs/screenshots`, `docs/icons` on main / manual, and
@@ -1231,7 +1251,8 @@ mistakes here waste hours of debugging later.
 - Build: `pio run`
 - Upload: `pio run -t upload`
 - Monitor: `pio device monitor -b 115200`
-- Test (native, logic only, no hardware): `pio test -e native`
+- Test (native, logic only, no hardware): `pio test -e native` — one suite:
+  `pio test -e native -f test_display`; with sanitizers (Linux): `pio test -e native-asan`
 - Screenshots of the config page (General, OpenSky, Firmware tabs) and the update question:
   `python tools/screenshots.py [--device cyd-sky.local]`
 

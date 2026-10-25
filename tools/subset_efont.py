@@ -13,7 +13,7 @@ Usage (from the repo root, after `pio run` has fetched LovyanGFX):
     python tools/subset_efont.py
 
 Change CODEPOINTS together with lcars_theme's kFontExtraCodepoints; the
-native test test_fonts checks that every character isFontSafeText() accepts
+native test fonts_test.cpp (test_display) checks that every character isFontSafeText() accepts
 has a glyph in every subset font.
 """
 

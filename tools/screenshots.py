@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Screenshots of the config page and the update question, made from the same demo
-data the tests use (test_config_page; release_check's updateDemoState()):
+data the tests use (test_admin/config_page_test.cpp; release_check's updateDemoState()):
 
   docs/screenshots/web_general.png       config page, General tab: the Display card
                                          (brightness + night mode, spec/03)
@@ -11,7 +11,7 @@ data the tests use (test_config_page; release_check's updateDemoState()):
   docs/screenshots/web_firmware_dev.png  ...with "show development versions" on
   docs/screenshots/update_prompt.png     the question on the display (--device)
 
-The web pages need no board: `pio test -e native -f test_config_page` renders them
+The web pages need no board: `pio test -e native -f test_admin` renders them
 (SCREENSHOT_OUT set) and headless Chrome / Edge photographs them at 500 px x2, like
 the other web_*.png. The display one is drawn by the board itself
 (GET /screenshot.bmp?screen=3 — the prompt with the demo data, then back to the
@@ -65,13 +65,13 @@ def render_pages(tmp):
     # Windows' application control now and then blocks a freshly built test
     # program (WinError 4551) — a second run gets through.
     for _ in range(3):
-        r = subprocess.run([find_pio(), "test", "-e", "native", "-f", "test_config_page"],
+        r = subprocess.run([find_pio(), "test", "-e", "native", "-f", "test_admin"],
                            cwd=REPO, env=env, capture_output=True, encoding="utf-8",
                            errors="replace")
         if r.returncode == 0 or "4551" not in r.stdout:
             break
     if r.returncode != 0:
-        sys.exit("test_config_page failed:\n" + r.stdout[-3000:] + r.stderr[-2000:])
+        sys.exit("test_admin failed:\n" + r.stdout[-3000:] + r.stderr[-2000:])
     return [tmp / name for name in ("web_general.html", "web_opensky.html",
                                     "web_firmware.html", "web_firmware_dev.html")]
 

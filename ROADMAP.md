@@ -22,7 +22,7 @@ project page (site/). Keep the format:
 
 | # | Item | Value | Effort | Risk | Rating | Verdict |
 |---|---|---|---|---|---|---|
-| 1 | Tests reorganized: 41 separate test programs become 6 groups that match the areas of the code, with shared helpers and failure messages that say what actually went wrong <!-- pl: Reorganizacja testów: 41 osobnych programów testowych zamienia się w 6 grup odpowiadających obszarom kodu, ze wspólnymi pomocnikami i komunikatami błędów, które mówią, co naprawdę poszło nie tak --> | medium | medium | low | ⭐⭐⭐⭐ | Underway. Two minutes per test run, and Windows randomly blocking freshly built test programs, got old fast. Spec 07. <!-- pl: W trakcie. Dwie minuty na przebieg testów i Windows losowo blokujący świeżo zbudowane programy testowe szybko się znudziły. Spec 07. --> |
+| 1 | Tests reorganized: 41 separate test programs become 6 groups that match the areas of the code, with shared helpers and failure messages that say what actually went wrong <!-- pl: Reorganizacja testów: 41 osobnych programów testowych zamienia się w 6 grup odpowiadających obszarom kodu, ze wspólnymi pomocnikami i komunikatami błędów, które mówią, co naprawdę poszło nie tak --> | medium | medium | low | ⭐⭐⭐⭐ | Nearly there: a full test run takes about 30 s instead of 3 minutes, all 727 tests kept, and a failure now says what was expected and what came out. Waiting for the first CI run with the memory and undefined-behaviour checks. Spec 07. <!-- pl: Prawie gotowe: pełny przebieg testów trwa około 30 s zamiast 3 minut, wszystkie 727 testów zostały, a błąd mówi teraz, czego się spodziewano i co wyszło. Czeka na pierwszy przebieg CI ze sprawdzaniem pamięci i niezdefiniowanych zachowań. Spec 07. --> |
 
 ## Planned
 

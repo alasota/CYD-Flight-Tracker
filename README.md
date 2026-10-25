@@ -127,7 +127,7 @@ answer to "what plane is that." Think of it as the away-team variant with better
 ```bash
 git clone <this-repo>
 cd cyd-sky-tracker
-pio test -e native      # test
+pio test -e native      # test (six suites, ~30 s; see test/README.md)
 pio run                 # build
 pio run -t upload       # flash it, engage
 pio device monitor -b 115200   # watch the logs scroll by dramatically
