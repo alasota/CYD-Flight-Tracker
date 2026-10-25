@@ -2,6 +2,7 @@
 #include <unity.h>
 
 #include "config_store.h"
+#include "test_support.h"
 
 namespace {
 
@@ -232,7 +233,7 @@ static void test_display_defaults(void) {
   TEST_ASSERT_TRUE(c.brightness_auto);
   TEST_ASSERT_EQUAL_UINT8(10, c.brightness_min_pct);
   TEST_ASSERT_EQUAL_UINT8(100, c.brightness_max_pct);
-  TEST_ASSERT_TRUE(c.night_mode == NightMode::Sun);  // owner decision §8.2
+  ASSERT_ENUM_EQ(NightMode::Sun, c.night_mode);  // owner decision §8.2
   TEST_ASSERT_EQUAL_UINT8(10, c.night_pct);
   TEST_ASSERT_EQUAL_UINT16(60, c.night_wake_s);
   TEST_ASSERT_FALSE(c.night_pause_polling);           // owner decision §8.3
@@ -253,7 +254,7 @@ static void test_sanitize_display_settings(void) {
   TEST_ASSERT_EQUAL_UINT8(5, s.brightness_fixed_pct);
   TEST_ASSERT_EQUAL_UINT8(90, s.brightness_min_pct);
   TEST_ASSERT_EQUAL_UINT8(100, s.brightness_max_pct);
-  TEST_ASSERT_TRUE(s.night_mode == kDefaultNightMode);
+  ASSERT_ENUM_EQ(kDefaultNightMode, s.night_mode);
   TEST_ASSERT_EQUAL_UINT16(1439, s.night_from_min);
   TEST_ASSERT_EQUAL_UINT8(100, s.night_pct);
   TEST_ASSERT_EQUAL_UINT16(10, s.night_wake_s);

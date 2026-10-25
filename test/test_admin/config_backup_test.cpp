@@ -4,15 +4,13 @@
 #include <string>
 
 #include "config_backup.h"
-
-namespace {
+#include "fixtures.h"
+#include "test_support.h"
 
 namespace {
 
 Config sample() {
-  Config c = defaultConfig();
-  c.home_lat = 52.2297f;
-  c.home_lon = 21.0122f;
+  Config c = makeConfig();  // Warsaw, home_configured
   c.radius_deg = 1.5f;
   c.poll_interval_s = 30;
   c.opensky_client_id = "my-client";
@@ -23,23 +21,18 @@ Config sample() {
   c.auto_cycle_interval_s = 20;
   c.near_airport_km = 12.5f;
   c.climb_rate_threshold_mps = 2.0f;
-  c.home_configured = true;
   c.update_check_enabled = false;
   c.update_show_prerelease = true;
   c.update_skipped_tag = "v1.4.0";  // device state: never in a backup
   return c;
 }
 
-bool contains(const std::string &s, const char *needle) { return s.find(needle) != std::string::npos; }
-
-}  // namespace
-
 static void test_round_trip_restores_every_setting(void) {
   const Config original = sample();
   const std::string json = configToBackupJson(original, true, "v1.2.3");
   BackupRestoreResult r = restoreConfigFromBackupJson(json, defaultConfig());
 
-  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(r.invalidFields.size()));
   TEST_ASSERT_EQUAL_INT(24, r.appliedFields);  // 14 + the display group (10)
   const Config &c = r.config;
@@ -49,8 +42,8 @@ static void test_round_trip_restores_every_setting(void) {
   TEST_ASSERT_EQUAL_UINT32(30u, c.poll_interval_s);
   TEST_ASSERT_EQUAL_STRING("my-client", c.opensky_client_id.c_str());
   TEST_ASSERT_EQUAL_STRING("s3cr\"et", c.opensky_client_secret.c_str());
-  TEST_ASSERT_TRUE(c.language == Language::EN);
-  TEST_ASSERT_TRUE(c.web_language == Language::PL);
+  ASSERT_ENUM_EQ(Language::EN, c.language);
+  ASSERT_ENUM_EQ(Language::PL, c.web_language);
   TEST_ASSERT_TRUE(c.auto_cycle_enabled);
   TEST_ASSERT_EQUAL_UINT32(20u, c.auto_cycle_interval_s);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 12.5f, c.near_airport_km);
@@ -63,15 +56,15 @@ static void test_round_trip_restores_every_setting(void) {
 
 static void test_update_settings_in_the_general_group(void) {
   const std::string json = configToBackupJson(sample(), false, "v1");
-  TEST_ASSERT_TRUE(contains(json, "\"update_check\": false"));
-  TEST_ASSERT_TRUE(contains(json, "\"update_show_prerelease\": true"));
-  TEST_ASSERT_FALSE(contains(json, "v1.4.0"));
+  ASSERT_CONTAINS(json, "\"update_check\": false");
+  ASSERT_CONTAINS(json, "\"update_show_prerelease\": true");
+  ASSERT_NOT_CONTAINS(json, "v1.4.0");
   // An older backup without the keys keeps the current values.
   Config current = defaultConfig();
   current.update_check_enabled = false;
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"general\":{}}", current);
-  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_FALSE(r.config.update_check_enabled);
   // A wrong type is skipped and listed.
   r = restoreConfigFromBackupJson(
@@ -84,23 +77,23 @@ static void test_update_settings_in_the_general_group(void) {
 
 static void test_backup_names_its_format_and_firmware(void) {
   const std::string json = configToBackupJson(sample(), true, "v1.2.3");
-  TEST_ASSERT_TRUE(contains(json, "\"format\": \"cyd-sky-tracker-config\""));
-  TEST_ASSERT_TRUE(contains(json, "\"format_version\": 1"));
-  TEST_ASSERT_TRUE(contains(json, "\"firmware\": \"v1.2.3\""));
-  TEST_ASSERT_TRUE(contains(json, "\"language\": \"en\""));
+  ASSERT_CONTAINS(json, "\"format\": \"cyd-sky-tracker-config\"");
+  ASSERT_CONTAINS(json, "\"format_version\": 1");
+  ASSERT_CONTAINS(json, "\"firmware\": \"v1.2.3\"");
+  ASSERT_CONTAINS(json, "\"language\": \"en\"");
 }
 
 static void test_backup_without_secrets_keeps_the_devices_credentials(void) {
   const std::string json = configToBackupJson(sample(), false, "v1");
-  TEST_ASSERT_FALSE(contains(json, "client_id"));
-  TEST_ASSERT_FALSE(contains(json, "client_secret"));
-  TEST_ASSERT_FALSE(contains(json, "s3cr"));
+  ASSERT_NOT_CONTAINS(json, "client_id");
+  ASSERT_NOT_CONTAINS(json, "client_secret");
+  ASSERT_NOT_CONTAINS(json, "s3cr");
 
   Config device = defaultConfig();
   device.opensky_client_id = "device-id";
   device.opensky_client_secret = "device-secret";
   BackupRestoreResult r = restoreConfigFromBackupJson(json, device);
-  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_EQUAL_STRING("device-id", r.config.opensky_client_id.c_str());
   TEST_ASSERT_EQUAL_STRING("device-secret", r.config.opensky_client_secret.c_str());
   TEST_ASSERT_EQUAL_UINT32(30u, r.config.poll_interval_s);  // the rest still restored
@@ -112,7 +105,7 @@ static void test_missing_keys_keep_current_values(void) {
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,"
       "\"general\":{\"auto_cycle\":false}}",
       current);
-  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_EQUAL_INT(1, r.appliedFields);
   TEST_ASSERT_FALSE(r.config.auto_cycle_enabled);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, current.home_lat, r.config.home_lat);
@@ -127,12 +120,12 @@ static void test_wrong_types_are_skipped_and_reported(void) {
       "\"opensky\":{\"poll_interval_s\":-5},"
       "\"general\":{\"language\":\"de\",\"auto_cycle\":\"yes\"}}",
       current);
-  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_EQUAL_INT(1, r.appliedFields);  // only location.lon
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 20.5f, r.config.home_lon);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, current.home_lat, r.config.home_lat);  // kept
   TEST_ASSERT_EQUAL_UINT32(30u, r.config.poll_interval_s);                // kept
-  TEST_ASSERT_TRUE(r.config.language == Language::EN);                    // kept
+  ASSERT_ENUM_EQ(Language::EN, r.config.language);                    // kept
   TEST_ASSERT_EQUAL_INT(4, static_cast<int>(r.invalidFields.size()));
   TEST_ASSERT_EQUAL_STRING("location.lat", r.invalidFields[0].c_str());
   TEST_ASSERT_EQUAL_STRING("opensky.poll_interval_s", r.invalidFields[1].c_str());
@@ -154,19 +147,13 @@ static void test_restoring_location_marks_home_configured(void) {
 
 static void test_rejects_files_that_are_not_backups(void) {
   const Config current = sample();
-  TEST_ASSERT_TRUE(restoreConfigFromBackupJson("", current).status == BackupRestoreStatus::NotJson);
-  TEST_ASSERT_TRUE(restoreConfigFromBackupJson("not json", current).status ==
-                   BackupRestoreStatus::NotJson);
-  TEST_ASSERT_TRUE(restoreConfigFromBackupJson("[1,2]", current).status ==
-                   BackupRestoreStatus::NotJson);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::NotJson, restoreConfigFromBackupJson("", current).status);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::NotJson, restoreConfigFromBackupJson("not json", current).status);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::NotJson, restoreConfigFromBackupJson("[1,2]", current).status);
   // OpenSky's credentials file is JSON too, but not a backup.
-  TEST_ASSERT_TRUE(restoreConfigFromBackupJson("{\"clientId\":\"a\",\"clientSecret\":\"b\"}", current)
-                       .status == BackupRestoreStatus::WrongFormat);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::WrongFormat, restoreConfigFromBackupJson("{\"clientId\":\"a\",\"clientSecret\":\"b\"}", current) .status);
   // A newer format this firmware doesn't know.
-  TEST_ASSERT_TRUE(
-      restoreConfigFromBackupJson("{\"format\":\"cyd-sky-tracker-config\",\"format_version\":2}",
-                                  current)
-          .status == BackupRestoreStatus::WrongFormat);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::WrongFormat, restoreConfigFromBackupJson("{\"format\":\"cyd-sky-tracker-config\",\"format_version\":2}", current) .status);
   // A rejected file leaves the config untouched.
   BackupRestoreResult r = restoreConfigFromBackupJson("{\"format\":\"other\"}", current);
   TEST_ASSERT_EQUAL_STRING("my-client", r.config.opensky_client_id.c_str());
@@ -176,15 +163,15 @@ static void test_rejects_oversized_files(void) {
   std::string big = "{\"format\":\"cyd-sky-tracker-config\",\"pad\":\"";
   big += std::string(kMaxBackupJsonBytes, 'x');
   big += "\"}";
-  TEST_ASSERT_TRUE(restoreConfigFromBackupJson(big, sample()).status == BackupRestoreStatus::NotJson);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::NotJson, restoreConfigFromBackupJson(big, sample()).status);
 }
 
 static void test_panel_password_travels_only_with_secrets(void) {
   Config c = sample();
   c.web_password = "hunter22";
-  TEST_ASSERT_TRUE(contains(configToBackupJson(c, true, "v1"), "\"web_password\": \"hunter22\""));
-  TEST_ASSERT_FALSE(contains(configToBackupJson(c, false, "v1"), "hunter22"));
-  TEST_ASSERT_FALSE(contains(configToBackupJson(sample(), true, "v1"), "security"));  // none set
+  ASSERT_CONTAINS(configToBackupJson(c, true, "v1"), "\"web_password\": \"hunter22\"");
+  ASSERT_NOT_CONTAINS(configToBackupJson(c, false, "v1"), "hunter22");
+  ASSERT_NOT_CONTAINS(configToBackupJson(sample(), true, "v1"), "security");  // none set
 
   BackupRestoreResult r = restoreConfigFromBackupJson(configToBackupJson(c, true, "v1"),
                                                       defaultConfig());
@@ -206,7 +193,7 @@ static void test_invalid_password_in_backup_is_reported_and_skipped(void) {
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"security\":{\"web_password\":\"short\"}}",
       device);
-  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_EQUAL_STRING("device-pass", r.config.web_password.c_str());
   TEST_ASSERT_EQUAL_INT(0, r.appliedFields);
   TEST_ASSERT_EQUAL_INT(1, static_cast<int>(r.invalidFields.size()));
@@ -226,17 +213,17 @@ static void test_display_group_round_trip(void) {
   c.night_wake_s = 120;
   c.night_pause_polling = true;
   const std::string json = configToBackupJson(c, false, "v1");
-  TEST_ASSERT_TRUE(contains(json, "\"display\": {"));
-  TEST_ASSERT_TRUE(contains(json, "\"night_mode\": \"schedule\""));
-  TEST_ASSERT_TRUE(contains(json, "\"night_from\": \"22:15\""));
+  ASSERT_CONTAINS(json, "\"display\": {");
+  ASSERT_CONTAINS(json, "\"night_mode\": \"schedule\"");
+  ASSERT_CONTAINS(json, "\"night_from\": \"22:15\"");
   BackupRestoreResult r = restoreConfigFromBackupJson(json, defaultConfig());
-  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_TRUE(r.invalidFields.empty());
   TEST_ASSERT_FALSE(r.config.brightness_auto);
   TEST_ASSERT_EQUAL_UINT8(42, r.config.brightness_fixed_pct);
   TEST_ASSERT_EQUAL_UINT8(15, r.config.brightness_min_pct);
   TEST_ASSERT_EQUAL_UINT8(90, r.config.brightness_max_pct);
-  TEST_ASSERT_TRUE(r.config.night_mode == NightMode::Schedule);
+  ASSERT_ENUM_EQ(NightMode::Schedule, r.config.night_mode);
   TEST_ASSERT_EQUAL_UINT16(22 * 60 + 15, r.config.night_from_min);
   TEST_ASSERT_EQUAL_UINT16(7 * 60, r.config.night_to_min);
   TEST_ASSERT_EQUAL_UINT8(0, r.config.night_pct);
@@ -250,7 +237,7 @@ static void test_display_group_bad_values_and_old_backups(void) {
   current.night_pct = 33;
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"general\":{}}", current);
-  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_EQUAL_UINT8(33, r.config.night_pct);
   // Wrong values are skipped and listed; a huge number is capped (sanitizeConfig clamps it).
   r = restoreConfigFromBackupJson(
@@ -266,7 +253,7 @@ static void test_display_group_bad_values_and_old_backups(void) {
   r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"future\":{\"x\":1}}",
       current);
-  TEST_ASSERT_TRUE(r.status == BackupRestoreStatus::Ok);
+  ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
 }
 
 }  // namespace

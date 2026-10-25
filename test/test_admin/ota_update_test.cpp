@@ -9,8 +9,7 @@
 #include <vector>
 
 #include "ota_update.h"
-
-namespace {
+#include "test_support.h"
 
 namespace {
 
@@ -71,38 +70,36 @@ void scan(FirmwareMarkerScanner &sc, const std::string &s) {
   sc.feed(reinterpret_cast<const uint8_t *>(s.data()), s.size());
 }
 
-}  // namespace
-
 // ---- checkImageHeader
 
 static void test_header_ok_for_esp32_app(void) {
   std::vector<uint8_t> h = esp32Header();
-  TEST_ASSERT_TRUE(checkImageHeader(h.data(), h.size()) == OtaImageCheck::Ok);
+  ASSERT_ENUM_EQ(OtaImageCheck::Ok, checkImageHeader(h.data(), h.size()));
 }
 
 static void test_header_recognises_the_full_image(void) {
   std::vector<uint8_t> h(64, 0xFF);
-  TEST_ASSERT_TRUE(checkImageHeader(h.data(), h.size()) == OtaImageCheck::LooksLikeFull);
+  ASSERT_ENUM_EQ(OtaImageCheck::LooksLikeFull, checkImageHeader(h.data(), h.size()));
 }
 
 static void test_header_rejects_other_chips_and_junk(void) {
   std::vector<uint8_t> h = esp32Header();
   h[12] = 0x09;  // ESP32-S3
-  TEST_ASSERT_TRUE(checkImageHeader(h.data(), h.size()) == OtaImageCheck::WrongChip);
+  ASSERT_ENUM_EQ(OtaImageCheck::WrongChip, checkImageHeader(h.data(), h.size()));
   const uint8_t png[kOtaImageHeaderBytes] = {0x89, 'P', 'N', 'G'};
-  TEST_ASSERT_TRUE(checkImageHeader(png, sizeof(png)) == OtaImageCheck::NotAppImage);
-  TEST_ASSERT_TRUE(checkImageHeader(h.data(), 10) == OtaImageCheck::TooShort);
-  TEST_ASSERT_TRUE(checkImageHeader(nullptr, 0) == OtaImageCheck::TooShort);
+  ASSERT_ENUM_EQ(OtaImageCheck::NotAppImage, checkImageHeader(png, sizeof(png)));
+  ASSERT_ENUM_EQ(OtaImageCheck::TooShort, checkImageHeader(h.data(), 10));
+  ASSERT_ENUM_EQ(OtaImageCheck::TooShort, checkImageHeader(nullptr, 0));
 }
 
 // ---- checkImageSize
 
 static void test_size_checks(void) {
-  TEST_ASSERT_TRUE(checkImageSize(0, kSlot) == OtaSizeCheck::Unknown);
-  TEST_ASSERT_TRUE(checkImageSize(17 * 1024, kSlot) == OtaSizeCheck::TooSmall);
-  TEST_ASSERT_TRUE(checkImageSize(kOtaMinImageBytes, kSlot) == OtaSizeCheck::Ok);
-  TEST_ASSERT_TRUE(checkImageSize(kSlot, kSlot) == OtaSizeCheck::Ok);
-  TEST_ASSERT_TRUE(checkImageSize(kSlot + 1, kSlot) == OtaSizeCheck::TooLarge);
+  ASSERT_ENUM_EQ(OtaSizeCheck::Unknown, checkImageSize(0, kSlot));
+  ASSERT_ENUM_EQ(OtaSizeCheck::TooSmall, checkImageSize(17 * 1024, kSlot));
+  ASSERT_ENUM_EQ(OtaSizeCheck::Ok, checkImageSize(kOtaMinImageBytes, kSlot));
+  ASSERT_ENUM_EQ(OtaSizeCheck::Ok, checkImageSize(kSlot, kSlot));
+  ASSERT_ENUM_EQ(OtaSizeCheck::TooLarge, checkImageSize(kSlot + 1, kSlot));
 }
 
 // ---- FirmwareMarkerScanner
@@ -182,7 +179,7 @@ static void test_every_result_has_a_message_and_status(void) {
   TEST_ASSERT_EQUAL_INT(200, otaResultHttpStatus(OtaResult::Ok));
   TEST_ASSERT_EQUAL_INT(413, otaResultHttpStatus(OtaResult::TooLarge));
   TEST_ASSERT_EQUAL_INT(401, otaResultHttpStatus(OtaResult::Unauthorized));
-  TEST_ASSERT_TRUE(otaResultMessage(OtaResult::LooksLikeFull) == WebStr::OtaFullImage);
+  ASSERT_ENUM_EQ(WebStr::OtaFullImage, otaResultMessage(OtaResult::LooksLikeFull));
 }
 
 // ---- OtaSession
@@ -191,12 +188,13 @@ static void test_good_image_is_written_and_activated(void) {
   FakeWriter w;
   OtaSession s(w, kSlot);
   const std::vector<uint8_t> img = fakeImage(600 * 1024);
-  TEST_ASSERT_TRUE(upload(s, img, 1436, img.size()) == OtaResult::Ok);
+  ASSERT_ENUM_EQ(OtaResult::Ok, upload(s, img, 1436, img.size()));
   TEST_ASSERT_EQUAL_INT(1, w.begins);
   TEST_ASSERT_EQUAL_UINT32(img.size(), w.beginSize);
   TEST_ASSERT_EQUAL_INT(1, w.ends);
   TEST_ASSERT_EQUAL_INT(0, w.aborts);
-  TEST_ASSERT_TRUE(w.data == img);
+  TEST_ASSERT_EQUAL_size_t(img.size(), w.data.size());
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(img.data(), w.data.data(), img.size());
   TEST_ASSERT_EQUAL_STRING("v1.3.0", s.marker().version().c_str());
 }
 
@@ -204,16 +202,17 @@ static void test_tiny_first_chunks_are_held_until_the_header_is_complete(void) {
   FakeWriter w;
   OtaSession s(w, kSlot);
   const std::vector<uint8_t> img = fakeImage(600 * 1024);
-  TEST_ASSERT_TRUE(upload(s, img, 7, 0) == OtaResult::Ok);
+  ASSERT_ENUM_EQ(OtaResult::Ok, upload(s, img, 7, 0));
   TEST_ASSERT_EQUAL_UINT32(0, w.beginSize);  // size unknown
-  TEST_ASSERT_TRUE(w.data == img);
+  TEST_ASSERT_EQUAL_size_t(img.size(), w.data.size());
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(img.data(), w.data.data(), img.size());
 }
 
 static void test_full_image_never_reaches_the_writer(void) {
   FakeWriter w;
   OtaSession s(w, kSlot);
   std::vector<uint8_t> img(700 * 1024, 0xFF);
-  TEST_ASSERT_TRUE(upload(s, img, 4096, img.size()) == OtaResult::LooksLikeFull);
+  ASSERT_ENUM_EQ(OtaResult::LooksLikeFull, upload(s, img, 4096, img.size()));
   TEST_ASSERT_EQUAL_INT(0, w.begins);
   TEST_ASSERT_EQUAL_INT(0, w.ends);
 }
@@ -222,8 +221,8 @@ static void test_declared_size_is_checked_before_anything_is_written(void) {
   FakeWriter w;
   OtaSession s(w, kSlot);
   const std::vector<uint8_t> img = fakeImage(600 * 1024);
-  TEST_ASSERT_TRUE(upload(s, img, 4096, kSlot + 1) == OtaResult::TooLarge);
-  TEST_ASSERT_TRUE(upload(s, img, 4096, 17 * 1024) == OtaResult::TooSmall);
+  ASSERT_ENUM_EQ(OtaResult::TooLarge, upload(s, img, 4096, kSlot + 1));
+  ASSERT_ENUM_EQ(OtaResult::TooSmall, upload(s, img, 4096, 17 * 1024));
   TEST_ASSERT_EQUAL_INT(0, w.begins);
 }
 
@@ -231,7 +230,7 @@ static void test_bootloader_sized_file_is_rejected_without_activation(void) {
   FakeWriter w;
   OtaSession s(w, kSlot);
   const std::vector<uint8_t> img = fakeImage(17 * 1024, true, 1000);
-  TEST_ASSERT_TRUE(upload(s, img, 4096, 0) == OtaResult::TooSmall);
+  ASSERT_ENUM_EQ(OtaResult::TooSmall, upload(s, img, 4096, 0));
   TEST_ASSERT_EQUAL_INT(0, w.ends);
   TEST_ASSERT_EQUAL_INT(1, w.aborts);
 }
@@ -240,7 +239,7 @@ static void test_foreign_firmware_is_aborted_at_the_end(void) {
   FakeWriter w;
   OtaSession s(w, kSlot);
   const std::vector<uint8_t> img = fakeImage(600 * 1024, false);
-  TEST_ASSERT_TRUE(upload(s, img, 4096, img.size()) == OtaResult::NotSkyTracker);
+  ASSERT_ENUM_EQ(OtaResult::NotSkyTracker, upload(s, img, 4096, img.size()));
   TEST_ASSERT_EQUAL_INT(0, w.ends);
   TEST_ASSERT_EQUAL_INT(1, w.aborts);
 }
@@ -250,7 +249,7 @@ static void test_write_error_aborts_and_ignores_the_rest(void) {
   w.failWriteAfter = 100000;
   OtaSession s(w, kSlot);
   const std::vector<uint8_t> img = fakeImage(600 * 1024);
-  TEST_ASSERT_TRUE(upload(s, img, 4096, img.size()) == OtaResult::WriteFailed);
+  ASSERT_ENUM_EQ(OtaResult::WriteFailed, upload(s, img, 4096, img.size()));
   TEST_ASSERT_EQUAL_INT(1, w.aborts);
   TEST_ASSERT_EQUAL_INT(0, w.ends);
 }
@@ -260,7 +259,7 @@ static void test_failed_verify_is_reported(void) {
   w.endOk = false;
   OtaSession s(w, kSlot);
   const std::vector<uint8_t> img = fakeImage(600 * 1024);
-  TEST_ASSERT_TRUE(upload(s, img, 4096, img.size()) == OtaResult::VerifyFailed);
+  ASSERT_ENUM_EQ(OtaResult::VerifyFailed, upload(s, img, 4096, img.size()));
   TEST_ASSERT_EQUAL_INT(0, w.aborts);
 }
 
@@ -271,9 +270,9 @@ static void test_broken_upload_aborts(void) {
   s.start(img.size());
   s.feed(img.data(), 50000);
   s.abort();
-  TEST_ASSERT_TRUE(s.result() == OtaResult::Aborted);
+  ASSERT_ENUM_EQ(OtaResult::Aborted, s.result());
   TEST_ASSERT_EQUAL_INT(1, w.aborts);
-  TEST_ASSERT_TRUE(s.finish() == OtaResult::Aborted);
+  ASSERT_ENUM_EQ(OtaResult::Aborted, s.finish());
   TEST_ASSERT_EQUAL_INT(0, w.ends);
 }
 
@@ -281,13 +280,12 @@ static void test_empty_upload_is_no_file(void) {
   FakeWriter w;
   OtaSession s(w, kSlot);
   s.start(0);
-  TEST_ASSERT_TRUE(s.finish() == OtaResult::NoFile);
+  ASSERT_ENUM_EQ(OtaResult::NoFile, s.finish());
   TEST_ASSERT_EQUAL_INT(0, w.begins);
 }
 
 // ---- downloads from GitHub: SHA-256 and version (release_check)
 
-namespace {
 // Not SHA-256 — a stand-in that depends on every byte, which is all
 // OtaSession needs to know about its digest.
 struct FakeDigest : OtaDigest {
@@ -325,7 +323,6 @@ OtaResult uploadExpecting(OtaSession &s, const std::vector<uint8_t> &img,
   }
   return s.finish();
 }
-}  // namespace
 
 static void test_matching_checksum_and_version_activate(void) {
   FakeWriter w;
@@ -335,7 +332,7 @@ static void test_matching_checksum_and_version_activate(void) {
   OtaExpectations e;
   e.sha256 = digestOf(img);
   e.version = "v1.3.0";  // what kMarker says
-  TEST_ASSERT_TRUE(uploadExpecting(s, img, e) == OtaResult::Ok);
+  ASSERT_ENUM_EQ(OtaResult::Ok, uploadExpecting(s, img, e));
   TEST_ASSERT_EQUAL_INT(1, w.ends);
   TEST_ASSERT_EQUAL_UINT32(img.size(), d.bytes);  // every byte, header included
 }
@@ -348,7 +345,7 @@ static void test_checksum_mismatch_never_activates(void) {
   OtaExpectations e;
   e.sha256 = digestOf(img);
   img[100000] ^= 0x01;  // one bit flipped on the way
-  TEST_ASSERT_TRUE(uploadExpecting(s, img, e) == OtaResult::ChecksumMismatch);
+  ASSERT_ENUM_EQ(OtaResult::ChecksumMismatch, uploadExpecting(s, img, e));
   TEST_ASSERT_EQUAL_INT(0, w.ends);
   TEST_ASSERT_EQUAL_INT(1, w.aborts);
   TEST_ASSERT_EQUAL_INT(400, otaResultHttpStatus(OtaResult::ChecksumMismatch));
@@ -360,7 +357,7 @@ static void test_expected_checksum_without_a_digest_fails_safe(void) {
   const std::vector<uint8_t> img = fakeImage(700 * 1024);
   OtaExpectations e;
   e.sha256 = std::string(64, 'a');
-  TEST_ASSERT_TRUE(uploadExpecting(s, img, e) == OtaResult::ChecksumMismatch);
+  ASSERT_ENUM_EQ(OtaResult::ChecksumMismatch, uploadExpecting(s, img, e));
   TEST_ASSERT_EQUAL_INT(0, w.ends);
 }
 
@@ -372,7 +369,7 @@ static void test_version_mismatch_never_activates(void) {
   OtaExpectations e;
   e.sha256 = digestOf(img);
   e.version = "v1.4.0";  // the file says v1.3.0
-  TEST_ASSERT_TRUE(uploadExpecting(s, img, e) == OtaResult::VersionMismatch);
+  ASSERT_ENUM_EQ(OtaResult::VersionMismatch, uploadExpecting(s, img, e));
   TEST_ASSERT_EQUAL_INT(0, w.ends);
 }
 
@@ -383,7 +380,7 @@ static void test_marker_is_checked_before_the_checksum(void) {
   const std::vector<uint8_t> img = fakeImage(700 * 1024, /*withMarker=*/false);
   OtaExpectations e;
   e.sha256 = std::string(64, '0');
-  TEST_ASSERT_TRUE(uploadExpecting(s, img, e) == OtaResult::NotSkyTracker);
+  ASSERT_ENUM_EQ(OtaResult::NotSkyTracker, uploadExpecting(s, img, e));
 }
 
 static void test_expectations_do_not_leak_into_the_next_upload(void) {
@@ -393,9 +390,9 @@ static void test_expectations_do_not_leak_into_the_next_upload(void) {
   const std::vector<uint8_t> img = fakeImage(700 * 1024);
   OtaExpectations e;
   e.sha256 = std::string(64, 'f');
-  TEST_ASSERT_TRUE(uploadExpecting(s, img, e) == OtaResult::ChecksumMismatch);
+  ASSERT_ENUM_EQ(OtaResult::ChecksumMismatch, uploadExpecting(s, img, e));
   // A file picked by hand next: no expectations, accepted.
-  TEST_ASSERT_TRUE(upload(s, img, 4096, img.size()) == OtaResult::Ok);
+  ASSERT_ENUM_EQ(OtaResult::Ok, upload(s, img, 4096, img.size()));
   TEST_ASSERT_EQUAL_INT(2, d.resets);
 }
 

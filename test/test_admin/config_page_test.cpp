@@ -6,8 +6,7 @@
 #include <string>
 
 #include "config_page.h"
-
-namespace {
+#include "test_support.h"
 
 namespace {
 
@@ -23,8 +22,6 @@ std::string render(const ConfigPageModel &m) {
   return html;
 }
 
-bool contains(const std::string &h, const char *needle) { return h.find(needle) != std::string::npos; }
-
 ConfigPageModel baseModel() {
   ConfigPageModel m;
   m.cfg = defaultConfig();
@@ -33,17 +30,15 @@ ConfigPageModel baseModel() {
   return m;
 }
 
-}  // namespace
-
 // ---- pure helpers -----------------------------------------------------------
 
 static void test_tab_ids_round_trip(void) {
   for (SettingsTab t : {SettingsTab::Location, SettingsTab::OpenSky, SettingsTab::General,
                         SettingsTab::Backup, SettingsTab::Firmware}) {
-    TEST_ASSERT_TRUE(settingsTabFromArg(settingsTabId(t)) == t);
+    ASSERT_ENUM_EQ(t, settingsTabFromArg(settingsTabId(t)));
   }
-  TEST_ASSERT_TRUE(settingsTabFromArg("") == SettingsTab::Location);
-  TEST_ASSERT_TRUE(settingsTabFromArg("nonsense") == SettingsTab::Location);
+  ASSERT_ENUM_EQ(SettingsTab::Location, settingsTabFromArg(""));
+  ASSERT_ENUM_EQ(SettingsTab::Location, settingsTabFromArg("nonsense"));
 }
 
 static void test_daily_credits(void) {
@@ -108,18 +103,18 @@ static void test_display_card(void) {
   m.cfg.home_configured = true;
   std::string h = render(m);
   // Defaults: automatic brightness, sunset to sunrise, no pause.
-  TEST_ASSERT_TRUE(contains(h, "<option value=\"auto\" selected>automatic (light sensor)"));
-  TEST_ASSERT_TRUE(contains(h, "<option value=\"sun\" selected>sunset to sunrise"));
-  TEST_ASSERT_TRUE(contains(h, "<div id=\"blauto\">"));
-  TEST_ASSERT_TRUE(contains(h, "<div id=\"blfix\" hidden>"));
-  TEST_ASSERT_TRUE(contains(h, "<div id=\"ntsch\" hidden>"));
-  TEST_ASSERT_TRUE(contains(h, "<div id=\"ntopt\">"));
-  TEST_ASSERT_TRUE(contains(h, "name=\"bl_min\" min=\"5\" max=\"100\" value=\"10\""));
-  TEST_ASSERT_TRUE(contains(h, "name=\"night_pct\" min=\"0\" max=\"100\" value=\"10\""));
-  TEST_ASSERT_TRUE(contains(h, "name=\"night_wake_s\" min=\"10\" max=\"600\" value=\"60\""));
-  TEST_ASSERT_TRUE(contains(h, "name=\"night_pause\" value=\"1\">"));
-  TEST_ASSERT_FALSE(contains(h, "name=\"night_pause\" value=\"1\" checked"));
-  TEST_ASSERT_TRUE(contains(h, "Sunrise and sunset appear once the clock is synced."));
+  ASSERT_CONTAINS(h, "<option value=\"auto\" selected>automatic (light sensor)");
+  ASSERT_CONTAINS(h, "<option value=\"sun\" selected>sunset to sunrise");
+  ASSERT_CONTAINS(h, "<div id=\"blauto\">");
+  ASSERT_CONTAINS(h, "<div id=\"blfix\" hidden>");
+  ASSERT_CONTAINS(h, "<div id=\"ntsch\" hidden>");
+  ASSERT_CONTAINS(h, "<div id=\"ntopt\">");
+  ASSERT_CONTAINS(h, "name=\"bl_min\" min=\"5\" max=\"100\" value=\"10\"");
+  ASSERT_CONTAINS(h, "name=\"night_pct\" min=\"0\" max=\"100\" value=\"10\"");
+  ASSERT_CONTAINS(h, "name=\"night_wake_s\" min=\"10\" max=\"600\" value=\"60\"");
+  ASSERT_CONTAINS(h, "name=\"night_pause\" value=\"1\">");
+  ASSERT_NOT_CONTAINS(h, "name=\"night_pause\" value=\"1\" checked");
+  ASSERT_CONTAINS(h, "Sunrise and sunset appear once the clock is synced.");
 
   m.cfg.brightness_auto = false;
   m.cfg.night_mode = NightMode::Schedule;
@@ -132,23 +127,23 @@ static void test_display_card(void) {
   m.light.raw = 1234;
   m.light.pct = 35;
   h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "<option value=\"fixed\" selected>fixed"));
-  TEST_ASSERT_TRUE(contains(h, "<div id=\"blfix\">"));
-  TEST_ASSERT_TRUE(contains(h, "<div id=\"ntsch\">"));
-  TEST_ASSERT_TRUE(contains(h, "type=\"time\" name=\"night_from\" value=\"22:30\""));
-  TEST_ASSERT_TRUE(contains(h, "name=\"night_pause\" value=\"1\" checked"));
-  TEST_ASSERT_TRUE(contains(h, "<b id=\"lr\">1234</b>"));
-  TEST_ASSERT_TRUE(contains(h, "<b id=\"lp\">35</b> %"));
-  TEST_ASSERT_TRUE(contains(h, "Sun today: sunrise 07:17, sunset 17:23"));
+  ASSERT_CONTAINS(h, "<option value=\"fixed\" selected>fixed");
+  ASSERT_CONTAINS(h, "<div id=\"blfix\">");
+  ASSERT_CONTAINS(h, "<div id=\"ntsch\">");
+  ASSERT_CONTAINS(h, "type=\"time\" name=\"night_from\" value=\"22:30\"");
+  ASSERT_CONTAINS(h, "name=\"night_pause\" value=\"1\" checked");
+  ASSERT_CONTAINS(h, "<b id=\"lr\">1234</b>");
+  ASSERT_CONTAINS(h, "<b id=\"lp\">35</b> %");
+  ASSERT_CONTAINS(h, "Sun today: sunrise 07:17, sunset 17:23");
   // 22:30-06:30 = 480 min at 15 s = 1920 fewer requests; the OpenSky tab counts them.
-  TEST_ASSERT_TRUE(contains(h, "<b id=\"ntsv\">1920</b> fewer requests tonight"));
-  TEST_ASSERT_TRUE(contains(h, "data-night=\"480\">≈ <b>3840</b>"));
+  ASSERT_CONTAINS(h, "<b id=\"ntsv\">1920</b> fewer requests tonight");
+  ASSERT_CONTAINS(h, "data-night=\"480\">≈ <b>3840</b>");
 
   m.cfg.night_mode = NightMode::Off;
   m.cfg.home_configured = false;
   h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "<div id=\"ntopt\" hidden>"));
-  TEST_ASSERT_TRUE(contains(h, "Set the location to work out sunrise and sunset."));
+  ASSERT_CONTAINS(h, "<div id=\"ntopt\" hidden>");
+  ASSERT_CONTAINS(h, "Set the location to work out sunrise and sunset.");
 }
 
 static void test_daily_limits(void) {
@@ -177,14 +172,14 @@ static void test_page_is_complete_and_never_emits_empty_chunks(void) {
   m.cfg.opensky_client_id = "";  // empty values must not produce empty chunks
   const std::string h = render(m);
   TEST_ASSERT_EQUAL_INT(0, emptyChunks);
-  TEST_ASSERT_TRUE(contains(h, "<!DOCTYPE html>"));
-  TEST_ASSERT_TRUE(contains(h, "</html>"));
+  ASSERT_CONTAINS(h, "<!DOCTYPE html>");
+  ASSERT_CONTAINS(h, "</html>");
 }
 
 static void test_page_has_the_project_favicon(void) {
   const std::string h = render(baseModel());
-  TEST_ASSERT_TRUE(contains(h, "<link rel=\"icon\" type=\"image/svg+xml\" href=\"data:image/svg+xml,"));
-  TEST_ASSERT_TRUE(contains(h, "fill='%23ff9966'"));      // peach plane, '#' escaped
+  ASSERT_CONTAINS(h, "<link rel=\"icon\" type=\"image/svg+xml\" href=\"data:image/svg+xml,");
+  ASSERT_CONTAINS(h, "fill='%23ff9966'");      // peach plane, '#' escaped
   TEST_ASSERT_TRUE(h.find("<link rel=\"icon\"") < h.find("</head>"));
 }
 
@@ -195,19 +190,19 @@ static void test_all_form_fields_present(void) {
                          "name=\"language\"", "name=\"web_language\"", "name=\"auto_cycle\"",
                          "name=\"auto_cycle_interval\"", "name=\"near_airport_km\"",
                          "name=\"climb_rate_mps\"", "name=\"tab\"", "name=\"creds_file\""};
-  for (const char *n : names) TEST_ASSERT_TRUE_MESSAGE(contains(h, n), n);
-  TEST_ASSERT_TRUE(contains(h, "id=\"lat\" name=\"lat\" inputmode=\"decimal\" autocomplete=\"off\" value=\"52.22970\""));
+  for (const char *n : names) ASSERT_CONTAINS(h, n);
+  ASSERT_CONTAINS(h, "id=\"lat\" name=\"lat\" inputmode=\"decimal\" autocomplete=\"off\" value=\"52.22970\"");
 }
 
 static void test_only_the_active_tab_is_visible(void) {
   ConfigPageModel m = baseModel();
   m.tab = SettingsTab::OpenSky;
   const std::string h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "<section data-tab=\"opensky\">"));
-  TEST_ASSERT_TRUE(contains(h, "<section data-tab=\"location\" hidden>"));
-  TEST_ASSERT_TRUE(contains(h, "<section data-tab=\"general\" hidden>"));
-  TEST_ASSERT_TRUE(contains(h, "data-t=\"opensky\" class=\"on\""));
-  TEST_ASSERT_TRUE(contains(h, "id=\"tab\" value=\"opensky\""));
+  ASSERT_CONTAINS(h, "<section data-tab=\"opensky\">");
+  ASSERT_CONTAINS(h, "<section data-tab=\"location\" hidden>");
+  ASSERT_CONTAINS(h, "<section data-tab=\"general\" hidden>");
+  ASSERT_CONTAINS(h, "data-t=\"opensky\" class=\"on\"");
+  ASSERT_CONTAINS(h, "id=\"tab\" value=\"opensky\"");
 }
 
 static void test_web_language_switches_the_page_text(void) {
@@ -215,15 +210,15 @@ static void test_web_language_switches_the_page_text(void) {
   m.cfg.web_language = Language::EN;
   m.cfg.language = Language::PL;  // the display language doesn't matter here
   std::string h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "<html lang=\"en\">"));
-  TEST_ASSERT_TRUE(contains(h, ">Location</button>"));
-  TEST_ASSERT_TRUE(contains(h, "class=\"on\" href=\"/lang?l=en\""));
+  ASSERT_CONTAINS(h, "<html lang=\"en\">");
+  ASSERT_CONTAINS(h, ">Location</button>");
+  ASSERT_CONTAINS(h, "class=\"on\" href=\"/lang?l=en\"");
 
   m.cfg.web_language = Language::PL;
   h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "<html lang=\"pl\">"));
-  TEST_ASSERT_TRUE(contains(h, ">Lokalizacja</button>"));
-  TEST_ASSERT_TRUE(contains(h, "class=\"on\" href=\"/lang?l=pl\""));
+  ASSERT_CONTAINS(h, "<html lang=\"pl\">");
+  ASSERT_CONTAINS(h, ">Lokalizacja</button>");
+  ASSERT_CONTAINS(h, "class=\"on\" href=\"/lang?l=pl\"");
 }
 
 static void test_selects_reflect_both_languages_independently(void) {
@@ -235,15 +230,15 @@ static void test_selects_reflect_both_languages_independently(void) {
   const size_t web = h.find("name=\"web_language\"");
   TEST_ASSERT_TRUE(display != std::string::npos && web != std::string::npos);
   TEST_ASSERT_TRUE(h.find("value=\"en\" selected", display) < web);       // display: EN
-  TEST_ASSERT_TRUE(h.find("value=\"pl\" selected", web) != std::string::npos);  // web: PL
+  ASSERT_CONTAINS(h.substr(web), "value=\"pl\" selected");  // web: PL
 }
 
 static void test_user_values_are_escaped(void) {
   ConfigPageModel m = baseModel();
   m.cfg.opensky_client_id = "a\"><script>x</script>";
   const std::string h = render(m);
-  TEST_ASSERT_FALSE(contains(h, "<script>x</script>"));
-  TEST_ASSERT_TRUE(contains(h, "a&quot;&gt;&lt;script&gt;"));
+  ASSERT_NOT_CONTAINS(h, "<script>x</script>");
+  ASSERT_CONTAINS(h, "a&quot;&gt;&lt;script&gt;");
 }
 
 static void test_message_and_detail(void) {
@@ -254,36 +249,36 @@ static void test_message_and_detail(void) {
   m.isError = true;
   m.messageDetail = "Latitude, <Radius>";
   const std::string h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "<div class=\"msg err\">Saved, but"));
-  TEST_ASSERT_TRUE(contains(h, "Latitude, &lt;Radius&gt;"));
+  ASSERT_CONTAINS(h, "<div class=\"msg err\">Saved, but");
+  ASSERT_CONTAINS(h, "Latitude, &lt;Radius&gt;");
 
   m.hasMessage = false;
-  TEST_ASSERT_FALSE(contains(render(m), "class=\"msg"));
+  ASSERT_NOT_CONTAINS(render(m), "class=\"msg");
 }
 
 static void test_status_and_daily_credit_readout(void) {
   ConfigPageModel m = baseModel();
   m.cfg.web_language = Language::EN;
   std::string h = render(m);  // anonymous, 15 s polls: 5760 > 400
-  TEST_ASSERT_TRUE(contains(h, "Anonymous mode"));
-  TEST_ASSERT_TRUE(contains(h, "<b>5760</b> credits a day"));
-  TEST_ASSERT_TRUE(contains(h, "limit 400<div class=\"warn\">"));
+  ASSERT_CONTAINS(h, "Anonymous mode");
+  ASSERT_CONTAINS(h, "<b>5760</b> credits a day");
+  ASSERT_CONTAINS(h, "limit 400<div class=\"warn\">");
 
   m.cfg.opensky_client_id = "id";
   m.cfg.opensky_client_secret = "secret";
   m.cfg.poll_interval_s = 30;  // 2880 <= 4000
   h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "class=\"pill ok\""));
-  TEST_ASSERT_TRUE(contains(h, "<b>2880</b>"));
-  TEST_ASSERT_FALSE(contains(h, "<div class=\"warn\">"));
+  ASSERT_CONTAINS(h, "class=\"pill ok\"");
+  ASSERT_CONTAINS(h, "<b>2880</b>");
+  ASSERT_NOT_CONTAINS(h, "<div class=\"warn\">");
 }
 
 static void test_auto_cycle_checkbox_state(void) {
   ConfigPageModel m = baseModel();
   m.cfg.auto_cycle_enabled = true;
-  TEST_ASSERT_TRUE(contains(render(m), "name=\"auto_cycle\" value=\"1\" checked"));
+  ASSERT_CONTAINS(render(m), "name=\"auto_cycle\" value=\"1\" checked");
   m.cfg.auto_cycle_enabled = false;
-  TEST_ASSERT_FALSE(contains(render(m), "name=\"auto_cycle\" value=\"1\" checked"));
+  ASSERT_NOT_CONTAINS(render(m), "name=\"auto_cycle\" value=\"1\" checked");
 }
 
 static void test_footer_shows_the_firmware_version(void) {
@@ -291,29 +286,28 @@ static void test_footer_shows_the_firmware_version(void) {
   m.cfg.web_language = Language::PL;
   std::string h = render(m);
   // Native builds get no injected version -> the fallback.
-  TEST_ASSERT_TRUE(contains(h, "wersja <span id=\"ver\">dev</span>"));
+  ASSERT_CONTAINS(h, "wersja <span id=\"ver\">dev</span>");
   m.cfg.web_language = Language::EN;
-  TEST_ASSERT_TRUE(contains(render(m), "version <span id=\"ver\">dev</span>"));
+  ASSERT_CONTAINS(render(m), "version <span id=\"ver\">dev</span>");
 }
 
 static void test_backup_tab_has_download_and_restore(void) {
   ConfigPageModel m = baseModel();
   m.tab = SettingsTab::Backup;
   const std::string h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "data-t=\"backup\" class=\"on\""));
-  TEST_ASSERT_TRUE(contains(h, "<section data-tab=\"backup\">"));
+  ASSERT_CONTAINS(h, "data-t=\"backup\" class=\"on\"");
+  ASSERT_CONTAINS(h, "<section data-tab=\"backup\">");
   // Download: GET form with the secrets checkbox (on by default).
-  TEST_ASSERT_TRUE(contains(h, "<form id=\"bk\" method=\"GET\" action=\"/backup.json\">"));
-  TEST_ASSERT_TRUE(contains(h, "name=\"secrets\" value=\"1\" form=\"bk\" checked"));
+  ASSERT_CONTAINS(h, "<form id=\"bk\" method=\"GET\" action=\"/backup.json\">");
+  ASSERT_CONTAINS(h, "name=\"secrets\" value=\"1\" form=\"bk\" checked");
   // Restore: multipart upload in its own form.
-  TEST_ASSERT_TRUE(contains(h, "<form id=\"rs\" method=\"POST\" action=\"/restore\" "
-                               "enctype=\"multipart/form-data\">"));
-  TEST_ASSERT_TRUE(contains(h, "name=\"backup_file\" form=\"rs\""));
+  ASSERT_CONTAINS(h, "<form id=\"rs\" method=\"POST\" action=\"/restore\" " "enctype=\"multipart/form-data\">");
+  ASSERT_CONTAINS(h, "name=\"backup_file\" form=\"rs\"");
   // The settings Save button means nothing on this tab.
-  TEST_ASSERT_TRUE(contains(h, "id=\"save\" hidden>"));
+  ASSERT_CONTAINS(h, "id=\"save\" hidden>");
 
   m.tab = SettingsTab::Location;
-  TEST_ASSERT_FALSE(contains(render(m), "id=\"save\" hidden>"));
+  ASSERT_NOT_CONTAINS(render(m), "id=\"save\" hidden>");
 }
 
 static void test_quota_status_text(void) {
@@ -348,14 +342,13 @@ static void test_opensky_tab_shows_the_quota(void) {
   m.quota.state = OpenSkyQuota::State::Available;
   m.quota.remaining = 3971;
   std::string h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "<div class=\"stat quota\" id=\"quota\">Credits left today: 3971"));
+  ASSERT_CONTAINS(h, "<div class=\"stat quota\" id=\"quota\">Credits left today: 3971");
 
   m.quota.state = OpenSkyQuota::State::Exhausted;
   m.quota.reset_in_s = 7200;
   m.quotaResetInS = 3600;
   h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "<div class=\"stat quota warn\" id=\"quota\">Daily limit reached: "
-                               "renews in about 1 h."));
+  ASSERT_CONTAINS(h, "<div class=\"stat quota warn\" id=\"quota\">Daily limit reached: " "renews in about 1 h.");
 }
 
 static void test_firmware_tab(void) {
@@ -363,15 +356,14 @@ static void test_firmware_tab(void) {
   m.cfg.web_language = Language::EN;
   m.tab = SettingsTab::Firmware;
   const std::string h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "<section data-tab=\"firmware\">"));
-  TEST_ASSERT_TRUE(contains(h, "id=\"tab\" value=\"firmware\""));
-  TEST_ASSERT_TRUE(contains(h, "<form id=\"fw\" method=\"POST\" action=\"/update\" "
-                               "enctype=\"multipart/form-data\">"));
-  TEST_ASSERT_TRUE(contains(h, "name=\"firmware\" form=\"fw\""));
-  TEST_ASSERT_TRUE(contains(h, "Installed version: <b id=\"fwv\">dev</b>"));
-  TEST_ASSERT_TRUE(contains(h, kReleasesUrl));
-  TEST_ASSERT_TRUE(contains(h, "id=\"save\" hidden>"));  // nothing to save here
-  TEST_ASSERT_TRUE(contains(h, ">Firmware</button>"));
+  ASSERT_CONTAINS(h, "<section data-tab=\"firmware\">");
+  ASSERT_CONTAINS(h, "id=\"tab\" value=\"firmware\"");
+  ASSERT_CONTAINS(h, "<form id=\"fw\" method=\"POST\" action=\"/update\" " "enctype=\"multipart/form-data\">");
+  ASSERT_CONTAINS(h, "name=\"firmware\" form=\"fw\"");
+  ASSERT_CONTAINS(h, "Installed version: <b id=\"fwv\">dev</b>");
+  ASSERT_CONTAINS(h, kReleasesUrl);
+  ASSERT_CONTAINS(h, "id=\"save\" hidden>");  // nothing to save here
+  ASSERT_CONTAINS(h, ">Firmware</button>");
 }
 
 // ---- Updates from GitHub (release_check), first card on the Firmware tab
@@ -388,25 +380,22 @@ static ConfigPageModel updateModel(bool withPre) {
 
 static void test_update_card_offers_the_newer_release(void) {
   const std::string h = render(updateModel(false));
-  TEST_ASSERT_TRUE(contains(h, "<div class=\"card\" id=\"gh\"><h2>Updates from GitHub</h2>"));
-  TEST_ASSERT_TRUE(contains(h, "Installed version: <b id=\"fwv\">v1.2.0</b>"));
-  TEST_ASSERT_TRUE(contains(h, "Latest release: <b>v1.3.0</b> \xC2\xB7 published 20.10.2026"));
-  TEST_ASSERT_TRUE(contains(h, "href=\"https://github.com/alasota/CYD-Flight-Tracker/releases/tag/v1.3.0\""));
-  TEST_ASSERT_TRUE(contains(h, "<span class=\"pill ok\" id=\"ups\"><span class=\"dot\"></span>"
-                               "A newer version is available.</span>"));
-  TEST_ASSERT_TRUE(contains(h, "checked 24.10.2026 09:11"));
-  TEST_ASSERT_TRUE(contains(h, "<button form=\"ui\" class=\"wide\" id=\"upi\""));
-  TEST_ASSERT_TRUE(contains(h, ">Install v1.3.0</button>"));
-  TEST_ASSERT_TRUE(contains(h, "<form id=\"ui\" method=\"POST\" action=\"/update/install\">"
-                               "<input type=\"hidden\" name=\"tag\" value=\"v1.3.0\"></form>"));
-  TEST_ASSERT_TRUE(contains(h, "<form id=\"uc\" method=\"POST\" action=\"/update/check\">"));
-  TEST_ASSERT_TRUE(contains(h, ">Check now</button>"));
-  TEST_ASSERT_TRUE(contains(h, "version <span id=\"ver\">v1.2.0</span>"));
+  ASSERT_CONTAINS(h, "<div class=\"card\" id=\"gh\"><h2>Updates from GitHub</h2>");
+  ASSERT_CONTAINS(h, "Installed version: <b id=\"fwv\">v1.2.0</b>");
+  ASSERT_CONTAINS(h, "Latest release: <b>v1.3.0</b> \xC2\xB7 published 20.10.2026");
+  ASSERT_CONTAINS(h, "href=\"https://github.com/alasota/CYD-Flight-Tracker/releases/tag/v1.3.0\"");
+  ASSERT_CONTAINS(h, "<span class=\"pill ok\" id=\"ups\"><span class=\"dot\"></span>" "A newer version is available.</span>");
+  ASSERT_CONTAINS(h, "checked 24.10.2026 09:11");
+  ASSERT_CONTAINS(h, "<button form=\"ui\" class=\"wide\" id=\"upi\"");
+  ASSERT_CONTAINS(h, ">Install v1.3.0</button>");
+  ASSERT_CONTAINS(h, "<form id=\"ui\" method=\"POST\" action=\"/update/install\">" "<input type=\"hidden\" name=\"tag\" value=\"v1.3.0\"></form>");
+  ASSERT_CONTAINS(h, "<form id=\"uc\" method=\"POST\" action=\"/update/check\">");
+  ASSERT_CONTAINS(h, ">Check now</button>");
+  ASSERT_CONTAINS(h, "version <span id=\"ver\">v1.2.0</span>");
   // Development versions: the switch is there, off, and nothing else.
-  TEST_ASSERT_TRUE(contains(h, "name=\"on\" value=\"1\" form=\"upr\" "
-                               "onchange=\"this.form.submit()\"></label>"));
-  TEST_ASSERT_FALSE(contains(h, "id=\"upre\""));
-  TEST_ASSERT_FALSE(contains(h, "id=\"upip\""));
+  ASSERT_CONTAINS(h, "name=\"on\" value=\"1\" form=\"upr\" " "onchange=\"this.form.submit()\"></label>");
+  ASSERT_NOT_CONTAINS(h, "id=\"upre\"");
+  ASSERT_NOT_CONTAINS(h, "id=\"upip\"");
 }
 
 static void test_update_card_install_button_only_when_installable(void) {
@@ -416,39 +405,38 @@ static void test_update_card_install_button_only_when_installable(void) {
                           UpdateStatus::NeverChecked}) {
     m.update.status = st;
     const std::string h = render(m);
-    TEST_ASSERT_FALSE(contains(h, "id=\"upi\""));
-    TEST_ASSERT_TRUE(contains(h, webTr(updateStatusMessage(st), Language::EN)));
+    ASSERT_NOT_CONTAINS(h, "id=\"upi\"");
+    ASSERT_CONTAINS(h, webTr(updateStatusMessage(st), Language::EN));
   }
   m.update.status = UpdateStatus::BackToRelease;
-  TEST_ASSERT_TRUE(contains(render(m), ">Go back to release v1.3.0</button>"));
+  ASSERT_CONTAINS(render(m), ">Go back to release v1.3.0</button>");
   m.update.status = UpdateStatus::DevBuild;
-  TEST_ASSERT_TRUE(contains(render(m), ">Install v1.3.0</button>"));
+  ASSERT_CONTAINS(render(m), ">Install v1.3.0</button>");
   // The installed version is never offered again.
   m.installedVersion = "v1.3.0";
-  TEST_ASSERT_FALSE(contains(render(m), "id=\"upi\""));
+  ASSERT_NOT_CONTAINS(render(m), "id=\"upi\"");
 }
 
 static void test_update_card_development_channel(void) {
   ConfigPageModel m = updateModel(true);
   std::string h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "onchange=\"this.form.submit()\" checked></label>"));
-  TEST_ASSERT_TRUE(contains(h, "id=\"upre\""));
-  TEST_ASSERT_TRUE(contains(h, "Latest development version: <b>v1.4.0-rc.1</b>"));
-  TEST_ASSERT_TRUE(contains(h, "A test version"));
-  TEST_ASSERT_TRUE(contains(h, ">Install v1.4.0-rc.1</button>"));
-  TEST_ASSERT_TRUE(contains(h, "<form id=\"uip\" method=\"POST\" action=\"/update/install\">"
-                               "<input type=\"hidden\" name=\"tag\" value=\"v1.4.0-rc.1\">"));
+  ASSERT_CONTAINS(h, "onchange=\"this.form.submit()\" checked></label>");
+  ASSERT_CONTAINS(h, "id=\"upre\"");
+  ASSERT_CONTAINS(h, "Latest development version: <b>v1.4.0-rc.1</b>");
+  ASSERT_CONTAINS(h, "A test version");
+  ASSERT_CONTAINS(h, ">Install v1.4.0-rc.1</button>");
+  ASSERT_CONTAINS(h, "<form id=\"uip\" method=\"POST\" action=\"/update/install\">" "<input type=\"hidden\" name=\"tag\" value=\"v1.4.0-rc.1\">");
   // Switch off: the pre-release isn't shown even if the state still has it.
   m.cfg.update_show_prerelease = false;
   h = render(m);
-  TEST_ASSERT_FALSE(contains(h, "id=\"upre\""));
-  TEST_ASSERT_FALSE(contains(h, ">Install v1.4.0-rc.1</button>"));
+  ASSERT_NOT_CONTAINS(h, "id=\"upre\"");
+  ASSERT_NOT_CONTAINS(h, ">Install v1.4.0-rc.1</button>");
   // Already running it: no button, a note instead.
   m = updateModel(true);
   m.installedVersion = "v1.4.0-rc.1";
   h = render(m);
-  TEST_ASSERT_FALSE(contains(h, "id=\"upip\""));
-  TEST_ASSERT_TRUE(contains(h, "v1.4.0-rc.1 \xC2\xB7 installed"));
+  ASSERT_NOT_CONTAINS(h, "id=\"upip\"");
+  ASSERT_CONTAINS(h, "v1.4.0-rc.1 \xC2\xB7 installed");
 }
 
 static void test_update_card_shows_a_failed_install(void) {
@@ -456,8 +444,7 @@ static void test_update_card_shows_a_failed_install(void) {
   m.update.lastInstall = OtaResult::ChecksumMismatch;
   m.update.lastInstallTag = "v1.3.0";
   const std::string h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "The last install failed (v1.3.0): Not updated: the downloaded "
-                               "file's SHA-256 does not match"));
+  ASSERT_CONTAINS(h, "The last install failed (v1.3.0): Not updated: the downloaded " "file's SHA-256 does not match");
 }
 
 static void test_update_card_escapes_what_came_from_the_network(void) {
@@ -465,18 +452,18 @@ static void test_update_card_escapes_what_came_from_the_network(void) {
   m.update.latest.tag = "v1.3.0\"><script>";
   m.update.latestPre.tag = "<b>";
   const std::string h = render(m);
-  TEST_ASSERT_FALSE(contains(h, "v1.3.0\"><script>"));
-  TEST_ASSERT_TRUE(contains(h, "<b>v1.3.0&quot;&gt;&lt;script&gt;</b>"));
+  ASSERT_NOT_CONTAINS(h, "v1.3.0\"><script>");
+  ASSERT_CONTAINS(h, "<b>v1.3.0&quot;&gt;&lt;script&gt;</b>");
 }
 
 static void test_update_check_switch_on_general(void) {
   ConfigPageModel m = baseModel();
   m.cfg.web_language = Language::EN;
-  TEST_ASSERT_TRUE(contains(render(m), "name=\"update_check\" value=\"1\" checked"));
+  ASSERT_CONTAINS(render(m), "name=\"update_check\" value=\"1\" checked");
   m.cfg.update_check_enabled = false;
   const std::string h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "name=\"update_check\" value=\"1\">"));
-  TEST_ASSERT_FALSE(contains(h, "name=\"update_check\" value=\"1\" checked"));
+  ASSERT_CONTAINS(h, "name=\"update_check\" value=\"1\">");
+  ASSERT_NOT_CONTAINS(h, "name=\"update_check\" value=\"1\" checked");
 }
 
 // Writes the demo Firmware tab (PL, like the other screenshots) for
@@ -554,12 +541,12 @@ static void test_restarting_page_reloads_itself(void) {
   m.hasMessage = true;
   m.message = WebStr::OtaOk;
   m.messageDetail = "v1.2.0 â v1.3.0";
-  TEST_ASSERT_FALSE(contains(render(m), "location.href='/?tab=firmware'"));
+  ASSERT_NOT_CONTAINS(render(m), "location.href='/?tab=firmware'");
   m.restarting = true;
   const std::string h = render(m);
-  TEST_ASSERT_TRUE(contains(h, "Firmware updated: v1.2.0"));
-  TEST_ASSERT_TRUE(contains(h, "The board is restarting"));
-  TEST_ASSERT_TRUE(contains(h, "location.href='/?tab=firmware'"));
+  ASSERT_CONTAINS(h, "Firmware updated: v1.2.0");
+  ASSERT_CONTAINS(h, "The board is restarting");
+  ASSERT_CONTAINS(h, "location.href='/?tab=firmware'");
 }
 
 static void test_saved_secret_never_reaches_the_page(void) {
@@ -568,15 +555,14 @@ static void test_saved_secret_never_reaches_the_page(void) {
   m.cfg.opensky_client_id = "my-id";
   m.cfg.opensky_client_secret = "TOP-SECRET-VALUE";
   std::string h = render(m);
-  TEST_ASSERT_FALSE(contains(h, "TOP-SECRET-VALUE"));
-  TEST_ASSERT_TRUE(contains(h, "name=\"client_secret\" autocomplete=\"off\" value=\"\" "
-                               "data-saved=\"1\" placeholder=\"saved"));
-  TEST_ASSERT_TRUE(contains(h, "name=\"clear_credentials\""));
+  ASSERT_NOT_CONTAINS(h, "TOP-SECRET-VALUE");
+  ASSERT_CONTAINS(h, "name=\"client_secret\" autocomplete=\"off\" value=\"\" " "data-saved=\"1\" placeholder=\"saved");
+  ASSERT_CONTAINS(h, "name=\"clear_credentials\"");
 
   m.cfg.opensky_client_secret.clear();
   h = render(m);
-  TEST_ASSERT_FALSE(contains(h, "data-saved"));
-  TEST_ASSERT_FALSE(contains(h, "name=\"clear_credentials\""));
+  ASSERT_NOT_CONTAINS(h, "data-saved");
+  ASSERT_NOT_CONTAINS(h, "name=\"clear_credentials\"");
 }
 
 static void test_panel_password_card(void) {
@@ -584,19 +570,19 @@ static void test_panel_password_card(void) {
   m.cfg.web_language = Language::EN;
   std::string h = render(m);
   // No password: warned on General and on Firmware, nothing to remove.
-  size_t first = h.find("The panel has no password");
-  TEST_ASSERT_TRUE(first != std::string::npos);
-  TEST_ASSERT_TRUE(h.find("The panel has no password", first + 1) != std::string::npos);
-  TEST_ASSERT_TRUE(contains(h, "name=\"new_password\" autocomplete=\"new-password\""));
-  TEST_ASSERT_TRUE(contains(h, "name=\"new_password2\""));
-  TEST_ASSERT_FALSE(contains(h, "name=\"clear_password\""));
+  ASSERT_CONTAINS(h, "The panel has no password");
+  const size_t first = h.find("The panel has no password");
+  ASSERT_CONTAINS(h.substr(first + 1), "The panel has no password");
+  ASSERT_CONTAINS(h, "name=\"new_password\" autocomplete=\"new-password\"");
+  ASSERT_CONTAINS(h, "name=\"new_password2\"");
+  ASSERT_NOT_CONTAINS(h, "name=\"clear_password\"");
 
   m.cfg.web_password = "hunter22-secret";
   h = render(m);
-  TEST_ASSERT_FALSE(contains(h, "hunter22-secret"));  // never echoed
-  TEST_ASSERT_FALSE(contains(h, "The panel has no password"));
-  TEST_ASSERT_TRUE(contains(h, "Password set"));
-  TEST_ASSERT_TRUE(contains(h, "name=\"clear_password\""));
+  ASSERT_NOT_CONTAINS(h, "hunter22-secret");  // never echoed
+  ASSERT_NOT_CONTAINS(h, "The panel has no password");
+  ASSERT_CONTAINS(h, "Password set");
+  ASSERT_CONTAINS(h, "name=\"clear_password\"");
 }
 
 }  // namespace

@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include "test_support.h"
 #include "web_auth.h"
 
 namespace {
@@ -10,51 +11,46 @@ namespace {
 // ---- validateWebPassword
 
 static void test_empty_password_means_none_and_is_ok(void) {
-  TEST_ASSERT_TRUE(validateWebPassword("") == WebPasswordCheck::Ok);
+  ASSERT_ENUM_EQ(WebPasswordCheck::Ok, validateWebPassword(""));
 }
 
 static void test_length_bounds(void) {
-  TEST_ASSERT_TRUE(validateWebPassword("1234567") == WebPasswordCheck::TooShort);
-  TEST_ASSERT_TRUE(validateWebPassword("12345678") == WebPasswordCheck::Ok);
-  TEST_ASSERT_TRUE(validateWebPassword(std::string(64, 'a')) == WebPasswordCheck::Ok);
-  TEST_ASSERT_TRUE(validateWebPassword(std::string(65, 'a')) == WebPasswordCheck::TooLong);
+  ASSERT_ENUM_EQ(WebPasswordCheck::TooShort, validateWebPassword("1234567"));
+  ASSERT_ENUM_EQ(WebPasswordCheck::Ok, validateWebPassword("12345678"));
+  ASSERT_ENUM_EQ(WebPasswordCheck::Ok, validateWebPassword(std::string(64, 'a')));
+  ASSERT_ENUM_EQ(WebPasswordCheck::TooLong, validateWebPassword(std::string(65, 'a')));
 }
 
 static void test_printable_ascii_only(void) {
-  TEST_ASSERT_TRUE(validateWebPassword("with space ~!") == WebPasswordCheck::Ok);
-  TEST_ASSERT_TRUE(validateWebPassword("za\xC5\xBC\xC3\xB3\xC5\x82\x63") ==
-                   WebPasswordCheck::BadChar);  // "zażółc"
-  TEST_ASSERT_TRUE(validateWebPassword("tab\there1") == WebPasswordCheck::BadChar);
-  TEST_ASSERT_TRUE(validateWebPassword("abc\x7F" "defgh") == WebPasswordCheck::BadChar);
+  ASSERT_ENUM_EQ(WebPasswordCheck::Ok, validateWebPassword("with space ~!"));
+  ASSERT_ENUM_EQ(WebPasswordCheck::BadChar, validateWebPassword("za\xC5\xBC\xC3\xB3\xC5\x82\x63"));  // "zażółc"
+  ASSERT_ENUM_EQ(WebPasswordCheck::BadChar, validateWebPassword("tab\there1"));
+  ASSERT_ENUM_EQ(WebPasswordCheck::BadChar, validateWebPassword("abc\x7F" "defgh"));
 }
 
 // ---- decidePasswordChange
 
 static void test_both_fields_empty_leaves_password_alone(void) {
-  TEST_ASSERT_TRUE(decidePasswordChange("", "", false).outcome ==
-                   PasswordChange::Outcome::Unchanged);
+  ASSERT_ENUM_EQ(PasswordChange::Outcome::Unchanged, decidePasswordChange("", "", false).outcome);
 }
 
 static void test_matching_valid_password_is_set(void) {
   PasswordChange c = decidePasswordChange("hunter22", "hunter22", false);
-  TEST_ASSERT_TRUE(c.outcome == PasswordChange::Outcome::Set);
+  ASSERT_ENUM_EQ(PasswordChange::Outcome::Set, c.outcome);
   TEST_ASSERT_EQUAL_STRING("hunter22", c.value.c_str());
 }
 
 static void test_mismatch_and_invalid_save_nothing(void) {
-  TEST_ASSERT_TRUE(decidePasswordChange("hunter22", "hunter23", false).outcome ==
-                   PasswordChange::Outcome::Mismatch);
-  TEST_ASSERT_TRUE(decidePasswordChange("hunter22", "", false).outcome ==
-                   PasswordChange::Outcome::Mismatch);
+  ASSERT_ENUM_EQ(PasswordChange::Outcome::Mismatch, decidePasswordChange("hunter22", "hunter23", false).outcome);
+  ASSERT_ENUM_EQ(PasswordChange::Outcome::Mismatch, decidePasswordChange("hunter22", "", false).outcome);
   PasswordChange c = decidePasswordChange("short", "short", false);
-  TEST_ASSERT_TRUE(c.outcome == PasswordChange::Outcome::Invalid);
-  TEST_ASSERT_TRUE(c.check == WebPasswordCheck::TooShort);
+  ASSERT_ENUM_EQ(PasswordChange::Outcome::Invalid, c.outcome);
+  ASSERT_ENUM_EQ(WebPasswordCheck::TooShort, c.check);
   TEST_ASSERT_TRUE(c.value.empty());
 }
 
 static void test_clear_wins_over_typed_fields(void) {
-  TEST_ASSERT_TRUE(decidePasswordChange("hunter22", "nope", true).outcome ==
-                   PasswordChange::Outcome::Cleared);
+  ASSERT_ENUM_EQ(PasswordChange::Outcome::Cleared, decidePasswordChange("hunter22", "nope", true).outcome);
 }
 
 // ---- AuthThrottle
@@ -113,42 +109,42 @@ static void test_lock_survives_millis_wraparound(void) {
 
 static void test_no_password_lets_everything_through(void) {
   AuthOutcome o = decideAuth(false, true, true, false);
-  TEST_ASSERT_TRUE(o.decision == AuthDecision::Allow);
+  ASSERT_ENUM_EQ(AuthDecision::Allow, o.decision);
   TEST_ASSERT_FALSE(o.countFailure);
 }
 
 static void test_first_request_without_credentials_is_challenged_not_counted(void) {
   AuthOutcome o = decideAuth(true, false, false, false);
-  TEST_ASSERT_TRUE(o.decision == AuthDecision::Challenge);
+  ASSERT_ENUM_EQ(AuthDecision::Challenge, o.decision);
   TEST_ASSERT_FALSE(o.countFailure);
 }
 
 static void test_wrong_password_is_challenged_and_counted(void) {
   AuthOutcome o = decideAuth(true, false, true, false);
-  TEST_ASSERT_TRUE(o.decision == AuthDecision::Challenge);
+  ASSERT_ENUM_EQ(AuthDecision::Challenge, o.decision);
   TEST_ASSERT_TRUE(o.countFailure);
 }
 
 static void test_right_password_is_allowed(void) {
   AuthOutcome o = decideAuth(true, false, true, true);
-  TEST_ASSERT_TRUE(o.decision == AuthDecision::Allow);
+  ASSERT_ENUM_EQ(AuthDecision::Allow, o.decision);
   TEST_ASSERT_TRUE(o.countSuccess);
 }
 
 static void test_locked_refuses_even_the_right_password(void) {
-  TEST_ASSERT_TRUE(decideAuth(true, true, true, true).decision == AuthDecision::Locked);
+  ASSERT_ENUM_EQ(AuthDecision::Locked, decideAuth(true, true, true, true).decision);
 }
 
 // ---- reset gesture
 
 static void test_reset_hold(void) {
-  TEST_ASSERT_TRUE(resetHoldState(0, 0) == ResetHoldState::Holding);
-  TEST_ASSERT_TRUE(resetHoldState(0, 4999) == ResetHoldState::Holding);
-  TEST_ASSERT_TRUE(resetHoldState(0, 5000) == ResetHoldState::Done);
+  ASSERT_ENUM_EQ(ResetHoldState::Holding, resetHoldState(0, 0));
+  ASSERT_ENUM_EQ(ResetHoldState::Holding, resetHoldState(0, 4999));
+  ASSERT_ENUM_EQ(ResetHoldState::Done, resetHoldState(0, 5000));
   // A dropped sample or two doesn't end the hold, a real release does.
-  TEST_ASSERT_TRUE(resetHoldState(300, 2000) == ResetHoldState::Holding);
-  TEST_ASSERT_TRUE(resetHoldState(301, 2000) == ResetHoldState::Released);
-  TEST_ASSERT_TRUE(resetHoldState(1000, 9000) == ResetHoldState::Released);
+  ASSERT_ENUM_EQ(ResetHoldState::Holding, resetHoldState(300, 2000));
+  ASSERT_ENUM_EQ(ResetHoldState::Released, resetHoldState(301, 2000));
+  ASSERT_ENUM_EQ(ResetHoldState::Released, resetHoldState(1000, 9000));
 }
 
 }  // namespace

@@ -5,8 +5,7 @@
 
 #include "github_fixtures.h"
 #include "release_check.h"
-
-namespace {
+#include "test_support.h"
 
 namespace {
 
@@ -34,8 +33,6 @@ PromptGate availableGate() {
   return g;
 }
 
-}  // namespace
-
 // ---- parseFwVersion
 
 static void test_parse_plain_release(void) {
@@ -44,7 +41,7 @@ static void test_parse_plain_release(void) {
   TEST_ASSERT_EQUAL_UINT16(1, v.major);
   TEST_ASSERT_EQUAL_UINT16(3, v.minor);
   TEST_ASSERT_EQUAL_UINT16(0, v.patch);
-  TEST_ASSERT_TRUE(v.pre == PreKind::None);
+  ASSERT_ENUM_EQ(PreKind::None, v.pre);
   TEST_ASSERT_EQUAL_UINT16(0, v.commitsAhead);
   TEST_ASSERT_FALSE(v.dirty);
   TEST_ASSERT_FALSE(isDevelopmentBuild(v));
@@ -80,15 +77,15 @@ static void test_parse_rejects_what_is_not_a_version(void) {
 static void test_parse_prerelease_suffixes(void) {
   FwVersion v = parseFwVersion("v1.4.0-rc.2");
   TEST_ASSERT_TRUE(v.valid);
-  TEST_ASSERT_TRUE(v.pre == PreKind::Rc);
+  ASSERT_ENUM_EQ(PreKind::Rc, v.pre);
   TEST_ASSERT_EQUAL_UINT16(2, v.preNumber);
   TEST_ASSERT_TRUE(isDevelopmentBuild(v));
-  TEST_ASSERT_TRUE(parseFwVersion("v1.4.0-beta.1").pre == PreKind::Beta);
-  TEST_ASSERT_TRUE(parseFwVersion("v1.4.0-dev.7").pre == PreKind::Dev);
+  ASSERT_ENUM_EQ(PreKind::Beta, parseFwVersion("v1.4.0-beta.1").pre);
+  ASSERT_ENUM_EQ(PreKind::Dev, parseFwVersion("v1.4.0-dev.7").pre);
 
   v = parseFwVersion("v1.4.0-rc.1-2-gabc1234");
   TEST_ASSERT_TRUE(v.valid);
-  TEST_ASSERT_TRUE(v.pre == PreKind::Rc);
+  ASSERT_ENUM_EQ(PreKind::Rc, v.pre);
   TEST_ASSERT_EQUAL_UINT16(1, v.preNumber);
   TEST_ASSERT_EQUAL_UINT16(2, v.commitsAhead);
 
@@ -120,18 +117,18 @@ static void test_compare_is_numeric_and_orders_prereleases(void) {
 }
 
 static void test_decide_offer(void) {
-  TEST_ASSERT_TRUE(decideOffer("v1.3.0", "v1.4.0") == UpdateOffer::Newer);
-  TEST_ASSERT_TRUE(decideOffer("v1.3.9", "v1.10.0") == UpdateOffer::Newer);
-  TEST_ASSERT_TRUE(decideOffer("v1.4.0", "v1.4.0") == UpdateOffer::UpToDate);
-  TEST_ASSERT_TRUE(decideOffer("v1.4.0-2-gabc1234", "v1.4.0") == UpdateOffer::UpToDate);
-  TEST_ASSERT_TRUE(decideOffer("v1.4.0-2-gabc1234", "v1.4.1") == UpdateOffer::Newer);
-  TEST_ASSERT_TRUE(decideOffer("v1.5.0", "v1.4.0") == UpdateOffer::UpToDate);  // never older
-  TEST_ASSERT_TRUE(decideOffer("abc1234-dirty", "v1.4.0") == UpdateOffer::DevBuild);
-  TEST_ASSERT_TRUE(decideOffer("dev", "v1.4.0") == UpdateOffer::DevBuild);
-  TEST_ASSERT_TRUE(decideOffer("v1.3.0-dirty", "v1.4.0") == UpdateOffer::DevBuild);
-  TEST_ASSERT_TRUE(decideOffer("v1.3.0", "nightly") == UpdateOffer::BadLatest);
-  TEST_ASSERT_TRUE(decideOffer("v1.5.0-rc.1", "v1.4.0") == UpdateOffer::BackToRelease);
-  TEST_ASSERT_TRUE(decideOffer("v1.4.0-rc.2", "v1.4.0") == UpdateOffer::Newer);
+  ASSERT_ENUM_EQ(UpdateOffer::Newer, decideOffer("v1.3.0", "v1.4.0"));
+  ASSERT_ENUM_EQ(UpdateOffer::Newer, decideOffer("v1.3.9", "v1.10.0"));
+  ASSERT_ENUM_EQ(UpdateOffer::UpToDate, decideOffer("v1.4.0", "v1.4.0"));
+  ASSERT_ENUM_EQ(UpdateOffer::UpToDate, decideOffer("v1.4.0-2-gabc1234", "v1.4.0"));
+  ASSERT_ENUM_EQ(UpdateOffer::Newer, decideOffer("v1.4.0-2-gabc1234", "v1.4.1"));
+  ASSERT_ENUM_EQ(UpdateOffer::UpToDate, decideOffer("v1.5.0", "v1.4.0"));  // never older
+  ASSERT_ENUM_EQ(UpdateOffer::DevBuild, decideOffer("abc1234-dirty", "v1.4.0"));
+  ASSERT_ENUM_EQ(UpdateOffer::DevBuild, decideOffer("dev", "v1.4.0"));
+  ASSERT_ENUM_EQ(UpdateOffer::DevBuild, decideOffer("v1.3.0-dirty", "v1.4.0"));
+  ASSERT_ENUM_EQ(UpdateOffer::BadLatest, decideOffer("v1.3.0", "nightly"));
+  ASSERT_ENUM_EQ(UpdateOffer::BackToRelease, decideOffer("v1.5.0-rc.1", "v1.4.0"));
+  ASSERT_ENUM_EQ(UpdateOffer::Newer, decideOffer("v1.4.0-rc.2", "v1.4.0"));
 }
 
 // ---- Releases
@@ -165,7 +162,7 @@ static void test_parse_latest_for_another_board_finds_no_file(void) {
   ReleaseInfo r;
   TEST_ASSERT_TRUE(parseLatestRelease(kLatestJson, "cyd-c", r));
   TEST_ASSERT_TRUE(r.assetUrl.empty());
-  TEST_ASSERT_TRUE(statusForRelease(UpdateOffer::Newer, r) == UpdateStatus::NoAsset);
+  ASSERT_ENUM_EQ(UpdateStatus::NoAsset, statusForRelease(UpdateOffer::Newer, r));
 }
 
 static void test_parse_latest_rejects_junk_drafts_and_prereleases(void) {
@@ -205,9 +202,9 @@ static void test_missing_digest_falls_back_to_the_sums_file(void) {
   TEST_ASSERT_TRUE(parseLatestRelease(json, "cyd-r", r));
   TEST_ASSERT_TRUE(r.sha256.empty());
   TEST_ASSERT_FALSE(r.sumsUrl.empty());
-  TEST_ASSERT_TRUE(statusForRelease(UpdateOffer::Newer, r) == UpdateStatus::Available);
+  ASSERT_ENUM_EQ(UpdateStatus::Available, statusForRelease(UpdateOffer::Newer, r));
   r.sumsUrl.clear();
-  TEST_ASSERT_TRUE(statusForRelease(UpdateOffer::Newer, r) == UpdateStatus::NoChecksum);
+  ASSERT_ENUM_EQ(UpdateStatus::NoChecksum, statusForRelease(UpdateOffer::Newer, r));
 }
 
 static void test_pick_latest_prerelease(void) {
@@ -301,14 +298,14 @@ static void test_refused_urls(void) {
 // ---- Schedule
 
 static void test_classify_check_response(void) {
-  TEST_ASSERT_TRUE(classifyCheckResponse(200, "59") == CheckOutcome::Ok);
-  TEST_ASSERT_TRUE(classifyCheckResponse(304, "59") == CheckOutcome::NotModified);
-  TEST_ASSERT_TRUE(classifyCheckResponse(404, "") == CheckOutcome::NoRelease);
-  TEST_ASSERT_TRUE(classifyCheckResponse(429, "") == CheckOutcome::RateLimited);
-  TEST_ASSERT_TRUE(classifyCheckResponse(403, "0") == CheckOutcome::RateLimited);
-  TEST_ASSERT_TRUE(classifyCheckResponse(403, "12") == CheckOutcome::Failed);  // e.g. no User-Agent
-  TEST_ASSERT_TRUE(classifyCheckResponse(500, "") == CheckOutcome::Failed);
-  TEST_ASSERT_TRUE(classifyCheckResponse(-1, "") == CheckOutcome::Failed);
+  ASSERT_ENUM_EQ(CheckOutcome::Ok, classifyCheckResponse(200, "59"));
+  ASSERT_ENUM_EQ(CheckOutcome::NotModified, classifyCheckResponse(304, "59"));
+  ASSERT_ENUM_EQ(CheckOutcome::NoRelease, classifyCheckResponse(404, ""));
+  ASSERT_ENUM_EQ(CheckOutcome::RateLimited, classifyCheckResponse(429, ""));
+  ASSERT_ENUM_EQ(CheckOutcome::RateLimited, classifyCheckResponse(403, "0"));
+  ASSERT_ENUM_EQ(CheckOutcome::Failed, classifyCheckResponse(403, "12"));  // e.g. no User-Agent
+  ASSERT_ENUM_EQ(CheckOutcome::Failed, classifyCheckResponse(500, ""));
+  ASSERT_ENUM_EQ(CheckOutcome::Failed, classifyCheckResponse(-1, ""));
 }
 
 static void test_rate_limit_wait(void) {
@@ -377,11 +374,11 @@ static void test_every_status_has_a_message(void) {
 
 static void test_status_for_release(void) {
   const ReleaseInfo r = releaseWith("v1.4.0");
-  TEST_ASSERT_TRUE(statusForRelease(UpdateOffer::Newer, r) == UpdateStatus::Available);
-  TEST_ASSERT_TRUE(statusForRelease(UpdateOffer::UpToDate, r) == UpdateStatus::UpToDate);
-  TEST_ASSERT_TRUE(statusForRelease(UpdateOffer::BackToRelease, r) == UpdateStatus::BackToRelease);
-  TEST_ASSERT_TRUE(statusForRelease(UpdateOffer::DevBuild, r) == UpdateStatus::DevBuild);
-  TEST_ASSERT_TRUE(statusForRelease(UpdateOffer::BadLatest, r) == UpdateStatus::NoRelease);
+  ASSERT_ENUM_EQ(UpdateStatus::Available, statusForRelease(UpdateOffer::Newer, r));
+  ASSERT_ENUM_EQ(UpdateStatus::UpToDate, statusForRelease(UpdateOffer::UpToDate, r));
+  ASSERT_ENUM_EQ(UpdateStatus::BackToRelease, statusForRelease(UpdateOffer::BackToRelease, r));
+  ASSERT_ENUM_EQ(UpdateStatus::DevBuild, statusForRelease(UpdateOffer::DevBuild, r));
+  ASSERT_ENUM_EQ(UpdateStatus::NoRelease, statusForRelease(UpdateOffer::BadLatest, r));
   TEST_ASSERT_TRUE(statusAllowsInstall(UpdateStatus::Available));
   TEST_ASSERT_TRUE(statusAllowsInstall(UpdateStatus::BackToRelease));
   TEST_ASSERT_TRUE(statusAllowsInstall(UpdateStatus::DevBuild));
@@ -462,8 +459,8 @@ static void test_prompt_tap_needs_a_fresh_touch(void) {
 
 static void test_demo_state_is_consistent(void) {
   const UpdateState s = updateDemoState(true);
-  TEST_ASSERT_TRUE(decideOffer(s.installed, s.latest.tag) == UpdateOffer::Newer);
-  TEST_ASSERT_TRUE(statusForRelease(UpdateOffer::Newer, s.latest) == s.status);
+  ASSERT_ENUM_EQ(UpdateOffer::Newer, decideOffer(s.installed, s.latest.tag));
+  ASSERT_ENUM_EQ(s.status, statusForRelease(UpdateOffer::Newer, s.latest));
   TEST_ASSERT_TRUE(isAllowedUpdateUrl(s.latest.assetUrl));
   TEST_ASSERT_TRUE(isAllowedUpdateUrl(s.latestPre.htmlUrl));
   TEST_ASSERT_TRUE(preReleaseWorthShowing(s.latestPre, s.latest));

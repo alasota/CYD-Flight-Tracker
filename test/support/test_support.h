@@ -64,6 +64,14 @@ inline void assertNotContains(const std::string &haystack, const std::string &ne
                                     around(haystack, at, needle.size(), 60) + "\""));
 }
 
+inline void assertContains(const std::string &haystack, char needle, const char *expr, int line) {
+  assertContains(haystack, std::string(1, needle), expr, line);
+}
+
+inline void assertNotContains(const std::string &haystack, char needle, const char *expr, int line) {
+  assertNotContains(haystack, std::string(1, needle), expr, line);
+}
+
 inline std::string joined(const std::vector<std::string> &v) {
   std::string out = "[";
   for (size_t i = 0; i < v.size(); ++i) out += (i ? ", \"" : "\"") + v[i] + "\"";
