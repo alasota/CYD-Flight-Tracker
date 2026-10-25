@@ -19,8 +19,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 <script>
-  // Pick the language before first paint: saved choice, else the browser's.
+  // Before first paint: the language (saved choice, else the browser's) and the
+  // "js" class, so the settings-page viewer is already one screenshot tall
+  // (site.js adds "js" again, harmless). Only classList: className would drop it.
   (function () {
+    document.documentElement.classList.add('js');
     var l = null;
     try { l = localStorage.getItem('lang'); } catch (e) {}
     if (l !== 'pl' && l !== 'en') l = /^pl\b/i.test(navigator.language || '') ? 'pl' : 'en';
