@@ -18,6 +18,9 @@ Rules:
   docs, CI) is "other": patch on its own, the owner confirms.
 - Specs to move to spec/done/: spec/planned/NN-*.md whose number appears in a merged feature
   branch (`spec/NN-…`) or whose status line says it's done.
+- Stale docs: ROADMAP rows outside "Done" for specs already in spec/done/, spec/README.md
+  `done` rows without a version — whenever they were released (see stale_docs()); each comes
+  with the version that actually shipped it.
 - vNEXT: docs written before the version was known carry a bare vNEXT placeholder (ROADMAP's
   Done rows, spec/README.md, spec status lines); the release replaces it with the version
   (`--fill vX.Y.Z` does it). Written in backticks it is text *about* the placeholder and stays.
@@ -109,6 +112,50 @@ def search_since(iso_utc):
     return t.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def first_release(tags):
+    """Lowest stable version among tags (those containing a commit) — when it shipped."""
+    stable = [(parse_version(t), t) for t in tags if parse_version(t)]
+    return min(stable)[1] if stable else None
+
+
+SPEC_REF = re.compile(r"\bSpec (\d{2})\b")
+VERSION_OR_PLACEHOLDER = re.compile(r"^(v\d+\.\d+\.\d+|vNEXT)$")
+
+
+def stale_docs(roadmap, spec_readme, done_specs):
+    """Docs that still describe a finished spec as unfinished — whatever release it went out in.
+    The window of PRs since the last tag can't see these (spec 06: implemented before the vNEXT
+    rule, v1.6.0 tagged by hand, the roadmap kept saying "in progress" through v1.6.1-v1.6.3).
+
+    - ROADMAP.md: a row outside "## Done" whose Verdict cites "Spec NN" with NN in spec/done/.
+    - spec/README.md: a `done` row whose "Stan" is neither vX.Y.Z nor the vNEXT placeholder.
+    Returns [{file, spec, problem}]."""
+    out = []
+    section = None
+    for line in roadmap.splitlines():
+        heading = re.match(r"^##\s+(.+?)\s*$", line)
+        if heading:
+            section = heading.group(1)
+            continue
+        if section in (None, "Done") or not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not cells or not cells[0].isdigit():
+            continue  # header / separator
+        for nn in sorted(set(SPEC_REF.findall(cells[-1]))):
+            if nn in done_specs:
+                out.append({"file": "ROADMAP.md", "spec": nn,
+                            "problem": f"row in '{section}' but the spec is in spec/done/"})
+    for line in spec_readme.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 4 or not re.fullmatch(r"\d{2}", cells[0]) or cells[2] != "done":
+            continue
+        if not VERSION_OR_PLACEHOLDER.match(cells[3]):
+            out.append({"file": "spec/README.md", "spec": cells[0],
+                        "problem": f"done, but 'Stan' is '{cells[3]}', not a version"})
+    return out
+
+
 DONE_STATUS = re.compile(r"Status:\s*\*\*(zrobione|zaimplementowane|done)", re.I)
 
 
@@ -138,6 +185,15 @@ def is_ancestor(sha, ref):
     r = subprocess.run(["git", "merge-base", "--is-ancestor", sha, ref], cwd=REPO_DIR,
                        capture_output=True)
     return r.returncode == 0
+
+
+def released_in(nn):
+    """First stable tag that contains spec NN's move to spec/done/; None = not released yet."""
+    added = git("log", "--diff-filter=A", "--format=%H", "--", f":(glob)spec/done/{nn}-*.md")
+    if not added:
+        return None
+    oldest = added.splitlines()[-1]
+    return first_release(git("tag", "--contains", oldest).splitlines())
 
 
 def find_gh():
@@ -215,16 +271,24 @@ def build_plan(bump_override=None, from_tag=None):
     merged_specs = {n for n in (spec_number(p["head"]) for p in prs if p["kind"] == "feature") if n}
     planned = [p.relative_to(REPO_DIR).as_posix() for p in (REPO_DIR / "spec" / "planned").glob("*.md")]
     commits = git("log", "--format=%h %s", f"{latest}..origin/main" if latest else "origin/main")
+    nxt = next_version(latest, bump) if bump else None
+    done_specs = {p.name[:2] for p in (REPO_DIR / "spec" / "done").glob("*.md")}
+    stale = stale_docs((REPO_DIR / "ROADMAP.md").read_text(encoding="utf-8"),
+                       (REPO_DIR / "spec" / "README.md").read_text(encoding="utf-8"), done_specs)
+    for item in stale:
+        # The version to write: the release that really shipped it, else the one being made.
+        item["version"] = released_in(item["spec"]) or nxt or "vNEXT"
     return {
         "latest": latest,
         "latest_date": since_utc,
         "bump": bump,
-        "next": next_version(latest, bump) if bump else None,
+        "next": nxt,
         "prs": prs,
         "commits_since": commits.splitlines() if commits else [],
         "specs_to_move": specs_to_move(planned, merged_specs,
                                        lambda f: (REPO_DIR / f).read_text(encoding="utf-8")),
         "vnext_files": vnext_files(),
+        "stale_docs": stale,
     }
 
 
