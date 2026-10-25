@@ -1,3 +1,4 @@
+// aircraft_names: airline from callsign prefix, friendly type names. CLAUDE.md "Code conventions" (aircraft_names).
 #include <unity.h>
 
 #include <cstring>
@@ -6,8 +7,7 @@
 #include "aircraft_names.h"
 #include "lcars_theme.h"  // isFontSafeText()
 
-void setUp(void) {}
-void tearDown(void) {}
+namespace {
 
 // ---- airline from callsign ---------------------------------------------------
 
@@ -70,8 +70,9 @@ static void test_tables_unique_font_safe_and_short(void) {
   TEST_ASSERT_TRUE(typeTableSize() > 60);
 }
 
-int main(int, char **) {
-  UNITY_BEGIN();
+}  // namespace
+
+void run_aircraft_names_tests() {
 
   RUN_TEST(test_airline_from_callsign_prefix);
   RUN_TEST(test_airline_needs_a_digit_after_the_prefix);
@@ -80,5 +81,4 @@ int main(int, char **) {
   RUN_TEST(test_unknown_type_is_null);
   RUN_TEST(test_tables_unique_font_safe_and_short);
 
-  return UNITY_END();
 }

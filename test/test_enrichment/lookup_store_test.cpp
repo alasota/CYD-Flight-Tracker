@@ -1,3 +1,4 @@
+// lookup_store: NVS record encode / decode of the lookup caches. CLAUDE.md "Code conventions" (lookup_store).
 #include <unity.h>
 
 #include <string>
@@ -6,12 +7,7 @@
 #include "lookup_store.h"
 #include "route_lookup.h"
 
-void setUp(void) {
-  aircraftLookupClearCacheForTesting();
-  routeLookupClearCacheForTesting();
-  airportLookupClearCacheForTesting();
-}
-void tearDown(void) {}
+namespace {
 
 // ---- round trips ----------------------------------------------------------------
 
@@ -107,8 +103,9 @@ static void test_seeded_entries_count_as_cached(void) {
   TEST_ASSERT_TRUE(airportLookupIsCached("LTAI"));
 }
 
-int main(int, char **) {
-  UNITY_BEGIN();
+}  // namespace
+
+void run_lookup_store_tests() {
 
   RUN_TEST(test_aircraft_round_trip);
   RUN_TEST(test_confirmed_miss_round_trips_too);
@@ -118,5 +115,4 @@ int main(int, char **) {
   RUN_TEST(test_separator_inside_a_value_does_not_break_the_record);
   RUN_TEST(test_seeded_entries_count_as_cached);
 
-  return UNITY_END();
 }

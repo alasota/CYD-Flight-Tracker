@@ -1,3 +1,4 @@
+// place_names: IATA -> city table, asciiFold(). CLAUDE.md "Code conventions" (place_names).
 #include <unity.h>
 
 #include <cstring>
@@ -6,8 +7,7 @@
 #include "lcars_theme.h"  // isFontSafeText()
 #include "place_names.h"
 
-void setUp(void) {}
-void tearDown(void) {}
+namespace {
 
 // ---- asciiFold ---------------------------------------------------------------
 
@@ -119,8 +119,9 @@ static void test_place_name_falls_back_to_codes(void) {
   TEST_ASSERT_EQUAL_STRING("XQQQ", placeName(unknown, "XQQQ", Language::EN).c_str());
 }
 
-int main(int, char **) {
-  UNITY_BEGIN();
+}  // namespace
+
+void run_place_names_tests() {
 
   RUN_TEST(test_fold_keeps_plain_ascii);
   RUN_TEST(test_fold_en_dash_to_hyphen);
@@ -139,5 +140,4 @@ int main(int, char **) {
   RUN_TEST(test_place_name_falls_back_to_short_airport_name);
   RUN_TEST(test_place_name_falls_back_to_codes);
 
-  return UNITY_END();
 }

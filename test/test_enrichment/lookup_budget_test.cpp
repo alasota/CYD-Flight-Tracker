@@ -1,11 +1,11 @@
+// lookup_budget: per-poll lookup budget planning. CLAUDE.md "Screen 1" (lookup budget).
 #include <unity.h>
 
 #include <set>
 
 #include "lookup_budget.h"
 
-void setUp(void) {}
-void tearDown(void) {}
+namespace {
 
 static std::function<bool(const std::string &)> cachedSet(std::set<std::string> keys) {
   return [keys](const std::string &k) { return keys.count(k) > 0; };
@@ -113,8 +113,9 @@ static void test_empty_priority_list_is_empty_plan(void) {
   TEST_ASSERT_EQUAL_size_t(0, plan.callsigns.size());
 }
 
-int main(int, char **) {
-  UNITY_BEGIN();
+}  // namespace
+
+void run_lookup_budget_tests() {
   RUN_TEST(test_new_fetches_are_capped_at_budget);
   RUN_TEST(test_cache_hits_are_always_included_and_free);
   RUN_TEST(test_cache_hits_do_not_consume_budget);
@@ -122,5 +123,4 @@ int main(int, char **) {
   RUN_TEST(test_empty_callsign_is_skipped_and_not_charged);
   RUN_TEST(test_duplicate_keys_are_deduped);
   RUN_TEST(test_empty_priority_list_is_empty_plan);
-  return UNITY_END();
 }

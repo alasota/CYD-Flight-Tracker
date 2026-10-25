@@ -1,14 +1,12 @@
+// route_lookup: hexdb.io route / airport parsing + caches. CLAUDE.md "Route & airport lookup".
 #include <unity.h>
 
 #include "route_lookup.h"
 
+namespace {
+
 // Both caches are shared static state across the whole test binary —
 // reset them before every test so cases don't leak into each other.
-void setUp(void) {
-  routeLookupClearCacheForTesting();
-  airportLookupClearCacheForTesting();
-}
-void tearDown(void) {}
 
 // ---- parseRouteLookupResponse ----------------------------------------------
 
@@ -221,8 +219,9 @@ static void test_airport_is_cached_after_lookup(void) {
   TEST_ASSERT_FALSE(airportLookupIsCached("LIRF"));
 }
 
-int main(int argc, char **argv) {
-  UNITY_BEGIN();
+}  // namespace
+
+void run_route_lookup_tests() {
 
   RUN_TEST(test_parse_route_splits_origin_dest);
   RUN_TEST(test_parse_route_not_found);
@@ -248,5 +247,4 @@ int main(int argc, char **argv) {
   RUN_TEST(test_route_is_cached_reflects_confirmed_results_only);
 
   RUN_TEST(test_airport_is_cached_after_lookup);
-  return UNITY_END();
 }

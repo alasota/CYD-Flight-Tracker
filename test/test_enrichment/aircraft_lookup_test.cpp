@@ -1,11 +1,12 @@
+// aircraft_lookup: hexdb.io aircraft parsing + cache. CLAUDE.md "Aircraft identification".
 #include <unity.h>
 
 #include "aircraft_lookup.h"
 
+namespace {
+
 // The cache is shared static state across the whole test binary — reset it
 // before every test so cases don't leak into each other.
-void setUp(void) { aircraftLookupClearCacheForTesting(); }
-void tearDown(void) {}
 
 // ---- parseAircraftLookupResponse ----------------------------------------
 
@@ -159,8 +160,9 @@ static void test_is_cached_reflects_confirmed_results_only(void) {
   TEST_ASSERT_FALSE(aircraftLookupIsCached("abcdef"));  // a failed attempt does not
 }
 
-int main(int argc, char **argv) {
-  UNITY_BEGIN();
+}  // namespace
+
+void run_aircraft_lookup_tests() {
 
   RUN_TEST(test_parse_found_response);
   RUN_TEST(test_parse_not_found_response);
@@ -176,5 +178,4 @@ int main(int argc, char **argv) {
 
   RUN_TEST(test_is_cached_reflects_confirmed_results_only);
 
-  return UNITY_END();
 }
