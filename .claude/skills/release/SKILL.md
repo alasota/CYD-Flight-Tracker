@@ -66,6 +66,9 @@ Otherwise skip to §5.
    `.feature`) to `spec/done/`, fixes links to them, replaces `vNEXT`, sets ROADMAP / spec status /
    `spec/README.md` to the version, and updates `site/` / README only where a released feature
    isn't described yet. It commits: `Release <next>: specs to done, version in roadmap and docs`.
+   The PR's last commit must keep the subject `Release <next>: …` (a fixup gets the same prefix):
+   `site.yml` skips the push deploy by it and leaves the page to `release.yml`, whose installer
+   carries this release's firmware.
 3. Check the diff yourself (`git diff origin/main...HEAD`): no placeholder left
    (`python tools/release_plan.py` → `"vnext_files": []` and `"stale_docs": []`), `python tools/check_bdd.py` clean,
    `tools/build_site.py`'s `parse_roadmap` still reads ROADMAP.md, nothing but docs changed.

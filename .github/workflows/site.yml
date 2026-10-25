@@ -6,6 +6,13 @@
 #   just points to the Releases page.
 # - Called from release.yml: gets the firmware built in that same run
 #   (input firmware-artifact).
+# - Not on the push of a release commit to main (subject "Release v…", the
+#   merged release PR): at that moment the latest GitHub Release is still the
+#   previous version (the tag comes after the merge), so this run would publish
+#   the old installer. release.yml publishes the page for that commit, with
+#   that release's firmware. (Don't test github.event_name here: in a
+#   workflow_call from release.yml it is the caller's tag push, whose head
+#   commit is the same release commit.)
 name: Site
 
 on:
@@ -37,6 +44,8 @@ concurrency:
 
 jobs:
   build:
+    # Skips the push deploy of a release commit (see the top); deploy needs build.
+    if: ${{ github.ref != 'refs/heads/main' || !startsWith(github.event.head_commit.message, 'Release v') }}
     runs-on: ubuntu-24.04  # pinned, not ubuntu-latest (moving to 26.04): switch deliberately
     steps:
       - name: Check out (full history + tags, for the changelog)
