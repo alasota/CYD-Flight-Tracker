@@ -2,6 +2,7 @@
 #include <unity.h>
 
 #include "opensky_quota.h"
+#include "test_support.h"
 
 namespace {
 
@@ -23,7 +24,7 @@ static void test_parse_header(void) {
 
 static void test_ok_answer_reports_remaining_credits(void) {
   OpenSkyQuota q = updateQuota(OpenSkyQuota{}, 200, "3971", "", 5000);
-  TEST_ASSERT_TRUE(q.state == State::Available);
+  ASSERT_ENUM_EQ(State::Available, q.state);
   TEST_ASSERT_EQUAL_UINT32(3971u, q.remaining);
   TEST_ASSERT_EQUAL_UINT32(5000u, q.observed_ms);
 }
@@ -31,37 +32,37 @@ static void test_ok_answer_reports_remaining_credits(void) {
 static void test_ok_answer_without_header_keeps_what_we_knew(void) {
   OpenSkyQuota known = updateQuota(OpenSkyQuota{}, 200, "100", "", 0);
   OpenSkyQuota q = updateQuota(known, 200, "", "", 1000);
-  TEST_ASSERT_TRUE(q.state == State::Available);
+  ASSERT_ENUM_EQ(State::Available, q.state);
   TEST_ASSERT_EQUAL_UINT32(100u, q.remaining);
 
-  TEST_ASSERT_TRUE(updateQuota(OpenSkyQuota{}, 200, "", "", 0).state == State::Unknown);
+  ASSERT_ENUM_EQ(State::Unknown, updateQuota(OpenSkyQuota{}, 200, "", "", 0).state);
 }
 
 static void test_429_marks_exhausted_with_the_real_wait(void) {
   // Not clamped like the client's backoff (3600 s): this is for showing
   // when the pool really renews.
   OpenSkyQuota q = updateQuota(updateQuota(OpenSkyQuota{}, 200, "5", "", 0), 429, "", "25012", 9000);
-  TEST_ASSERT_TRUE(q.state == State::Exhausted);
+  ASSERT_ENUM_EQ(State::Exhausted, q.state);
   TEST_ASSERT_EQUAL_UINT32(0u, q.remaining);
   TEST_ASSERT_EQUAL_UINT32(25012u, q.reset_in_s);
   TEST_ASSERT_EQUAL_UINT32(9000u, q.observed_ms);
 
   OpenSkyQuota noHeader = updateQuota(OpenSkyQuota{}, 429, "", "", 0);
-  TEST_ASSERT_TRUE(noHeader.state == State::Exhausted);
+  ASSERT_ENUM_EQ(State::Exhausted, noHeader.state);
   TEST_ASSERT_EQUAL_UINT32(0u, noHeader.reset_in_s);
 }
 
 static void test_pool_back_after_exhaustion(void) {
   OpenSkyQuota ex = updateQuota(OpenSkyQuota{}, 429, "", "60", 0);
-  TEST_ASSERT_TRUE(updateQuota(ex, 200, "4000", "", 70000).state == State::Available);
-  TEST_ASSERT_TRUE(updateQuota(ex, 200, "", "", 70000).state == State::Unknown);
+  ASSERT_ENUM_EQ(State::Available, updateQuota(ex, 200, "4000", "", 70000).state);
+  ASSERT_ENUM_EQ(State::Unknown, updateQuota(ex, 200, "", "", 70000).state);
 }
 
 static void test_other_answers_change_nothing(void) {
   OpenSkyQuota known = updateQuota(OpenSkyQuota{}, 200, "321", "", 0);
   for (int code : {401, 403, 500, 503, -1}) {
     OpenSkyQuota q = updateQuota(known, code, "1", "1", 99);
-    TEST_ASSERT_TRUE(q.state == State::Available);
+    ASSERT_ENUM_EQ(State::Available, q.state);
     TEST_ASSERT_EQUAL_UINT32(321u, q.remaining);
   }
 }
