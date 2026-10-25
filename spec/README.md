@@ -16,7 +16,7 @@ wtedy też poprawić odnośniki `spec/planned/…` w `src/`, CLAUDE.md i testach
 | 05 | [Ograniczone cache hexdb.io](done/05-bounded-lookup-cache.md) | done | v1.4.3 |
 | 06 | [Błąd logowania OpenSky → tryb anonimowy](planned/06-opensky-login-fallback.md) | planned | czeka (po 08) |
 | 07 | [Reorganizacja testów](done/07-test-reorganization.md) | done | v1.4.2 |
-| 08 | [Ostrzeżenia urządzenia („!”)](done/08-device-alerts.md) | done | v1.5.0 |
+| 08 | [Ostrzeżenia urządzenia („!”)](done/08-device-alerts.md) | done | v1.5.1 |
 | 09 | [Odporność: zrzut ekranu, komendy, WWW w trakcie lookupów](planned/09-concurrency-robustness.md) | planned | czeka |
 | 10 | [Bezpieczeństwo panelu WWW](planned/10-web-panel-security.md) | planned | czeka |
 | 11 | [Porządki: martwy kod, komentarze, dokumentacja](planned/11-cleanup-dead-code-docs.md) | planned | czeka |
