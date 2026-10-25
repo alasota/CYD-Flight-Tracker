@@ -744,6 +744,10 @@ static void test_login_failed_warning_with_code_time_and_retry(void) {
   const size_t cid = h.find("name=\"client_id\"");
   TEST_ASSERT_TRUE(pill != std::string::npos && warn != std::string::npos && pill < warn &&
                    warn < cid);
+  // The generic "without an account: 400" hint would only repeat the warning.
+  ASSERT_NOT_CONTAINS(h, "Bez konta wyświetlacz działa anonimowo");
+  ASSERT_NOT_CONTAINS(render(authModel(OpenSkyAuthState::Mode::LoginFailed, Language::EN)),
+                      "Without an account the display runs anonymously");
 
   ASSERT_STR_EQ("OpenSky rejected the client_id / client_secret (HTTP 401, since 25.10.2026 "
                 "14:32). The device runs anonymously: a limit of 400 credits a day instead of "
@@ -777,6 +781,9 @@ static void test_no_login_warning_unless_failed(void) {
       ASSERT_NOT_CONTAINS(h, "class=\"pill err\"");
       ASSERT_NOT_CONTAINS(h, "OpenSky odrzucił");
       ASSERT_NOT_CONTAINS(h, "OpenSky rejected");
+      // ...and the generic hint about the account's trade-off is there.
+      ASSERT_CONTAINS(h, lang == Language::PL ? "Bez konta wyświetlacz działa anonimowo"
+                                              : "Without an account the display runs anonymously");
     }
   }
 }
@@ -832,6 +839,25 @@ static void test_login_failed_detail_across_millis_rollover(void) {
   const std::string text = loginFailedDetailText(s, now, kSince + 180, Language::EN);
   ASSERT_CONTAINS(text, "(HTTP 401, since 25.10.2026 14:32).");
   ASSERT_CONTAINS(text, "attempt in 27 min.");
+}
+
+// Edge case (review): a series older than kLoginFailedSinceMaxMs — or one
+// marked stale because millis() may have wrapped past it — leaves "since" out
+// instead of showing a date weeks too late.
+static void test_login_failed_detail_omits_since_when_too_old(void) {
+  OpenSkyAuthState s = authModel(OpenSkyAuthState::Mode::LoginFailed, Language::EN).auth;
+  const uint32_t now = s.failedSinceMs + kLoginFailedSinceMaxMs;  // right at the bound: shown
+  s.nextTokenTryMs = now + 60000u;
+  ASSERT_CONTAINS(loginFailedDetailText(s, now, kSince + 600, Language::EN), "(HTTP 401, since ");
+  // One ms past it: left out.
+  std::string text = loginFailedDetailText(s, now + 1u, kSince + 600, Language::EN);
+  ASSERT_CONTAINS(text, "(HTTP 401).");
+  ASSERT_NOT_CONTAINS(text, "since");
+  // Stale (the age looks small again after a wrap): left out too.
+  s.failedSinceStale = true;
+  text = loginFailedDetailText(s, s.failedSinceMs + 60000u, kSince + 600, Language::PL);
+  ASSERT_CONTAINS(text, "(HTTP 401).");
+  ASSERT_NOT_CONTAINS(text, ", od ");
 }
 
 // Edge case: the live estimate's script learns about LoginFailed through data-lf.
@@ -903,6 +929,7 @@ void run_config_page_tests() {
   RUN_TEST(test_just_saved_credentials_show_account);
   RUN_TEST(test_login_failed_detail_minutes_round_up);
   RUN_TEST(test_login_failed_detail_across_millis_rollover);
+  RUN_TEST(test_login_failed_detail_omits_since_when_too_old);
   RUN_TEST(test_login_failed_marks_live_estimate);
   RUN_TEST(test_login_failed_pill_style);
 }

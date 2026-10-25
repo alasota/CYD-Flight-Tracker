@@ -41,18 +41,29 @@ OpenSkyAuthState onTokenResult(const OpenSkyAuthState &s, TokenOutcome o, int ht
                                uint32_t nowMs) {
   OpenSkyAuthState out = s;
   if (s.mode == OpenSkyAuthState::Mode::NoCredentials) return out;
+  // A long series: remember that "since" can't be trusted before millis()
+  // wraps past it (token results come every 30 min while polling).
+  if (s.mode == OpenSkyAuthState::Mode::LoginFailed && !loginFailedSinceKnown(s, nowMs)) {
+    out.failedSinceStale = true;
+  }
   switch (o) {
     case TokenOutcome::Ok:
       out.mode = OpenSkyAuthState::Mode::Account;
       out.lastHttpCode = 0;
       out.failedSinceMs = 0;
       out.nextTokenTryMs = 0;
+      out.tokenGranted = true;
+      out.failedSinceStale = false;
       break;
     case TokenOutcome::Rejected:
       // The first rejection of a series sets "since when"; later ones keep it.
-      if (s.mode != OpenSkyAuthState::Mode::LoginFailed) out.failedSinceMs = nowMs;
+      if (s.mode != OpenSkyAuthState::Mode::LoginFailed) {
+        out.failedSinceMs = nowMs;
+        out.failedSinceStale = false;
+      }
       out.mode = OpenSkyAuthState::Mode::LoginFailed;
       out.lastHttpCode = httpCode;
+      out.tokenGranted = false;
       out.nextTokenTryMs = nowMs + kLoginRetryMs;  // wraps like millis() does
       break;
     case TokenOutcome::Transient:
@@ -62,6 +73,11 @@ OpenSkyAuthState onTokenResult(const OpenSkyAuthState &s, TokenOutcome o, int ht
       break;
   }
   return out;
+}
+
+bool loginFailedSinceKnown(const OpenSkyAuthState &s, uint32_t nowMs) {
+  return s.mode == OpenSkyAuthState::Mode::LoginFailed && !s.failedSinceStale &&
+         nowMs - s.failedSinceMs <= kLoginFailedSinceMaxMs;  // unsigned: wrap-safe up to ~49.7 days
 }
 
 bool shouldTryToken(const OpenSkyAuthState &s, uint32_t nowMs) {
@@ -94,14 +110,15 @@ StatesDecision afterStatesResponse(const OpenSkyAuthState &s, int httpCode, bool
 }
 
 std::string authChangeLogLine(const OpenSkyAuthState &prev, const OpenSkyAuthState &next) {
-  if (prev.mode == next.mode) return {};
-  if (next.mode == OpenSkyAuthState::Mode::LoginFailed) {
+  if (prev.mode != OpenSkyAuthState::Mode::LoginFailed &&
+      next.mode == OpenSkyAuthState::Mode::LoginFailed) {
     return "login failed (http=" + std::to_string(next.lastHttpCode) +
            ") — check client_id/secret; using anonymous access, next try in " +
            std::to_string(kLoginRetryMs / 60000u) + " min";
   }
-  if (prev.mode == OpenSkyAuthState::Mode::LoginFailed &&
-      next.mode == OpenSkyAuthState::Mode::Account) {
+  // Only a granted token proves the login works: a credentials change
+  // (LoginFailed -> Account without a token yet) says nothing so far.
+  if (next.mode == OpenSkyAuthState::Mode::Account && next.tokenGranted && !prev.tokenGranted) {
     return "login ok — using account";
   }
   return {};
