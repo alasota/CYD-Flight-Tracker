@@ -1,7 +1,6 @@
 # Spec 07 — Reorganizacja i poprawa testów natywnych
 
-Z przeglądu kodu 2026-10-25, sekcja 4. Status: **zaimplementowane 2026-10-25**, czeka tylko na zielone CI z `native-asan` (kryterium 6,
-§9); potem `git mv` do `spec/done/`.
+Z przeglądu kodu 2026-10-25, sekcja 4. Status: **zrobione** 2026-10-25, wydane w v1.4.2 (wyniki w §9).
 
 ## 1. Problem
 
@@ -179,8 +178,9 @@ niewymagane.
 4. Każdy helper zepsuty celowo raz — komunikaty w tabeli `test/README.md` to faktyczne wyjście.
 5. `python tools/screenshots.py` z `-f test_admin`: renderuje, PNG bajtowo identyczne z
    poprzednimi.
-6. CI: **do potwierdzenia po pushu.** Lokalnie ASan się nie da (MinGW, brak WSL); UBSan w trybie
-   trap (`-fsanitize=undefined -fsanitize-trap=all`) — wszystkie 6 suite'ów zielone.
+6. CI zielone (Firmware + Release v1.4.2), w tym krok `native-asan` (ASan + UBSan na Ubuntu).
+   Lokalnie ASan się nie da (MinGW, brak WSL); UBSan w trybie trap
+   (`-fsanitize=undefined -fsanitize-trap=all`) — wszystkie 6 suite'ów zielone.
 
 Uwagi z implementacji:
 - Unity bierze nazwę pliku z `UNITY_BEGIN()` (czyli `main.cpp`), więc każdy `run_…_tests()`

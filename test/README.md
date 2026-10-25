@@ -2,7 +2,7 @@
 
 Pure logic only — no ESP32, no display, no network. Unity, run by PlatformIO on the PC.
 Why the code is split so this works: "Testing" in [CLAUDE.md](../CLAUDE.md).
-How the layout came about: [spec 07](../spec/planned/07-test-reorganization.md).
+How the layout came about: [spec 07](../spec/done/07-test-reorganization.md).
 
 ## Running
 

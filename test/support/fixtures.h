@@ -1,4 +1,4 @@
-// Test data builders shared by the suites (spec/07-test-reorganization.md §4):
+// Test data builders shared by the suites (spec/done/07-test-reorganization.md §4):
 // aircraft, table rows, a configured Config and stub hexdb.io lookup ports.
 #pragma once
 

@@ -1,5 +1,5 @@
 // Shared assertions and the per-test reset for the native suites
-// (spec/07-test-reorganization.md §3.1, §4). Header-only: every suite's
+// (spec/done/07-test-reorganization.md §3.1, §4). Header-only: every suite's
 // main.cpp and *_test.cpp include it via `-I test/support`.
 #pragma once
 

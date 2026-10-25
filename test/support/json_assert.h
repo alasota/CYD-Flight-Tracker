@@ -1,5 +1,5 @@
 // JSON checks by path instead of by exact text, so whitespace and key order
-// don't matter (spec/07-test-reorganization.md §4). Paths are dot-separated
+// don't matter (spec/done/07-test-reorganization.md §4). Paths are dot-separated
 // object keys: "general.update_check".
 #pragma once
 
