@@ -1,6 +1,6 @@
 # Spec 06 — Błąd logowania OpenSky: tryb anonimowy + komunikat w panelu
 
-Z przeglądu kodu 2026-10-25, punkt 1.2. Status: **zrobione 2026-10-25** (logika i panel; sprawdzenie na płytce — scenariusze `@manual` w PR).
+Z przeglądu kodu 2026-10-25, punkt 1.2. Status: **zrobione** 2026-10-25, wydane w v1.6.0 (logika i panel; sprawdzenie na płytce — scenariusze `@manual` w PR #3).
 
 ## 1. Problem
 
