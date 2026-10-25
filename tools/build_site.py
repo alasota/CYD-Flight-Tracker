@@ -7,8 +7,10 @@ Copies site/ (the page itself) plus the README's images (docs/screenshots,
 docs/icons), and fills the page's "What's next" section from ROADMAP.md (in
 place of the <!-- ROADMAP --> marker in site/index.html) and the current
 version + changelog from git (<!-- VERSION --> / <!-- CHANGELOG -->): one entry
-per v* tag, listing the commit subjects since the previous tag — so it needs a
-checkout with full history and tags. With --firmware it also adds firmware/ for the in-browser
+per minor version (v1.6 = v1.6.0 … v1.6.4), led by ROADMAP.md's "Done in vX.Y.Z"
+items, with the commit subjects since the previous release folded below — so it
+needs a checkout with full history and tags. The pure part is tested by
+tools/test_build_site.py. With --firmware it also adds firmware/ for the in-browser
 installer (ESP Web Tools): the four flash parts and a manifest.json naming the
 version.
 
@@ -131,12 +133,9 @@ def releases():
     """[(tag, date, [commit subjects]), ...], newest first: one entry per v* release
     tag, with the non-merge commits since the previous one (all history for the first).
     Development versions (v1.3.0-rc.1 — any tag with a "-") get no entry of their
-    own: their commits land in the next release's."""
-    tags = [t for t in git("tag", "--list", "v*", "--sort=-v:refname").splitlines()
-            if t and "-" not in t]
+    own: their commits land in the next release's (release_ranges())."""
     out = []
-    for i, tag in enumerate(tags):
-        rng = tag if i == len(tags) - 1 else "%s..%s" % (tags[i + 1], tag)
+    for tag, rng in release_ranges(git("tag", "--list", "v*").splitlines()):
         subjects = [s for s in git("log", "--no-merges", "--format=%s", rng).splitlines() if s]
         out.append((tag, git("log", "-1", "--format=%cs", tag), subjects))
     return out
@@ -154,47 +153,146 @@ def both(en, pl):
 Group = collections.namedtuple("Group", "minor tags date subjects prev_tag")
 
 
+STABLE_TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+DONE_IN = re.compile(r"^Done in (v\d+\.\d+\.\d+)\b")
+# Behind-the-scenes commits (tests, docs, specs, harness, release tooling): greyed in the
+# changelog, not hidden. Case-sensitive: "Fix: …" is a user-visible fix, "fix" alone isn't.
+CHORE = re.compile(r"^(Tests?\b|Docs?\b|Plan and BDD|Specs? ?\d|Spec/|/release|/fix|Release plan"
+                   r"|Harness|Python bytecode|fix$)")
+CHANGELOG_OPEN = 2  # newest groups shown open; older ones fold to one line
+
+
 def parse_version(tag):
     """'v1.10.2' -> (1, 10, 2); anything else (dev tags, 'v1.6', '1.6.0') -> None."""
-    return None  # TODO(spec 13): stub from test-author
+    m = STABLE_TAG.match(tag)
+    return tuple(int(x) for x in m.groups()) if m else None
 
 
 def release_ranges(tags):
     """All v* tags (any order) -> [(tag, git range)], newest first, stable tags only;
-    the oldest gets the tag alone (all history)."""
-    return []  # TODO(spec 13): stub from test-author
+    the oldest gets the tag alone (all history). A development tag (v1.6.4-dev.11) gets
+    no range of its own: its commits land in the next release's."""
+    stable = sorted((t for t in tags if parse_version(t)), key=parse_version, reverse=True)
+    return [(t, t if i == len(stable) - 1 else "%s..%s" % (stable[i + 1], t))
+            for i, t in enumerate(stable)]
 
 
 def group_by_minor(rels):
     """[(tag, date, subjects)] -> [Group], newest minor first (numeric order)."""
-    return []  # TODO(spec 13): stub from test-author
+    rels = sorted((r for r in rels if parse_version(r[0])),
+                  key=lambda r: parse_version(r[0]), reverse=True)
+    groups = []  # [minor, tags, date, subjects]
+    for tag, date, subjects in rels:
+        minor = "v%d.%d" % parse_version(tag)[:2]
+        if not groups or groups[-1][0] != minor:
+            groups.append([minor, [], date, []])
+        groups[-1][1].append(tag)
+        groups[-1][3].extend(subjects)
+    return [Group(minor, tags, date, subjects, groups[i + 1][1][0] if i + 1 < len(groups) else None)
+            for i, (minor, tags, date, subjects) in enumerate(groups)]
 
 
 def roadmap_done_by_version(sections):
     """parse_roadmap() output -> {"v1.4": [(version, (item_en, item_pl)), ...]}: rows of
-    the Done section whose verdict starts with "Done in vX.Y.Z", sorted by version."""
-    return {}  # TODO(spec 13): stub from test-author
+    the Done section whose verdict starts with "Done in vX.Y.Z", sorted by version.
+    "Done in vNEXT" (split_cell made it "Done in the next release") matches nothing."""
+    out = {}
+    for name, columns, rows in sections:
+        if name != "Done" or "Item" not in columns or "Verdict" not in columns:
+            continue
+        item_i, verdict_i = columns.index("Item"), columns.index("Verdict")
+        for row in rows:
+            if len(row) <= max(item_i, verdict_i):
+                continue
+            m = DONE_IN.match(row[verdict_i][0])
+            if m:
+                version = m.group(1)
+                out.setdefault("v%d.%d" % parse_version(version)[:2], []).append((version, row[item_i]))
+    for items in out.values():
+        items.sort(key=lambda it: parse_version(it[0]))
+    return out
 
 
 def is_chore(subject):
     """True for behind-the-scenes commits (tests, docs, specs, harness, release)."""
-    return False  # TODO(spec 13): stub from test-author
+    return bool(CHORE.match(subject))
 
 
 def format_date(iso):
     """'2026-10-25' -> '25.10.2026'; '' stays ''."""
-    return ""  # TODO(spec 13): stub from test-author
+    parts = iso.split("-")
+    return ".".join(reversed(parts)) if len(parts) == 3 else iso
 
 
 def done_version(verdict_en, verdict_pl):
     """'Done in v1.6.0: …' -> 'v1.6.0'; an unreleased (vNEXT) row -> ('the next release',
     'następna wersja'); no version -> None."""
-    return None  # TODO(spec 13): stub from test-author
+    m = DONE_IN.match(verdict_en)
+    if m:
+        return m.group(1)
+    if verdict_en.startswith("Done in the next release"):  # split_cell's vNEXT
+        return ("the next release", "następna wersja")
+    return None
+
+
+def esc_both(en, pl):
+    return both(html.escape(en), html.escape(pl))
+
+
+def commit_list_html(group):
+    """<ul> of a group's commits (chores greyed), max CHANGELOG_MAX_ITEMS + "…and N more"."""
+    newest = group.tags[0]
+    items = "".join('<li%s>%s</li>' % (' class="chore"' if is_chore(s) else "", html.escape(s))
+                    for s in group.subjects[:CHANGELOG_MAX_ITEMS])
+    more = len(group.subjects) - CHANGELOG_MAX_ITEMS
+    if more > 0:
+        url = ("%s/compare/%s...%s" % (GITHUB, group.prev_tag, newest) if group.prev_tag
+               else "%s/commits/%s" % (GITHUB, newest))
+        items += '<li class="more"><a href="%s">%s</a></li>' % (
+            url, both("…and %d more" % more, "…i jeszcze %d" % more))
+    return '<ul class="ticks">%s</ul>' % (items or "<li>—</li>")
 
 
 def changelog_html(groups, done_by_minor=None):
-    """HTML of the changelog: one <details> per Group (see the plan)."""
-    return ""  # TODO(spec 13): stub from test-author
+    """HTML of the changelog: one <details class="card"> per minor version. The summary
+    has the version, the release range, the newest release's date, the number of commits
+    and the release / diff links; a folded group also shows its first roadmap item (or
+    the count) in one line. Inside: the group's "Done in vX.Y.Z" roadmap items (linking
+    to #roadmap), then its commits folded under "Commits (N)" — or, for a group with no
+    roadmap items, the commits directly."""
+    if not groups:
+        return '<p class="muted center">%s</p>' % both("No releases yet.", "Jeszcze nic nie wydano.")
+    done_by_minor = done_by_minor or {}
+    blocks = []
+    for i, g in enumerate(groups):
+        newest, n = g.tags[0], len(g.subjects)
+        count = both("%d change(s)" % n, "zmian: %d" % n)
+        items = [item for _, item in done_by_minor.get(g.minor, [])]
+        is_open = i < CHANGELOG_OPEN
+        span = newest if len(g.tags) == 1 else "%s – %s" % (g.tags[-1], newest)
+        meta = [html.escape(span)] + ([html.escape(format_date(g.date))] if g.date else [])
+        preview = ""
+        if is_open or items:
+            meta.append(count)
+        if not is_open:
+            preview = '<span class="first-item">%s</span>' % (esc_both(*items[0]) if items else count)
+        links = '<a href="%s/releases/tag/%s">%s</a>' % (GITHUB, newest, both("release", "wydanie"))
+        if g.prev_tag:
+            links += ' · <a href="%s/compare/%s...%s">%s</a>' % (
+                GITHUB, g.prev_tag, newest, both("diff", "różnice"))
+        summary = ('<summary><b>%s</b> <span class="muted">%s</span>%s'
+                   '<span class="links-r">%s</span></summary>' % (
+                       html.escape(g.minor), " · ".join(meta), preview, links))
+        if items:
+            body = '<ul class="ticks items">%s</ul>' % "".join(
+                '<li><a href="#roadmap">%s</a></li>' % esc_both(en, pl) for en, pl in items)
+            body += '<details class="commits"><summary>%s</summary>%s</details>' % (
+                both("Commits (%d)" % n, "Commity (%d)" % n), commit_list_html(g))
+        else:
+            body = commit_list_html(g)
+        blocks.append('<details class="card"%s>%s%s</details>' % (
+            " open" if is_open else "", summary, body))
+    return '<div class="changelog">%s</div>' % "".join(blocks)
 
 
 def version_html(rels):
@@ -205,33 +303,6 @@ def version_html(rels):
         both("Current version", "Aktualna wersja"), html.escape(tag), html.escape(date))
 
 
-def legacy_changelog_html(rels):
-    # TODO(spec 13): the pre-spec-13 changelog, kept so the site still builds until
-    # changelog_html(groups, done_by_minor) is implemented — remove then.
-    if not rels:
-        return '<p class="muted center">%s</p>' % both("No releases yet.", "Jeszcze nic nie wydano.")
-    blocks = []
-    for i, (tag, date, subjects) in enumerate(rels):
-        prev = rels[i + 1][0] if i + 1 < len(rels) else None
-        items = "".join("<li>%s</li>" % html.escape(s) for s in subjects[:CHANGELOG_MAX_ITEMS])
-        more = len(subjects) - CHANGELOG_MAX_ITEMS
-        if more > 0:
-            url = "%s/compare/%s...%s" % (GITHUB, prev, tag) if prev else "%s/commits/%s" % (GITHUB, tag)
-            items += '<li class="more"><a href="%s">%s</a></li>' % (
-                url, both("…and %d more" % more, "…i jeszcze %d" % more))
-        links = '<a href="%s/releases/tag/%s">%s</a>' % (GITHUB, tag, both("release", "wydanie"))
-        if prev:
-            links += ' · <a href="%s/compare/%s...%s">%s</a>' % (
-                GITHUB, prev, tag, both("diff", "różnice"))
-        blocks.append(
-            '<details class="card"%s><summary><b>%s</b> <span class="muted">%s · %s</span>'
-            '<span class="links-r">%s</span></summary><ul class="ticks">%s</ul></details>' % (
-                " open" if i == 0 else "", html.escape(tag), html.escape(date),
-                both("%d change(s)" % len(subjects), "zmian: %d" % len(subjects)), links,
-                items or "<li>—</li>"))
-    return '<div class="changelog">%s</div>' % "".join(blocks)
-
-
 def fill_releases(out):
     index = os.path.join(out, "index.html")
     with open(index, encoding="utf-8") as f:
@@ -240,11 +311,15 @@ def fill_releases(out):
         if marker not in page:
             raise SystemExit("index.html has no %s marker" % marker)
     rels = releases()
+    groups = group_by_minor(rels)
+    with open(ROADMAP, encoding="utf-8") as f:
+        done = roadmap_done_by_version(parse_roadmap(f.read()))
     page = page.replace(VERSION_MARKER, version_html(rels))
-    page = page.replace(CHANGELOG_MARKER, legacy_changelog_html(rels))
+    page = page.replace(CHANGELOG_MARKER, changelog_html(groups, done))
     with open(index, "w", encoding="utf-8", newline="\n") as f:
         f.write(page)
-    print("changelog: %d release(s)%s" % (len(rels), ", current " + rels[0][0] if rels else ""))
+    print("changelog: %d release(s) in %d group(s)%s" % (
+        len(rels), len(groups), ", current " + rels[0][0] if rels else ""))
 
 
 def fill_roadmap(out):
