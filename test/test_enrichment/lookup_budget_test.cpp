@@ -4,6 +4,7 @@
 #include <set>
 
 #include "lookup_budget.h"
+#include "test_support.h"
 
 namespace {
 
@@ -13,13 +14,6 @@ static std::function<bool(const std::string &)> cachedSet(std::set<std::string> 
 
 static std::function<bool(const std::string &)> nothingCached() {
   return [](const std::string &) { return false; };
-}
-
-static bool contains(const std::vector<std::string> &v, const std::string &s) {
-  for (const auto &e : v) {
-    if (e == s) return true;
-  }
-  return false;
 }
 
 // ---- budget spending ---------------------------------------------------
@@ -33,9 +27,9 @@ static void test_new_fetches_are_capped_at_budget(void) {
   // 2 new fetches total, shared across both kinds, spent nearest-first.
   size_t total = plan.icao24.size() + plan.callsigns.size();
   TEST_ASSERT_EQUAL_size_t(2, total);
-  TEST_ASSERT_TRUE(contains(plan.icao24, "a1"));
-  TEST_ASSERT_TRUE(contains(plan.callsigns, "CS1"));
-  TEST_ASSERT_FALSE(contains(plan.icao24, "a2"));
+  ASSERT_CONTAINS(plan.icao24, "a1");
+  ASSERT_CONTAINS(plan.callsigns, "CS1");
+  ASSERT_NOT_CONTAINS(plan.icao24, "a2");
 }
 
 static void test_cache_hits_are_always_included_and_free(void) {
@@ -45,12 +39,12 @@ static void test_cache_hits_are_always_included_and_free(void) {
   // a1/CS1 and a3/CS3 cached; only a2/CS2 are new.
   LookupPlan plan = planLookups(pri, cachedSet({"a1", "a3"}), cachedSet({"CS1", "CS3"}), 2);
 
-  TEST_ASSERT_TRUE(contains(plan.icao24, "a1"));
-  TEST_ASSERT_TRUE(contains(plan.icao24, "a3"));
-  TEST_ASSERT_TRUE(contains(plan.icao24, "a2"));  // new, within budget
-  TEST_ASSERT_TRUE(contains(plan.callsigns, "CS1"));
-  TEST_ASSERT_TRUE(contains(plan.callsigns, "CS3"));
-  TEST_ASSERT_TRUE(contains(plan.callsigns, "CS2"));
+  ASSERT_CONTAINS(plan.icao24, "a1");
+  ASSERT_CONTAINS(plan.icao24, "a3");
+  ASSERT_CONTAINS(plan.icao24, "a2");  // new, within budget
+  ASSERT_CONTAINS(plan.callsigns, "CS1");
+  ASSERT_CONTAINS(plan.callsigns, "CS3");
+  ASSERT_CONTAINS(plan.callsigns, "CS2");
 }
 
 static void test_cache_hits_do_not_consume_budget(void) {
@@ -61,8 +55,8 @@ static void test_cache_hits_do_not_consume_budget(void) {
                                 cachedSet({"CACHED1", "CACHED2"}), 2);
 
   // Both new keys still fit — the two cache hits didn't eat the budget.
-  TEST_ASSERT_TRUE(contains(plan.icao24, "new1"));
-  TEST_ASSERT_TRUE(contains(plan.callsigns, "NEW1"));
+  ASSERT_CONTAINS(plan.icao24, "new1");
+  ASSERT_CONTAINS(plan.callsigns, "NEW1");
 }
 
 static void test_zero_budget_returns_only_cache_hits(void) {
@@ -71,7 +65,7 @@ static void test_zero_budget_returns_only_cache_hits(void) {
   LookupPlan plan = planLookups(pri, cachedSet({"a1"}), cachedSet({}), 0);
 
   TEST_ASSERT_EQUAL_size_t(1, plan.icao24.size());
-  TEST_ASSERT_TRUE(contains(plan.icao24, "a1"));
+  ASSERT_CONTAINS(plan.icao24, "a1");
   TEST_ASSERT_EQUAL_size_t(0, plan.callsigns.size());
 }
 
@@ -80,13 +74,13 @@ static void test_empty_callsign_is_skipped_and_not_charged(void) {
 
   LookupPlan plan = planLookups(pri, nothingCached(), nothingCached(), 2);
 
-  TEST_ASSERT_FALSE(contains(plan.callsigns, ""));
+  ASSERT_NOT_CONTAINS(plan.callsigns, "");
   // a1 (icao), a2 (icao), CS2 (route) would be 3 — but budget 2, spent
   // nearest-first: a1, a2. CS2 misses out because the empty callsign
   // didn't waste a slot but a1+a2 filled it.
-  TEST_ASSERT_TRUE(contains(plan.icao24, "a1"));
-  TEST_ASSERT_TRUE(contains(plan.icao24, "a2"));
-  TEST_ASSERT_FALSE(contains(plan.callsigns, "CS2"));
+  ASSERT_CONTAINS(plan.icao24, "a1");
+  ASSERT_CONTAINS(plan.icao24, "a2");
+  ASSERT_NOT_CONTAINS(plan.callsigns, "CS2");
 }
 
 static void test_duplicate_keys_are_deduped(void) {
