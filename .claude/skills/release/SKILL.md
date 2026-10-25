@@ -31,8 +31,15 @@ uncommitted. If `main` can't fast-forward (local commits on main), stop and ask.
 - `prs` — merged into main since `latest`, each with `kind`; `commits_since` — every commit on
   main since `latest` (commits not from a PR are fine, list them).
 - `specs_to_move` — `spec/planned/…` that are done; `vnext_files` — files still saying `vNEXT`.
+- `stale_docs` — docs that still call a finished spec unfinished, **whenever** it was released
+  (ROADMAP row outside "Done" for a spec in `spec/done/`; a `done` row in `spec/README.md`
+  without a version), each with `version` = the release that really shipped it (found from
+  tags), else the one being made. The PR window can't see these: spec 06 sat "In progress" on
+  the project page through v1.6.0-v1.6.3 (implemented before the `vNEXT` rule, v1.6.0 tagged
+  by hand).
 
-`bump` is null and `commits_since` is empty → nothing to release; say so and stop.
+`bump` is null and `commits_since` is empty → nothing to release; say so and stop — unless
+`stale_docs` isn't empty: then offer a docs-only `release/fix-docs` PR (§4 without the tag).
 
 Also check:
 - `main`'s CI is green on its HEAD: `gh run list --workflow firmware.yml --branch main --limit 3
@@ -49,18 +56,18 @@ bump / cancel. A tag is public and triggers the GitHub Release — no tag withou
 
 ## 4. Release PR (only if there is something to update)
 
-Needed when `specs_to_move` or `vnext_files` is non-empty, or a merged feature has no
+Needed when `specs_to_move`, `vnext_files` or `stale_docs` is non-empty, or a merged feature has no
 `## Done` row in ROADMAP.md, or the project page lacks something a released feature changed.
 Otherwise skip to §5.
 
 1. `git switch -c release/<next> origin/main`.
 2. Spawn `docs-writer` in **release mode** with: the version, the PR list (titles, bodies via
-   `gh pr view N --json title,body`), `specs_to_move`, `vnext_files`. It moves the specs (+ their
+   `gh pr view N --json title,body`), `specs_to_move`, `vnext_files`, `stale_docs`. It moves the specs (+ their
    `.feature`) to `spec/done/`, fixes links to them, replaces `vNEXT`, sets ROADMAP / spec status /
    `spec/README.md` to the version, and updates `site/` / README only where a released feature
    isn't described yet. It commits: `Release <next>: specs to done, version in roadmap and docs`.
 3. Check the diff yourself (`git diff origin/main...HEAD`): no placeholder left
-   (`python tools/release_plan.py` → `"vnext_files": []`), `python tools/check_bdd.py` clean,
+   (`python tools/release_plan.py` → `"vnext_files": []` and `"stale_docs": []`), `python tools/check_bdd.py` clean,
    `tools/build_site.py`'s `parse_roadmap` still reads ROADMAP.md, nothing but docs changed.
 4. `git push -u origin release/<next>`;
    `gh pr create --base main --title "Release <next>" --body-file <body>` — body: the version,

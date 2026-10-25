@@ -54,7 +54,7 @@ Nothing to document → write that in `docs.md` and commit nothing. Else commit
 ## Release mode
 
 Input: the version (`vX.Y.Z`), the included PRs (titles, bodies), `specs_to_move`,
-`vnext_files` from `tools/release_plan.py`. On the `release/vX.Y.Z` branch:
+`vnext_files`, `stale_docs` from `tools/release_plan.py`. On the `release/vX.Y.Z` branch:
 
 1. Each spec in `specs_to_move`: `git mv` it and its `.feature` (if any) to `spec/done/`; fix
    links (`grep -rn "planned/NN" --include=*.md --include=*.h --include=*.cpp --include=*.py .`);
@@ -63,6 +63,10 @@ Input: the version (`vX.Y.Z`), the included PRs (titles, bodies), `specs_to_move
 2. `python tools/release_plan.py --fill vX.Y.Z` — replaces every bare placeholder (ROADMAP,
    README, CLAUDE.md, spec/, site/) and lists the files; `` `vNEXT` `` in backticks is text
    about it and stays. Check that `python tools/release_plan.py` now reports `"vnext_files": []`.
+2b. Each `stale_docs` item, with **its own** `version` (an older release that shipped it, not
+   necessarily this one): ROADMAP row → `## Done` (top, next number) with "Done in <version>:
+   <what it does>" (EN + `<!-- pl: Zrobione w <version>: … -->`, from the spec's "Wynik");
+   `spec/README.md` "Stan" → `<version>`; the spec's status line → `wydane w <version>`.
 3. ROADMAP.md: every included feature PR has its `## Done` row with "Done in vX.Y.Z"; add a
    missing one from the PR body (EN + `<!-- pl: -->`), move a leftover "In progress" row. Fixes
    don't get rows. Parse check as above.
