@@ -55,10 +55,12 @@ PL_COMMENT = re.compile(r"<!--\s*pl:\s*(.*?)\s*-->")
 
 
 def split_cell(cell):
-    """(english, polish) of a table cell: text + optional <!-- pl: ... --> comment."""
+    """(english, polish) of a table cell: text + optional <!-- pl: ... --> comment.
+    "vNEXT" (merged, not released yet — /release puts the number in) reads as words."""
     m = PL_COMMENT.search(cell)
     en = PL_COMMENT.sub("", cell).strip()
-    return en, (m.group(1).strip() if m else en)
+    pl = m.group(1).strip() if m else en
+    return en.replace("vNEXT", "the next release"), pl.replace("vNEXT", "następnej wersji")
 
 
 def translate_words(column, text):
