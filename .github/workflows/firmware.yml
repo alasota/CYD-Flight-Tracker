@@ -1,6 +1,7 @@
-# Firmware: native unit tests + build + versioned binaries (uploaded as a
-# build artifact). Runs on pushes to main, on pull requests and by hand; the
-# release workflow (release.yml) also calls it for tags.
+# Firmware: native unit tests + BDD check + build + versioned binaries
+# (uploaded as a build artifact). Runs on pushes to main and by hand; the
+# release workflow (release.yml) calls it for tags and pr.yml for pull
+# requests (with a forced -dev version and the PR's head commit).
 #
 # Output folder (artifact "cyd-sky-tracker-<version>"):
 #   cyd-sky-tracker-<version>.bin       app only — OTA updates, or flashing at 0x10000
@@ -14,9 +15,17 @@ name: Firmware
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      version:
+        description: Force this firmware version (FW_VERSION), e.g. v1.4.3-dev.57; empty = git describe
+        type: string
+        default: ""
+      ref:
+        description: Commit to build; empty = the event's default
+        type: string
+        default: ""
     outputs:
       version:
         description: Firmware version (git describe)
@@ -39,6 +48,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ inputs.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -64,7 +74,15 @@ jobs:
         # Same suites, built with -fsanitize=address,undefined (platformio.ini).
         run: pio test -e native-asan
 
+      - name: BDD scenarios are backed by tests
+        # Every Scenario in spec/**/*.feature names its Unity test or is @manual.
+        run: |
+          python tools/test_check_bdd.py
+          python tools/check_bdd.py
+
       - name: Build firmware
+        env:
+          FW_VERSION: ${{ inputs.version }}  # empty -> git describe (tools/pio_version.py)
         run: pio run -e cyd
 
       - name: Check the OTA firmware marker
