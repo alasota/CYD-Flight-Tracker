@@ -44,6 +44,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </a>
     <nav class="links">
       <a href="#screens"><span class="en">Screens</span><span class="pl">Ekrany</span></a>
+      <a href="#features"><span class="en">Features</span><span class="pl">Funkcje</span></a>
       <a href="#install"><span class="en">Install</span><span class="pl">Instalacja</span></a>
       <a href="#setup"><span class="en">Setup</span><span class="pl">Konfiguracja</span></a>
       <a href="#roadmap"><span class="en">Roadmap</span><span class="pl">Roadmapa</span></a>
@@ -152,6 +153,145 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <span class="en">The exact question everyone at the barbecue asks. Now with pixel art.</span>
     <span class="pl">Dokładnie to pytanie, które pada przy każdym grillu. Teraz w pixel arcie.</span>
   </p>
+</section>
+
+<!-- ============================== features -->
+<section id="features" class="wrap">
+  <h2 class="sec"><span class="en">What else it does</span><span class="pl">Co jeszcze potrafi</span></h2>
+  <div class="features">
+    <article class="card tile">
+      <h3><span class="en">A "!" when something needs you</span><span class="pl">„!”, gdy coś wymaga Twojej uwagi</span></h3>
+      <figure class="tile-shot">
+        <img src="screenshots/alert_screen.png" width="320" height="240" alt="Display: ATTENTION screen listing OpenSky login failed, OpenSky limit reached and polling too often, with a CLOSE button counting down" loading="lazy">
+      </figure>
+      <p class="en">A small red or orange <b>!</b> in the header means something needs you: a
+        rejected OpenSky login, used-up credits, or a poll interval your daily limit can't
+        afford. Tap it and the display tells you what's wrong.</p>
+      <p class="pl">Małe czerwone albo pomarańczowe <b>!</b> w nagłówku znaczy, że coś wymaga
+        Twojej uwagi: odrzucone logowanie OpenSky, zużyte kredyty albo odświeżanie, na które nie
+        stać dziennego limitu. Stuknij je, a wyświetlacz powie, co jest nie tak.</p>
+      <details>
+        <summary><span class="en">More</span><span class="pl">Więcej</span></summary>
+        <p class="en">A typo in the OpenSky secret used to surface hours later as "no flights". Now a
+          small <b>!</b> appears in the header next to the app name: <b>red</b> for an error (OpenSky
+          rejected your login, today's credits are used up), <b>orange</b> for a warning (you're
+          polling more often than your daily limit allows, so it <i>will</i> run out). Tap it and the
+          display says what's wrong in one line each; it closes itself after 15 seconds. The settings
+          page puts the same "!" in a box above the tabs, with the numbers (HTTP code, when the
+          credits come back, the shortest interval that fits) and a link to the tab where you fix it.
+          Fix the cause and the "!" goes away on its own. Nothing to acknowledge.</p>
+        <p class="pl">Literówka w sekrecie OpenSky wychodziła kiedyś po kilku godzinach jako „brak
+          lotów”. Teraz w nagłówku obok nazwy pojawia się małe <b>!</b>: <b>czerwone</b> przy błędzie
+          (OpenSky odrzucił logowanie, dzisiejsze kredyty się skończyły), <b>pomarańczowe</b> przy
+          ostrzeżeniu (odpytujesz częściej, niż pozwala dzienny limit, więc <i>na pewno</i> się
+          skończy). Stuknij je, a wyświetlacz powie w jednej linijce, co jest nie tak; sam się zamknie
+          po 15 sekundach. Strona ustawień pokazuje to samo „!” w ramce nad zakładkami, z liczbami
+          (kod HTTP, kiedy wrócą kredyty, najkrótszy interwał, który się mieści) i linkiem do
+          zakładki, w której to naprawisz. Usuń przyczynę, a „!” zniknie samo. Niczego nie trzeba
+          potwierdzać.</p>
+      </details>
+    </article>
+    <article class="card tile">
+      <h3><span class="en">It asks before it updates itself</span><span class="pl">Sam pyta, zanim się zaktualizuje</span></h3>
+      <figure class="tile-shot">
+        <img src="screenshots/update_prompt.png" width="320" height="240" alt="Display: NEW VERSION AVAILABLE, v1.2.0 → v1.3.0, INSTALL IT? with YES and NO buttons" loading="lazy">
+      </figure>
+      <p class="en">Once a day it checks GitHub for a new version and asks on the screen: YES
+        installs, NO means no. Nothing gets installed without your tap, and a version that
+        misbehaves rolls itself back.</p>
+      <p class="pl">Raz na dobę sprawdza na GitHubie, czy jest nowa wersja, i pyta na ekranie: TAK
+        instaluje, NIE znaczy nie. Bez Twojego stuknięcia nic się nie instaluje, a wersja, która
+        źle się zachowuje, sama się wycofuje.</p>
+      <details>
+        <summary><span class="en">More</span><span class="pl">Więcej</span></summary>
+        <p class="en">Once a day the board asks GitHub whether there's something newer. If there
+          is, the display asks you <b>once</b>: tap <b>YES</b> and a minute later it's running the new
+          version, settings and all; tap <b>NO</b> and it stops bringing that version up. It never
+          installs anything without a YES, and it won't interrupt a plane that's about to pass
+          overhead. The download is checked three ways: a verified HTTPS connection to GitHub only,
+          the file's SHA-256 against the one GitHub lists, and the version inside the file. A
+          version that crashes on start still rolls itself back.</p>
+        <p class="pl">Raz na dobę płytka pyta GitHuba, czy jest coś nowszego. Jeśli jest, wyświetlacz
+          pyta Cię <b>raz</b>: stuknij <b>TAK</b>, a minutę później działa nowa wersja, z wszystkimi
+          ustawieniami; stuknij <b>NIE</b>, a przestanie o tę wersję zagadywać. Nic nie instaluje bez
+          TAK i nie przerwie samolotu, który zaraz przeleci nad głową. Pobrany plik jest sprawdzany
+          na trzy sposoby: zweryfikowane połączenie HTTPS wyłącznie z GitHubem, suma SHA-256 zgodna z
+          tą z GitHuba i wersja zapisana w pliku. Wersja, która wywraca się przy starcie, nadal sama
+          się wycofuje.</p>
+        <p class="en">Prefer clicking? <b>Firmware → Updates from GitHub</b> on the settings page has
+          <i>Check now</i> and <i>Install</i>. Prefer doing it the old way? Download
+          <code>cyd-sky-tracker-&lt;version&gt;.bin</code> from
+          <a href="https://github.com/alasota/CYD-Flight-Tracker/releases/latest">the latest release</a>
+          and upload it on the same tab. Feeling brave? Tick <i>Show development versions</i> and the
+          page also offers test builds (<code>v1.4.0-rc.1</code> and friends), with a warning, never on
+          the display. The daily check can be switched off on the General tab; all it tells GitHub is
+          your IP and the firmware version.</p>
+        <p class="pl">Wolisz klikać? Na stronie ustawień <b>Firmware → Aktualizacje z GitHuba</b> ma
+          <i>Sprawdź teraz</i> i <i>Zainstaluj</i>. Wolisz po staremu? Pobierz
+          <code>cyd-sky-tracker-&lt;wersja&gt;.bin</code> z
+          <a href="https://github.com/alasota/CYD-Flight-Tracker/releases/latest">najnowszego wydania</a>
+          i wgraj go na tej samej zakładce. Lubisz ryzyko? Zaznacz <i>Pokazuj wersje deweloperskie</i>,
+          a strona zaproponuje też wersje testowe (<code>v1.4.0-rc.1</code> i spółka), z ostrzeżeniem,
+          nigdy na wyświetlaczu. Codzienne sprawdzanie wyłączysz na zakładce Ogólne; GitHub dowiaduje
+          się z niego tylko Twojego IP i wersji firmware.</p>
+      </details>
+    </article>
+    <article class="card tile" id="night-mode">
+      <h3><span class="en">It dims itself, and it knows when the sun sets</span><span class="pl">Sam się przyciemnia i wie, kiedy zachodzi słońce</span></h3>
+      <p class="en">A light sensor next to the screen sets the brightness, and at sunset the
+        display drops to a gentle night level. It can also pause the OpenSky requests at night,
+        when nobody's watching anyway.</p>
+      <p class="pl">Czujnik światła obok ekranu ustawia jasność, a o zachodzie słońca wyświetlacz
+        schodzi na łagodny poziom nocny. W nocy może też wstrzymać zapytania do OpenSky, skoro i
+        tak nikt nie patrzy.</p>
+      <details>
+        <summary><span class="en">More</span><span class="pl">Więcej</span></summary>
+        <p class="en">The CYD has a tiny light sensor next to the screen, and now it's put to work:
+          bright by the window, dimmed by the reading lamp, no flicker, no jumps. At sunset (worked
+          out on the board from your home location, no internet needed) the display drops to a gentle
+          10&nbsp;% for the night and comes back at sunrise. Prefer a bedroom-friendly black screen?
+          Set the night brightness to 0&nbsp;%: a tap lights it up for a minute (that tap doesn't
+          switch tabs, it just says hello). Short on OpenSky credits? <i>Pause data fetching at
+          night</i> skips the requests nobody watches. A 15-second poll from 23:00 to 06:30 is
+          1,800 requests a day saved, enough to fit an account's 4,000. A tap still brings fresh
+          planes for the wake time. It's off by default, because some people do watch planes at 2 a.m.</p>
+        <p class="pl">CYD ma obok ekranu malutki czujnik światła i wreszcie ma co robić: przy oknie
+          ekran jest jasny, przy lampce przygaszony, bez migania i skoków. O zachodzie słońca
+          (policzonym na płytce z Twojej lokalizacji, bez internetu) wyświetlacz schodzi na noc do
+          łagodnych 10&nbsp;% i wraca o wschodzie. Wolisz czarny ekran w sypialni? Ustaw jasność w
+          nocy na 0&nbsp;%: dotknięcie zapala go na minutę (ten dotyk nie przełącza zakładek, tylko
+          mówi „cześć”). Brakuje kredytów OpenSky? <i>Wstrzymaj pobieranie danych w nocy</i> pomija
+          zapytania, których nikt nie ogląda. Przy odświeżaniu co 15 s od 23:00 do 6:30 to 1800
+          zapytań mniej na dobę, czyli tyle, żeby zmieścić się w 4000 z konta. Dotknięcie i tak przyniesie
+          świeże samoloty na czas wybudzenia. Domyślnie wyłączone, bo niektórzy oglądają samoloty o
+          drugiej w nocy.</p>
+        <p class="en">All of it lives in <b>General → Display</b>, with a live readout of the sensor
+          and today's sunrise and sunset.</p>
+        <p class="pl">Wszystko jest w <b>Ogólne → Ekran</b>, razem z podglądem czujnika na żywo
+          i dzisiejszymi godzinami wschodu i zachodu.</p>
+      </details>
+    </article>
+    <article class="card tile">
+      <h3><span class="en">A backup, because you'll flash it again</span><span class="pl">Kopia zapasowa, bo i tak wgrasz to jeszcze raz</span></h3>
+      <p class="en">One JSON file with every setting, ready for a clean install, a second board or
+        the morning after an experiment. Restoring it only touches what's in the file.</p>
+      <p class="pl">Jeden plik JSON ze wszystkimi ustawieniami, gotowy na czystą instalację, drugą
+        płytkę albo poranek po eksperymencie. Przywracanie rusza tylko to, co jest w pliku.</p>
+      <details>
+        <summary><span class="en">More</span><span class="pl">Więcej</span></summary>
+        <p class="en">The <b>Backup</b> tab saves every setting to one JSON file and restores it
+          later: after a clean install, on a second board, or after an experiment that seemed like a
+          good idea at the time. Anything missing from the file is left alone. Heads-up: with
+          <i>Include OpenSky credentials</i> ticked, your client secret sits in that file as plain
+          text, so treat it like a password.</p>
+        <p class="pl">Zakładka <b>Kopia</b> zapisuje wszystkie ustawienia do jednego pliku JSON i
+          przywraca je później: po czystej instalacji, na drugiej płytce albo po eksperymencie, który
+          wtedy wydawał się dobrym pomysłem. To, czego nie ma w pliku, zostaje bez zmian. Uwaga: z
+          zaznaczonym <i>Dołącz dane logowania OpenSky</i> sekret klienta leży w pliku zwykłym
+          tekstem, więc traktuj go jak hasło.</p>
+      </details>
+    </article>
+  </div>
 </section>
 
 <!-- ============================== install -->
@@ -264,123 +404,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
   </div>
   <div class="card backup-note">
-    <h3><span class="en">Bonus: a backup, because you'll flash it again</span><span class="pl">Bonus: kopia zapasowa, bo i tak wgrasz to jeszcze raz</span></h3>
-    <p class="en">The <b>Backup</b> tab saves every setting to one JSON file and restores it
-      later: after a clean install, on a second board, or after an experiment that seemed like a
-      good idea at the time. Anything missing from the file is left alone. Heads-up: with
-      <i>Include OpenSky credentials</i> ticked, your client secret sits in that file as plain
-      text, so treat it like a password.</p>
-    <p class="pl">Zakładka <b>Kopia</b> zapisuje wszystkie ustawienia do jednego pliku JSON i
-      przywraca je później: po czystej instalacji, na drugiej płytce albo po eksperymencie, który
-      wtedy wydawał się dobrym pomysłem. To, czego nie ma w pliku, zostaje bez zmian. Uwaga: z
-      zaznaczonym <i>Dołącz dane logowania OpenSky</i> sekret klienta leży w pliku zwykłym
-      tekstem, więc traktuj go jak hasło.</p>
-  </div>
-  <div class="card backup-note update-note">
-    <h3><span class="en">New: a "!" when something needs you</span><span class="pl">Nowość: „!”, gdy coś wymaga Twojej uwagi</span></h3>
-    <figure class="update-shot">
-      <img src="screenshots/alert_screen.png" width="320" height="240" alt="Display: ATTENTION screen listing OpenSky login failed, OpenSky limit reached and polling too often, with a CLOSE button counting down" loading="lazy">
-    </figure>
-    <p class="en">A typo in the OpenSky secret used to surface hours later as "no flights". Now a
-      small <b>!</b> appears in the header next to the app name: <b>red</b> for an error (OpenSky
-      rejected your login, today's credits are used up), <b>orange</b> for a warning (you're
-      polling more often than your daily limit allows, so it <i>will</i> run out). Tap it and the
-      display says what's wrong in one line each; it closes itself after 15 seconds. The settings
-      page puts the same "!" in a box above the tabs, with the numbers (HTTP code, when the
-      credits come back, the shortest interval that fits) and a link to the tab where you fix it.
-      Fix the cause and the "!" goes away on its own. Nothing to acknowledge.</p>
-    <p class="pl">Literówka w sekrecie OpenSky wychodziła kiedyś po kilku godzinach jako „brak
-      lotów”. Teraz w nagłówku obok nazwy pojawia się małe <b>!</b>: <b>czerwone</b> przy błędzie
-      (OpenSky odrzucił logowanie, dzisiejsze kredyty się skończyły), <b>pomarańczowe</b> przy
-      ostrzeżeniu (odpytujesz częściej, niż pozwala dzienny limit, więc <i>na pewno</i> się
-      skończy). Stuknij je, a wyświetlacz powie w jednej linijce, co jest nie tak; sam się zamknie
-      po 15 sekundach. Strona ustawień pokazuje to samo „!” w ramce nad zakładkami, z liczbami
-      (kod HTTP, kiedy wrócą kredyty, najkrótszy interwał, który się mieści) i linkiem do
-      zakładki, w której to naprawisz. Usuń przyczynę, a „!” zniknie samo. Niczego nie trzeba
-      potwierdzać.</p>
-  </div>
-  <div class="card backup-note update-note">
-    <h3><span class="en">It asks before it updates itself</span><span class="pl">Sam pyta, zanim się zaktualizuje</span></h3>
-    <figure class="update-shot">
-      <img src="screenshots/update_prompt.png" width="320" height="240" alt="Display: NEW VERSION AVAILABLE, v1.2.0 → v1.3.0, INSTALL IT? with YES and NO buttons" loading="lazy">
-    </figure>
-    <p class="en">Once a day the board asks GitHub whether there's something newer. If there
-      is, the display asks you <b>once</b>: tap <b>YES</b> and a minute later it's running the new
-      version, settings and all; tap <b>NO</b> and it stops bringing that version up. It never
-      installs anything without a YES, and it won't interrupt a plane that's about to pass
-      overhead. The download is checked three ways: a verified HTTPS connection to GitHub only,
-      the file's SHA-256 against the one GitHub lists, and the version inside the file. A
-      version that crashes on start still rolls itself back.</p>
-    <p class="pl">Raz na dobę płytka pyta GitHuba, czy jest coś nowszego. Jeśli jest, wyświetlacz
-      pyta Cię <b>raz</b>: stuknij <b>TAK</b>, a minutę później działa nowa wersja, z wszystkimi
-      ustawieniami; stuknij <b>NIE</b>, a przestanie o tę wersję zagadywać. Nic nie instaluje bez
-      TAK i nie przerwie samolotu, który zaraz przeleci nad głową. Pobrany plik jest sprawdzany
-      na trzy sposoby: zweryfikowane połączenie HTTPS wyłącznie z GitHubem, suma SHA-256 zgodna z
-      tą z GitHuba i wersja zapisana w pliku. Wersja, która wywraca się przy starcie, nadal sama
-      się wycofuje.</p>
-    <p class="en">Prefer clicking? <b>Firmware → Updates from GitHub</b> on the settings page has
-      <i>Check now</i> and <i>Install</i>. Prefer doing it the old way? Download
-      <code>cyd-sky-tracker-&lt;version&gt;.bin</code> from
-      <a href="https://github.com/alasota/CYD-Flight-Tracker/releases/latest">the latest release</a>
-      and upload it on the same tab. Feeling brave? Tick <i>Show development versions</i> and the
-      page also offers test builds (<code>v1.4.0-rc.1</code> and friends), with a warning, never on
-      the display. The daily check can be switched off on the General tab; all it tells GitHub is
-      your IP and the firmware version.</p>
-    <p class="pl">Wolisz klikać? Na stronie ustawień <b>Firmware → Aktualizacje z GitHuba</b> ma
-      <i>Sprawdź teraz</i> i <i>Zainstaluj</i>. Wolisz po staremu? Pobierz
-      <code>cyd-sky-tracker-&lt;wersja&gt;.bin</code> z
-      <a href="https://github.com/alasota/CYD-Flight-Tracker/releases/latest">najnowszego wydania</a>
-      i wgraj go na tej samej zakładce. Lubisz ryzyko? Zaznacz <i>Pokazuj wersje deweloperskie</i>,
-      a strona zaproponuje też wersje testowe (<code>v1.4.0-rc.1</code> i spółka), z ostrzeżeniem,
-      nigdy na wyświetlaczu. Codzienne sprawdzanie wyłączysz na zakładce Ogólne; GitHub dowiaduje
-      się z niego tylko Twojego IP i wersji firmware.</p>
-  </div>
-  <div class="card backup-note" id="night-mode">
-    <h3><span class="en">New: it dims itself, and it knows when the sun sets</span><span class="pl">Nowość: sam się przyciemnia i wie, kiedy zachodzi słońce</span></h3>
-    <p class="en">The CYD has a tiny light sensor next to the screen, and now it's put to work:
-      bright by the window, dimmed by the reading lamp, no flicker, no jumps. At sunset (worked
-      out on the board from your home location, no internet needed) the display drops to a gentle
-      10&nbsp;% for the night and comes back at sunrise. Prefer a bedroom-friendly black screen?
-      Set the night brightness to 0&nbsp;%: a tap lights it up for a minute (that tap doesn't
-      switch tabs, it just says hello). Short on OpenSky credits? <i>Pause data fetching at
-      night</i> skips the requests nobody watches. A 15-second poll from 23:00 to 06:30 is
-      1,800 requests a day saved, enough to fit an account's 4,000. A tap still brings fresh
-      planes for the wake time. It's off by default, because some people do watch planes at 2 a.m.</p>
-    <p class="pl">CYD ma obok ekranu malutki czujnik światła i wreszcie ma co robić: przy oknie
-      ekran jest jasny, przy lampce przygaszony, bez migania i skoków. O zachodzie słońca
-      (policzonym na płytce z Twojej lokalizacji, bez internetu) wyświetlacz schodzi na noc do
-      łagodnych 10&nbsp;% i wraca o wschodzie. Wolisz czarny ekran w sypialni? Ustaw jasność w
-      nocy na 0&nbsp;%: dotknięcie zapala go na minutę (ten dotyk nie przełącza zakładek, tylko
-      mówi „cześć”). Brakuje kredytów OpenSky? <i>Wstrzymaj pobieranie danych w nocy</i> pomija
-      zapytania, których nikt nie ogląda. Przy odświeżaniu co 15 s od 23:00 do 6:30 to 1800
-      zapytań mniej na dobę, czyli tyle, żeby zmieścić się w 4000 z konta. Dotknięcie i tak przyniesie
-      świeże samoloty na czas wybudzenia. Domyślnie wyłączone, bo niektórzy oglądają samoloty o
-      drugiej w nocy.</p>
-    <p class="en">All of it lives in <b>General → Display</b>, with a live readout of the sensor
-      and today's sunrise and sunset.</p>
-    <p class="pl">Wszystko jest w <b>Ogólne → Ekran</b>, razem z podglądem czujnika na żywo
-      i dzisiejszymi godzinami wschodu i zachodu.</p>
-  </div>
-  <div class="card backup-note" id="dual-core">
-    <h3><span class="en">New: the screen no longer waits for the internet</span><span class="pl">Nowość: ekran już nie czeka na internet</span></h3>
-    <p class="en">The ESP32 has two CPU cores, and until now one of them was mostly twiddling its
-      thumbs. Now core 0 does all the talking (OpenSky, hexdb.io, GitHub, the settings page,
-      updates) and core 1 only draws and listens to your finger. Before, every data refresh froze
-      the screen for about a second, and up to 5.7 seconds when the settings page or the GitHub
-      check joined in. Now the longest pause is about 0.1 s. The settings page opens in 0.1 s
-      instead of 5, aircraft positions show up right after OpenSky answers (airline and route
-      follow a moment later), and lookups for new planes share one connection, so three of them
-      take 3 seconds instead of 8. Curious how it's doing? <code>cyd-sky.local/perf.json</code>.</p>
-    <p class="pl">ESP32 ma dwa rdzenie, a dotąd jeden z nich głównie się nudził. Teraz rdzeń 0
-      zajmuje się całą komunikacją (OpenSky, hexdb.io, GitHub, strona ustawień, aktualizacje),
-      a rdzeń 1 tylko rysuje i słucha palca. Wcześniej każde odświeżenie danych zamrażało ekran na
-      około sekundę, a z otwartą stroną ustawień albo sprawdzaniem GitHuba nawet na 5,7 s. Teraz
-      najdłuższa przerwa to około 0,1 s. Strona ustawień otwiera się w 0,1 s zamiast 5, pozycje
-      samolotów pojawiają się zaraz po odpowiedzi OpenSky (linia i trasa dochodzą chwilę później),
-      a sprawdzanie nowych samolotów idzie jednym połączeniem, więc trzy trwają 3 sekundy
-      zamiast 8. Ciekawi Cię, jak sobie radzi? <code>cyd-sky.local/perf.json</code>.</p>
-  </div>
-  <div class="card backup-note">
     <h3><span class="en">Set a panel password (recommended)</span><span class="pl">Ustaw hasło do panelu (zalecane)</span></h3>
     <p class="en">Out of the box the settings page is open, so the first setup just works. That
       also means anyone on your WiFi can change the settings or flash their own firmware. Fix it in
@@ -429,9 +452,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         literami odchudzone z 1 MB do 4 KB, żeby firmware zmieścił się dwa razy i mógł
         aktualizować się bezprzewodowo.</span></li>
       <li><span class="en">Two CPU cores, two jobs: core 0 argues with the internet, core 1
-        draws. The screen no longer freezes while a server thinks.</span><span class="pl">Dwa
+        draws. The screen no longer freezes while a server thinks: the longest pause is ~0.1 s
+        instead of up to 5.7 s (live numbers: <code>cyd-sky.local/perf.json</code>).</span><span class="pl">Dwa
         rdzenie, dwie role: rdzeń 0 kłóci się z internetem, rdzeń 1 rysuje. Ekran już nie zamiera,
-        kiedy serwer się zastanawia.</span></li>
+        kiedy serwer się zastanawia: najdłuższa przerwa to ~0,1 s zamiast do 5,7 s (liczby na
+        żywo: <code>cyd-sky.local/perf.json</code>).</span></li>
       <li><span class="en">Hundreds of unit tests. The manager in me demanded KPIs.</span><span class="pl">Setki
         testów jednostkowych. Menedżer we mnie zażądał KPI.</span></li>
       <li><span class="en">Every release is built and published by GitHub Actions. Nobody
