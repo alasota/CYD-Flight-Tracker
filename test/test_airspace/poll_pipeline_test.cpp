@@ -220,7 +220,7 @@ static LookupPorts simPorts() {
 static std::vector<Aircraft> rotatingSky(int first, int count) {
   std::vector<Aircraft> v;
   for (int i = first; i < first + count; ++i) {
-    char hex[8], cs[12];
+    char hex[16], cs[16];  // room for any int: gcc 13 -Wformat-truncation (CI)
     std::snprintf(hex, sizeof(hex), "a%05d", i);
     std::snprintf(cs, sizeof(cs), "SIM%d", i);
     v.push_back(makeAircraft(hex, cs, kHomeLat + 0.01f * static_cast<float>(i % 30), kHomeLon));
