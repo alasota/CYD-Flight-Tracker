@@ -175,9 +175,25 @@ ol.steps li::before {
 .changelog summary b { color: var(--accent); font-size: 1.05rem; }
 .changelog summary .muted { font-size: .875rem; }
 .changelog .links-r { margin-left: auto; font-size: .85rem; }
+/* a folded group: its first roadmap item (or the count) on the same line, cut with "…" */
+.changelog .first-item {
+  flex: 1 1 200px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: #c9cad1; font-size: .9rem;
+}
 .changelog ul.ticks { margin: 0; padding: 0 22px 18px 22px; }
 .changelog ul.ticks li { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .88rem; color: #c9cad1; }
+/* what changed for the user (ROADMAP.md "Done in vX.Y.Z" items): body font, not monospace */
+.changelog ul.items li { font-family: inherit; font-size: .95rem; }
+.changelog ul.items a { color: var(--text); text-decoration: none; }
+.changelog ul.items a:hover { color: var(--accent-soft); text-decoration: underline; }
 .changelog li.more { font-family: inherit; }
+/* behind-the-scenes commits (is_chore() in build_site.py): greyed, not hidden */
+.changelog li.chore { color: var(--muted); opacity: .6; }
+.changelog details.commits { padding: 0 22px 14px; }
+.changelog details.commits > summary { padding: 0 0 10px; color: var(--muted); font-size: .85rem; }
+.changelog details.commits > summary::before { content: "+ "; color: var(--accent); }
+.changelog details.commits[open] > summary::before { content: "– "; }
+.changelog details.commits ul.ticks { padding: 0 0 4px; }
 
 /* ---- FAQ */
 .faq { max-width: 760px; margin: 0 auto; display: grid; gap: 12px; }
