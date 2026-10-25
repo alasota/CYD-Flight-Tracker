@@ -1,4 +1,4 @@
-// opensky_auth: did the OpenSky login work, 30 min between rejected logins, Bearer / retry decisions, daily limit. spec/planned/06 + 08 §2.
+// opensky_auth: did the OpenSky login work, 30 min between rejected logins, Bearer / retry decisions, daily limit. spec/done/06-opensky-login-fallback.md + 08 §2.
 #include <unity.h>
 
 #include <cstdint>
@@ -227,6 +227,39 @@ static void test_token_ok_clears_failure_fields(void) {
   TEST_ASSERT_EQUAL_UINT32(0, n.nextTokenTryMs);
   TEST_ASSERT_EQUAL_UINT32(f.credentialsHash, n.credentialsHash);
   TEST_ASSERT_TRUE(shouldTryToken(n, retry));
+  TEST_ASSERT_TRUE(n.tokenGranted);
+  // A later rejection takes it back.
+  TEST_ASSERT_FALSE(onTokenResult(n, TokenOutcome::Rejected, 401, retry + 1).tokenGranted);
+}
+
+// Edge case (review): failedSinceMs is a millis() value. A series older than
+// kLoginFailedSinceMaxMs is marked stale at its next token result, so "since"
+// stays hidden after millis() wraps; a new series or a granted token clears it.
+static void test_long_failure_series_marks_since_stale(void) {
+  const OpenSkyAuthState f = failedState(401, kT);
+  TEST_ASSERT_TRUE(loginFailedSinceKnown(f, kT));
+  TEST_ASSERT_TRUE(loginFailedSinceKnown(f, kT + kLoginFailedSinceMaxMs));
+  TEST_ASSERT_FALSE(loginFailedSinceKnown(f, kT + kLoginFailedSinceMaxMs + 1u));
+  TEST_ASSERT_FALSE(loginFailedSinceKnown(account(), kT));  // only LoginFailed has a "since"
+
+  // Within the bound: a rejection keeps the series fresh.
+  const OpenSkyAuthState early = onTokenResult(f, TokenOutcome::Rejected, 401, kT + kLoginRetryMs);
+  TEST_ASSERT_FALSE(early.failedSinceStale);
+  // Past it (rejected, or no answer): stale, and still stale after the wrap
+  // when the plain age would look small again.
+  const uint32_t late = kT + kLoginFailedSinceMaxMs + 1000u;
+  const OpenSkyAuthState stale = onTokenResult(f, TokenOutcome::Rejected, 401, late);
+  TEST_ASSERT_TRUE(stale.failedSinceStale);
+  TEST_ASSERT_EQUAL_UINT32(kT, stale.failedSinceMs);
+  TEST_ASSERT_TRUE(onTokenResult(f, TokenOutcome::Transient, 0, late).failedSinceStale);
+  TEST_ASSERT_FALSE(loginFailedSinceKnown(stale, kT + 60000u));  // wrapped: age looks like 1 min
+
+  // A granted token ends the series; the next rejection starts a fresh one.
+  const OpenSkyAuthState ok = onTokenResult(stale, TokenOutcome::Ok, 200, late);
+  TEST_ASSERT_FALSE(ok.failedSinceStale);
+  const OpenSkyAuthState again = onTokenResult(ok, TokenOutcome::Rejected, 401, late + 1u);
+  TEST_ASSERT_FALSE(again.failedSinceStale);
+  TEST_ASSERT_TRUE(loginFailedSinceKnown(again, late + 1u));
 }
 
 // ---- spec 06: decisions around /states/all (§3.2) ----------------------------
@@ -318,7 +351,28 @@ static void test_auth_log_line_only_on_change(void) {
 
 // Scenario: Powrót do konta daje linię „login ok”
 static void test_auth_log_line_login_ok(void) {
-  ASSERT_STR_EQ("login ok — using account", authChangeLogLine(failedState(401, kT), account()));
+  const OpenSkyAuthState f = failedState(401, kT);
+  ASSERT_STR_EQ("login ok — using account",
+                authChangeLogLine(f, onTokenResult(f, TokenOutcome::Ok, 200, kT + kLoginRetryMs)));
+}
+
+// Edge case (review): saving other credentials while LoginFailed is not a
+// login yet — no line; the first token granted for them logs "login ok",
+// and a later refresh of a working account logs nothing.
+static void test_auth_log_line_login_ok_only_after_token(void) {
+  const OpenSkyAuthState f = failedState(401, kT, 1);
+  const OpenSkyAuthState saved = onCredentials(f, 2, true);
+  ASSERT_ENUM_EQ(Mode::Account, saved.mode);
+  ASSERT_STR_EQ("", authChangeLogLine(f, saved));
+  // A still-wrong secret: the usual "login failed" line, no "login ok" before it.
+  ASSERT_STR_EQ("login failed (http=401) — check client_id/secret; using anonymous access, "
+                "next try in 30 min",
+                authChangeLogLine(saved, onTokenResult(saved, TokenOutcome::Rejected, 401, kT)));
+  const OpenSkyAuthState granted = onTokenResult(saved, TokenOutcome::Ok, 200, kT);
+  ASSERT_STR_EQ("login ok — using account", authChangeLogLine(saved, granted));
+  ASSERT_STR_EQ("", authChangeLogLine(granted, onTokenResult(granted, TokenOutcome::Ok, 200, kT)));
+  // No answer from the login server is not a login result either.
+  ASSERT_STR_EQ("", authChangeLogLine(saved, onTokenResult(saved, TokenOutcome::Transient, 0, kT)));
 }
 
 // Edge case: setting up or removing credentials isn't a login result — no line.
@@ -346,6 +400,7 @@ void run_opensky_auth_tests() {
   RUN_TEST(test_no_credentials_never_tries_token);
   RUN_TEST(test_no_credentials_ignore_token_results);
   RUN_TEST(test_token_ok_clears_failure_fields);
+  RUN_TEST(test_long_failure_series_marks_since_stale);
   RUN_TEST(test_bearer_only_with_account_and_valid_token);
   RUN_TEST(test_states_401_with_bearer_refreshes_once);
   RUN_TEST(test_states_rejected_after_refresh_retries_anonymously);
@@ -353,5 +408,6 @@ void run_opensky_auth_tests() {
   RUN_TEST(test_states_200_and_429_are_accepted);
   RUN_TEST(test_auth_log_line_only_on_change);
   RUN_TEST(test_auth_log_line_login_ok);
+  RUN_TEST(test_auth_log_line_login_ok_only_after_token);
   RUN_TEST(test_auth_log_line_silent_without_login_result);
 }

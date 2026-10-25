@@ -193,7 +193,8 @@ bool fetchToken(const std::string &client_id, const std::string &client_secret, 
 
 OpenSkyAuthState auth;  // did the login work (opensky_auth, spec 06 / 08)
 
-// Moves `auth` to `next`, logging a change of mode once (not every poll).
+// Moves `auth` to `next`, logging a login result once (not every poll, not
+// on a credentials change — authChangeLogLine()).
 void setAuth(const OpenSkyAuthState &next) {
   const std::string line = authChangeLogLine(auth, next);
   if (!line.empty()) Serial.printf("[opensky_client] %s\n", line.c_str());

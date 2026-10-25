@@ -961,8 +961,9 @@ instead of 4000).
 - The cached token is dropped on `Rejected` and *before* a refresh: a refresh with no answer
   sends the retry anonymously and keeps `Account`, instead of re-sending a rejected token and
   landing in `LoginFailed` for 30 min over a network blip.
-- **Log** (`authChangeLogLine()`, once per mode change, not on setting up / removing
-  credentials): `[opensky_client] login failed (http=401) — check client_id/secret; using
+- **Log** (`authChangeLogLine()`, once per login result, nothing on setting up / changing /
+  removing credentials — `login ok` only for the first token granted for them,
+  `OpenSkyAuthState::tokenGranted`): `[opensky_client] login failed (http=401) — check client_id/secret; using
   anonymous access, next try in 30 min` / `[opensky_client] login ok — using account`.
   A rejected anonymous request: `/states/all rejected (http=401, anonymous)`. On the board,
   "no token requests for 30 min" = no `token fetch failed` line in that time.
@@ -970,7 +971,8 @@ instead of 4000).
   `onCredentials(model.auth, hash(cfg), …)`, so credentials just saved read as `Account`. Pill:
   grey "Anonymous mode" / green "OpenSky account configured" / red `.pill.err` "Login failed —
   anonymous mode". In `LoginFailed` a `.stat.quota.warn#loginwarn` line below it
-  (`loginFailedDetailText()`): HTTP code, ", since DD.MM.YYYY HH:MM" (only with a synced clock,
+  (`loginFailedDetailText()`): HTTP code, ", since DD.MM.YYYY HH:MM" (only with a synced clock and a series younger
+  than 40 days, `loginFailedSinceKnown()` — millis() wraps after 49.7;
   `ConfigPageModel::nowEpoch` = `timeSyncNowLocal()`), 400 instead of 4000, "next login attempt
   in N min" (rounded up, never below 1). The daily estimate compares with
   `openSkyDailyLimit(auth)`; `#daily` gets `data-lf="1"` so the live JS keeps 400 until the

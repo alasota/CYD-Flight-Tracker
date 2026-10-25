@@ -93,9 +93,11 @@ std::string lightStateText(const BacklightStatus &s, Language lang) {
 std::string loginFailedDetailText(const OpenSkyAuthState &s, uint32_t nowMs,
                                   std::time_t nowEpoch, Language lang) {
   // "since": the first rejection's millis() turned into wall-clock time —
-  // only with a synced clock (an unsynced one would say 1970).
+  // only with a synced clock (an unsynced one would say 1970) and while the
+  // age is trustworthy (millis() wraps after ~49.7 days: a wrapped age would
+  // give a date weeks too late, so it is left out instead).
   std::string since;
-  if (nowEpoch != 0) {
+  if (nowEpoch != 0 && loginFailedSinceKnown(s, nowMs)) {
     const uint32_t agoS = (nowMs - s.failedSinceMs) / 1000u;  // unsigned: wrap-safe
     const std::time_t at = nowEpoch - static_cast<std::time_t>(agoS);
     since = fillTemplate(webTr(WebStr::LoginFailedSince, lang),
@@ -781,9 +783,13 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
     w.esc(loginFailedDetailText(auth, m.nowMs, m.nowEpoch, lang));
     w.raw("</div>");
   }
-  w.raw("<p class=\"intro\">");
-  w.t(WebStr::OpenSkyIntro);
-  w.raw("</p>");
+  // The "without an account: 400" hint explains the trade-off; in LoginFailed
+  // the warning above already says it (and an account *is* set up).
+  if (!loginFailed) {
+    w.raw("<p class=\"intro\">");
+    w.t(WebStr::OpenSkyIntro);
+    w.raw("</p>");
+  }
   w.field("cid", WebStr::ClientId,
           "name=\"client_id\" autocomplete=\"off\" autocapitalize=\"off\" spellcheck=\"false\"",
           c.opensky_client_id);
