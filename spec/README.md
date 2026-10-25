@@ -8,7 +8,9 @@ Gotowa specyfikacja przechodzi do `done/` (`git mv`) razem z ostatnim commitem i
 wtedy też poprawić odnośniki `spec/planned/…` w `src/`, CLAUDE.md i testach.
 
 Implementacja: `/implement NN` (albo `/implement #<issue>`) — agenci na osobnej gałęzi, aż do
-PR (CLAUDE.md „Spec → PR harness”). Obok specyfikacji leży jej `NN-nazwa.feature`: scenariusze
+PR (CLAUDE.md „Spec → PR harness”). Do czasu wydania kolumna „Stan” i linia „Status” mówią
+`vNEXT`; `/release` wpisuje numer wersji i przenosi do `done/` to, co jeszcze zostało w
+`planned/`. Obok specyfikacji leży jej `NN-nazwa.feature`: scenariusze
 BDD (Gherkin, słowa kluczowe po angielsku), każdy z `@test=<suite>/<plik>.cpp:<funkcja>` albo
 `@manual`; `python tools/check_bdd.py` pilnuje, że testy istnieją. Issue bez specyfikacji
 dostaje ją od agenta (`NN` = kolejny wolny numer, „Źródło: issue #N”).
