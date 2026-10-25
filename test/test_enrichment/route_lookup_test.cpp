@@ -90,7 +90,7 @@ static void test_parse_airport_rejects_oversized_body(void) {
 
 static int gRouteFetchCallCount = 0;
 
-static HexdbFetchResult stubRouteFetchFound(const std::string &callsign) {
+static HexdbFetchResult stubRouteFetchFound(const std::string & /*callsign*/) {
   gRouteFetchCallCount++;
   HexdbFetchResult r;
   r.response_ok = true;
@@ -98,7 +98,7 @@ static HexdbFetchResult stubRouteFetchFound(const std::string &callsign) {
   return r;
 }
 
-static HexdbFetchResult stubRouteFetchConfirmedNotFound(const std::string &callsign) {
+static HexdbFetchResult stubRouteFetchConfirmedNotFound(const std::string & /*callsign*/) {
   gRouteFetchCallCount++;
   HexdbFetchResult r;
   r.response_ok = true;  // a confirmed 404, per hexdb.io's real behavior
@@ -106,7 +106,7 @@ static HexdbFetchResult stubRouteFetchConfirmedNotFound(const std::string &calls
   return r;
 }
 
-static HexdbFetchResult stubRouteFetchTransportFailure(const std::string &callsign) {
+static HexdbFetchResult stubRouteFetchTransportFailure(const std::string & /*callsign*/) {
   gRouteFetchCallCount++;
   return HexdbFetchResult{};  // response_ok=false
 }
@@ -161,7 +161,7 @@ static void test_lookup_route_fetches_separately_per_callsign(void) {
 
 static int gAirportFetchCallCount = 0;
 
-static HexdbFetchResult stubAirportFetchFound(const std::string &code) {
+static HexdbFetchResult stubAirportFetchFound(const std::string & /*code*/) {
   gAirportFetchCallCount++;
   HexdbFetchResult r;
   r.response_ok = true;

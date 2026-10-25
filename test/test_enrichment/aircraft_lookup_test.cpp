@@ -58,7 +58,7 @@ static void test_parse_rejects_oversized_body(void) {
 
 static int gFetchCallCount = 0;
 
-static FetchResult stubFetchFound(const std::string &icao24) {
+static FetchResult stubFetchFound(const std::string & /*icao24*/) {
   gFetchCallCount++;
   FetchResult r;
   r.response_ok = true;
@@ -66,7 +66,7 @@ static FetchResult stubFetchFound(const std::string &icao24) {
   return r;
 }
 
-static FetchResult stubFetchNotFound(const std::string &icao24) {
+static FetchResult stubFetchNotFound(const std::string & /*icao24*/) {
   gFetchCallCount++;
   FetchResult r;
   r.response_ok = true;
@@ -76,7 +76,7 @@ static FetchResult stubFetchNotFound(const std::string &icao24) {
 
 // Simulates a transient transport failure (timeout, WiFi drop, hexdb.io
 // unreachable, non-200 status) — see review notes 1.2.
-static FetchResult stubFetchTransportFailure(const std::string &icao24) {
+static FetchResult stubFetchTransportFailure(const std::string & /*icao24*/) {
   gFetchCallCount++;
   return FetchResult{};  // response_ok=false
 }

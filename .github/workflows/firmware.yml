@@ -60,6 +60,10 @@ jobs:
       - name: Unit tests (native)
         run: pio test -e native
 
+      - name: Unit tests under AddressSanitizer + UBSan
+        # Same suites, built with -fsanitize=address,undefined (platformio.ini).
+        run: pio test -e native-asan
+
       - name: Build firmware
         run: pio run -e cyd
 
