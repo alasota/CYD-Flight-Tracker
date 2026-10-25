@@ -383,7 +383,8 @@ snapshot of the data (handed over by swapping one pointer) and a few small comma
 
 For the curious (and for bug reports): `http://cyd-sky.local/perf.json` and the `[perf]` line
 in the serial log, once a minute, show how responsive the screen is (`ui gap max` — the
-longest the display waited, in ms), how busy the network side is, and the free memory.
+longest the display waited, in ms), how busy the network side is, the free memory, and how many hexdb.io answers are kept in RAM
+(`cache` — capped, so it stops growing after the first busy hour; the rest stays in flash).
 
 ## Roadmap
 

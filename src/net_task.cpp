@@ -296,6 +296,9 @@ PerfReport buildReport() {
   r.freeHeap = ESP.getFreeHeap();
   r.maxBlock = ESP.getMaxAllocHeap();
   r.uptimeS = millis() / 1000;
+  r.cacheAircraft = aircraftLookupCacheSize();
+  r.cacheRoute = routeLookupCacheSize();
+  r.cacheAirport = airportLookupCacheSize();
   return r;
 }
 
@@ -324,6 +327,9 @@ std::string perfJsonNow() {
   r.freeHeap = now.freeHeap;
   r.maxBlock = now.maxBlock;
   r.uptimeS = now.uptimeS;
+  r.cacheAircraft = now.cacheAircraft;
+  r.cacheRoute = now.cacheRoute;
+  r.cacheAirport = now.cacheAirport;
   return perfJson(r);
 }
 

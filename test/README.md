@@ -33,7 +33,7 @@ so they stay put when `src/` gets reorganized. Each suite is one executable.
 | Suite | What | Modules (`<module>_test.cpp`) |
 |---|---|---|
 | `test_airspace` | the sky over home: phase, overhead pass, sky snapshot | flight_phase, cpa_predictor, poll_pipeline |
-| `test_enrichment` | aircraft / route / airport data (hexdb.io, caches, NVS) | aircraft_lookup, route_lookup, lookup_store, lookup_budget, aircraft_names, place_names |
+| `test_enrichment` | aircraft / route / airport data (hexdb.io, caches, NVS) | aircraft_lookup, route_lookup, lookup_cache, lookup_store, lookup_budget, aircraft_names, place_names |
 | `test_opensky` | the OpenSky data source | opensky_client, opensky_quota |
 | `test_display` | screens, theme, navigation, touch, brightness, display texts | table_view, featured_panel, flight_screen, radar_view, radar_geometry, aircraft_summary, status_bar, service_screen, screen_nav, redraw_policy, touch_input, lcars_theme, fonts, backlight, i18n |
 | `test_admin` | settings, web panel, backups, password, updates | config_page, config_portal, config_backup, config_store, web_auth, web_i18n, ota_update, release_check, version, screenshot |

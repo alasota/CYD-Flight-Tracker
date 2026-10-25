@@ -5,6 +5,7 @@
 
 void run_aircraft_lookup_tests();
 void run_route_lookup_tests();
+void run_lookup_cache_tests();
 void run_lookup_store_tests();
 void run_lookup_budget_tests();
 void run_aircraft_names_tests();
@@ -25,6 +26,7 @@ int main(int, char **) {
   UNITY_BEGIN();
   if (RUN_MODULE(aircraft_lookup)) run_aircraft_lookup_tests();
   if (RUN_MODULE(route_lookup)) run_route_lookup_tests();
+  if (RUN_MODULE(lookup_cache)) run_lookup_cache_tests();
   if (RUN_MODULE(lookup_store)) run_lookup_store_tests();
   if (RUN_MODULE(lookup_budget)) run_lookup_budget_tests();
   if (RUN_MODULE(aircraft_names)) run_aircraft_names_tests();

@@ -3,6 +3,10 @@
 
 #include "route_lookup.h"
 
+#include <string>
+
+#include "lookup_cache.h"
+
 namespace {
 
 // Both caches are shared static state across the whole test binary —
@@ -219,6 +223,43 @@ static void test_airport_is_cached_after_lookup(void) {
   TEST_ASSERT_FALSE(airportLookupIsCached("LIRF"));
 }
 
+// ---- size limit (spec 05) ----------------------------------------------------
+
+static void test_evicted_route_is_fetched_again(void) {
+  lookupRouteWithFetcher("EIN17A", stubRouteFetchFound);
+  for (size_t i = 0; i < kRouteCacheCapacity; ++i) {
+    lookupRouteWithFetcher("CS" + std::to_string(i), stubRouteFetchFound);
+  }
+  TEST_ASSERT_EQUAL_size_t(kRouteCacheCapacity, routeLookupCacheSize());
+  TEST_ASSERT_FALSE(routeLookupIsCached("EIN17A"));
+
+  gRouteFetchCallCount = 0;
+  lookupRouteWithFetcher("EIN17A", stubRouteFetchFound);
+  TEST_ASSERT_EQUAL_INT(1, gRouteFetchCallCount);
+}
+
+static void test_confirmed_route_miss_is_evicted_too(void) {
+  lookupRouteWithFetcher("ZZZ000", stubRouteFetchConfirmedNotFound);
+  TEST_ASSERT_TRUE(routeLookupIsCached("ZZZ000"));
+  for (size_t i = 0; i < kRouteCacheCapacity; ++i) {
+    lookupRouteWithFetcher("CS" + std::to_string(i), stubRouteFetchFound);
+  }
+  TEST_ASSERT_FALSE(routeLookupIsCached("ZZZ000"));
+}
+
+static void test_evicted_airport_is_fetched_again(void) {
+  lookupAirportWithFetcher("EGLL", stubAirportFetchFound);
+  for (size_t i = 0; i < kAirportCacheCapacity; ++i) {
+    lookupAirportWithFetcher("AP" + std::to_string(i), stubAirportFetchFound);
+  }
+  TEST_ASSERT_EQUAL_size_t(kAirportCacheCapacity, airportLookupCacheSize());
+  TEST_ASSERT_FALSE(airportLookupIsCached("EGLL"));
+
+  gAirportFetchCallCount = 0;
+  lookupAirportWithFetcher("EGLL", stubAirportFetchFound);
+  TEST_ASSERT_EQUAL_INT(1, gAirportFetchCallCount);
+}
+
 }  // namespace
 
 void run_route_lookup_tests() {
@@ -248,4 +289,8 @@ void run_route_lookup_tests() {
   RUN_TEST(test_route_is_cached_reflects_confirmed_results_only);
 
   RUN_TEST(test_airport_is_cached_after_lookup);
+
+  RUN_TEST(test_evicted_route_is_fetched_again);
+  RUN_TEST(test_confirmed_route_miss_is_evicted_too);
+  RUN_TEST(test_evicted_airport_is_fetched_again);
 }

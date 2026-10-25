@@ -3,6 +3,10 @@
 
 #include "aircraft_lookup.h"
 
+#include <string>
+
+#include "lookup_cache.h"
+
 namespace {
 
 // The cache is shared static state across the whole test binary — reset it
@@ -160,6 +164,50 @@ static void test_is_cached_reflects_confirmed_results_only(void) {
   TEST_ASSERT_FALSE(aircraftLookupIsCached("abcdef"));  // a failed attempt does not
 }
 
+// ---- size limit (spec 05) ----------------------------------------------------
+
+static std::string hexKey(size_t i) { return "k" + std::to_string(i); }
+
+static void test_evicted_entry_is_fetched_again(void) {
+  gFetchCallCount = 0;
+  lookupAircraftWithFetcher("4010ee", stubFetchFound);
+  for (size_t i = 0; i < kAircraftCacheCapacity; ++i) {
+    lookupAircraftWithFetcher(hexKey(i), stubFetchFound);
+  }
+  TEST_ASSERT_EQUAL_size_t(kAircraftCacheCapacity, aircraftLookupCacheSize());
+  TEST_ASSERT_FALSE(aircraftLookupIsCached("4010ee"));  // the stalest one fell out
+
+  gFetchCallCount = 0;
+  lookupAircraftWithFetcher("4010ee", stubFetchFound);
+  TEST_ASSERT_EQUAL_INT(1, gFetchCallCount);  // the cache really dropped it
+}
+
+static void test_recently_used_entry_survives(void) {
+  lookupAircraftWithFetcher("4010ee", stubFetchFound);
+  for (size_t i = 0; i < kAircraftCacheCapacity * 3; ++i) {
+    lookupAircraftWithFetcher(hexKey(i), stubFetchFound);
+    lookupAircraftWithFetcher("4010ee", stubFetchFound);  // a hit refreshes it
+  }
+  TEST_ASSERT_TRUE(aircraftLookupIsCached("4010ee"));
+  TEST_ASSERT_EQUAL_size_t(kAircraftCacheCapacity, aircraftLookupCacheSize());
+}
+
+static void test_confirmed_miss_is_evicted_too(void) {
+  lookupAircraftWithFetcher("ffffff", stubFetchNotFound);
+  TEST_ASSERT_TRUE(aircraftLookupIsCached("ffffff"));
+  for (size_t i = 0; i < kAircraftCacheCapacity; ++i) {
+    lookupAircraftWithFetcher(hexKey(i), stubFetchFound);
+  }
+  TEST_ASSERT_FALSE(aircraftLookupIsCached("ffffff"));
+}
+
+static void test_seed_respects_the_limit(void) {
+  AircraftInfo info;
+  info.found = true;
+  for (size_t i = 0; i < kAircraftCacheCapacity + 10; ++i) aircraftLookupSeedCache(hexKey(i), info);
+  TEST_ASSERT_EQUAL_size_t(kAircraftCacheCapacity, aircraftLookupCacheSize());
+}
+
 }  // namespace
 
 void run_aircraft_lookup_tests() {
@@ -178,5 +226,10 @@ void run_aircraft_lookup_tests() {
   RUN_TEST(test_lookup_recovers_after_transport_failure);
 
   RUN_TEST(test_is_cached_reflects_confirmed_results_only);
+
+  RUN_TEST(test_evicted_entry_is_fetched_again);
+  RUN_TEST(test_recently_used_entry_survives);
+  RUN_TEST(test_confirmed_miss_is_evicted_too);
+  RUN_TEST(test_seed_respects_the_limit);
 
 }

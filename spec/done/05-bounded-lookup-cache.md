@@ -1,6 +1,6 @@
 # Spec 05 — Ograniczone cache hexdb.io w RAM
 
-Z przeglądu kodu 2026-10-25, punkt 1.1. Status: **do zrobienia**.
+Z przeglądu kodu 2026-10-25, punkt 1.1. Status: **zrobione** w v1.4.3 (2026-10-25, sprawdzone na płytce — §7).
 
 ## 1. Problem
 
@@ -102,3 +102,29 @@ mniej (krótkie stringi mieszczą się w SSO). Jeśli pomiar na płytce (§5) po
 
 - Limit / wygaszanie wpisów w NVS (`lookup_store` już czyści przestrzeń nazw przy zapełnieniu).
 - Odświeżanie starych wpisów (typ samolotu się nie zmienia, CLAUDE.md).
+
+## 7. Wykonanie i wyniki (2026-10-25)
+
+Zrobione zgodnie z §3, bez odstępstw w API. Dodatkowo `aircraftLookupSeedCache()` /
+`…SeedCache()` też podlegają limitowi (seed z NVS to zwykłe `put()`).
+
+Testy (`pio test -e native`: 745 przypadków, wszystkie zielone):
+- `test_enrichment/lookup_cache_test.cpp` — 10 testów z §4 (LRU, `contains()` nie odświeża,
+  10 000 kluczy, pojemność 0 i 1, `clear()`, pojemności ≥ zbioru roboczego).
+- `aircraft_lookup_test.cpp` / `route_lookup_test.cpp` — wypadnięty wpis woła fetcher ponownie,
+  potwierdzony brak też wypada, `…SeedCache()` respektuje limit.
+- `poll_pipeline_test.cpp` `test_caches_stay_bounded_over_200_polls` — 200 pollów, 30 samolotów
+  + 5 nowych na poll (1025 samolotów, ~10× pojemność), produkcyjne okablowanie (RAM → „NVS” →
+  fetch): rozmiary ≤ pojemności, każdy klucz pobrany z „hexdb.io” dokładnie raz, samoloty
+  wracające po wypadnięciu z RAM-u przychodzą z „NVS” (`fetches == 0`).
+
+Płytka (CYD, v1.4.2-2-ga46bb11-dirty, COM3):
+1. Normalne pojemności: `[perf] … | cache ac=3 rt=3 ap=2` → `ac=8 rt=6 ap=5` w kolejnych
+   minutach, `/perf.json` zwraca `"cache":{"ac":9,"rt":7,"ap":6}`; heap 142–148 KB, największy
+   blok 61 KB; zapytania do hexdb.io jak przed zmianą (jedno nowe `icao24` na poll, reszta
+   `cache hit`).
+2. Build próbny z pojemnościami 3 / 3 / 2 (wycofany): przy 8–12 samolotach w zasięgu
+   `cache ac=3 rt=3 ap=2`, a każdy wcześniej widziany samolot dalej `cache hit` (wraca z NVS) —
+   do hexdb.io szły tylko nowe `icao24`. Kryterium §5.3 spełnione.
+3. **Do zrobienia:** kryterium §5.2 (24 h pracy, różnica heap / `maxBlock` < 5 KB) — sprawdzić
+   `/perf.json` po dobie od wgrania.

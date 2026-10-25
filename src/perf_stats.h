@@ -53,10 +53,15 @@ struct PerfReport {
   uint32_t freeHeap = 0;
   uint32_t maxBlock = 0;
   uint32_t uptimeS = 0;
+  // hexdb.io RAM caches (lookup_cache, spec 05): entries now — they must
+  // level off at the capacities, not grow with uptime.
+  uint32_t cacheAircraft = 0;
+  uint32_t cacheRoute = 0;
+  uint32_t cacheAirport = 0;
 };
 
 // "[perf] ui gap max=14ms p99<20ms slow=0 | net busy 3.1% max=1840ms |
-//  stack ui=3120 net=5480 | heap 201344 (max block 110580)"
+//  stack ui=3120 net=5480 | heap 201344 (max block 110580) | cache ac=40 rt=38 ap=12"
 std::string perfLogLine(const PerfReport &r);
 
 // GET /perf.json body.

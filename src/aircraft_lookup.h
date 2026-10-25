@@ -1,11 +1,13 @@
 // aircraft_lookup — icao24 -> airline/aircraft_type/registration enrichment
-// via hexdb.io, with an in-RAM cache so a given icao24 is only ever looked
-// up once. See CLAUDE.md "Aircraft identification: airline + flight +
+// via hexdb.io, with a size-limited in-RAM cache (lookup_cache, LRU) in front
+// of the NVS copy (lookup_store), so a given icao24 is only ever fetched
+// once. See CLAUDE.md "Aircraft identification: airline + flight +
 // model". No TFT/drawing code, no OpenSky polling logic — sits purely
 // between opensky_client's output and the view modules, and takes only a
 // plain icao24 string as input (no dependency on opensky_client itself).
 #pragma once
 
+#include <cstddef>
 #include <string>
 
 struct AircraftInfo {
@@ -47,8 +49,8 @@ struct FetchResult {
 // an icao24, returns a FetchResult.
 using AircraftFetchFn = FetchResult (*)(const std::string &icao24);
 
-// Core lookup logic: consults (and fills) an in-RAM cache first so a given
-// icao24 is only ever fetched via `fetch` once per boot — see CLAUDE.md
+// Core lookup logic: consults (and fills) the in-RAM cache first so a given
+// icao24 is fetched via `fetch` only once while it stays cached — see CLAUDE.md
 // "be a good citizen" towards hexdb.io's free service. A confirmed
 // response (fetch()'s response_ok == true) is cached whether it's a real
 // hit or a genuine hexdb.io miss — a miss (military/private/very new
@@ -59,10 +61,10 @@ using AircraftFetchFn = FetchResult (*)(const std::string &icao24);
 // injected `fetch` call — no direct HTTP/WiFi dependency — tested under
 // `pio test -e native` with a stub.
 //
-// TODO: persist the cache to NVS (config_store-style Preferences) so it
-// survives a reboot too, not just the current session. RAM-only is enough
-// for now — see CLAUDE.md "Testing": don't complicate a step beyond what
-// it needs.
+// The RAM cache holds the kAircraftCacheCapacity most recently used entries
+// (spec 05); an evicted one is fetched again by this function. The
+// lookupAircraft() adapter below checks NVS first, so on the device it comes
+// back from flash, not from hexdb.io.
 //
 // `wasCacheHit`, if non-null, is set to true/false so a caller (e.g. the
 // lookupAircraft() adapter below) can log whether this call served from
@@ -81,6 +83,10 @@ bool aircraftLookupIsCached(const std::string &icao24);
 // Puts an already-known result (e.g. loaded from NVS by lookup_store) into
 // the RAM cache, so it counts as cached and is never fetched again.
 void aircraftLookupSeedCache(const std::string &icao24, const AircraftInfo &info);
+
+// Entries in the RAM cache now (<= kAircraftCacheCapacity) — for [perf] and
+// /perf.json.
+size_t aircraftLookupCacheSize();
 
 // Clears the in-RAM cache. Exposed for tests; production code has no real
 // reason to call this (an icao24's airline/type/registration essentially

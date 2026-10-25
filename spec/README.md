@@ -13,7 +13,7 @@ wtedy też poprawić odnośniki `spec/planned/…` w `src/`, CLAUDE.md i testach
 | 02 | [Nowe wersje z GitHuba](done/02-github-release-check.md) | done | v1.2.0 |
 | 03 | [Jasność i tryb nocny](done/03-brightness-night-mode.md) | done | v1.3.0 |
 | 04 | [Dwa rdzenie](done/04-dual-core.md) | done | v1.4.0 |
-| 05 | [Ograniczone cache hexdb.io](planned/05-bounded-lookup-cache.md) | planned | czeka |
+| 05 | [Ograniczone cache hexdb.io](done/05-bounded-lookup-cache.md) | done | v1.4.3 |
 | 06 | [Błąd logowania OpenSky → tryb anonimowy](planned/06-opensky-login-fallback.md) | planned | czeka (po 08) |
 | 07 | [Reorganizacja testów](done/07-test-reorganization.md) | done | v1.4.2 |
 | 08 | [Ostrzeżenia urządzenia („!”)](planned/08-device-alerts.md) | planned | czeka |

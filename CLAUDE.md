@@ -131,10 +131,14 @@ which is an airline name or aircraft type on its own. Enrichment is required.
   aircraft outside its database (military, private, very new registrations). Handle this as
   "show callsign only, airline/type = unknown" — never crash or block the row on a miss.
 - **This is a small hobby-run free service, not an SLA** — be a good citizen and don't hammer it:
-  - **Cache every successful lookup by `icao24` in RAM (and ideally NVS)** — an aircraft's
-    airline/type essentially never changes, so a given `icao24` should only ever be looked up
-    once per boot (or ever, if cached to flash). Re-fetching on every poll would be both rude
-    and pointless.
+  - **Cache every successful lookup by `icao24`** — an aircraft's airline/type essentially
+    never changes, so a given `icao24` is looked up once, ever: every confirmed answer goes to
+    NVS (`lookup_store`), and the **RAM cache is size-limited** (`lookup_cache`, LRU, the 96
+    most recently used — spec 05). An entry that falls out of RAM comes back from NVS, never
+    from hexdb.io. (Before spec 05 the RAM cache was an unbounded `std::map`: a few hundred new
+    aircraft a day, so after days of uptime the heap's largest block fell below the 50 KB
+    `release_check` needs and update checks silently stopped.) Re-fetching on every poll would
+    be both rude and pointless.
   - Their stated informal limit is ~1000 requests / 5 minutes — trivially fine for one device
     with caching, so there's no excuse to skip the cache "because the limit is generous."
   - If a lookup is slow/unavailable, show the row with whatever's cached (or just the callsign)
@@ -171,8 +175,9 @@ here from hexdb.io's own published endpoint list, not independently tested by ha
 - **Caching, two different keys**:
   - Route lookups cache by **callsign** (a flight's route doesn't change mid-flight).
   - Airport/country lookups cache by **airport code** — this cache will end up tiny in practice
-    (mostly the same handful of nearby airports repeating), so it's cheap to keep in RAM even
-    without NVS persistence.
+    (mostly the same handful of nearby airports repeating).
+  - Both are NVS-backed (`lookup_store`) with a size-limited RAM cache in front (`lookup_cache`:
+    96 routes, 64 airports), same as aircraft.
   - Same rule as `aircraft_lookup`: never re-fetch a cache hit, never block the table on one
     slow/failed request, degrade to "—" instead of hiding the row.
 
@@ -694,7 +699,7 @@ Spec: `spec/done/01-ota-updates.md` (roadmap #1). Released in v1.1.0, tested on 
   is the CI's `cyd-sky-tracker-<version>.bin` (app only). `OtaSession` checks the header before
   anything reaches `Update`, and only calls `Update.end()` (which switches the boot slot) when
   the file carried the **firmware marker** `CYDSKY-FW1|board=<FW_BOARD>|v=<FW_VERSION>`
-  (`version.cpp`, `firmwareMarker()`; `FW_BOARD` defaults to `cyd-r` — roadmap #4 will set it
+  (`version.cpp`, `firmwareMarker()`; `FW_BOARD` defaults to `cyd-r` — the "builds for other CYD variants" roadmap item will set it
   per env and reject a mismatch). `firmware.yml` greps the built `.bin` for it. Builds older
   than this feature have no marker, so going back to them needs USB / the web installer.
 - **Display:** `config_portal` and `release_check` draw nothing; their `OtaObserver` callbacks
@@ -829,8 +834,10 @@ check). Now:
   `saveLastScreen`) — a few ms to tens of ms on the UI, visible in `[perf]`.
 - **Perf** (`perf_stats`, pure): the UI measures how much later than planned each pass starts
   (its drawing time + oversleep); `net_task` logs once a minute
-  `[perf] ui gap max=85ms p99<20ms slow=0 | net busy 20.3% max=807ms | stack ui=… net=… | heap …`
-  and serves the same as `GET /perf.json`.
+  `[perf] ui gap max=85ms p99<20ms slow=0 | net busy 20.3% max=807ms | stack ui=… net=… | heap …
+  | cache ac=40 rt=38 ap=12` and serves the same as `GET /perf.json` (`"cache": {ac, rt, ap}` =
+  entries in the hexdb.io RAM caches; they must level off at the `lookup_cache` capacities, not
+  grow with uptime).
 
 ## Brightness & night mode (backlight, sun_times)
 
@@ -997,8 +1004,9 @@ each with a single responsibility:
 - `opensky_client` — token fetch/refresh + `/states/all` polling. Returns a plain struct/array
   of aircraft. **No TFT/drawing code in this module** — must be swappable/testable independently
   of the visualization.
-- `aircraft_lookup` — `icao24` → airline/aircraft-type enrichment via hexdb.io, with an
-  in-memory (ideally NVS-backed) cache so a given `icao24` is only ever looked up once. No TFT
+- `aircraft_lookup` — `icao24` → airline/aircraft-type enrichment via hexdb.io, with a
+  size-limited RAM cache (`lookup_cache`) over the NVS copy (`lookup_store`), so a given
+  `icao24` is only ever fetched once. No TFT
   code, no OpenSky polling logic — purely a lookup + cache layer sitting between
   `opensky_client`'s output and the view modules.
 - `route_lookup` — `callsign` → origin/destination IATA codes, and airport code → country code,
@@ -1024,6 +1032,12 @@ each with a single responsibility:
   `ICAOTypeCode` (`B38M` -> "737 MAX 8", `E75L` -> "E175", <= 12 chars to fit the TYP column)
   instead of its long, truncated `Type` strings. `aircraft_summary` uses hexdb.io first, then
   these tables, then `...` / `--`.
+- `lookup_cache` — header-only `LookupCache<V>`: the LRU RAM cache behind `aircraft_lookup` and
+  `route_lookup` (spec 05). `find()` refreshes an entry, `contains()` doesn't (the per-poll
+  budget asks about every aircraft — asking isn't using), `put()` drops the least recently used
+  when full. Capacities `kAircraftCacheCapacity` 96, `kRouteCacheCapacity` 96,
+  `kAirportCacheCapacity` 64 — each must hold one poll's working set (all aircraft in range),
+  or every poll would go back to NVS. Sizes: `aircraftLookupCacheSize()` etc. -> `[perf]`.
 - `lookup_store` — persists the hexdb.io caches (aircraft / route / airport) in NVS
   (namespaces `lk_ac`, `lk_rt`, `lk_ap`; record = version + fields joined by 0x1F; confirmed
   misses stored too). Lookups check RAM, then NVS, then hexdb.io; NVS hits count as free in the
