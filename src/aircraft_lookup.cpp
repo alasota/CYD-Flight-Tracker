@@ -1,6 +1,6 @@
 #include "aircraft_lookup.h"
 
-#include <map>
+#include "lookup_cache.h"
 
 #include <ArduinoJson.h>
 
@@ -31,15 +31,14 @@ AircraftInfo parseAircraftLookupResponse(const std::string &json) {
 }
 
 namespace {
-std::map<std::string, AircraftInfo> cache;
+LookupCache<AircraftInfo> cache(kAircraftCacheCapacity);
 }  // namespace
 
 AircraftInfo lookupAircraftWithFetcher(const std::string &icao24, AircraftFetchFn fetch,
                                         bool *wasCacheHit) {
-  auto it = cache.find(icao24);
-  if (it != cache.end()) {
+  if (const AircraftInfo *cached = cache.find(icao24)) {
     if (wasCacheHit != nullptr) *wasCacheHit = true;
-    return it->second;
+    return *cached;
   }
 
   if (wasCacheHit != nullptr) *wasCacheHit = false;
@@ -54,17 +53,19 @@ AircraftInfo lookupAircraftWithFetcher(const std::string &icao24, AircraftFetchF
   }
 
   AircraftInfo info = parseAircraftLookupResponse(fetchResult.body);
-  cache[icao24] = info;  // cache both real hits and confirmed misses
+  cache.put(icao24, info);  // cache both real hits and confirmed misses
   return info;
 }
 
 bool aircraftLookupIsCached(const std::string &icao24) {
-  return cache.find(icao24) != cache.end();
+  return cache.contains(icao24);
 }
 
 void aircraftLookupSeedCache(const std::string &icao24, const AircraftInfo &info) {
-  cache[icao24] = info;
+  cache.put(icao24, info);
 }
+
+size_t aircraftLookupCacheSize() { return cache.size(); }
 
 void aircraftLookupClearCacheForTesting() { cache.clear(); }
 

@@ -179,6 +179,34 @@ static void test_empty_state_texts_fit_their_slots(void) {
   }
 }
 
+
+// ---- the device-alert "!" badge (spec 08 §3.4) ------------------------------
+
+static void test_zones_with_badge_do_not_overlap_for_longest_texts(void) {
+  for (Language lang : {Language::PL, Language::EN}) {
+    const std::string count = statusBarBlockLabel(250, true, lang);
+    const HeaderZones z = statusBarZones(320, kStatusBarAppName, count, "--.--.----", "00:00", true);
+    TEST_ASSERT_EQUAL_INT(z.name_end + kAlertBadgeGap, z.alert_x);
+    TEST_ASSERT_TRUE_MESSAGE(z.alert_x + kAlertBadgeDiameter < z.count_start, count.c_str());
+    TEST_ASSERT_TRUE_MESSAGE(z.count_end < z.right_start, count.c_str());
+    TEST_ASSERT_TRUE(z.right_end <= 320);
+  }
+  // Inside the 15 px header, above its bottom rule.
+  TEST_ASSERT_TRUE(kAlertBadgeTop >= 0);
+  TEST_ASSERT_TRUE(kAlertBadgeTop + kAlertBadgeDiameter <= LCARS_HEADER_HEIGHT - 1);
+}
+
+static void test_count_centred_between_badge_and_date(void) {
+  const HeaderZones z = statusBarZones(320, kStatusBarAppName, "7 LOT\xC3\x93W", "18.10.2026", "08:46", true);
+  const int left = z.alert_x + kAlertBadgeDiameter;
+  TEST_ASSERT_INT_WITHIN(1, (left + z.right_start) / 2, (z.count_start + z.count_end) / 2);
+}
+
+static void test_no_badge_means_no_alert_x(void) {
+  TEST_ASSERT_EQUAL_INT(-1, statusBarZones(320, kStatusBarAppName, "--", "--.--.----", "--:--").alert_x);
+  TEST_ASSERT_EQUAL_INT(-1, statusBarZones(320, kStatusBarAppName, "--", "--.--.----", "--:--", false).alert_x);
+}
+
 }  // namespace
 
 void run_status_bar_tests() {
@@ -208,5 +236,7 @@ void run_status_bar_tests() {
   RUN_TEST(test_header_uses_no_button_colour);
   RUN_TEST(test_zones_do_not_overlap_for_longest_texts);
   RUN_TEST(test_count_is_centred_in_the_free_space);
-
+  RUN_TEST(test_zones_with_badge_do_not_overlap_for_longest_texts);
+  RUN_TEST(test_count_centred_between_badge_and_date);
+  RUN_TEST(test_no_badge_means_no_alert_x);
 }

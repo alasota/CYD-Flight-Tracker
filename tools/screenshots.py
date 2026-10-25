@@ -9,13 +9,17 @@ data the tests use (test_admin/config_page_test.cpp; release_check's updateDemoS
   docs/screenshots/web_firmware.png      config page, Firmware tab: v1.3.0 available
                                          (spec/02-github-release-check.md)
   docs/screenshots/web_firmware_dev.png  ...with "show development versions" on
+  docs/screenshots/web_alert.png         config page with the device-alert card above
+                                         the tabs (spec/08, all three alerts)
   docs/screenshots/update_prompt.png     the question on the display (--device)
+  docs/screenshots/alert_screen.png      the "!" message screen on the display (--device)
 
 The web pages need no board: `pio test -e native -f test_admin` renders them
 (SCREENSHOT_OUT set) and headless Chrome / Edge photographs them at 500 px x2, like
 the other web_*.png. The display one is drawn by the board itself
 (GET /screenshot.bmp?screen=3 — the prompt with the demo data, then back to the
-normal screen); LovyanGFX can't run on the PC without SDL.
+normal screen; screen=4 the alert message screen); LovyanGFX can't run on the PC
+without SDL.
 
   python tools/screenshots.py                          # web pages only
   python tools/screenshots.py --device cyd-sky.local   # + the display prompt
@@ -39,6 +43,7 @@ REPO = Path(__file__).resolve().parent.parent
 OUT = REPO / "docs" / "screenshots"
 PAGE_BG = (0x17, 0x18, 0x1C)  # config_page's --bg
 UPDATE_PROMPT_SCREEN = 3  # main.cpp: kScreenshotUpdatePrompt = kScreenCount
+ALERT_SCREEN = 4          # main.cpp: kScreenshotAlertScreen = kScreenCount + 1
 
 
 def find_pio():
@@ -73,7 +78,8 @@ def render_pages(tmp):
     if r.returncode != 0:
         sys.exit("test_admin failed:\n" + r.stdout[-3000:] + r.stderr[-2000:])
     return [tmp / name for name in ("web_general.html", "web_opensky.html",
-                                    "web_firmware.html", "web_firmware_dev.html")]
+                                    "web_firmware.html", "web_firmware_dev.html",
+                                    "web_alert.html")]
 
 
 def crop_page(png):
@@ -101,14 +107,16 @@ def shoot_page(browser, html, png):
 
 
 def shoot_device(host, password):
-    url = "http://%s/screenshot.bmp?screen=%d" % (host, UPDATE_PROMPT_SCREEN)
     mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
     mgr.add_password(None, "http://%s/" % host, "admin", password or "")
     opener = urllib.request.build_opener(urllib.request.HTTPDigestAuthHandler(mgr))
-    bmp = opener.open(url, timeout=30).read()
-    png = OUT / "update_prompt.png"
-    Image.open(io.BytesIO(bmp)).convert("RGB").save(png, optimize=True)
-    print("wrote", png.relative_to(REPO), Image.open(png).size)
+    for screen, name in ((UPDATE_PROMPT_SCREEN, "update_prompt.png"),
+                         (ALERT_SCREEN, "alert_screen.png")):
+        url = "http://%s/screenshot.bmp?screen=%d" % (host, screen)
+        bmp = opener.open(url, timeout=30).read()
+        png = OUT / name
+        Image.open(io.BytesIO(bmp)).convert("RGB").save(png, optimize=True)
+        print("wrote", png.relative_to(REPO), Image.open(png).size)
 
 
 def main():

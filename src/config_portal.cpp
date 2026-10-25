@@ -68,6 +68,7 @@ bool isValidUnsignedIntString(const std::string &s) {
 #include <string>
 
 #include "backlight.h"  // backlightStatus() — General tab, GET /light.json
+#include "device_alerts.h"  // deviceAlertInputs() — the alert card above the tabs
 #include "config_backup.h"
 #include "config_page.h"
 #include "config_store.h"
@@ -170,6 +171,11 @@ void sendPage(ConfigPageModel model, int status = 200) {
   model.update = releaseUpdateState();
   model.installedVersion = firmwareVersion();
   model.light = backlightStatus(model.cfg);
+  // The same alerts as the display's "!" (net_task computes them the same way).
+  const AlertInputs alertIn = deviceAlertInputs(model.cfg);
+  model.alerts = collectAlerts(alertIn);
+  model.alertDetails = collectAlertDetails(alertIn);
+  model.nowMs = millis();
 
   server.sendHeader("Cache-Control", "no-store");
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);

@@ -9,7 +9,7 @@ uint8_t computeRedrawMask(const RedrawEvents &e, int currentScreen) {
 
   uint8_t mask = 0;
   if (e.newPoll) mask |= kRedrawContent | kRedrawHeader;
-  if (e.minuteChanged || e.healthChanged) mask |= kRedrawHeader;
+  if (e.minuteChanged || e.healthChanged || e.alertsChanged) mask |= kRedrawHeader;
   if (e.countdownTick && currentScreen == kScreenFlight && !(mask & kRedrawContent)) {
     mask |= kRedrawCountdown;
   }

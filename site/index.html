@@ -277,7 +277,30 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       tekstem, więc traktuj go jak hasło.</p>
   </div>
   <div class="card backup-note update-note">
-    <h3><span class="en">New: it asks before it updates itself</span><span class="pl">Nowość: sam pyta, zanim się zaktualizuje</span></h3>
+    <h3><span class="en">New: a "!" when something needs you</span><span class="pl">Nowość: „!”, gdy coś wymaga Twojej uwagi</span></h3>
+    <figure class="update-shot">
+      <img src="screenshots/alert_screen.png" width="320" height="240" alt="Display: ATTENTION screen listing OpenSky login failed, OpenSky limit reached and polling too often, with a CLOSE button counting down" loading="lazy">
+    </figure>
+    <p class="en">A typo in the OpenSky secret used to surface hours later as "no flights". Now a
+      small <b>!</b> appears in the header next to the app name: <b>red</b> for an error (OpenSky
+      rejected your login, today's credits are used up), <b>orange</b> for a warning (you're
+      polling more often than your daily limit allows, so it <i>will</i> run out). Tap it and the
+      display says what's wrong in one line each; it closes itself after 15 seconds. The settings
+      page puts the same "!" in a box above the tabs, with the numbers (HTTP code, when the
+      credits come back, the shortest interval that fits) and a link to the tab where you fix it.
+      Fix the cause and the "!" goes away on its own. Nothing to acknowledge.</p>
+    <p class="pl">Literówka w sekrecie OpenSky wychodziła kiedyś po kilku godzinach jako „brak
+      lotów”. Teraz w nagłówku obok nazwy pojawia się małe <b>!</b>: <b>czerwone</b> przy błędzie
+      (OpenSky odrzucił logowanie, dzisiejsze kredyty się skończyły), <b>pomarańczowe</b> przy
+      ostrzeżeniu (odpytujesz częściej, niż pozwala dzienny limit, więc <i>na pewno</i> się
+      skończy). Stuknij je, a wyświetlacz powie w jednej linijce, co jest nie tak; sam się zamknie
+      po 15 sekundach. Strona ustawień pokazuje to samo „!” w ramce nad zakładkami, z liczbami
+      (kod HTTP, kiedy wrócą kredyty, najkrótszy interwał, który się mieści) i linkiem do
+      zakładki, w której to naprawisz. Usuń przyczynę, a „!” zniknie samo. Niczego nie trzeba
+      potwierdzać.</p>
+  </div>
+  <div class="card backup-note update-note">
+    <h3><span class="en">It asks before it updates itself</span><span class="pl">Sam pyta, zanim się zaktualizuje</span></h3>
     <figure class="update-shot">
       <img src="screenshots/update_prompt.png" width="320" height="240" alt="Display: NEW VERSION AVAILABLE, v1.2.0 → v1.3.0, INSTALL IT? with YES and NO buttons" loading="lazy">
     </figure>
@@ -381,6 +404,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <img src="screenshots/web_general.png" width="1000" height="4512" alt="Settings page, General tab: screen brightness and night mode, panel password" loading="lazy">
     <img src="screenshots/web_backup.png" width="1000" height="1424" alt="Settings page, Backup tab" loading="lazy">
     <img src="screenshots/web_firmware.png" width="1000" height="1981" alt="Settings page, Firmware tab: updates from GitHub and a manual upload" loading="lazy">
+    <img src="screenshots/web_alert.png" width="1000" height="3762" alt="Settings page with the Needs attention box above the tabs: OpenSky login failed, daily limit reached, polling too often" loading="lazy">
   </div>
 </section>
 

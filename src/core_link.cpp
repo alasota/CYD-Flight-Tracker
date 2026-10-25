@@ -18,6 +18,8 @@ RedrawEvents diffNetState(const NetState *prev, const NetState &next) {
     if (next.data == nullptr || next.data->rows.empty()) e.newPoll = true;
   }
 
+  if (prev->alerts.displaySeverity() != next.alerts.displaySeverity()) e.alertsChanged = true;
+
   if (prev->cfg != next.cfg && prev->cfg != nullptr && next.cfg != nullptr) {
     const Config &a = *prev->cfg;
     const Config &b = *next.cfg;
@@ -31,13 +33,23 @@ RedrawEvents diffNetState(const NetState *prev, const NetState &next) {
   return e;
 }
 
+namespace {
+// Everything the texts show — not quotaObservedMs (see netStateDiffers()).
+bool alertDetailsDiffer(const AlertDetails &a, const AlertDetails &b) {
+  return a.loginHttpCode != b.loginHttpCode || a.quotaResetInS != b.quotaResetInS ||
+         a.estimatedDailyCredits != b.estimatedDailyCredits || a.dailyLimit != b.dailyLimit ||
+         a.pollIntervalS != b.pollIntervalS || a.minPollIntervalS != b.minPollIntervalS;
+}
+}  // namespace
+
 bool netStateDiffers(const NetState &a, const NetState &b) {
   return a.data != b.data || a.cfg != b.cfg || a.cfgSeq != b.cfgSeq || a.health != b.health ||
          a.wifi != b.wifi || a.restartPending != b.restartPending ||
          a.update.status != b.update.status || a.update.installed != b.update.installed ||
          a.update.latestTag != b.update.latestTag ||
          a.update.installPending != b.update.installPending || a.ota.seq != b.ota.seq ||
-         a.ota.phase != b.ota.phase;
+         a.ota.phase != b.ota.phase || a.alerts != b.alerts ||
+         alertDetailsDiffer(a.alertDetails, b.alertDetails);
 }
 
 NetCommand makeNetCommand(NetCommandType type, const std::string &tag) {
@@ -72,6 +84,7 @@ uint32_t uiSleepMs(const UiWake &w) {
   ms = std::min(ms, w.untilMinuteMs);
   ms = std::min(ms, w.untilPromptTimerMs);
   ms = std::min(ms, w.untilBacklightMs);
+  ms = std::min(ms, w.untilAlertTimerMs);
   return ms;
 }
 

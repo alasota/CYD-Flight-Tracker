@@ -13,6 +13,7 @@ void run_ota_update_tests();
 void run_release_check_tests();
 void run_version_tests();
 void run_screenshot_tests();
+void run_device_alerts_tests();
 
 void setUp(void) { resetAllForTesting(); }
 void tearDown(void) {}
@@ -37,5 +38,6 @@ int main(int, char **) {
   if (RUN_MODULE(release_check)) run_release_check_tests();
   if (RUN_MODULE(version)) run_version_tests();
   if (RUN_MODULE(screenshot)) run_screenshot_tests();
+  if (RUN_MODULE(device_alerts)) run_device_alerts_tests();
   return UNITY_END();
 }

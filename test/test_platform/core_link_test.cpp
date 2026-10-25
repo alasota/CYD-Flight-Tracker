@@ -332,6 +332,56 @@ static void test_heartbeat_stale(void) {
   TEST_ASSERT_FALSE(heartbeatStale(500u, 0xFFFFFF00u, kUiAliveLimitMs));  // rollover
 }
 
+
+// ---- device alerts in NetState (spec 08 §3.3) --------------------------------
+
+static void test_differs_on_alerts_and_their_details(void) {
+  const NetState a = baseState();
+  NetState b = a;
+  b.alerts.set(AlertId::OpenSkyBudgetOverLimit);
+  TEST_ASSERT_TRUE(netStateDiffers(a, b));
+  b = a;
+  b.alertDetails.estimatedDailyCredits = 5760;
+  TEST_ASSERT_TRUE(netStateDiffers(a, b));
+  b = a;
+  b.alertDetails.loginHttpCode = 401;
+  TEST_ASSERT_TRUE(netStateDiffers(a, b));
+  b = a;
+  b.alertDetails.quotaResetInS = 600;
+  TEST_ASSERT_TRUE(netStateDiffers(a, b));
+}
+
+static void test_quota_observed_ms_alone_is_no_publish(void) {
+  const NetState a = baseState();
+  NetState b = a;
+  b.alertDetails.quotaObservedMs = 123456;
+  TEST_ASSERT_FALSE(netStateDiffers(a, b));
+}
+
+static void test_diff_alerts_changed_only_when_the_badge_changes(void) {
+  NetState a = baseState();
+  NetState b = a;
+  b.alerts.set(AlertId::OpenSkyBudgetOverLimit);  // None -> Warning
+  RedrawEvents e = diffNetState(&a, b);
+  TEST_ASSERT_TRUE(e.alertsChanged);
+  TEST_ASSERT_FALSE(e.newPoll);
+  a = b;
+  b.alerts.set(AlertId::OpenSkyQuotaExhausted);  // Warning -> Error
+  TEST_ASSERT_TRUE(diffNetState(&a, b).alertsChanged);
+  a = b;
+  b.alerts.set(AlertId::OpenSkyLoginFailed);  // still Error: same badge
+  TEST_ASSERT_FALSE(diffNetState(&a, b).alertsChanged);
+  a = b;
+  b.alertDetails.estimatedDailyCredits = 1;  // details aren't drawn in the header
+  TEST_ASSERT_FALSE(diffNetState(&a, b).alertsChanged);
+}
+
+static void test_ui_sleep_wakes_for_the_alert_countdown(void) {
+  UiWake w;
+  w.untilAlertTimerMs = 3;
+  TEST_ASSERT_EQUAL_UINT32(3, uiSleepMs(w));
+}
+
 }  // namespace
 
 void run_core_link_tests() {
@@ -366,4 +416,8 @@ void run_core_link_tests() {
   RUN_TEST(test_ui_sleep_is_capped);
 
   RUN_TEST(test_heartbeat_stale);
+  RUN_TEST(test_differs_on_alerts_and_their_details);
+  RUN_TEST(test_quota_observed_ms_alone_is_no_publish);
+  RUN_TEST(test_diff_alerts_changed_only_when_the_badge_changes);
+  RUN_TEST(test_ui_sleep_wakes_for_the_alert_countdown);
 }

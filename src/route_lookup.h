@@ -1,7 +1,8 @@
 // route_lookup — flight-route (origin/destination airport) and
 // airport-country enrichment via hexdb.io. Mirrors aircraft_lookup's
-// design: an in-RAM cache per key so a given callsign/airport code is only
-// ever looked up once. See CLAUDE.md "Aircraft identification" (route
+// design: a size-limited in-RAM cache (lookup_cache, LRU) per key in front of
+// the NVS copy (lookup_store), so a given callsign/airport code is only ever
+// fetched once. See CLAUDE.md "Aircraft identification" (route
 // lookup listed there as a nice-to-have) and hexdb.io's documented REST
 // API (https://hexdb.io/). No TFT/drawing code, no OpenSky polling logic.
 //
@@ -12,6 +13,7 @@
 // project never has.
 #pragma once
 
+#include <cstddef>
 #include <string>
 
 // Origin/destination airport for a flight, by callsign. hexdb.io's
@@ -77,8 +79,9 @@ using RouteFetchFn = HexdbFetchResult (*)(const std::string &callsign);
 using AirportFetchFn = HexdbFetchResult (*)(const std::string &airport_code);
 
 // Core lookup logic for routes: consults (and fills) an in-RAM cache keyed
-// by callsign first, so a given callsign is only ever fetched via `fetch`
-// once — same "be a good citizen towards hexdb.io" reasoning as
+// by callsign first (the kRouteCacheCapacity most recently used, spec 05),
+// so a given callsign is fetched via `fetch` only once while it stays cached —
+// same "be a good citizen towards hexdb.io" reasoning as
 // aircraft_lookup. A confirmed response (found or genuine miss) is cached;
 // a failed fetch attempt is not, so a later call can retry. Pure aside
 // from the injected `fetch` call — tested under `pio test -e native` with
@@ -104,6 +107,11 @@ void airportLookupSeedCache(const std::string &airport_code, const AirportInfo &
 // Same idea, keyed by (ICAO) airport code.
 AirportInfo lookupAirportWithFetcher(const std::string &airport_code, AirportFetchFn fetch,
                                       bool *wasCacheHit = nullptr);
+
+// Entries in each RAM cache now (<= kRouteCacheCapacity /
+// kAirportCacheCapacity) — for [perf] and /perf.json.
+size_t routeLookupCacheSize();
+size_t airportLookupCacheSize();
 
 // Clears both in-RAM caches. Exposed for tests; production code has no
 // real reason to call this.

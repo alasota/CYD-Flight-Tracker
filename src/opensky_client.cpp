@@ -189,6 +189,26 @@ uint32_t rateLimitedUntilMs = 0;
 uint32_t lastPollMs = 0;
 bool everPolled = false;
 OpenSkyQuota quota;  // credits left / reset time, from the last answer's headers
+bool fetchToken(const std::string &client_id, const std::string &client_secret, int *httpCode);
+
+OpenSkyAuthState auth;  // did the login work (opensky_auth, spec 08's alert)
+
+// One token request, with the outcome folded into `auth` (logged once per change).
+bool fetchTokenTracked(const Config &cfg) {
+  int code = 0;
+  const bool ok = fetchToken(cfg.opensky_client_id, cfg.opensky_client_secret, &code);
+  const OpenSkyAuthState next = onTokenResult(auth, code, ok);
+  if (next.mode != auth.mode) {
+    if (next.mode == OpenSkyAuthState::Mode::LoginFailed) {
+      Serial.printf("[opensky_client] login failed (http=%d) — check client_id/secret; "
+                    "using anonymous access\n", next.lastHttpCode);
+    } else if (next.mode == OpenSkyAuthState::Mode::Account) {
+      Serial.println("[opensky_client] login ok — using account");
+    }
+  }
+  auth = next;
+  return ok;
+}
 
 // One /states/all attempt, with the 200-response body parsed inline
 // straight from the socket (streaming + an ArduinoJson field filter) so a
@@ -203,7 +223,9 @@ struct StatesAttempt {
   std::vector<Aircraft> aircraft;
 };
 
-bool fetchToken(const std::string &client_id, const std::string &client_secret) {
+// `httpCode` gets the login server's status (0 = no answer) for opensky_auth.
+bool fetchToken(const std::string &client_id, const std::string &client_secret, int *httpCode) {
+  *httpCode = 0;
   WiFiClientSecure client;
   // No CA bundle pinned — acceptable for a hobby device per CLAUDE.md's
   // scope; a future hardening pass could pin OpenSky/Keycloak's cert.
@@ -233,6 +255,7 @@ bool fetchToken(const std::string &client_id, const std::string &client_secret) 
   }
 
   int code = http.POST(reinterpret_cast<uint8_t *>(body), static_cast<size_t>(written));
+  *httpCode = code > 0 ? code : 0;
   if (code != HTTP_CODE_OK) {
     Serial.printf("[opensky_client] token fetch failed (http=%d)\n", code);
     http.end();
@@ -355,9 +378,12 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
   }
 
   bool useAuth = shouldUseOAuth(cfg.opensky_client_id, cfg.opensky_client_secret);
+  const uint32_t hash = credentialsHash(cfg.opensky_client_id, cfg.opensky_client_secret);
+  if (hash != auth.credentialsHash) cachedToken.valid = false;  // a token for the old ones
+  auth = onCredentials(auth, hash, useAuth);
 
   if (useAuth && tokenNeedsRefresh(cachedToken, now)) {
-    if (!fetchToken(cfg.opensky_client_id, cfg.opensky_client_secret)) {
+    if (!fetchTokenTracked(cfg)) {
       // Couldn't get a token this round; fall back to anonymous for this
       // poll rather than failing outright.
       useAuth = false;
@@ -371,7 +397,7 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
 
   if (att.transport_ok && att.code == 401 && useAuth) {
     // Treat a first 401 as "refresh once and retry", not fatal — see CLAUDE.md.
-    if (fetchToken(cfg.opensky_client_id, cfg.opensky_client_secret)) {
+    if (fetchTokenTracked(cfg)) {
       att = requestStatesOnce(bbox, cachedToken.access_token);
     }
   }
@@ -433,6 +459,11 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
 }
 
 OpenSkyQuota openSkyQuota() { return quota; }
+
+OpenSkyAuthState openSkyAuthStatus(const Config &cfg) {
+  return onCredentials(auth, credentialsHash(cfg.opensky_client_id, cfg.opensky_client_secret),
+                       shouldUseOAuth(cfg.opensky_client_id, cfg.opensky_client_secret));
+}
 
 uint32_t openSkyMsUntilNextPoll(uint32_t now_ms, const Config &cfg) {
   return msUntilNextPoll(now_ms, lastPollMs, everPolled, cfg.poll_interval_s * 1000UL);

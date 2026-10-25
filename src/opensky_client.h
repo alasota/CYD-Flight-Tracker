@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "opensky_auth.h"   // OpenSkyAuthState — openSkyAuthStatus()
 #include "opensky_quota.h"  // OpenSkyQuota — openSkyQuota()
 
 // ---- Pure logic (no WiFi/HTTP dependency) — testable under
@@ -172,6 +173,11 @@ OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const Config &cfg);
 // backing off after a 429 it stays Exhausted (count down with
 // quotaSecondsUntilReset()). Read by the config page.
 OpenSkyQuota openSkyQuota();
+
+// Did the OpenSky login work (opensky_auth), for the credentials in `cfg` —
+// so a just-saved change reads as "Account" before the next poll tries it.
+// Core 0 only, like openSkyQuota().
+OpenSkyAuthState openSkyAuthStatus(const Config &cfg);
 
 // msUntilNextPoll() for the adapter's own schedule and `cfg`.
 uint32_t openSkyMsUntilNextPoll(uint32_t now_ms, const Config &cfg);

@@ -467,6 +467,13 @@ static void test_demo_state_is_consistent(void) {
   TEST_ASSERT_TRUE(updateDemoState(false).latestPre.tag.empty());
 }
 
+
+static void test_prompt_not_over_the_alert_screen(void) {
+  PromptGate g = availableGate();
+  g.alertScreenOpen = true;
+  TEST_ASSERT_FALSE(shouldShowUpdatePrompt(g));
+}
+
 }  // namespace
 
 void run_release_check_tests() {
@@ -504,4 +511,5 @@ void run_release_check_tests() {
   RUN_TEST(test_prompt_waits_for_the_overhead_moment);
   RUN_TEST(test_prompt_tap_needs_a_fresh_touch);
   RUN_TEST(test_demo_state_is_consistent);
+  RUN_TEST(test_prompt_not_over_the_alert_screen);
 }

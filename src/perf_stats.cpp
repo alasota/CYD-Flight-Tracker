@@ -42,20 +42,21 @@ float BusyStats::busyPct() const {
 }
 
 std::string perfLogLine(const PerfReport &r) {
-  char buf[200];
+  char buf[256];
   std::snprintf(buf, sizeof(buf),
                 "[perf] ui gap max=%ums p99<%ums slow=%u | net busy %.1f%% max=%ums | "
-                "stack ui=%u net=%u | heap %u (max block %u)",
+                "stack ui=%u net=%u | heap %u (max block %u) | cache ac=%u rt=%u ap=%u",
                 static_cast<unsigned>(r.ui.maxMs), static_cast<unsigned>(r.ui.percentileMs(99)),
                 static_cast<unsigned>(r.ui.slowCount()), static_cast<double>(r.net.busyPct()),
                 static_cast<unsigned>(r.net.maxBusyMs), static_cast<unsigned>(r.uiStackFree),
                 static_cast<unsigned>(r.netStackFree), static_cast<unsigned>(r.freeHeap),
-                static_cast<unsigned>(r.maxBlock));
+                static_cast<unsigned>(r.maxBlock), static_cast<unsigned>(r.cacheAircraft),
+                static_cast<unsigned>(r.cacheRoute), static_cast<unsigned>(r.cacheAirport));
   return buf;
 }
 
 std::string perfJson(const PerfReport &r) {
-  char buf[512];
+  char buf[640];
   std::snprintf(
       buf, sizeof(buf),
       "{\"uptime_s\":%u,"
@@ -63,7 +64,8 @@ std::string perfJson(const PerfReport &r) {
       "\"buckets\":[%u,%u,%u,%u,%u,%u],\"gap_max_ever_ms\":%u,\"slow_ever\":%u},"
       "\"net\":{\"busy_pct\":%.1f,\"max_busy_ms\":%u,\"max_busy_ever_ms\":%u},"
       "\"stack_free\":{\"ui\":%u,\"net\":%u},"
-      "\"heap\":{\"free\":%u,\"max_block\":%u}}",
+      "\"heap\":{\"free\":%u,\"max_block\":%u},"
+      "\"cache\":{\"ac\":%u,\"rt\":%u,\"ap\":%u}}",
       static_cast<unsigned>(r.uptimeS), static_cast<unsigned>(r.ui.maxMs),
       static_cast<unsigned>(r.ui.percentileMs(99)), static_cast<unsigned>(r.ui.slowCount()),
       static_cast<unsigned>(r.ui.count), static_cast<unsigned>(r.ui.buckets[0]),
@@ -73,6 +75,8 @@ std::string perfJson(const PerfReport &r) {
       static_cast<unsigned>(r.uiSlowEver), static_cast<double>(r.net.busyPct()),
       static_cast<unsigned>(r.net.maxBusyMs), static_cast<unsigned>(r.netMaxEverMs),
       static_cast<unsigned>(r.uiStackFree), static_cast<unsigned>(r.netStackFree),
-      static_cast<unsigned>(r.freeHeap), static_cast<unsigned>(r.maxBlock));
+      static_cast<unsigned>(r.freeHeap), static_cast<unsigned>(r.maxBlock),
+      static_cast<unsigned>(r.cacheAircraft), static_cast<unsigned>(r.cacheRoute),
+      static_cast<unsigned>(r.cacheAirport));
   return buf;
 }

@@ -83,6 +83,143 @@ static void test_prompt_timer_strip_runs_out(void) {
   TEST_ASSERT_EQUAL_INT16(0, promptTimerFillPx(1000, 0, 200));
 }
 
+
+// ---- the alert message screen (spec 08 §3.5) ----------------------------------
+
+static bool overlaps(const Rect &a, const Rect &b) {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+}
+static bool onScreen(const Rect &r) { return r.x >= 0 && r.y >= 0 && r.x + r.w <= 320 && r.y + r.h <= 240; }
+
+static void test_alert_layout_fits_without_overlap(void) {
+  for (int count = 1; count <= 5; ++count) {
+    const AlertScreenLayout l = alertScreenLayout(320, 240, count);
+    TEST_ASSERT_TRUE(onScreen(l.title));
+    TEST_ASSERT_TRUE(onScreen(l.hint));
+    TEST_ASSERT_TRUE(onScreen(l.button));
+    TEST_ASSERT_TRUE(l.button.h >= kAlertCloseButtonMinH);
+    TEST_ASSERT_FALSE(overlaps(l.hint, l.button));
+    for (int i = 0; i < kAlertScreenMaxRows; ++i) {
+      TEST_ASSERT_TRUE(onScreen(l.entries[i]));
+      TEST_ASSERT_FALSE(overlaps(l.entries[i], l.title));
+      TEST_ASSERT_FALSE(overlaps(l.entries[i], l.hint));
+      TEST_ASSERT_FALSE(overlaps(l.entries[i], l.button));
+      if (i > 0) TEST_ASSERT_FALSE(overlaps(l.entries[i - 1], l.entries[i]));
+    }
+  }
+}
+
+static void test_alert_layout_counts_and_more_row(void) {
+  TEST_ASSERT_EQUAL_INT(1, alertScreenLayout(320, 240, 1).shown);
+  TEST_ASSERT_EQUAL_INT(0, alertScreenLayout(320, 240, 1).more);
+  TEST_ASSERT_EQUAL_INT(2, alertScreenLayout(320, 240, 2).shown);
+  TEST_ASSERT_EQUAL_INT(3, alertScreenLayout(320, 240, 3).shown);
+  TEST_ASSERT_EQUAL_INT(0, alertScreenLayout(320, 240, 3).more);
+  const AlertScreenLayout five = alertScreenLayout(320, 240, 5);
+  TEST_ASSERT_EQUAL_INT(2, five.shown);
+  TEST_ASSERT_EQUAL_INT(3, five.more);  // "+ 3 more" in the third row
+  TEST_ASSERT_EQUAL_INT16(five.entries[2].y, five.moreRow.y);
+}
+
+static void test_alert_texts_fit(void) {
+  // Titles in the body font right of the icon, the rest in the small font.
+  for (Language lang : {Language::PL, Language::EN}) {
+    for (Str id : {Str::AlertLoginTitle, Str::AlertQuotaTitle, Str::AlertBudgetTitle}) {
+      TEST_ASSERT_TRUE(utf8Length(tr(id, lang)) * LCARS_FONT_BODY_CHAR_PX <= 304 - 26);
+    }
+    TEST_ASSERT_TRUE(utf8Length(tr(Str::AlertDetailsHint, lang)) * LCARS_FONT_SMALL_CHAR_PX <= 304);
+    const std::string more = fillTemplate(tr(Str::AlertMore, lang), {"9"});
+    TEST_ASSERT_TRUE(utf8Length(more) * LCARS_FONT_SMALL_CHAR_PX <= 304 - 26);
+    TEST_ASSERT_TRUE(isFontSafeText(more));
+    // "ZAMKNIJ  15 s" inside the 160 px button.
+    TEST_ASSERT_TRUE(utf8Length(alertCloseLabel(15, lang)) * LCARS_FONT_BODY_CHAR_PX <= 160 - 16);
+  }
+  ASSERT_STR_EQ("ZAMKNIJ  15 s", alertCloseLabel(15, Language::PL));
+  ASSERT_STR_EQ("CLOSE  1 s", alertCloseLabel(1, Language::EN));
+}
+
+static AlertScreenInput at(uint32_t nowMs, bool pressed = false, int16_t x = 0, int16_t y = 0) {
+  AlertScreenInput in;
+  in.nowMs = nowMs;
+  in.pressed = pressed;
+  in.x = x;
+  in.y = y;
+  return in;
+}
+
+static void buttonCentre(int16_t *x, int16_t *y) {
+  const Rect b = alertScreenLayout(320, 240, 1).button;
+  *x = static_cast<int16_t>(b.x + b.w / 2);
+  *y = static_cast<int16_t>(b.y + b.h / 2);
+}
+
+static void test_alert_screen_closes_on_a_fresh_tap_on_close(void) {
+  int16_t bx, by;
+  buttonCentre(&bx, &by);
+  AlertScreen s = openAlertScreen(1000);
+  // The opening finger is still down, and slides onto the button: no close.
+  AlertScreenStepResult r = alertScreenStep(s, at(1100, true, bx, by));
+  TEST_ASSERT_FALSE(r.close);
+  s = r.state;
+  r = alertScreenStep(s, at(1200));  // lifted
+  TEST_ASSERT_FALSE(r.close);
+  s = r.state;
+  r = alertScreenStep(s, at(1500, true, bx, by));  // a fresh tap on CLOSE
+  TEST_ASSERT_TRUE(r.close);
+  TEST_ASSERT_FALSE(r.state.open);
+}
+
+static void test_alert_screen_tap_elsewhere_changes_nothing(void) {
+  AlertScreen s = openAlertScreen(0);
+  s = alertScreenStep(s, at(100)).state;  // lifted
+  AlertScreenStepResult r = alertScreenStep(s, at(2000, true, 160, 100));  // on an entry
+  TEST_ASSERT_FALSE(r.close);
+  TEST_ASSERT_TRUE(r.state.open);
+  // ...and doesn't extend the time.
+  r = alertScreenStep(r.state, at(kAlertScreenTimeoutMs));
+  TEST_ASSERT_TRUE(r.close);
+}
+
+static void test_alert_screen_closes_after_exactly_15_s(void) {
+  const AlertScreen s = openAlertScreen(5000);
+  TEST_ASSERT_FALSE(alertScreenStep(s, at(5000 + 14999)).close);
+  TEST_ASSERT_TRUE(alertScreenStep(s, at(5000 + 15000)).close);
+}
+
+static void test_alert_screen_closes_when_the_alerts_go(void) {
+  const AlertScreen s = openAlertScreen(0);
+  AlertScreenInput in = at(3000);
+  in.anyDisplayAlerts = false;
+  TEST_ASSERT_TRUE(alertScreenStep(s, in).close);
+}
+
+static void test_alert_screen_countdown_ticks_each_second(void) {
+  AlertScreen s = openAlertScreen(0);
+  TEST_ASSERT_EQUAL_UINT32(15, s.secondsShown);
+  TEST_ASSERT_EQUAL_UINT32(15, alertScreenSecondsLeft(s, 999));
+  TEST_ASSERT_EQUAL_UINT32(14, alertScreenSecondsLeft(s, 1000));
+  TEST_ASSERT_EQUAL_UINT32(1, alertScreenSecondsLeft(s, 14999));
+  TEST_ASSERT_EQUAL_UINT32(0, alertScreenSecondsLeft(s, 15000));
+  AlertScreenStepResult r = alertScreenStep(s, at(500));
+  TEST_ASSERT_FALSE(r.redrawTimer);
+  r = alertScreenStep(r.state, at(1000));
+  TEST_ASSERT_TRUE(r.redrawTimer);
+  TEST_ASSERT_EQUAL_UINT32(14, r.state.secondsShown);
+  r = alertScreenStep(r.state, at(1500));
+  TEST_ASSERT_FALSE(r.redrawTimer);
+  TEST_ASSERT_EQUAL_UINT32(1000, alertScreenMsToNextSecond(s, 0));
+  TEST_ASSERT_EQUAL_UINT32(500, alertScreenMsToNextSecond(s, 500));
+  TEST_ASSERT_EQUAL_UINT32(1, alertScreenMsToNextSecond(s, 999));
+}
+
+static void test_alert_screen_survives_millis_wrap(void) {
+  const uint32_t start = UINT32_MAX - 2000;
+  const AlertScreen s = openAlertScreen(start);
+  TEST_ASSERT_FALSE(alertScreenStep(s, at(start + 10000)).close);  // wrapped past 0
+  TEST_ASSERT_EQUAL_UINT32(5, alertScreenSecondsLeft(s, start + 10000));
+  TEST_ASSERT_TRUE(alertScreenStep(s, at(start + 15000)).close);
+}
+
 }  // namespace
 
 void run_service_screen_tests() {
@@ -96,4 +233,13 @@ void run_service_screen_tests() {
   RUN_TEST(test_screen_texts_fit_one_line);
   RUN_TEST(test_update_prompt_hint_fits_in_the_small_font);
   RUN_TEST(test_prompt_timer_strip_runs_out);
+  RUN_TEST(test_alert_layout_fits_without_overlap);
+  RUN_TEST(test_alert_layout_counts_and_more_row);
+  RUN_TEST(test_alert_texts_fit);
+  RUN_TEST(test_alert_screen_closes_on_a_fresh_tap_on_close);
+  RUN_TEST(test_alert_screen_tap_elsewhere_changes_nothing);
+  RUN_TEST(test_alert_screen_closes_after_exactly_15_s);
+  RUN_TEST(test_alert_screen_closes_when_the_alerts_go);
+  RUN_TEST(test_alert_screen_countdown_ticks_each_second);
+  RUN_TEST(test_alert_screen_survives_millis_wrap);
 }

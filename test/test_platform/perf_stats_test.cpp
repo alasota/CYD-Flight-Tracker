@@ -90,6 +90,9 @@ static PerfReport sampleReport() {
   r.freeHeap = 201344;
   r.maxBlock = 110580;
   r.uptimeS = 125;
+  r.cacheAircraft = 40;
+  r.cacheRoute = 38;
+  r.cacheAirport = 12;
   return r;
 }
 
@@ -97,7 +100,7 @@ static void test_log_line(void) {
   const std::string s = perfLogLine(sampleReport());
   TEST_ASSERT_EQUAL_STRING(
       "[perf] ui gap max=14ms p99<20ms slow=0 | net busy 3.1% max=1840ms | stack ui=3120 "
-      "net=5480 | heap 201344 (max block 110580)",
+      "net=5480 | heap 201344 (max block 110580) | cache ac=40 rt=38 ap=12",
       s.c_str());
 }
 
@@ -108,6 +111,7 @@ static void test_json(void) {
   ASSERT_CONTAINS(s, "\"buckets\":[11,0,0,0,0,0]");
   ASSERT_CONTAINS(s, "\"max_busy_ms\":1840");
   ASSERT_CONTAINS(s, "\"stack_free\":{\"ui\":3120,\"net\":5480}");
+  ASSERT_CONTAINS(s, "\"cache\":{\"ac\":40,\"rt\":38,\"ap\":12}");
   TEST_ASSERT_EQUAL_CHAR('{', s.front());
   TEST_ASSERT_EQUAL_CHAR('}', s.back());
 }

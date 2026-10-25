@@ -83,7 +83,7 @@ constexpr Language kDefaultLanguage = Language::PL;
   X(ResetConfirm, "USUNĄĆ HASŁO PANELU?", "REMOVE THE PASSWORD?")           \
   X(ResetYes, "TAK", "YES")                                                 \
   X(ResetNo, "NIE", "NO")                                                   \
-  X(ResetDone, "HASŁO USUNIĘTE", "PASSWORD REMOVED")
+  X(ResetDone, "HASŁO USUNIĘTE", "PASSWORD REMOVED")                           /* device alerts (device_alerts): the message screen behind the "!" */      X(AlertScreenTitle, "UWAGA", "ATTENTION")                                   X(AlertLoginTitle, "BŁĄD LOGOWANIA OPENSKY", "OPENSKY LOGIN FAILED")        X(AlertQuotaTitle, "LIMIT OPENSKY WYCZERPANY", "OPENSKY LIMIT REACHED")     X(AlertBudgetTitle, "ZA CZĘSTE ODPYTYWANIE", "POLLING TOO OFTEN")           /* bodies: each {} is filled in by fillTemplate() */                        X(AlertLoginBody, "Działa anonimowo: {} kredytów/dzień",                      "Running anonymously: {} credits/day")                                    X(AlertQuotaBodyIn, "Odnowienie za ok. {}", "Renews in about {}")           X(AlertQuotaBodySoon, "Powinien się już odnowić", "Should renew any moment")   X(AlertQuotaBodyUnknown, "OpenSky nie podał czasu odnowienia",                "OpenSky didn't say when it renews")                                      X(AlertBudgetBody, "{} z {} kredytów dziennie", "{} of {} credits a day")   X(AlertMore, "+ {} więcej — zobacz panel WWW", "+ {} more — see the web panel")   X(AlertDetailsHint, "Szczegóły: http://cyd-sky.local", "Details: http://cyd-sky.local")   X(AlertClose, "ZAMKNIJ", "CLOSE")
 
 enum class Str : int {
 #define I18N_ENUM_ENTRY(id, pl, en) id,

@@ -88,6 +88,10 @@ answer to "what plane is that." Think of it as the away-team variant with better
   screen when there's a new version (tap **YES**, a minute later it's done), or pick the `.bin`
   on the settings page yourself. No cable, settings kept. A bad build rolls itself back. The
   settings page can have a password.
+- ❗ **It tells you when something's wrong**: a red (error) or orange (warning) **!** in the
+  header when OpenSky rejects your login, today's credits run out, or you poll more often than
+  the daily limit allows. Tap it for a one-line explanation; the settings page explains it in a
+  box above the tabs, with a link to the tab where you fix it. Fix the cause and it goes away.
 - 🌙 **Automatic brightness and night mode**: the built-in light sensor dims the screen in a
   dark room. From sunset to sunrise (worked out on the board for your location) or between set
   hours it goes down to a night level, or fully dark until you tap it. It can also pause
@@ -243,6 +247,24 @@ and in the dark the screen's own light shines into it. That feedback pushes the 
 (darker room, dimmer screen, even darker reading), so the screen settles at its minimum in the
 dark. Update screens and the password reset always run at full brightness.
 
+### When the "!" shows up
+
+A small **!** next to the app name means the board found something you should know about:
+**red** = an error, **orange** = a warning. Tap it and the display lists what's wrong (it closes
+itself after 15 s); the settings page shows the same thing in a *Needs attention* box above the
+tabs, with the details and a link to the right tab. Right now it covers:
+
+- **OpenSky login failed** (red): OpenSky rejected the client id / secret. The board keeps going
+  anonymously (400 credits a day instead of 4000). Check them on your OpenSky account page.
+- **OpenSky daily limit reached** (red): the last request got a 429. The box says when the
+  credits come back.
+- **Polling too often** (orange): with your interval and radius the board would use more credits
+  a day than your limit. The box says the shortest interval that fits.
+
+Nothing to acknowledge: once the cause is gone, so is the **!**.
+
+<p align="center"><img src="docs/screenshots/alert_screen.png" width="320" alt="Display: ATTENTION screen with three warnings and a CLOSE button counting down"></p>
+
 ### Backing up your settings
 
 Flashing a fresh install with *Erase device*, swapping the board, or "just trying something"
@@ -383,7 +405,8 @@ snapshot of the data (handed over by swapping one pointer) and a few small comma
 
 For the curious (and for bug reports): `http://cyd-sky.local/perf.json` and the `[perf]` line
 in the serial log, once a minute, show how responsive the screen is (`ui gap max` — the
-longest the display waited, in ms), how busy the network side is, and the free memory.
+longest the display waited, in ms), how busy the network side is, the free memory, and how many hexdb.io answers are kept in RAM
+(`cache` — capped, so it stops growing after the first busy hour; the rest stays in flash).
 
 ## Roadmap
 

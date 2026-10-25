@@ -585,6 +585,87 @@ static void test_panel_password_card(void) {
   ASSERT_CONTAINS(h, "name=\"clear_password\"");
 }
 
+
+// ---- the device-alert card above the tabs (spec 08 §3.6) -----------------------
+
+static ConfigPageModel alertModel(Language lang) {
+  ConfigPageModel m = baseModel();
+  m.cfg.web_language = lang;
+  const AlertDemo demo = alertDemoState();
+  m.alerts = demo.alerts;
+  m.alertDetails = demo.details;
+  return m;
+}
+
+static void test_no_alerts_no_card(void) {
+  const std::string h = render(baseModel());
+  ASSERT_NOT_CONTAINS(h, "card alert");
+  ASSERT_NOT_CONTAINS(h, "id=\"alerts\"");
+}
+
+static void test_each_alert_renders_title_why_action_link(void) {
+  for (Language lang : {Language::PL, Language::EN}) {
+    for (int i = 0; i < kAlertCount; ++i) {
+      const AlertId id = static_cast<AlertId>(i);
+      ConfigPageModel m = alertModel(lang);
+      m.alerts = AlertSet{};
+      m.alerts.set(id);
+      const std::string h = render(m);
+      const AlertDef &def = alertDef(id);
+      ASSERT_CONTAINS(h, std::string("id=\"alert-") + def.code + "\"");
+      ASSERT_CONTAINS(h, webTr(def.webTitle, lang));
+      ASSERT_CONTAINS(h, webTr(def.webAction, lang));
+      ASSERT_CONTAINS(h, htmlEscape(alertWebWhy(id, m.alertDetails, 0, lang)));
+      ASSERT_CONTAINS(h, "href=\"/?tab=opensky\"");
+      ASSERT_CONTAINS(h, webTr(WebStr::AlertCardTitle, lang));
+      const std::string cls = alertWebClass(def.severity);
+      ASSERT_CONTAINS(h, "class=\"card alert " + cls + "\"");
+      ASSERT_CONTAINS(h, "class=\"ai " + cls + "\"");
+    }
+  }
+}
+
+static void test_alert_card_errors_first_and_worst_colour(void) {
+  const std::string h = render(alertModel(Language::EN));
+  ASSERT_CONTAINS(h, "class=\"card alert err\"");  // an error is among them
+  const size_t login = h.find("alert-opensky_login_failed");
+  const size_t budget = h.find("alert-opensky_budget_over_limit");
+  TEST_ASSERT_TRUE(login != std::string::npos && budget != std::string::npos && login < budget);
+  ConfigPageModel w = alertModel(Language::EN);
+  w.alerts = AlertSet{};
+  w.alerts.set(AlertId::OpenSkyBudgetOverLimit);
+  ASSERT_CONTAINS(render(w), "class=\"card alert warn\"");
+}
+
+static void test_alert_card_is_above_the_tabs_on_every_tab(void) {
+  for (SettingsTab t : {SettingsTab::Location, SettingsTab::OpenSky, SettingsTab::General,
+                        SettingsTab::Backup, SettingsTab::Firmware}) {
+    ConfigPageModel m = alertModel(Language::PL);
+    m.tab = t;
+    const std::string h = render(m);
+    const size_t card = h.find("id=\"alerts\"");
+    const size_t tabs = h.find("class=\"tabs\"");
+    TEST_ASSERT_TRUE(card != std::string::npos && tabs != std::string::npos && card < tabs);
+  }
+}
+
+// docs/screenshots/web_alert.png (tools/screenshots.py, SCREENSHOT_OUT).
+static void test_render_alert_demo(void) {
+  const char *dir = std::getenv("SCREENSHOT_OUT");
+  if (dir == nullptr || *dir == '\0') {
+    TEST_IGNORE_MESSAGE("SCREENSHOT_OUT not set");
+    return;
+  }
+  ConfigPageModel m = alertModel(Language::PL);
+  m.cfg.web_password = "demo-password";
+  m.tab = SettingsTab::OpenSky;
+  std::FILE *f = std::fopen((std::string(dir) + "/web_alert.html").c_str(), "wb");
+  TEST_ASSERT_NOT_NULL(f);
+  const std::string h = render(m);
+  std::fwrite(h.data(), 1, h.size(), f);
+  std::fclose(f);
+}
+
 }  // namespace
 
 void run_config_page_tests() {
@@ -625,4 +706,9 @@ void run_config_page_tests() {
   RUN_TEST(test_render_general_and_opensky_demo);
   RUN_TEST(test_saved_secret_never_reaches_the_page);
   RUN_TEST(test_panel_password_card);
+  RUN_TEST(test_no_alerts_no_card);
+  RUN_TEST(test_each_alert_renders_title_why_action_link);
+  RUN_TEST(test_alert_card_errors_first_and_worst_colour);
+  RUN_TEST(test_alert_card_is_above_the_tabs_on_every_tab);
+  RUN_TEST(test_render_alert_demo);
 }

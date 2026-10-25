@@ -1,7 +1,6 @@
 #include "route_lookup.h"
 
-#include <map>
-
+#include "lookup_cache.h"
 #include "place_names.h"  // asciiFold()
 
 #include <ArduinoJson.h>
@@ -58,16 +57,15 @@ AirportInfo parseAirportLookupResponse(const std::string &json) {
 }
 
 namespace {
-std::map<std::string, RouteInfo> routeCache;
-std::map<std::string, AirportInfo> airportCache;
+LookupCache<RouteInfo> routeCache(kRouteCacheCapacity);
+LookupCache<AirportInfo> airportCache(kAirportCacheCapacity);
 }  // namespace
 
 RouteInfo lookupRouteWithFetcher(const std::string &callsign, RouteFetchFn fetch,
                                   bool *wasCacheHit) {
-  auto it = routeCache.find(callsign);
-  if (it != routeCache.end()) {
+  if (const RouteInfo *cached = routeCache.find(callsign)) {
     if (wasCacheHit != nullptr) *wasCacheHit = true;
-    return it->second;
+    return *cached;
   }
   if (wasCacheHit != nullptr) *wasCacheHit = false;
 
@@ -77,16 +75,15 @@ RouteInfo lookupRouteWithFetcher(const std::string &callsign, RouteFetchFn fetch
   }
 
   RouteInfo info = parseRouteLookupResponse(fetchResult.body);
-  routeCache[callsign] = info;  // caches both real hits and confirmed misses
+  routeCache.put(callsign, info);  // caches both real hits and confirmed misses
   return info;
 }
 
 AirportInfo lookupAirportWithFetcher(const std::string &airport_code, AirportFetchFn fetch,
                                       bool *wasCacheHit) {
-  auto it = airportCache.find(airport_code);
-  if (it != airportCache.end()) {
+  if (const AirportInfo *cached = airportCache.find(airport_code)) {
     if (wasCacheHit != nullptr) *wasCacheHit = true;
-    return it->second;
+    return *cached;
   }
   if (wasCacheHit != nullptr) *wasCacheHit = false;
 
@@ -96,25 +93,28 @@ AirportInfo lookupAirportWithFetcher(const std::string &airport_code, AirportFet
   }
 
   AirportInfo info = parseAirportLookupResponse(fetchResult.body);
-  airportCache[airport_code] = info;
+  airportCache.put(airport_code, info);
   return info;
 }
 
 bool routeLookupIsCached(const std::string &callsign) {
-  return routeCache.find(callsign) != routeCache.end();
+  return routeCache.contains(callsign);
 }
 
 bool airportLookupIsCached(const std::string &airport_code) {
-  return airportCache.find(airport_code) != airportCache.end();
+  return airportCache.contains(airport_code);
 }
 
 void routeLookupSeedCache(const std::string &callsign, const RouteInfo &info) {
-  routeCache[callsign] = info;
+  routeCache.put(callsign, info);
 }
 
 void airportLookupSeedCache(const std::string &airport_code, const AirportInfo &info) {
-  airportCache[airport_code] = info;
+  airportCache.put(airport_code, info);
 }
+
+size_t routeLookupCacheSize() { return routeCache.size(); }
+size_t airportLookupCacheSize() { return airportCache.size(); }
 
 void routeLookupClearCacheForTesting() { routeCache.clear(); }
 void airportLookupClearCacheForTesting() { airportCache.clear(); }

@@ -105,3 +105,9 @@ bool shouldPersistScreenChange(bool userInitiated, uint32_t msSinceLastPersist,
   if (userInitiated) return true;
   return msSinceLastPersist >= minIntervalMs;
 }
+
+bool alertBadgeHit(int16_t x, int16_t y, const HeaderZones &zones) {
+  if (zones.alert_x < 0) return false;
+  const int right = zones.alert_x + kAlertBadgeDiameter + kAlertBadgeTouchSlackX;
+  return x >= 0 && x <= right && y >= 0 && y <= kAlertBadgeTouchBottom;
+}

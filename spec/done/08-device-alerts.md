@@ -1,7 +1,10 @@
 # Spec 08 — Ostrzeżenia urządzenia: „!” na ekranie, ekran komunikatu, wyjaśnienie w panelu
 
-Z przeglądu kodu 2026-10-25 (decyzje właściciela 2026-10-25). Status: **do zrobienia**.
-Pierwszy użytkownik mechanizmu: [spec 06](06-opensky-login-fallback.md) (błąd logowania OpenSky).
+Z przeglądu kodu 2026-10-25 (decyzje właściciela 2026-10-25). Status: **zrobione, v1.5.1**
+(2026-10-25). Na płytce sprawdzone kryteria 1, 2, 5 i 7 z §5; 6 tylko na zrzucie demo (429 nie
+da się wywołać na żądanie); 3–4 (dotyk) do potwierdzenia przy okazji. Stan logowania
+(`OpenSkyAuthState`) wszedł jako pierwszy kawałek spec 06 (`src/opensky_auth.h`).
+Pierwszy użytkownik mechanizmu: [spec 06](../planned/06-opensky-login-fallback.md) (błąd logowania OpenSky).
 
 ## 1. Cel
 

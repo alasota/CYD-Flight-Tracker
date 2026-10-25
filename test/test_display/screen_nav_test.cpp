@@ -2,6 +2,7 @@
 #include <unity.h>
 
 #include "screen_nav.h"
+#include "table_view.h"  // tableFirstRowY()
 #include "test_support.h"
 
 namespace {
@@ -367,6 +368,45 @@ static void test_persist_screen_auto_change_rate_limited(void) {
                                              kScreenPersistMinIntervalMs));
 }
 
+
+// ---- alertBadgeHit (spec 08 §3.5) -----------------------------------------------
+
+static HeaderZones badgeZones() {
+  return statusBarZones(320, kStatusBarAppName, "7 LOT\xC3\x93W", "18.10.2026", "08:46", true);
+}
+
+static void test_alert_badge_hit_on_the_badge_and_its_slack(void) {
+  const HeaderZones z = badgeZones();
+  const int16_t cx = static_cast<int16_t>(z.alert_x + kAlertBadgeDiameter / 2);
+  TEST_ASSERT_TRUE(alertBadgeHit(cx, 7, z));
+  TEST_ASSERT_TRUE(alertBadgeHit(0, 0, z));  // the whole left end, the name too
+  const int16_t right = static_cast<int16_t>(z.alert_x + kAlertBadgeDiameter + kAlertBadgeTouchSlackX);
+  TEST_ASSERT_TRUE(alertBadgeHit(right, 7, z));
+  TEST_ASSERT_FALSE(alertBadgeHit(static_cast<int16_t>(right + 1), 7, z));
+  TEST_ASSERT_TRUE(alertBadgeHit(cx, kAlertBadgeTouchBottom, z));
+  TEST_ASSERT_FALSE(alertBadgeHit(cx, kAlertBadgeTouchBottom + 1, z));
+  TEST_ASSERT_FALSE(alertBadgeHit(-1, 7, z));
+}
+
+static void test_alert_badge_miss_without_badge(void) {
+  const HeaderZones z = statusBarZones(320, kStatusBarAppName, "7 LOT\xC3\x93W", "18.10.2026", "08:46", false);
+  TEST_ASSERT_FALSE(alertBadgeHit(10, 7, z));
+  TEST_ASSERT_FALSE(alertBadgeHit(60, 7, z));
+}
+
+static void test_alert_badge_zone_clear_of_nav_and_table_paging(void) {
+  const HeaderZones z = badgeZones();
+  // Every point of the badge zone is no nav tap, and above the table's first row.
+  for (int16_t y = 0; y <= kAlertBadgeTouchBottom; ++y) {
+    for (int16_t x = 0; x <= z.alert_x + kAlertBadgeDiameter + kAlertBadgeTouchSlackX; x += 4) {
+      ASSERT_ENUM_EQ(NavAction::None, navHitTest(x, y, 320, 240).action);
+    }
+  }
+  TEST_ASSERT_TRUE(kAlertBadgeTouchBottom < tableFirstRowY());
+  // And the bottom nav band isn't part of it.
+  TEST_ASSERT_FALSE(alertBadgeHit(10, 215, z));
+}
+
 }  // namespace
 
 void run_screen_nav_tests() {
@@ -421,5 +461,7 @@ void run_screen_nav_tests() {
 
   RUN_TEST(test_persist_screen_user_change_always_writes);
   RUN_TEST(test_persist_screen_auto_change_rate_limited);
-
+  RUN_TEST(test_alert_badge_hit_on_the_badge_and_its_slack);
+  RUN_TEST(test_alert_badge_miss_without_badge);
+  RUN_TEST(test_alert_badge_zone_clear_of_nav_and_table_paging);
 }
