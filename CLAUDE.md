@@ -1343,7 +1343,13 @@ mistakes here waste hours of debugging later.
   - `site.yml` — changes under `site/`, `docs/screenshots`, `docs/icons` on main / manual, and
     reusable: builds the page and deploys it to Pages. On its own it takes the installer's
     firmware from the **latest GitHub Release** (no release -> page without the installer);
-    called with `firmware-artifact` it uses that artifact.
+    called with `firmware-artifact` it uses that artifact. A push of a **release commit** to
+    main (head commit subject starts with `Release v` — the merged release PR) doesn't deploy
+    (`build` job's `if:`); `release.yml` does, with that release's firmware. ⚠️ Found the hard
+    way: v1.7.0's page first went out with the v1.6.4 installer — the push deploy took the
+    latest Release before the v1.7.0 one existed. The condition must not use
+    `github.event_name`: in `release.yml`'s `workflow_call` it is the tag push, so it would skip
+    the release deploy too (`SiteWorkflowDeployTest` in `tools/test_build_site.py`).
   - `release.yml` — tags `v*`: calls `firmware.yml`, creates the GitHub Release with its files,
     then calls `site.yml` with the same artifact.
   - `pr.yml` — every push to a PR against main: version = next patch after the latest release +
