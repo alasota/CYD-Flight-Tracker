@@ -764,5 +764,137 @@ class SiteHtmlTest(unittest.TestCase):
                 self.assertEqual("Więcej", head.text("pl"))
 
 
+
+# ---------------------------------------------------------------- .github/workflows/site.yml
+
+SITE_YML = REPO / ".github" / "workflows" / "site.yml"
+
+
+def workflow_job_conditions(text):
+    """{job name: its job-level `if:` expression (without ${{ }}), or None} for the jobs
+    under `jobs:` of a workflow file. Plain text parsing: CI has no PyYAML."""
+    jobs, current, in_jobs = {}, None, False
+    for line in text.splitlines():
+        if re.match(r"^jobs:\s*$", line):
+            in_jobs = True
+            continue
+        if not in_jobs:
+            continue
+        if re.match(r"^\S", line):
+            break
+        m = re.match(r"^  ([\w-]+):\s*$", line)
+        if m:
+            current = m.group(1)
+            jobs[current] = None
+            continue
+        m = re.match(r"^    if:\s*(.+?)\s*$", line)
+        if m and current:
+            expr = m.group(1)
+            if (expr[0] == expr[-1]) and expr[0] in "\"'":
+                expr = expr[1:-1]
+            expr = re.sub(r"^\$\{\{\s*(.*?)\s*\}\}$", r"\1", expr)
+            jobs[current] = expr
+    return jobs
+
+
+def eval_gh_expression(expr, ctx):
+    """Evaluates the subset of GitHub Actions expressions a job `if:` uses here:
+    context paths (missing = null), 'strings', true/false/null, == != ! && || ( ),
+    startsWith / endsWith / contains (case-insensitive, like GitHub's)."""
+    class V:
+        """A value with GitHub's loose comparison (null == '' == false) and truthiness."""
+        def __init__(self, v):
+            self.v = v
+
+        def text(self):
+            return "" if self.v in (None, False) else str(self.v).lower()
+
+        def __eq__(self, other):
+            return self.text() == other.text()
+
+        def __ne__(self, other):
+            return not self == other
+
+        def __bool__(self):
+            return self.v not in (None, False, "", 0)
+
+    token_re = re.compile(r"\s*(?:('(?:[^']|'')*')|(\|\||&&|==|!=|!|\(|\)|,)|([A-Za-z_][\w.\-]*))")
+    funcs = {"startsWith": "_sw", "endsWith": "_ew", "contains": "_ct"}
+    values, out, pos = [], [], 0
+    while expr[pos:].strip():
+        m = token_re.match(expr, pos)
+        if not m:
+            raise ValueError("unsupported expression: " + expr[pos:])
+        pos = m.end()
+        lit, op, ident = m.groups()
+        if op is not None:
+            out.append({"||": " or ", "&&": " and ", "!": " not "}.get(op, " %s " % op))
+        elif ident in funcs:
+            out.append(funcs[ident])
+        else:
+            if lit is not None:
+                value = lit[1:-1].replace("''", "'")
+            elif ident in ("true", "false", "null"):
+                value = {"true": True, "false": False, "null": None}[ident]
+            else:
+                value = ctx.get(ident)  # unknown context path = null, as on GitHub
+            values.append(V(value))
+            out.append("_v[%d]" % (len(values) - 1))
+    env = {
+        "_v": values,
+        "_sw": lambda a, b: a.text().startswith(b.text()),
+        "_ew": lambda a, b: a.text().endswith(b.text()),
+        "_ct": lambda a, b: b.text() in a.text(),
+    }
+    return bool(eval("".join(out), {"__builtins__": {}}, env))  # noqa: S307 - our own workflow file
+
+
+class SiteWorkflowDeployTest(unittest.TestCase):
+    """Which runs of site.yml publish the page (build + deploy both run)."""
+
+    # Regression: merging the "Release v1.7.0: ..." PR deployed the page from the push
+    # (installer = latest GitHub Release = v1.6.4) before release.yml created v1.7.0;
+    # the page kept "Wersja firmware v1.6.4" after the release.
+
+    def deploys(self, **ctx):
+        jobs = workflow_job_conditions(SITE_YML.read_text(encoding="utf-8"))
+        self.assertIn("build", jobs)
+        self.assertIn("deploy", jobs)
+        return all(eval_gh_expression(cond, ctx) if cond else True
+                   for cond in (jobs["build"], jobs["deploy"]))
+
+    def push_to_main(self, message):
+        return {"github.event_name": "push", "github.ref": "refs/heads/main",
+                "github.event.head_commit.message": message}
+
+    def test_push_of_release_commit_does_not_deploy(self):
+        msg = "Release v1.7.0: specs to done, version in roadmap and docs\n\nCo-Authored-By: x"
+        self.assertFalse(self.deploys(**self.push_to_main(msg)),
+                         "a push of the release commit must leave the page to release.yml")
+
+    def test_push_of_patch_release_commit_does_not_deploy(self):
+        self.assertFalse(self.deploys(**self.push_to_main(
+            "Release v1.7.1: version in roadmap and docs")))
+
+    def test_ordinary_push_to_main_deploys(self):
+        for msg in ("Project page: the settings viewer collapses before first paint",
+                    "Fix: installer shows the released version",
+                    "Release plan: next version from the merged PRs",  # not a release commit
+                    "Docs: Release v2 ideas"):                          # "Release v" not first
+            with self.subTest(msg=msg):
+                self.assertTrue(self.deploys(**self.push_to_main(msg)))
+
+    def test_release_workflow_call_deploys_even_for_release_commit(self):
+        # Called from release.yml: github.* is the caller's tag push, head commit = the
+        # release commit itself.
+        self.assertTrue(self.deploys(**{
+            "github.event_name": "push", "github.ref": "refs/tags/v1.7.0",
+            "github.event.head_commit.message": "Release v1.7.0: specs to done, version in roadmap and docs",
+            "inputs.firmware-artifact": "cyd-sky-tracker-v1.7.0"}))
+
+    def test_manual_run_deploys(self):
+        self.assertTrue(self.deploys(**{"github.event_name": "workflow_dispatch",
+                                        "github.ref": "refs/heads/main"}))
+
 if __name__ == "__main__":
     unittest.main()
