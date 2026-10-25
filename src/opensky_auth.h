@@ -1,11 +1,10 @@
 // opensky_auth — did the OpenSky login work? The state device_alerts reads
-// for the "login failed" alert (spec/done/08-device-alerts.md §2) and the
-// daily credit limit that goes with it.
-//
-// This is the first slice of spec/planned/06-opensky-login-fallback.md: the
-// state and its transitions on a token answer. Still to come with spec 06:
-// waiting 30 min before trying a rejected login again (today every poll
-// tries), the OpenSky tab's red pill and the anonymous retry of a poll.
+// for the "login failed" alert (spec/done/08-device-alerts.md §2), the daily
+// credit limit that goes with it, and the decisions opensky_client takes
+// around a poll (spec/planned/06-opensky-login-fallback.md): wait 30 min
+// before asking the login server again after a rejection, send a Bearer token
+// only with a working account, and retry a poll rejected with a token
+// anonymously instead of giving up.
 //
 // Pure — tested under `pio test -e native`.
 #pragma once

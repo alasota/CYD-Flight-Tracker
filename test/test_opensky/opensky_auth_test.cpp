@@ -321,6 +321,13 @@ static void test_auth_log_line_login_ok(void) {
   ASSERT_STR_EQ("login ok — using account", authChangeLogLine(failedState(401, kT), account()));
 }
 
+// Edge case: setting up or removing credentials isn't a login result — no line.
+static void test_auth_log_line_silent_without_login_result(void) {
+  ASSERT_STR_EQ("", authChangeLogLine(OpenSkyAuthState{}, account()));
+  ASSERT_STR_EQ("", authChangeLogLine(account(), OpenSkyAuthState{}));
+  ASSERT_STR_EQ("", authChangeLogLine(failedState(401, kT), OpenSkyAuthState{}));
+}
+
 }  // namespace
 
 void run_opensky_auth_tests() {
@@ -346,4 +353,5 @@ void run_opensky_auth_tests() {
   RUN_TEST(test_states_200_and_429_are_accepted);
   RUN_TEST(test_auth_log_line_only_on_change);
   RUN_TEST(test_auth_log_line_login_ok);
+  RUN_TEST(test_auth_log_line_silent_without_login_result);
 }
