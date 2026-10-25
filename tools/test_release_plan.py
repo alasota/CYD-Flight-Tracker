@@ -86,6 +86,62 @@ class UnreleasedTest(unittest.TestCase):
         self.assertEqual("2026-10-24T18:37:46Z", rp.search_since("2026-10-25T18:37:46Z"))
 
 
+ROADMAP_SPEC06 = """# Roadmap
+
+## Planned
+
+| # | Item | Value | Effort | Risk | Rating | Verdict |
+|---|---|---|---|---|---|---|
+| 1 | Robustness fixes <!-- pl: Poprawki --> | medium | small | low | ⭐⭐⭐ | Rare bugs. Spec 09. <!-- pl: Spec 09. --> |
+
+## In progress
+
+| # | Item | Value | Effort | Risk | Rating | Verdict |
+|---|---|---|---|---|---|---|
+| 1 | Wrong OpenSky credentials <!-- pl: Złe dane --> | high | small | low | ⭐⭐⭐⭐ | Built, waiting for a check on the board. Spec 06. <!-- pl: Spec 06. --> |
+
+## Done
+
+| # | Item | Value | Effort | Risk | Rating | Verdict |
+|---|---|---|---|---|---|---|
+| 7 | Warnings <!-- pl: Ostrzeżenia --> | high | medium | low | ⭐⭐⭐⭐ | Done in v1.5.1: x. Spec 08. <!-- pl: Spec 08. --> |
+"""
+
+README_SPEC06 = """| Nr | Specyfikacja | Katalog | Stan |
+|---|---|---|---|
+| 05 | [Cache](done/05-bounded-lookup-cache.md) | done | v1.4.3 |
+| 06 | [Logowanie](done/06-opensky-login-fallback.md) | done | zrobione 2026-10-25, czeka na wydanie |
+| 07 | [Testy](done/07-test-reorganization.md) | done | vNEXT |
+| 09 | [Odporność](planned/09-concurrency-robustness.md) | planned | czeka |
+"""
+
+
+class StaleDocsTest(unittest.TestCase):
+    # Regression: spec 06 was implemented before the vNEXT rule — ROADMAP kept it "In progress",
+    # spec/README.md said "czeka na wydanie" — and v1.6.0 was tagged by hand. /release for
+    # v1.6.1-v1.6.3 only looked at PRs since the last tag and at bare vNEXT, so the project page
+    # kept showing spec 06 as in progress.
+    def test_done_spec_still_in_progress_on_the_roadmap(self):
+        stale = rp.stale_docs(ROADMAP_SPEC06, README_SPEC06, done_specs={"05", "06", "07", "08"})
+        self.assertIn({"file": "ROADMAP.md", "spec": "06",
+                       "problem": "row in 'In progress' but the spec is in spec/done/"}, stale)
+
+    def test_done_spec_without_a_version_in_spec_readme(self):
+        stale = rp.stale_docs(ROADMAP_SPEC06, README_SPEC06, done_specs={"05", "06", "07", "08"})
+        self.assertIn({"file": "spec/README.md", "spec": "06",
+                       "problem": "done, but 'Stan' is 'zrobione 2026-10-25, czeka na wydanie', not a version"},
+                      stale)
+
+    def test_consistent_rows_are_not_reported(self):
+        stale = rp.stale_docs(ROADMAP_SPEC06, README_SPEC06, done_specs={"05", "06", "07", "08"})
+        # 05: version; 07: vNEXT (filled by the release); 08: in Done; 09: planned and not done.
+        self.assertEqual(["06", "06"], sorted(s["spec"] for s in stale))
+
+    def test_first_release_containing_a_spec(self):
+        self.assertEqual("v1.6.0", rp.first_release(["v1.6.1", "v1.6.1-dev.5", "v1.6.0", "v1.6.3"]))
+        self.assertIsNone(rp.first_release(["v1.7.0-dev.9"]))
+
+
 class PlaceholderTest(unittest.TestCase):
     def test_only_bare_vnext_is_a_placeholder(self):
         self.assertTrue(rp.has_placeholder("| 5 | x | ⭐ | Done in vNEXT: y |"))
