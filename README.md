@@ -340,6 +340,8 @@ published as GitHub *pre-releases*. Nobody gets them by accident: the display ne
 them, and the settings page shows them only after you tick **Firmware → Show development
 versions** — then with an *Install v1.4.0-rc.1* button and a warning. To go back, install the
 release shown above it (*Go back to release vX.Y.Z*).
+Every pull request publishes one too (`v1.4.3-dev.57 · PR #12`, gone when the PR is closed), so a
+change can be tried on the board before it's merged — no cable, no local build.
 
 <p align="center"><img src="docs/screenshots/web_firmware_dev.png" width="260" alt="Firmware tab with Show development versions ticked: latest development version v1.4.0-rc.1 with a warning and an Install button"></p>
 

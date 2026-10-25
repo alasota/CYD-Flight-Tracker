@@ -7,6 +7,12 @@ Numery są stałe (kolejność powstania, nie priorytet); priorytet jest w [ROAD
 Gotowa specyfikacja przechodzi do `done/` (`git mv`) razem z ostatnim commitem implementacji;
 wtedy też poprawić odnośniki `spec/planned/…` w `src/`, CLAUDE.md i testach.
 
+Implementacja: `/implement NN` (albo `/implement #<issue>`) — agenci na osobnej gałęzi, aż do
+PR (CLAUDE.md „Spec → PR harness”). Obok specyfikacji leży jej `NN-nazwa.feature`: scenariusze
+BDD (Gherkin, słowa kluczowe po angielsku), każdy z `@test=<suite>/<plik>.cpp:<funkcja>` albo
+`@manual`; `python tools/check_bdd.py` pilnuje, że testy istnieją. Issue bez specyfikacji
+dostaje ją od agenta (`NN` = kolejny wolny numer, „Źródło: issue #N”).
+
 | Nr | Specyfikacja | Katalog | Stan |
 |---|---|---|---|
 | 01 | [Aktualizacje OTA i hasło panelu](done/01-ota-updates.md) | done | v1.1.0 |
