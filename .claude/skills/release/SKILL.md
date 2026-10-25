@@ -98,6 +98,9 @@ never on a PR branch. Then `git log --oneline -1 --decorate` to show it.
 `cyd-sky-tracker-<next>.bin`, `-full.bin`, bootloader, partitions, boot_app0, SHA256SUMS.txt,
 version.txt). The Release's notes are GitHub's generated list of the merged PRs. The project page
 (`site.yml`, called by release.yml) rebuilds with the new version badge, changelog and roadmap.
+Check the live installer: `https://alasota.github.io/CYD-Flight-Tracker/firmware/manifest.json`
+must say `"version": "<next>"` (v1.7.0 first went out with v1.6.4's) — if not, `gh workflow run
+site.yml` (the latest Release is the new one by now) and check again.
 Failure → `gh run view <id> --log-failed`, report; don't delete or move the tag without the
 owner (a re-run of the failed job is fine: `gh run rerun <id> --failed`).
 
