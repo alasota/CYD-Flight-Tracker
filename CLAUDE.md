@@ -1336,7 +1336,8 @@ mistakes here waste hours of debugging later.
 - **GitHub Actions — four workflows** (`.github/workflows/`):
   - `firmware.yml` — push to main / manual, and reusable (`workflow_call`, inputs `version` =
     forced `FW_VERSION`, `ref` = commit): runs `pio test -e native`, `pio test -e native-asan`,
-    the BDD check (`tools/test_check_bdd.py`, `tools/check_bdd.py`), builds, uploads artifact `cyd-sky-tracker-<version>` with
+    the Python tool tests (`tools/test_check_bdd.py`, `tools/test_release_plan.py`,
+    `tools/test_build_site.py`) and the BDD check (`tools/check_bdd.py`), builds, uploads artifact `cyd-sky-tracker-<version>` with
     `cyd-sky-tracker-<version>.bin` (app, OTA or 0x10000), `…-full.bin` (merged image, 0x0),
     `bootloader.bin`, `partitions.bin`, `boot_app0.bin`, `version.txt`, `SHA256SUMS.txt`.
   - `site.yml` — changes under `site/`, `docs/screenshots`, `docs/icons` on main / manual, and
@@ -1368,11 +1369,38 @@ mistakes here waste hours of debugging later.
   `<!-- pl: … -->` comment (hidden on GitHub); Value/Effort/Risk use fixed words
   (high/medium/low, small/medium/large) that `build_site.py` translates (`WORDS_PL`); Rating is
   ⭐ stars. Editing ROADMAP.md on main republishes the page.
+  In the **Done** table the Verdict column is replaced by **Version / Wersja**
+  (`done_version()`: "Done in v1.6.0: …" -> a `v1.6.0` link to `#changelog`, `vNEXT` -> "the
+  next release" without a link, no version -> the full verdict); the long "what it does" text
+  stays in ROADMAP.md. Other sections show all columns. Columns are looked up by name.
   The "Current version" badge (`<!-- VERSION -->`) and the "What changed" section
-  (`<!-- CHANGELOG -->`) come from git: one entry per `v*` tag (newest first, newest expanded)
-  listing the non-merge commit subjects since the previous tag, max 15 + a GitHub compare
-  link. Hence `site.yml` checks out with `fetch-depth: 0`. Commit subjects are shown as they
-  are (not translated) — write them so they read well in a changelog.
+  (`<!-- CHANGELOG -->`) come from git, **grouped by minor version** (`group_by_minor()`:
+  v1.6.0 – v1.6.4 = one `<details class="card">`, newest first; only stable `vX.Y.Z` tags,
+  a dev tag's commits land in the next release's). The summary: version, tag range, newest
+  release's date, number of changes, release / diff links. The 2 newest groups are open
+  (`CHANGELOG_OPEN`), older ones fold to one line with their first roadmap item. Inside: first
+  the ROADMAP **Done** rows whose verdict says "Done in vX.Y.Z" of that minor
+  (`roadmap_done_by_version()`, linking to `#roadmap`) — the "what you get" — then the commits
+  folded under "Commits (N)" (a group without roadmap items, like v1.0, shows its commits
+  directly), max 15 + a GitHub compare link. Behind-the-scenes commits (tests, docs, specs,
+  harness, release tooling — the `CHORE` regex, `is_chore()`) are greyed (`li.chore`), not
+  hidden; "Fix: …" isn't a chore. So a feature gets its changelog headline from its ROADMAP
+  row: give every released feature one. Hence `site.yml` checks out with `fetch-depth: 0`.
+  Commit subjects are shown as they are (not translated) — write them so they read well in a
+  changelog. The pure parts of `build_site.py` (no `git` calls) are tested by
+  `tools/test_build_site.py` (`unittest`).
+  **Hand-written sections** of `site/index.html` besides the intro: `#screens`, **`#features`**
+  ("What else it does": 2×2 tiles — the "!", updates from GitHub, brightness / night
+  (`id="night-mode"`), backup — each a two-sentence summary with a screenshot or not, the long
+  story folded in a native `<details>` "More"), **`#panel`** (the settings page: a tab viewer,
+  `role="tablist"`, one screenshot at a time in a frame of max 640 px that scrolls inside, a
+  caption beside it; `site.js` handles click / arrow keys / Home / End), "First boot" (3 steps
+  + password), "For the curious". Without JS the tab row is hidden and all panels show one
+  under another (`html.js` gates it). ⚠️ `site.js` and the inline head script set the language
+  with `classList` (`remove('en','pl')` / `add(lang)`), never `className =` — that would wipe
+  the `js` class and every panel would reappear. Grids use `minmax(0, 1fr)`: a plain `1fr`
+  column grew to its min-content (nowrap changelog summaries, roadmap tables) and the 375 px
+  page scrolled sideways.
   `site/img/device.jpg` is a placeholder for a real photo: 1600×1000 px JPG, ≤ ~300 KB.
 
 ## Spec → PR harness (`/implement`, `/fix`, `/release`)
@@ -1384,8 +1412,10 @@ One spec (`spec/planned/NN-*.md`) or one GitHub issue -> its own branch -> a PR,
 `reviewer` (up to two fix rounds) -> PR from `.github/pull_request_template.md`. Shared rules:
 `.claude/harness/conventions.md`; hand-over files in `.claude/work/<slug>/` (git-ignored).
 - **BDD:** `spec/**/NN-name.feature` next to its spec; every Scenario is tagged
-  `@test=<suite>/<file>.cpp:<function>` (a Unity test that must exist and be `RUN_TEST`ed) or
-  `@manual` (checked on the board, listed in the PR). `tools/check_bdd.py` enforces it in CI;
+  `@test=<suite>/<file>.cpp:<function>` (a Unity test that must exist and be `RUN_TEST`ed),
+  `@test=tools/<file>.py:<Class>.<method>` (a Python `unittest` method `test*` in that
+  top-level class — for the tooling, e.g. spec 13's `build_site.py`) or `@manual` (checked on
+  the board / in a browser, listed in the PR). `tools/check_bdd.py` enforces it in CI;
   `--list` / `--manual <feature>` print the PR tables.
 - Branches `spec/NN-name` / `issue/N-name`; the agents never commit to main or merge — merging
   stays with the owner. `main` takes changes only through PRs (ruleset: PR + `firmware / build`
@@ -1419,6 +1449,9 @@ One spec (`spec/planned/NN-*.md`) or one GitHub issue -> its own branch -> a PR,
 - Test (native, logic only, no hardware): `pio test -e native` — one suite:
   `pio test -e native -f test_display`; with sanitizers (Linux): `pio test -e native-asan`
 - BDD check: `python tools/check_bdd.py` (its own tests: `python tools/test_check_bdd.py`)
+- Tool tests (what CI runs): `python tools/test_check_bdd.py`, `python tools/test_release_plan.py`,
+  `python tools/test_build_site.py`
+- Build the project page locally: `python tools/build_site.py --out _site` (`--firmware DIR` adds the installer)
 - Implement a spec / issue on a branch up to a PR: `/implement 05`, `/implement #12`
 - Fix a bug on a branch up to a PR: `/fix <description>`, `/fix #14`
 - Release what's merged: `/release` (`python tools/release_plan.py` shows the plan alone)
