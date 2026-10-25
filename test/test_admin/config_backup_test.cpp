@@ -5,6 +5,7 @@
 
 #include "config_backup.h"
 #include "fixtures.h"
+#include "json_assert.h"
 #include "test_support.h"
 
 namespace {
@@ -56,8 +57,9 @@ static void test_round_trip_restores_every_setting(void) {
 
 static void test_update_settings_in_the_general_group(void) {
   const std::string json = configToBackupJson(sample(), false, "v1");
-  ASSERT_CONTAINS(json, "\"update_check\": false");
-  ASSERT_CONTAINS(json, "\"update_show_prerelease\": true");
+  const JsonDocument doc = parseJson(json);
+  assertJsonBool(doc, "general.update_check", false);
+  assertJsonBool(doc, "general.update_show_prerelease", true);
   ASSERT_NOT_CONTAINS(json, "v1.4.0");
   // An older backup without the keys keeps the current values.
   Config current = defaultConfig();
@@ -76,18 +78,22 @@ static void test_update_settings_in_the_general_group(void) {
 }
 
 static void test_backup_names_its_format_and_firmware(void) {
-  const std::string json = configToBackupJson(sample(), true, "v1.2.3");
-  ASSERT_CONTAINS(json, "\"format\": \"cyd-sky-tracker-config\"");
-  ASSERT_CONTAINS(json, "\"format_version\": 1");
-  ASSERT_CONTAINS(json, "\"firmware\": \"v1.2.3\"");
-  ASSERT_CONTAINS(json, "\"language\": \"en\"");
+  const JsonDocument doc = parseJson(configToBackupJson(sample(), true, "v1.2.3"));
+  assertJsonString(doc, "format", "cyd-sky-tracker-config");
+  assertJsonInt(doc, "format_version", 1);
+  assertJsonString(doc, "firmware", "v1.2.3");
+  assertJsonString(doc, "general.language", "en");
+  assertJsonString(doc, "opensky.client_id", "my-client");
+  assertJsonString(doc, "opensky.client_secret", "s3cr\"et");
 }
 
 static void test_backup_without_secrets_keeps_the_devices_credentials(void) {
   const std::string json = configToBackupJson(sample(), false, "v1");
-  ASSERT_NOT_CONTAINS(json, "client_id");
-  ASSERT_NOT_CONTAINS(json, "client_secret");
-  ASSERT_NOT_CONTAINS(json, "s3cr");
+  const JsonDocument doc = parseJson(json);
+  assertJsonMissing(doc, "opensky.client_id");
+  assertJsonMissing(doc, "opensky.client_secret");
+  assertJsonInt(doc, "opensky.poll_interval_s", 30);
+  ASSERT_NOT_CONTAINS(json, "s3cr");  // nowhere else either
 
   Config device = defaultConfig();
   device.opensky_client_id = "device-id";
@@ -169,9 +175,10 @@ static void test_rejects_oversized_files(void) {
 static void test_panel_password_travels_only_with_secrets(void) {
   Config c = sample();
   c.web_password = "hunter22";
-  ASSERT_CONTAINS(configToBackupJson(c, true, "v1"), "\"web_password\": \"hunter22\"");
+  assertJsonString(parseJson(configToBackupJson(c, true, "v1")), "security.web_password", "hunter22");
   ASSERT_NOT_CONTAINS(configToBackupJson(c, false, "v1"), "hunter22");
-  ASSERT_NOT_CONTAINS(configToBackupJson(sample(), true, "v1"), "security");  // none set
+  assertJsonMissing(parseJson(configToBackupJson(c, false, "v1")), "security");
+  assertJsonMissing(parseJson(configToBackupJson(sample(), true, "v1")), "security");  // none set
 
   BackupRestoreResult r = restoreConfigFromBackupJson(configToBackupJson(c, true, "v1"),
                                                       defaultConfig());
@@ -213,9 +220,14 @@ static void test_display_group_round_trip(void) {
   c.night_wake_s = 120;
   c.night_pause_polling = true;
   const std::string json = configToBackupJson(c, false, "v1");
-  ASSERT_CONTAINS(json, "\"display\": {");
-  ASSERT_CONTAINS(json, "\"night_mode\": \"schedule\"");
-  ASSERT_CONTAINS(json, "\"night_from\": \"22:15\"");
+  const JsonDocument doc = parseJson(json);
+  assertJsonBool(doc, "display.brightness_auto", false);
+  assertJsonInt(doc, "display.brightness_fixed", 42);
+  assertJsonString(doc, "display.night_mode", "schedule");
+  assertJsonString(doc, "display.night_from", "22:15");
+  assertJsonString(doc, "display.night_to", "07:00");
+  assertJsonInt(doc, "display.night_brightness", 0);
+  assertJsonBool(doc, "display.night_pause_polling", true);
   BackupRestoreResult r = restoreConfigFromBackupJson(json, defaultConfig());
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_TRUE(r.invalidFields.empty());
