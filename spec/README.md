@@ -22,7 +22,7 @@ dostaje ją od agenta (`NN` = kolejny wolny numer, „Źródło: issue #N”).
 | 03 | [Jasność i tryb nocny](done/03-brightness-night-mode.md) | done | v1.3.0 |
 | 04 | [Dwa rdzenie](done/04-dual-core.md) | done | v1.4.0 |
 | 05 | [Ograniczone cache hexdb.io](done/05-bounded-lookup-cache.md) | done | v1.4.3 |
-| 06 | [Błąd logowania OpenSky → tryb anonimowy](done/06-opensky-login-fallback.md) | done | zrobione 2026-10-25, czeka na wydanie |
+| 06 | [Błąd logowania OpenSky → tryb anonimowy](done/06-opensky-login-fallback.md) | done | v1.6.0 |
 | 07 | [Reorganizacja testów](done/07-test-reorganization.md) | done | v1.4.2 |
 | 08 | [Ostrzeżenia urządzenia („!”)](done/08-device-alerts.md) | done | v1.5.1 |
 | 09 | [Odporność: zrzut ekranu, komendy, WWW w trakcie lookupów](planned/09-concurrency-robustness.md) | planned | czeka |
