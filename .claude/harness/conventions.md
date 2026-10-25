@@ -5,15 +5,22 @@ names), the test rules in `test/README.md`. This file only adds what the harness
 
 ## The run
 
-`/implement <spec | issue>` (`.claude/skills/implement/SKILL.md`) is the orchestrator — the main
-session. It spawns the agents below one at a time; agents don't spawn agents.
+Three orchestrators, each a skill run by the main session; they spawn the agents below one at a
+time (agents don't spawn agents):
+
+| Command | Branch | Ends with |
+|---|---|---|
+| `/implement <spec \| #issue>` (`.claude/skills/implement/`) | `spec/NN-name`, `issue/N-name` | a PR (feature → minor release) |
+| `/fix <description \| #issue>` (`.claude/skills/fix/`) | `fix/N-name`, `fix/name` | a PR labelled `bug` (→ patch release) |
+| `/release [patch\|minor\|major]` (`.claude/skills/release/`) | `release/vX.Y.Z` (only if docs need it) | an annotated tag on main + the GitHub Release |
 
 | Agent | Writes | Never touches |
 |---|---|---|
 | `spec-analyst` | `.claude/work/<slug>/plan.md`, `spec/planned/<NN-name>.feature`, a new spec file for an issue | `src/`, `test/` |
+| `bug-investigator` (/fix) | `.claude/work/<slug>/diagnosis.md`, the failing regression test (+ a stub if needed) | the fix itself |
 | `test-author` | `test/**`, declarations + neutral stubs in `src/*.h` / `src/*.cpp` so the tests compile and fail | real logic in `src/` |
 | `implementer` | `src/**`, `platformio.ini`, tools; tests only to fix a test that is provably wrong (say so) | the `.feature`, the spec's requirements |
-| `docs-writer` | `CLAUDE.md`, `README.md`, `test/README.md`, `ROADMAP.md`, `spec/**` status, `site/`, `docs/screenshots/` | `src/`, `test/` |
+| `docs-writer` (feature / fix / release mode) | `CLAUDE.md`, `README.md`, `test/README.md`, `ROADMAP.md`, `spec/**` status, `site/`, `docs/screenshots/` | `src/`, `test/` |
 | `reviewer` | `.claude/work/<slug>/review.md` | everything else (read-only) |
 
 Hand-over between agents is through `.claude/work/<slug>/` (git-ignored): `plan.md` (analyst),
@@ -54,9 +61,18 @@ left, anything that needs the owner's decision — short.
   `resetAllForTesting()`. `-Wall -Wextra -Werror`.
 - Edge cases the spec names (boundaries, empty, null, overflow, wraparound) each get a test.
 
+## Versions: vNEXT
+
+A branch doesn't know its version. Docs that need it (ROADMAP "Done in …", spec status
+"wydane w …", `spec/README.md`'s "Stan") say `vNEXT`; `/release` replaces it with the number
+(`tools/release_plan.py` lists the files). The project page renders it as "the next release".
+Features → minor (X.Y+1.0), fixes → patch (X.Y.Z+1), decided from the merged branches
+(`spec/`, `issue/` = feature; `fix/` or label `bug` = fix). Tags only on main, after the merge.
+
 ## Commits
 
-On the feature branch only (`spec/NN-<name>` or `issue/<N>-<name>`), never on `main`. One logical
+On the work branch only (`spec/…`, `issue/…`, `fix/…`, `release/…`), never on `main` — main
+takes changes through PRs only (its ruleset), only the release tag is pushed directly. One logical
 step per commit, tests green after each (except the test-author's "red" commit, which says so).
 Subjects in English, written to read well in the project page's changelog (they are shown there
 as they are). End every message with the `Co-Authored-By:` line Claude Code gives you. Stage

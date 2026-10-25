@@ -1352,7 +1352,8 @@ mistakes here waste hours of debugging later.
     and tags. Tags made with `GITHUB_TOKEN` don't trigger `release.yml` — on purpose.
   Platform and library versions are pinned in `platformio.ini` so CI and local builds match —
   bump them deliberately (and rerun `tools/subset_efont.py` after a LovyanGFX bump).
-- Release: `git tag v1.2.0 && git push origin v1.2.0`.
+- Release: `/release` (see "Spec → PR harness") — or by hand, on main after the merge:
+  `git switch main && git pull --ff-only && git tag -a v1.7.0 -m v1.7.0 && git push origin v1.7.0`.
 - **Project page** (GitHub Pages, https://alasota.github.io/CYD-Flight-Tracker/): source in
   `site/` (static HTML/CSS/JS, PL/EN — every text is a `.en` / `.pl` element pair, CSS shows
   one; light, humorous tone). `tools/build_site.py` assembles `_site/` = `site/` +
@@ -1374,7 +1375,7 @@ mistakes here waste hours of debugging later.
   are (not translated) — write them so they read well in a changelog.
   `site/img/device.jpg` is a placeholder for a real photo: 1600×1000 px JPG, ≤ ~300 KB.
 
-## Spec → PR harness (`/implement`)
+## Spec → PR harness (`/implement`, `/fix`, `/release`)
 
 One spec (`spec/planned/NN-*.md`) or one GitHub issue -> its own branch -> a PR, done by agents:
 `/implement 05` / `/implement #12` (`.claude/skills/implement/SKILL.md`, the orchestrator) runs
@@ -1387,9 +1388,28 @@ One spec (`spec/planned/NN-*.md`) or one GitHub issue -> its own branch -> a PR,
   `@manual` (checked on the board, listed in the PR). `tools/check_bdd.py` enforces it in CI;
   `--list` / `--manual <feature>` print the PR tables.
 - Branches `spec/NN-name` / `issue/N-name`; the agents never commit to main or merge — merging
-  and tagging releases stay with the owner.
-- PR creation uses `gh` (not installed on this machine yet: `winget install GitHub.cli`,
-  `gh auth login`); without it the orchestrator leaves a compare link + `pr.md`.
+  stays with the owner. `main` takes changes only through PRs (ruleset: PR + `firmware / build`
+  green + linear history, rebase merges — the agents' commit subjects become the changelog).
+- **`/fix <description | #issue>`** (`.claude/skills/fix/`): branch `fix/…`; `bug-investigator`
+  finds the root cause and commits a **regression test that fails** (`// Regression: …`) ->
+  **stops for the owner's OK** on the diagnosis -> `implementer` (smallest fix, the test turns
+  green unchanged) -> `docs-writer` fix mode (pitfalls only) -> `reviewer` -> PR "Fix: …" with
+  label `bug`.
+- **`/release [patch|minor|major]`** (`.claude/skills/release/`): `tools/release_plan.py`
+  (tested by `tools/test_release_plan.py`) reads the highest stable tag and the PRs merged
+  since -> **minor** if any feature (`spec/…`, `issue/…`), **patch** for fixes only (`fix/…`,
+  label `bug`) and other changes; major only on request. Owner confirms -> a `release/vX.Y.Z` PR
+  if docs need it (`docs-writer` release mode: specs still in `planned/` to `done/`, `vNEXT` ->
+  the version, ROADMAP rows, project page / README for released features), rebase-merged when
+  green -> annotated tag on main's HEAD -> watches `release.yml` (GitHub Release with generated
+  notes, project page).
+- **`vNEXT`:** branches don't know their version, so docs write a bare `vNEXT` placeholder
+  (ROADMAP's "Done in `vNEXT`" rows, spec status, `spec/README.md`); `/release` fills it in
+  (`release_plan.py --fill vX.Y.Z`), the project page shows it as "the next release" meanwhile
+  (`build_site.py`'s `split_cell()`). In backticks, as here, it's text about the placeholder and
+  is left alone — always write it that way when *explaining* it.
+- PR creation, merging and releases use `gh` (installed, logged in as alasota); without it
+  `/implement` / `/fix` leave a compare link + `pr.md`, `/release` stops.
 
 ## Commands
 
@@ -1400,6 +1420,8 @@ One spec (`spec/planned/NN-*.md`) or one GitHub issue -> its own branch -> a PR,
   `pio test -e native -f test_display`; with sanitizers (Linux): `pio test -e native-asan`
 - BDD check: `python tools/check_bdd.py` (its own tests: `python tools/test_check_bdd.py`)
 - Implement a spec / issue on a branch up to a PR: `/implement 05`, `/implement #12`
+- Fix a bug on a branch up to a PR: `/fix <description>`, `/fix #14`
+- Release what's merged: `/release` (`python tools/release_plan.py` shows the plan alone)
 - Screenshots of the config page (General, OpenSky, Firmware tabs) and the update question:
   `python tools/screenshots.py [--device cyd-sky.local]`
 

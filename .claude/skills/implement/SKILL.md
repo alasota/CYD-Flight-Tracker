@@ -1,7 +1,7 @@
 ---
 name: implement
 description: Implement one spec (spec/planned/NN-*.md) or one GitHub issue end to end on its own branch — plan + BDD scenarios (stop for the owner's approval), failing tests first, implementation, docs and screenshots, independent review, then a pull request whose CI builds a -dev release. Use when the user says "/implement 05", "/implement spec/planned/05-…md", "/implement #12" or "zaimplementuj issue 12".
-argument-hint: <spec number | spec path | #issue | issue URL>
+argument-hint: "<spec number | spec path | #issue | issue URL>"
 ---
 
 # /implement — spec or issue → branch → PR
@@ -66,7 +66,8 @@ Only flash after a yes. Tell the docs-writer whether the board runs the branch.
 
 ## 5. Docs and screenshots — agent `docs-writer`
 
-Tell it the target version if the owner named one (otherwise ROADMAP stays "In progress").
+Feature mode. The version isn't known yet: it writes `vNEXT` (ROADMAP "Done in vNEXT", spec
+status, `spec/README.md`), which `/release` replaces.
 Look at the screenshots it made (Read the PNGs).
 
 ## 6. Review — agent `reviewer`
@@ -105,4 +106,4 @@ for the owner and ask whether to open the PR anyway (as draft) or stop.
 
 To the owner: PR link, dev version (or "CI running"), what to test on the board (manual
 checklist), open points. Don't merge — that's the owner's call. Merging closes the PR, and CI
-deletes its dev releases; a real release is `git tag vX.Y.Z` on main as before.
+deletes its dev releases; the version comes with `/release` (a feature = minor bump).
