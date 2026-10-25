@@ -19,31 +19,15 @@ std::vector<std::string> &calls = stubHexdb().calls;
 static constexpr float kHomeLat = 52.0f;
 static constexpr float kHomeLon = 21.0f;
 
-static Aircraft plane(const char *hex, const char *cs, float lat, float lon, bool ground = false) {
-  Aircraft a;
-  a.icao24 = hex;
-  a.callsign = cs;
-  a.lat = lat;
-  a.lon = lon;
-  a.has_position = true;
-  a.has_altitude = !ground;
-  a.baro_altitude = ground ? 0.0f : 3000.0f;
-  a.has_velocity = true;
-  a.velocity = ground ? 5.0f : 200.0f;
-  a.true_track = 180.0f;  // southbound
-  a.on_ground = ground;
-  return a;
-}
-
 // near airborne, far airborne, ground right next to home, no position
 static std::vector<Aircraft> sky() {
   std::vector<Aircraft> v;
-  v.push_back(plane("far001", "FAR1", 52.40f, 21.0f));
-  v.push_back(plane("gnd001", "GND1", 52.002f, 21.0f, /*ground=*/true));
-  Aircraft np = plane("nopos1", "NOP1", 0.0f, 0.0f);
+  v.push_back(makeAircraft("far001", "FAR1", 52.40f, 21.0f));
+  v.push_back(makeAircraft("gnd001", "GND1", 52.002f, 21.0f, groundOpts()));
+  Aircraft np = makeAircraft("nopos1", "NOP1", 0.0f, 0.0f);
   np.has_position = false;
   v.push_back(np);
-  v.push_back(plane("near01", "NEAR1", 52.05f, 21.0f));
+  v.push_back(makeAircraft("near01", "NEAR1", 52.05f, 21.0f));
   return v;
 }
 

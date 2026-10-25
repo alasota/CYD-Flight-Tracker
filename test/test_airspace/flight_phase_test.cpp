@@ -2,6 +2,7 @@
 #include <unity.h>
 
 #include "flight_phase.h"
+#include "test_support.h"
 
 namespace {
 
@@ -10,64 +11,64 @@ namespace {
 static void test_on_ground_forces_none(void) {
   // Even with signals that would otherwise say "taking off" or "landing",
   // on_ground wins.
-  TEST_ASSERT_TRUE(classifyPhase(1.0f, 10.0f, true, 5.0f, 3.0f) == Phase::NONE);
-  TEST_ASSERT_TRUE(classifyPhase(1.0f, -10.0f, true, 5.0f, 3.0f) == Phase::NONE);
-  TEST_ASSERT_TRUE(classifyPhase(50.0f, 0.0f, true, 5.0f, 3.0f) == Phase::NONE);
+  ASSERT_ENUM_EQ(Phase::NONE, classifyPhase(1.0f, 10.0f, true, 5.0f, 3.0f));
+  ASSERT_ENUM_EQ(Phase::NONE, classifyPhase(1.0f, -10.0f, true, 5.0f, 3.0f));
+  ASSERT_ENUM_EQ(Phase::NONE, classifyPhase(50.0f, 0.0f, true, 5.0f, 3.0f));
 }
 
 static void test_takeoff_near_airport_climbing(void) {
-  TEST_ASSERT_TRUE(classifyPhase(2.0f, 5.0f, false, 5.0f, 3.0f) == Phase::TAKEOFF);
+  ASSERT_ENUM_EQ(Phase::TAKEOFF, classifyPhase(2.0f, 5.0f, false, 5.0f, 3.0f));
 }
 
 static void test_landing_near_airport_descending(void) {
-  TEST_ASSERT_TRUE(classifyPhase(2.0f, -5.0f, false, 5.0f, 3.0f) == Phase::LANDING);
+  ASSERT_ENUM_EQ(Phase::LANDING, classifyPhase(2.0f, -5.0f, false, 5.0f, 3.0f));
 }
 
 static void test_far_from_airport_has_no_phase(void) {
   // CLAUDE.md "Flight phase": beyond near_airport_km -> NONE, no icon. (The
   // first implementation returned OVERFLIGHT here, so every distant aircraft
   // showed the same icon and the FAZA column told you nothing.)
-  TEST_ASSERT_TRUE(classifyPhase(50.0f, 10.0f, false, 5.0f, 3.0f) == Phase::NONE);
-  TEST_ASSERT_TRUE(classifyPhase(50.0f, -10.0f, false, 5.0f, 3.0f) == Phase::NONE);
-  TEST_ASSERT_TRUE(classifyPhase(50.0f, 0.0f, false, 5.0f, 3.0f) == Phase::NONE);
+  ASSERT_ENUM_EQ(Phase::NONE, classifyPhase(50.0f, 10.0f, false, 5.0f, 3.0f));
+  ASSERT_ENUM_EQ(Phase::NONE, classifyPhase(50.0f, -10.0f, false, 5.0f, 3.0f));
+  ASSERT_ENUM_EQ(Phase::NONE, classifyPhase(50.0f, 0.0f, false, 5.0f, 3.0f));
 }
 
 static void test_overflight_near_airport_but_level(void) {
   // Near an airport but not climbing/descending fast enough - level flyover.
-  TEST_ASSERT_TRUE(classifyPhase(2.0f, 1.0f, false, 5.0f, 3.0f) == Phase::OVERFLIGHT);
-  TEST_ASSERT_TRUE(classifyPhase(2.0f, -1.0f, false, 5.0f, 3.0f) == Phase::OVERFLIGHT);
-  TEST_ASSERT_TRUE(classifyPhase(2.0f, 0.0f, false, 5.0f, 3.0f) == Phase::OVERFLIGHT);
+  ASSERT_ENUM_EQ(Phase::OVERFLIGHT, classifyPhase(2.0f, 1.0f, false, 5.0f, 3.0f));
+  ASSERT_ENUM_EQ(Phase::OVERFLIGHT, classifyPhase(2.0f, -1.0f, false, 5.0f, 3.0f));
+  ASSERT_ENUM_EQ(Phase::OVERFLIGHT, classifyPhase(2.0f, 0.0f, false, 5.0f, 3.0f));
 }
 
 // ---- boundary: exactly at near_airport_km ----------------------------------
 
 static void test_exactly_at_near_airport_threshold_counts_as_near(void) {
   // distance_km == near_airport_km -> inclusive, still "near".
-  TEST_ASSERT_TRUE(classifyPhase(5.0f, 5.0f, false, 5.0f, 3.0f) == Phase::TAKEOFF);
-  TEST_ASSERT_TRUE(classifyPhase(5.0f, -5.0f, false, 5.0f, 3.0f) == Phase::LANDING);
+  ASSERT_ENUM_EQ(Phase::TAKEOFF, classifyPhase(5.0f, 5.0f, false, 5.0f, 3.0f));
+  ASSERT_ENUM_EQ(Phase::LANDING, classifyPhase(5.0f, -5.0f, false, 5.0f, 3.0f));
 }
 
 static void test_just_past_near_airport_threshold_is_none(void) {
-  TEST_ASSERT_TRUE(classifyPhase(5.01f, 5.0f, false, 5.0f, 3.0f) == Phase::NONE);
-  TEST_ASSERT_TRUE(classifyPhase(5.01f, 0.0f, false, 5.0f, 3.0f) == Phase::NONE);
+  ASSERT_ENUM_EQ(Phase::NONE, classifyPhase(5.01f, 5.0f, false, 5.0f, 3.0f));
+  ASSERT_ENUM_EQ(Phase::NONE, classifyPhase(5.01f, 0.0f, false, 5.0f, 3.0f));
 }
 
 // ---- boundary: exactly at climb_threshold_mps ------------------------------
 
 static void test_exactly_at_climb_threshold_counts_as_takeoff(void) {
-  TEST_ASSERT_TRUE(classifyPhase(1.0f, 3.0f, false, 5.0f, 3.0f) == Phase::TAKEOFF);
+  ASSERT_ENUM_EQ(Phase::TAKEOFF, classifyPhase(1.0f, 3.0f, false, 5.0f, 3.0f));
 }
 
 static void test_just_below_climb_threshold_is_overflight(void) {
-  TEST_ASSERT_TRUE(classifyPhase(1.0f, 2.99f, false, 5.0f, 3.0f) == Phase::OVERFLIGHT);
+  ASSERT_ENUM_EQ(Phase::OVERFLIGHT, classifyPhase(1.0f, 2.99f, false, 5.0f, 3.0f));
 }
 
 static void test_exactly_at_negative_climb_threshold_counts_as_landing(void) {
-  TEST_ASSERT_TRUE(classifyPhase(1.0f, -3.0f, false, 5.0f, 3.0f) == Phase::LANDING);
+  ASSERT_ENUM_EQ(Phase::LANDING, classifyPhase(1.0f, -3.0f, false, 5.0f, 3.0f));
 }
 
 static void test_just_above_negative_climb_threshold_is_overflight(void) {
-  TEST_ASSERT_TRUE(classifyPhase(1.0f, -2.99f, false, 5.0f, 3.0f) == Phase::OVERFLIGHT);
+  ASSERT_ENUM_EQ(Phase::OVERFLIGHT, classifyPhase(1.0f, -2.99f, false, 5.0f, 3.0f));
 }
 
 }  // namespace
