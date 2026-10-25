@@ -25,6 +25,7 @@ and its .md spec next to it. Exit 1 with one line per problem.
 """
 
 import argparse
+import ast
 import re
 import sys
 from pathlib import Path
@@ -120,13 +121,17 @@ def py_test_defined(repo_root, rel, name):
     if not path.is_file():
         return f"test file {rel} does not exist"
     src = path.read_text(encoding="utf-8", errors="replace")
-    m = re.search(r"^class\s+%s\b.*:[ \t]*$" % re.escape(cls), src, re.M)
-    if not m:
+    # Parsed, not scanned: a fixture string with lines at column 0 inside a method doesn't
+    # end the class, and a def nested in a method or an inner class isn't one of its methods.
+    try:
+        tree = ast.parse(src, filename=str(path))
+    except SyntaxError as e:
+        return f"{rel} doesn't parse (line {e.lineno}: {e.msg})"
+    klass = next((n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == cls), None)
+    if klass is None:
         return f"{rel} has no class {cls}"
-    # The class body runs until the next top-level line (class, def, if __name__ ...).
-    end = re.search(r"^\S", src[m.end():], re.M)
-    body = src[m.end():m.end() + end.start()] if end else src[m.end():]
-    if not re.search(r"^[ \t]+def\s+%s\s*\(\s*self\b" % re.escape(method), body, re.M):
+    if not any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == method
+               for n in klass.body):
         return f"{rel} has no method {method} in class {cls}"
     if not method.startswith("test"):
         return f"{rel}: {cls}.{method} isn't named test*, unittest never runs it"

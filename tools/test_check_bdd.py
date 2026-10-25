@@ -19,6 +19,29 @@ void run_x_tests() {
 }
 """
 
+# A fixture at column 0 inside a method, a def nested in a method, an inner class.
+TEST_PY_TRICKY = '''\
+import unittest
+
+
+class YTest(unittest.TestCase):
+    def test_fixture(self):
+        text = """\\
+## Done
+| # | Item |
+"""
+        def test_nested(self):
+            pass
+        self.assertTrue(text)
+
+    class Inner:
+        def test_inner(self):
+            pass
+
+    def test_after_fixture(self):
+        pass
+'''
+
 TEST_PY = """\
 import unittest
 
@@ -217,6 +240,31 @@ class CheckBddTest(unittest.TestCase):
         self.assertIn("has no method test_b", msgs[2])  # test_b is OtherTest's, not XTest's
         self.assertIn("helper", msgs[3])  # unittest never runs a method not named test*
         self.assertFalse(any("malformed tag" in m for m in msgs), msgs)
+
+    def test_python_test_methods_found_by_syntax_not_indentation(self):
+        # A fixture string with lines at column 0 inside a method doesn't end the class,
+        # and a def nested in a method (or in an inner class) isn't a method of the class.
+        (self.root / "tools").mkdir(exist_ok=True)
+        (self.root / "tools" / "test_y.py").write_text(TEST_PY_TRICKY)
+        p = self.feature("""\n            Feature: F
+              @test=tools/test_y.py:YTest.test_after_fixture
+              Scenario: After a column-0 string
+                Then a
+              @test=tools/test_y.py:YTest.test_nested
+              Scenario: Nested in a method
+                Then b
+              @test=tools/test_y.py:YTest.test_inner
+              Scenario: Method of an inner class
+                Then c
+              @test=tools/test_y.py:Inner.test_inner
+              Scenario: Inner class isn't top-level
+                Then d
+            """)
+        msgs = self.problems(p)
+        self.assertEqual(3, len(msgs), msgs)
+        self.assertIn("has no method test_nested in class YTest", msgs[0])
+        self.assertIn("has no method test_inner in class YTest", msgs[1])
+        self.assertIn("has no class Inner", msgs[2])
 
     def test_python_tag_outside_tools_or_without_method_is_malformed(self):
         self.python_test_file()
