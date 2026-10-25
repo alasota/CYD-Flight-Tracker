@@ -29,3 +29,4 @@ dostaje ją od agenta (`NN` = kolejny wolny numer, „Źródło: issue #N”).
 | 10 | [Bezpieczeństwo panelu WWW](planned/10-web-panel-security.md) | planned | czeka |
 | 11 | [Porządki: martwy kod, komentarze, dokumentacja](planned/11-cleanup-dead-code-docs.md) | planned | czeka |
 | 12 | [Reorganizacja kodu (DDD)](planned/12-code-reorganization-ddd.md) | planned | czeka (po 07, 11) |
+| 13 | [Strona projektu: historia zmian, zrzuty panelu, opis funkcji](planned/13-project-page-layout.md) | planned | czeka |
