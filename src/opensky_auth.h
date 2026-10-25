@@ -52,13 +52,6 @@ uint32_t credentialsHash(const std::string &id, const std::string &secret);
 // token is granted).
 OpenSkyAuthState onCredentials(const OpenSkyAuthState &s, uint32_t hash, bool haveCredentials);
 
-// After one token request: 200 with a token -> Account; 400 / 401 / 403 ->
-// LoginFailed (+ the code); anything else (no answer, 5xx, a body without a
-// token) is transient -> unchanged.
-// TODO(spec 06): old signature, still used by opensky_client.cpp — remove
-// once the adapter calls the TokenOutcome overload below.
-OpenSkyAuthState onTokenResult(const OpenSkyAuthState &s, int httpCode, bool gotToken);
-
 // After one token request (spec 06 §3.1): Ok -> Account (code, failedSinceMs,
 // nextTokenTryMs cleared); Rejected -> LoginFailed + code, failedSinceMs = now
 // unless already failed, nextTokenTryMs = now + kLoginRetryMs; Transient in

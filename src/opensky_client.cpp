@@ -191,23 +191,25 @@ bool everPolled = false;
 OpenSkyQuota quota;  // credits left / reset time, from the last answer's headers
 bool fetchToken(const std::string &client_id, const std::string &client_secret, int *httpCode);
 
-OpenSkyAuthState auth;  // did the login work (opensky_auth, spec 08's alert)
+OpenSkyAuthState auth;  // did the login work (opensky_auth, spec 06 / 08)
 
-// One token request, with the outcome folded into `auth` (logged once per change).
-bool fetchTokenTracked(const Config &cfg) {
+// Moves `auth` to `next`, logging a change of mode once (not every poll).
+void setAuth(const OpenSkyAuthState &next) {
+  const std::string line = authChangeLogLine(auth, next);
+  if (!line.empty()) Serial.printf("[opensky_client] %s\n", line.c_str());
+  auth = next;
+}
+
+// One token request, with the outcome folded into `auth`. A rejected login
+// drops the cached token too, so the retry 30 min later asks for a new one
+// instead of reusing a token /states/all no longer accepts.
+TokenOutcome fetchTokenTracked(const Config &cfg) {
   int code = 0;
   const bool ok = fetchToken(cfg.opensky_client_id, cfg.opensky_client_secret, &code);
-  const OpenSkyAuthState next = onTokenResult(auth, code, ok);
-  if (next.mode != auth.mode) {
-    if (next.mode == OpenSkyAuthState::Mode::LoginFailed) {
-      Serial.printf("[opensky_client] login failed (http=%d) — check client_id/secret; "
-                    "using anonymous access\n", next.lastHttpCode);
-    } else if (next.mode == OpenSkyAuthState::Mode::Account) {
-      Serial.println("[opensky_client] login ok — using account");
-    }
-  }
-  auth = next;
-  return ok;
+  const TokenOutcome outcome = classifyTokenResponse(code, ok);
+  if (outcome == TokenOutcome::Rejected) cachedToken.valid = false;
+  setAuth(onTokenResult(auth, outcome, code, millis()));
+  return outcome;
 }
 
 // One /states/all attempt, with the 200-response body parsed inline
@@ -377,29 +379,44 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
     return result;
   }
 
-  bool useAuth = shouldUseOAuth(cfg.opensky_client_id, cfg.opensky_client_secret);
+  const bool haveCredentials = shouldUseOAuth(cfg.opensky_client_id, cfg.opensky_client_secret);
   const uint32_t hash = credentialsHash(cfg.opensky_client_id, cfg.opensky_client_secret);
   if (hash != auth.credentialsHash) cachedToken.valid = false;  // a token for the old ones
-  auth = onCredentials(auth, hash, useAuth);
+  setAuth(onCredentials(auth, hash, haveCredentials));
 
-  if (useAuth && tokenNeedsRefresh(cachedToken, now)) {
-    if (!fetchTokenTracked(cfg)) {
-      // Couldn't get a token this round; fall back to anonymous for this
-      // poll rather than failing outright.
-      useAuth = false;
-    }
+  // In LoginFailed the login server is asked only every kLoginRetryMs;
+  // without a token this poll simply goes anonymous.
+  bool tokenFetched = false;
+  if (shouldTryToken(auth, now) && tokenNeedsRefresh(cachedToken, now)) {
+    fetchTokenTracked(cfg);
+    tokenFetched = true;
   }
 
   BoundingBox bbox = computeBoundingBox(cfg.home_lat, cfg.home_lon, cfg.radius_deg);
 
-  StatesAttempt att =
-      requestStatesOnce(bbox, useAuth ? cachedToken.access_token : std::string());
+  bool bearer = planStatesRequest(auth, cachedToken.valid);
+  StatesAttempt att = requestStatesOnce(bbox, bearer ? cachedToken.access_token : std::string());
 
-  if (att.transport_ok && att.code == 401 && useAuth) {
-    // Treat a first 401 as "refresh once and retry", not fatal — see CLAUDE.md.
-    if (fetchTokenTracked(cfg)) {
-      att = requestStatesOnce(bbox, cachedToken.access_token);
+  // 401/403, decided by opensky_auth: with a token -> refresh once and retry
+  // (a token fetched this poll is already fresh: that step is skipped);
+  // still rejected -> LoginFailed and the same poll anonymously; rejected
+  // anonymously -> AuthError below. At most two extra requests.
+  for (int round = 0; att.transport_ok && round < 2; ++round) {
+    const StatesDecision d = afterStatesResponse(auth, att.code, bearer, tokenFetched, millis());
+    if (d.step == StatesStep::RefreshTokenAndRetry) {
+      // Drop the rejected token first: if the refresh doesn't yield a new
+      // one (rejected or no answer), the retry goes anonymous.
+      cachedToken.valid = false;
+      fetchTokenTracked(cfg);
+      tokenFetched = true;
+    } else if (d.step == StatesStep::RetryAnonymous) {
+      cachedToken.valid = false;
+      setAuth(d.auth);
+    } else {
+      break;  // Accept, or AuthError (handled with the other 401/403 below)
     }
+    bearer = planStatesRequest(auth, cachedToken.valid);
+    att = requestStatesOnce(bbox, bearer ? cachedToken.access_token : std::string());
   }
 
   if (!att.transport_ok) {
@@ -429,10 +446,11 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
   }
 
   if (att.code == 401 || att.code == 403) {
-    // Still rejected after a fresh token — the credentials are wrong, not a
-    // transient blip. Surface it instead of silently going empty forever
+    // Rejected even without a token (a rejected token already fell back to
+    // anonymous above) — surface it instead of silently going empty forever
     // (review notes 1.3).
-    Serial.printf("[opensky_client] auth rejected (http=%d) — check client_id/secret\n", att.code);
+    Serial.printf("[opensky_client] /states/all rejected (http=%d, %s)\n", att.code,
+                  bearer ? "account" : "anonymous");
     result.status = OpenSkyPollStatus::AuthError;
     return result;
   }
@@ -447,7 +465,7 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
   if (quota.state == OpenSkyQuota::State::Available) {
     Serial.printf("[opensky_client] ok: %u aircraft, credits remaining=%u (%s)\n",
                   static_cast<unsigned>(att.aircraft.size()), static_cast<unsigned>(quota.remaining),
-                  useAuth ? "account" : "anonymous");
+                  bearer ? "account" : "anonymous");
   } else {
     Serial.printf("[opensky_client] ok: %u aircraft, credits remaining unknown (no header)\n",
                   static_cast<unsigned>(att.aircraft.size()));
