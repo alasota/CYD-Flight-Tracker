@@ -7,10 +7,13 @@
 #include "lookup_budget.h"
 #include "table_view.h"
 
-// TODO(spec 09): stub from test-author
-bool serveBetweenFetches(bool & /*busy*/, const std::function<void()> & /*serve*/,
-                         const std::function<bool()> & /*updateStarted*/) {
-  return true;
+bool serveBetweenFetches(bool &busy, const std::function<void()> &serve,
+                         const std::function<bool()> &updateStarted) {
+  if (busy) return true;  // called from inside serve(): nothing to do, go on
+  busy = true;
+  serve();
+  busy = false;
+  return !updateStarted();
 }
 
 PipelineParams cacheOnly(PipelineParams p) {
@@ -37,15 +40,31 @@ DataSnapshot buildDataSnapshot(const std::vector<Aircraft> &aircraft, const Pipe
   const LookupPlan plan =
       planLookups(byPriority, ports.aircraftKnown, ports.routeKnown, p.lookupBudget);
 
+  // A key that isn't cached costs a hexdb.io request: counted, followed by
+  // the betweenFetches hook (net_task serves the settings page there). Once
+  // the hook says stop, uncached keys are skipped (left *_pending); cached
+  // ones still resolve — they cost nothing.
+  bool stopped = false;
+  auto mayLookUp = [&](bool cached) { return cached || !stopped; };
+  auto afterLookup = [&](bool cached) {
+    if (cached) return;
+    ++s.fetches;
+    if (ports.betweenFetches && !ports.betweenFetches()) stopped = true;
+  };
+
   std::map<std::string, AircraftInfo> infoByIcao24;
   for (const std::string &hex : plan.icao24) {
-    if (!ports.aircraftKnown(hex)) ++s.fetches;
+    const bool cached = ports.aircraftKnown(hex);
+    if (!mayLookUp(cached)) continue;
     infoByIcao24[hex] = ports.aircraft(hex);
+    afterLookup(cached);
   }
   std::map<std::string, RouteInfo> routeByCallsign;
   for (const std::string &cs : plan.callsigns) {
-    if (!ports.routeKnown(cs)) ++s.fetches;
+    const bool cached = ports.routeKnown(cs);
+    if (!mayLookUp(cached)) continue;
     routeByCallsign[cs] = ports.route(cs);
+    afterLookup(cached);
   }
 
   // Fold the enrichment into the already-sorted rows in place — it doesn't
@@ -80,8 +99,10 @@ DataSnapshot buildDataSnapshot(const std::vector<Aircraft> &aircraft, const Pipe
       planLookups(airportKeys, ports.airportKnown, ports.routeKnown, p.airportBudget);
   std::map<std::string, AirportInfo> airportByCode;
   for (const std::string &code : airportPlan.icao24) {
-    if (!ports.airportKnown(code)) ++s.fetches;
+    const bool cached = ports.airportKnown(code);
+    if (!mayLookUp(cached)) continue;
     airportByCode[code] = ports.airport(code);
+    afterLookup(cached);
   }
   for (AircraftRow &r : rows) {
     if (!r.route.found) continue;
