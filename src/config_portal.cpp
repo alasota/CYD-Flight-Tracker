@@ -265,15 +265,22 @@ void handleRoot() {
   sendConfigPage(loadConfig(), requestedTab());
 }
 
-// GET /lang?l=pl|en[&tab=...] — the PL/EN switch in the page header: saves
+// POST /lang (l=pl|en, tab=...) — the PL/EN switch in the page header: saves
 // the web panel's language only and redirects back to the same tab.
 void handleLang() {
-  if (!authorize()) return;
+  if (!requireSameOrigin() || !authorize()) return;
   Config cfg = loadConfig();
   cfg.web_language = languageFromCode(server.arg("l").c_str());
   saveConfig(cfg);
   server.sendHeader("Location", String("/?tab=") + settingsTabId(requestedTab()));
   server.send(303, "text/plain", "");
+}
+
+// GET /lang — was the switch before spec 10; a GET must not change anything
+// (an <img src> on any page could flip it).
+void handleLangGet() {
+  server.sendHeader("Allow", "POST");
+  server.send(405, "text/plain", "Method not allowed: use POST");
 }
 
 // Turns a refused password into the label listed after "these fields were invalid".
@@ -838,7 +845,8 @@ void configPortalBegin() {
 
   server.on("/", HTTP_GET, secured<handleRoot>);
   server.on("/save", HTTP_POST, secured<handleSave>);
-  server.on("/lang", HTTP_GET, secured<handleLang>);
+  server.on("/lang", HTTP_POST, secured<handleLang>);
+  server.on("/lang", HTTP_GET, secured<handleLangGet>);
   server.on("/screenshot.bmp", HTTP_GET, secured<handleScreenshot>);
   server.on("/light.json", HTTP_GET, secured<handleLight>);
   server.on("/perf.json", HTTP_GET, secured<handlePerf>);
