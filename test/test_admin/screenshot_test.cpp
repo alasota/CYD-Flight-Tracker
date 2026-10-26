@@ -723,6 +723,47 @@ static void test_each_finished_capture_returns_to_its_own_previous_screen(void) 
   TEST_ASSERT_EQUAL_INT(2, r.returns);
 }
 
+// Regression: the UI took the Prepare job and switched the screen, but the
+// handler's begin() timed out before finishJob() — capturing() never went
+// true, so the old edge-triggered afterPass() never fired: the display stayed
+// on the captured screen and the stale target jumped back at the end of some
+// later, unrelated capture.
+static void test_screen_returns_when_prepare_finished_after_begin_timeout(void) {
+  ReturnRig r(2);
+  Bridge::Job job;
+  bool taken = false;
+  // The UI picks the request up on the first wait step but is slow to finish it.
+  r.rig.onPause = [&] {
+    if (!taken) {
+      job = r.rig.bridge.takeJob();
+      taken = true;
+    }
+  };
+  TEST_ASSERT_FALSE(r.rig.bridge.begin(0, 3));  // 503 for the client
+  ASSERT_ENUM_EQ(Bridge::Job::Prepare, job.kind);
+
+  // The rest of that slow UI pass, as main.cpp's serviceScreenshot() does it.
+  r.ret.onPrepare(r.shown, job.screen, kRealScreens);
+  r.shown = job.screen;
+  r.rig.bridge.finishJob(job, r.rig.now);  // too late: generation is stale
+  const bool capturing = r.rig.bridge.capturing(r.rig.now);
+  TEST_ASSERT_FALSE(capturing);
+  const int back = r.ret.afterPass(capturing);
+  TEST_ASSERT_EQUAL_INT(2, back);  // back on RADAR in the same pass
+  r.shown = back;
+
+  // Later the user taps TERAZ and a capture of that same screen runs: nothing
+  // left over to jump back to.
+  r.shown = 1;
+  r.rig.onPause = [&r] { r.uiPass(); };
+  r.captureAllBands(1);
+  r.rig.bridge.end();
+  r.uiPass();
+  r.uiPass();
+  TEST_ASSERT_EQUAL_INT(0, r.returns);
+  TEST_ASSERT_EQUAL_INT(1, r.shown);
+}
+
 static void test_return_not_triggered_without_prepare(void) {
   ScreenshotReturn ret;
   TEST_ASSERT_EQUAL_INT(-1, ret.afterPass(false));
@@ -766,6 +807,7 @@ void run_screenshot_tests() {
   RUN_TEST(test_no_return_when_capture_did_not_switch_screen);
   RUN_TEST(test_return_target_is_first_screen_of_capture_series);
   RUN_TEST(test_each_finished_capture_returns_to_its_own_previous_screen);
+  RUN_TEST(test_screen_returns_when_prepare_finished_after_begin_timeout);
   RUN_TEST(test_return_not_triggered_without_prepare);
 
 }

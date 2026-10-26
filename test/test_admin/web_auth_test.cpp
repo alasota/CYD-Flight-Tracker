@@ -161,10 +161,9 @@ static void assertOriginExamples(const OriginExample *ex, size_t n) {
   for (size_t i = 0; i < n; ++i) {
     const std::string what = std::string("Host=") + ex[i].host + " Origin=" + ex[i].origin +
                              " Referer=" + ex[i].referer;
-    TEST_ASSERT_EQUAL_INT_MESSAGE(static_cast<int>(ex[i].want),
-                                  static_cast<int>(checkRequestOrigin(ex[i].origin, ex[i].referer,
-                                                                      ex[i].host)),
-                                  what.c_str());
+    const OriginCheck got = checkRequestOrigin(ex[i].origin, ex[i].referer, ex[i].host);
+    if (got != ex[i].want) TEST_MESSAGE(what.c_str());  // which example, only when it fails
+    ASSERT_ENUM_EQ(ex[i].want, got);
   }
 }
 

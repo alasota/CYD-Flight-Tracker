@@ -226,8 +226,11 @@ class ScreenshotBridge {
 // /screenshot.bmp?screen=N switches the display only for the capture. The UI
 // (core 1) calls onPrepare() when it answers the Prepare job and afterPass()
 // with ScreenshotBridge::capturing() on every pass; afterPass() returns the
-// screen to go back to exactly once, on the capturing true -> false edge
-// (end(), timeout or the 5 s idle rule), else -1. Only a real switch
+// screen to go back to exactly once, on the first pass that isn't capturing
+// (end(), timeout or the 5 s idle rule), else -1. Not tied to a capturing
+// true -> false edge: a Prepare whose begin() timed out before the UI finished
+// it never makes capturing() true, and the switched screen must still come
+// back (and not linger as a stale target for a later capture). Only a real switch
 // (requested in 0..screenCount-1 and != current) is remembered — no screen
 // argument (-1), the same screen and the demo indices (>= screenCount) leave
 // nothing to return to. UI side only, no lock.
@@ -243,9 +246,7 @@ class ScreenshotReturn {
   }
 
   int afterPass(bool capturing) {
-    const bool ended = wasCapturing_ && !capturing;
-    wasCapturing_ = capturing;
-    if (!ended || !armed_) return -1;
+    if (capturing || !armed_) return -1;
     armed_ = false;
     return back_;
   }
@@ -253,5 +254,4 @@ class ScreenshotReturn {
  private:
   bool armed_ = false;
   int back_ = -1;
-  bool wasCapturing_ = false;
 };
