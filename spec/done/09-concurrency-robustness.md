@@ -99,11 +99,23 @@ Scenariusze BDD: `09-concurrency-robustness.feature`.
    tam `configPortalLoop()` przez czysty `serveBetweenFetches()` (bez zagnieżdżenia; „stop”, gdy
    ruszyła aktualizacja OTA). Po „stop” klucze z cache dalej się rozwiązują, reszta zostaje `...`;
    przerwana faza B jest publikowana, jeśli coś pobrała (decyzja właściciela).
+4. **Po przeglądzie (poza zakresem specyfikacji, ten sam problem co §3):** *Sprawdź teraz*
+   (`POST /update/check`) i przełącznik wersji deweloperskich (`POST /update/prerelease`) robiły
+   sprawdzenie GitHuba (TLS, sekundy) wewnątrz obsługi żądania strony. Teraz tylko je kolejkują
+   (`ManualCheck` w `release_check`: `askManualCheck()` / `takeManualCheck()` /
+   `manualCheckPending()`); `releaseCheckLoop()` wykonuje je po odpytaniu OpenSky. Zakładka
+   Firmware pokazuje „Sprawdzam na GitHubie…” i przeładowuje się co 3 s; prośba niewykonana w
+   60 s wygasa; „raz na minutę” liczone od sprawdzenia, które faktycznie się odbyło, drugie
+   kliknięcie w tej minucie dostaje stronę z wyjaśnieniem zamiast cichego 303. Usunięte:
+   `releaseCheckNow()`, `configPortalSetUpdateGateSource()` / `UpdateGateSource`. Testy w
+   `release_check_test.cpp` i `config_page_test.cpp`; po tej rundzie `native` 855 przypadków
+   (852 zielone, 3 pominięte), `pio run -e cyd` 1 466 457 B (74,6 %).
 
 **Do sprawdzenia na płytce (`@manual`)** — kryteria §4.1 i §4.2: 50 × przerwany `curl
 --max-time 0.3 /screenshot.bmp` (bez restartu, ekran rysuje ≤ 1 s po przerwaniu, `[perf]` bez
 przerw UI > 5 s); strona ustawień co 2 s przez 5 min < 1,5 s na ładowanie, także przy
-`phase B: N hexdb.io lookups`; zapis ustawień / *Sprawdź teraz* / wgranie OTA w trakcie fazy B.
+`phase B: N hexdb.io lookups`; zapis ustawień / *Sprawdź teraz* (strona od razu pokazuje „Sprawdzam na GitHubie…”, linia `[update]`
+po odpytaniu) / wgranie OTA w trakcie fazy B.
 Przy okazji `[perf] stack net=` — `configPortalLoop()` działa teraz zagnieżdżone w
 `pollOpenSky()`; przy zapasie < ~2 KB podnieść `kNetTaskStackBytes`. Kryterium §4.3 (`native`
 zielone) spełnione lokalnie; `native-asan` sprawdza CI.
