@@ -80,6 +80,45 @@ struct AuthOutcome {
 };
 AuthOutcome decideAuth(bool passwordSet, bool locked, bool sentCredentials, bool credentialsOk);
 
+// ---- Cross-site requests (spec 10 §2.1) -------------------------------------
+//
+// Did a state-changing POST come from the panel's own page? `origin` /
+// `referer` / `host` are the request headers as WebServer::header() returns
+// them ("" = absent). Origin decides when present; without it, the host of
+// Referer. Same = exact, case-insensitive host[:port] match against Host,
+// scheme `http://` only, ":80" equal to no port. Neither header = NoHeaders
+// (curl, `pio run -e cyd-ota -t upload`) — allowed.
+enum class OriginCheck : uint8_t {
+  SameOrigin,
+  CrossOrigin,
+  NoHeaders,
+};
+OriginCheck checkRequestOrigin(const std::string &origin, const std::string &referer,
+                               const std::string &host);
+
+// At UPLOAD_FILE_START, before anything is buffered or written: origin
+// first, then the password.
+enum class UploadStart : uint8_t {
+  Accept,
+  RefuseOrigin,  // 403, nothing written
+  RefuseAuth,    // 401 / 429 as for any request
+};
+UploadStart decideUploadStart(OriginCheck origin, bool credentialsOk);
+
+// "[auth] cross-origin POST /save from http://evil.example refused" — the
+// Origin, or the Referer when there was no Origin.
+std::string crossOriginLogLine(const std::string &method, const std::string &path,
+                               const std::string &origin, const std::string &referer);
+
+// Sent with every response of the panel (spec 10 §2.3): no framing; no
+// Access-Control-* header at all (no CORS).
+struct SecurityHeader {
+  const char *name;
+  const char *value;
+};
+constexpr size_t kSecurityHeaderCount = 2;
+extern const SecurityHeader kSecurityHeaders[kSecurityHeaderCount];
+
 // ---- Resetting a forgotten password from the touchscreen: hold a finger on
 // the screen while the board powers up, for kResetHoldMs, then confirm
 // YES / NO (no answer within kResetConfirmTimeoutMs = NO).

@@ -220,3 +220,21 @@ class ScreenshotBridge {
   bool capturing_ = false;
   uint32_t lastActivityMs_ = 0;
 };
+
+// ---- Back to the screen shown before the capture (spec 10 §2.2) -------------
+//
+// /screenshot.bmp?screen=N switches the display only for the capture. The UI
+// (core 1) calls onPrepare() when it answers the Prepare job and afterPass()
+// with ScreenshotBridge::capturing() on every pass; afterPass() returns the
+// screen to go back to exactly once, on the capturing true -> false edge
+// (end(), timeout or the 5 s idle rule), else -1. Only a real switch
+// (requested in 0..screenCount-1 and != current) is remembered — no screen
+// argument (-1), the same screen and the demo indices (>= screenCount) leave
+// nothing to return to. UI side only, no lock.
+class ScreenshotReturn {
+ public:
+  // TODO(spec 10): stub from test-author
+  void onPrepare(int /*currentScreen*/, int /*requestedScreen*/, int /*screenCount*/) {}
+  // TODO(spec 10): stub from test-author
+  int afterPass(bool /*capturing*/) { return -1; }
+};

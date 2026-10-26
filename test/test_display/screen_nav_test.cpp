@@ -1,5 +1,6 @@
 // screen_nav: screen order, nav tabs, hit tests, auto-cycle. CLAUDE.md "Screen navigation", "Auto screen cycling".
 #include <unity.h>
+#include <string>
 
 #include "screen_nav.h"
 #include "table_view.h"  // tableFirstRowY()
@@ -353,18 +354,42 @@ static void test_auto_advance_no_overflow_on_huge_interval(void) {
 
 static void test_persist_screen_user_change_always_writes(void) {
   // Manual tap: persist now, regardless of how recently we last wrote.
-  TEST_ASSERT_TRUE(shouldPersistScreenChange(true, 0, kScreenPersistMinIntervalMs));
-  TEST_ASSERT_TRUE(shouldPersistScreenChange(true, 1, kScreenPersistMinIntervalMs));
+  TEST_ASSERT_TRUE(shouldPersistScreenChange(ScreenChangeCause::Touch, 0, kScreenPersistMinIntervalMs));
+  TEST_ASSERT_TRUE(shouldPersistScreenChange(ScreenChangeCause::Touch, 1, kScreenPersistMinIntervalMs));
 }
 
 static void test_persist_screen_auto_change_rate_limited(void) {
   // Auto-cycle: only persist once the min interval has elapsed.
-  TEST_ASSERT_FALSE(shouldPersistScreenChange(false, 0, kScreenPersistMinIntervalMs));
+  TEST_ASSERT_FALSE(shouldPersistScreenChange(ScreenChangeCause::AutoCycle, 0, kScreenPersistMinIntervalMs));
   TEST_ASSERT_FALSE(
-      shouldPersistScreenChange(false, kScreenPersistMinIntervalMs - 1, kScreenPersistMinIntervalMs));
+      shouldPersistScreenChange(ScreenChangeCause::AutoCycle, kScreenPersistMinIntervalMs - 1, kScreenPersistMinIntervalMs));
   TEST_ASSERT_TRUE(
-      shouldPersistScreenChange(false, kScreenPersistMinIntervalMs, kScreenPersistMinIntervalMs));
-  TEST_ASSERT_TRUE(shouldPersistScreenChange(false, kScreenPersistMinIntervalMs + 5000,
+      shouldPersistScreenChange(ScreenChangeCause::AutoCycle, kScreenPersistMinIntervalMs, kScreenPersistMinIntervalMs));
+  TEST_ASSERT_TRUE(shouldPersistScreenChange(ScreenChangeCause::AutoCycle, kScreenPersistMinIntervalMs + 5000,
+                                             kScreenPersistMinIntervalMs));
+}
+
+
+// Zmiana ekranu na czas zrzutu nigdy nie trafia do NVS
+static void test_screenshot_screen_change_is_never_persisted(void) {
+  const uint32_t examples[] = {0u, 600000u, 4294967295u};
+  for (uint32_t ms : examples) {
+    TEST_ASSERT_FALSE_MESSAGE(
+        shouldPersistScreenChange(ScreenChangeCause::Screenshot, ms, kScreenPersistMinIntervalMs),
+        std::to_string(ms).c_str());
+  }
+}
+
+// Dotyk i auto-cykl zapisują ekran jak dotąd
+static void test_touch_and_auto_cycle_persistence_unchanged(void) {
+  TEST_ASSERT_TRUE(shouldPersistScreenChange(ScreenChangeCause::Touch, 0, kScreenPersistMinIntervalMs));
+  TEST_ASSERT_TRUE(shouldPersistScreenChange(ScreenChangeCause::Touch, 4294967295u,
+                                             kScreenPersistMinIntervalMs));
+  TEST_ASSERT_FALSE(shouldPersistScreenChange(ScreenChangeCause::AutoCycle,
+                                              kScreenPersistMinIntervalMs - 1,
+                                              kScreenPersistMinIntervalMs));
+  TEST_ASSERT_TRUE(shouldPersistScreenChange(ScreenChangeCause::AutoCycle,
+                                             kScreenPersistMinIntervalMs,
                                              kScreenPersistMinIntervalMs));
 }
 
@@ -461,6 +486,8 @@ void run_screen_nav_tests() {
 
   RUN_TEST(test_persist_screen_user_change_always_writes);
   RUN_TEST(test_persist_screen_auto_change_rate_limited);
+  RUN_TEST(test_screenshot_screen_change_is_never_persisted);
+  RUN_TEST(test_touch_and_auto_cycle_persistence_unchanged);
   RUN_TEST(test_alert_badge_hit_on_the_badge_and_its_slack);
   RUN_TEST(test_alert_badge_miss_without_badge);
   RUN_TEST(test_alert_badge_zone_clear_of_nav_and_table_paging);

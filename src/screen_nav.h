@@ -114,6 +114,13 @@ constexpr uint32_t kScreenPersistMinIntervalMs = 10UL * 60UL * 1000UL;
 bool shouldPersistScreenChange(bool userInitiated, uint32_t msSinceLastPersist,
                                uint32_t minIntervalMs);
 
+// Why the active screen changed (spec 10 §2.2). A screenshot's switch
+// (/screenshot.bmp?screen=N) is temporary and never written to NVS; a touch
+// always is; an auto-cycle advance at most every `minIntervalMs`.
+enum class ScreenChangeCause : uint8_t { Touch, AutoCycle, Screenshot };
+bool shouldPersistScreenChange(ScreenChangeCause cause, uint32_t msSinceLastPersist,
+                               uint32_t minIntervalMs);
+
 // ---- Touch geometry -------------------------------------------------------
 //
 // Screens are switched **only** by the bottom nav buttons. (Left/right edge
