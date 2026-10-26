@@ -25,7 +25,7 @@ dostaje ją od agenta (`NN` = kolejny wolny numer, „Źródło: issue #N”).
 | 06 | [Błąd logowania OpenSky → tryb anonimowy](done/06-opensky-login-fallback.md) | done | v1.6.0 |
 | 07 | [Reorganizacja testów](done/07-test-reorganization.md) | done | v1.4.2 |
 | 08 | [Ostrzeżenia urządzenia („!”)](done/08-device-alerts.md) | done | v1.5.1 |
-| 09 | [Odporność: zrzut ekranu, komendy, WWW w trakcie lookupów](done/09-concurrency-robustness.md) | done | vNEXT |
+| 09 | [Odporność: zrzut ekranu, komendy, WWW w trakcie lookupów](done/09-concurrency-robustness.md) | done | v1.8.0 |
 | 10 | [Bezpieczeństwo panelu WWW](planned/10-web-panel-security.md) | planned | czeka |
 | 11 | [Porządki: martwy kod, komentarze, dokumentacja](planned/11-cleanup-dead-code-docs.md) | planned | czeka |
 | 12 | [Reorganizacja kodu (DDD)](planned/12-code-reorganization-ddd.md) | planned | czeka (po 07, 11) |
