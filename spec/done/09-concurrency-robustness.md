@@ -1,6 +1,6 @@
 # Spec 09 — Poprawki odporności: zrzut ekranu, kolejka komend, serwer WWW w trakcie lookupów
 
-Z przeglądu kodu 2026-10-25, punkty 1.3 i 1.5. Status: **zrobione** 2026-10-26, wydane w vNEXT. Niezależne od siebie;
+Z przeglądu kodu 2026-10-25, punkty 1.3 i 1.5. Status: **zrobione** 2026-10-26, wydane w v1.8.0. Niezależne od siebie;
 każdy punkt = osobny commit z testem.
 
 ## 1. Wyścig w protokole zrzutu ekranu (`shot::` w `main.cpp`)
