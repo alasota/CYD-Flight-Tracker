@@ -465,6 +465,16 @@ static void maybeShowUpdatePrompt(bool touchPressed) {
   drawUpdatePromptScreen(tft, u.installed, promptTag);
 }
 
+// YES / NO go to net_task as a NetCommand. If the queue is full the command
+// waits here and is retried on every loop() pass until it fits — the answer
+// must not get lost (spec 09 §2).
+static PendingCommand pendingCmd;
+
+static void submitUpdateCommand(const NetCommand &c) {
+  pendingCmd = submitCommand(c, core_link::sendCommand);
+  if (pendingCmd.logQueueFull) Serial.println("[update] command queue full, retrying");
+}
+
 // While the prompt is up it owns the touchscreen; returns once answered.
 static void serviceUpdatePrompt() {
   const uint32_t shownFor = millis() - promptShownAtMs;
@@ -477,14 +487,12 @@ static void serviceUpdatePrompt() {
       promptActive = false;
       // net_task starts the install; its OTA screen follows. If it can't
       // (no longer on offer), the normal screens come back.
-      if (!core_link::sendCommand(makeNetCommand(NetCommandType::InstallTag, promptTag))) {
-        Serial.println("[update] command queue full");
-      }
+      submitUpdateCommand(makeNetCommand(NetCommandType::InstallTag, promptTag));
       pendingRedraw.firstDraw = true;
       return;
     }
     if (c == ResetChoice::No) {
-      core_link::sendCommand(makeNetCommand(NetCommandType::SkipTag, promptTag));
+      submitUpdateCommand(makeNetCommand(NetCommandType::SkipTag, promptTag));
       promptActive = false;
       pendingRedraw.firstDraw = true;
       return;
@@ -757,6 +765,7 @@ void setup() {
 void loop() {
   perfLoopTick();
   core_link::uiBeatMs.store(millis());
+  pendingCmd = retryPendingCommand(pendingCmd, core_link::sendCommand);
 
   takeNetState();
   updateShownHealth();
