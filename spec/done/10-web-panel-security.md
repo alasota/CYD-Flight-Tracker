@@ -1,6 +1,6 @@
 # Spec 10 — Bezpieczeństwo panelu WWW: CSRF, zmiany stanu przez GET, osadzanie w ramce
 
-Z przeglądu kodu 2026-10-25, punkt 1.4. Status: **w trakcie**.
+Z przeglądu kodu 2026-10-25, punkt 1.4. Status: **zrobione** 2026-10-26, wydane w vNEXT.
 
 ## 1. Problem
 
@@ -80,3 +80,46 @@ Bez `Access-Control-Allow-Origin` nigdzie (dziś też go nie ma — test, żeby 
 - HTTPS na urządzeniu (certyfikat dla `cyd-sky.local` to osobny, duży temat).
 - Tokeny CSRF w formularzach — sprawdzanie `Origin` wystarcza dla przeglądarek, które
   obsługują ten panel (wszystkie obecne).
+
+## Wynik
+
+Zrobione 2026-10-26 na gałęzi `spec/10-web-panel-security`. `pio test -e native`: wszystkie sześć
+zestawów zielone; `pio run -e cyd`: 1 470 513 B (74,8 % slotu OTA, ok. +600 B);
+`check_bdd.py` bez uwag. Scenariusze BDD: `10-web-panel-security.feature` (22, w tym 6 `@manual`).
+
+- **§2.1 Pochodzenie żądań** — `checkRequestOrigin()` w `web_auth` (czysta): Origin rozstrzyga,
+  bez niego host z Referer; tylko `http://`, dokładne porównanie host[:port] bez względu na
+  wielkość liter, `:80` = brak portu. `CrossOrigin` także dla `null`, `https://`, userinfo
+  (`cyd-sky.local@evil.example`), podszywającego się sufiksu (`cyd-sky.local.evil.com`), Origin
+  ze ścieżką i pustego `Host`. `requireSameOrigin()` stoi przed `authorize()` we wszystkich
+  ośmiu trasach POST; 403 `Cross-site request refused` + log
+  `[auth] cross-origin POST /save from <origin> refused`. Callbacki uploadu decydują przy
+  `UPLOAD_FILE_START` przez `decideUploadStart()` (najpierw pochodzenie, potem hasło) — nic nie
+  jest buforowane, `OtaSession` nie startuje, na wyświetlaczu nie ma „aktualizacja nieudana”.
+  `collectHeaders`: `Content-Type, Origin, Referer, Host`.
+- **§2.2 Bez zmian stanu przez GET** — przełącznik PL/EN to dwa formularze `POST /lang`
+  (ukryte `l` i `tab`, skrypt trzyma `tab` na bieżącej zakładce), wygląd bez zmian (zrzuty
+  stron ustawień wyszły identyczne co do piksela); `GET /lang` → 405 + `Allow: POST`.
+  `/screenshot.bmp?screen=N`: `ScreenChangeCause::Screenshot` nigdy nie zapisuje `last_screen`;
+  `ScreenshotReturn` (`screenshot.h`) przywraca ekran sprzed zrzutu, gdy zrzut się kończy
+  (`end()`, timeout albo 5 s bezczynności), raz, tylko po rzeczywistym przełączeniu.
+- **§2.3 Nagłówki** — `X-Frame-Options: DENY` i `Content-Security-Policy: frame-ancestors 'none'`
+  na **każdej** odpowiedzi panelu (opakowanie tras `secured<Handler>`, także 401 / 429 / 403,
+  BMP, JSON), nie tylko na HTML; żadnego `Access-Control-*` (test).
+
+**Odstępstwa od specyfikacji i decyzje:**
+- Zamiast parametru `persist=false` w `onScreenChanged()` — przyczyna zmiany
+  (`ScreenChangeCause`: `Touch` / `AutoCycle` / `Screenshot`); stara wersja z `bool` usunięta.
+- Origin obecny, a `Host` pusty → `CrossOrigin`.
+- Bez `X-Content-Type-Options` / `Referrer-Policy` (poza zakresem, decyzja właściciela).
+- Teksty 403 / 405 po angielsku, bez tłumaczenia (jak istniejące 429).
+- Powrót po zrzucie to zwykła zmiana ekranu: zeruje stronę tabeli i licznik auto-przełączania.
+  Komunikat „!” zamknięty przez zrzut zwykłego ekranu nie otwiera się ponownie; po zrzucie
+  ekranu demo (`screen=3` / `4`) urządzenie odświeża bieżący ekran, jak dotąd.
+
+**Do sprawdzenia na płytce (`@manual`):** kryteria 1–4 — formularz i upload z obcej strony
+(403, ustawienia bez zmian, brak ekranu OTA, linia w logu), normalna praca panelu z hasłem i bez
+(zapis, PL/EN na tej samej zakładce, upload danych, przywracanie, OTA z zakładki i
+`pio run -e cyd-ota -t upload`), `curl -i .../lang` → 405, `curl -I /` z nagłówkami, panel
+w `<iframe>` zablokowany, `tools/screenshots.py --device` → ekran sprzed zrzutu, po restarcie
+ekran wybrany ręcznie.
