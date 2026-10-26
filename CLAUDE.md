@@ -765,10 +765,19 @@ Spec: `spec/done/02-github-release-check.md` (built and tested on the board 2026
   30 s = later (next boot). Screenshot of it: `/screenshot.bmp?screen=3` (demo data,
   `updateDemoState()`).
 - **Config page** (Firmware tab, first card): installed / latest / status / checked time,
-  *Install*, *Check now* (`POST /update/check`, max once a minute), *Show development versions*
+  *Install*, *Check now* (`POST /update/check`), *Show development versions*
   (`POST /update/prerelease`, NVS `updpre`, default off) which adds the newest GitHub
   pre-release above the latest release with *Install* (`POST /update/install tag=…` accepts only
   the shown tags). Development versions are never offered on the display.
+  **Check now and the switch only queue the check** (spec 09; `ManualCheck`:
+  `askManualCheck()` -> Queued / AlreadyQueued / TooSoon, `takeManualCheck(gateOpen)`,
+  `manualCheckPending()`): the TLS check never runs inside the HTTP handler (it held the page
+  for seconds). `releaseCheckLoop()` runs it after `pollOpenSky()`, before the scheduled check;
+  a request not run within `kUpdateManualCheckExpiryMs` (60 s, gate closed: no heap / clock)
+  expires. Once a minute, counted from a check that actually *ran*; a second click within it
+  answers with the page + "Sprawdzono przed chwilą — …" (`WebStr::UpdCheckTooSoon`). While
+  pending (`ConfigPageModel::updateCheckPending`) the pill reads "Checking GitHub…"
+  (`WebStr::UpdChecking`) and the Firmware tab reloads every 3 s.
 - **Development versions = tags with a suffix** (`v1.3.0-rc.1`, `-beta.N`, `-dev.N`):
   `release.yml` marks them pre-release and skips the project page; `build_site.py` gives them no
   changelog entry. Release one: `git tag v1.3.0-rc.1 && git push origin v1.3.0-rc.1`.
@@ -1108,7 +1117,8 @@ each with a single responsibility:
   `otaResultMessage()` / `otaResultHttpStatus()`, `shouldMarkAppValid()`.
 - `release_check` — new versions on GitHub (see "New versions from GitHub"): pure version
   parsing/comparison (`parseFwVersion`, `decideOffer`), release JSON (`parseLatestRelease`,
-  `pickLatestPrerelease`), URL allow-list, schedule, `shouldShowUpdatePrompt()`; adapter (TLS check
+  `pickLatestPrerelease`), URL allow-list, schedule, the queued manual check (`ManualCheck`),
+  `shouldShowUpdatePrompt()`; adapter (TLS check
   + download into `otaFlashSession()`) behind `#ifdef ARDUINO`.
 - `service_screen` — full-screen maintenance displays: OTA progress (title, "v1 → v2", bar,
   percent / KB, "do not power off", then restarting / failed) and the password-reset hold +
