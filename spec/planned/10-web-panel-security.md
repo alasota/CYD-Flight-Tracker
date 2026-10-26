@@ -1,6 +1,6 @@
 # Spec 10 — Bezpieczeństwo panelu WWW: CSRF, zmiany stanu przez GET, osadzanie w ramce
 
-Z przeglądu kodu 2026-10-25, punkt 1.4. Status: **do zrobienia**.
+Z przeglądu kodu 2026-10-25, punkt 1.4. Status: **w trakcie**.
 
 ## 1. Problem
 
