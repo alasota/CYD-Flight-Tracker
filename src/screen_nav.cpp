@@ -106,6 +106,13 @@ bool shouldPersistScreenChange(bool userInitiated, uint32_t msSinceLastPersist,
   return msSinceLastPersist >= minIntervalMs;
 }
 
+// TODO(spec 10): stub from test-author — today's behaviour (a screenshot counts as a touch)
+bool shouldPersistScreenChange(ScreenChangeCause cause, uint32_t msSinceLastPersist,
+                               uint32_t minIntervalMs) {
+  return shouldPersistScreenChange(cause != ScreenChangeCause::AutoCycle, msSinceLastPersist,
+                                   minIntervalMs);
+}
+
 bool alertBadgeHit(int16_t x, int16_t y, const HeaderZones &zones) {
   if (zones.alert_x < 0) return false;
   const int right = zones.alert_x + kAlertBadgeDiameter + kAlertBadgeTouchSlackX;

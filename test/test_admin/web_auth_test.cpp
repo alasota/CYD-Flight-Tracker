@@ -1,7 +1,8 @@
-// web_auth: panel password, digest decision, throttle. CLAUDE.md "Firmware updates (OTA) & panel password".
+// web_auth: panel password, digest decision, throttle, cross-site origin check (spec 10). CLAUDE.md "Firmware updates (OTA) & panel password".
 #include <unity.h>
 
 #include <string>
+#include <vector>
 
 #include "test_support.h"
 #include "web_auth.h"
@@ -147,6 +148,159 @@ static void test_reset_hold(void) {
   ASSERT_ENUM_EQ(ResetHoldState::Released, resetHoldState(1000, 9000));
 }
 
+// ---- checkRequestOrigin / decideUploadStart / log line / headers (spec 10)
+
+struct OriginExample {
+  const char *host;
+  const char *origin;
+  const char *referer;
+  OriginCheck want;
+};
+
+static void assertOriginExamples(const OriginExample *ex, size_t n) {
+  for (size_t i = 0; i < n; ++i) {
+    const std::string what = std::string("Host=") + ex[i].host + " Origin=" + ex[i].origin +
+                             " Referer=" + ex[i].referer;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(static_cast<int>(ex[i].want),
+                                  static_cast<int>(checkRequestOrigin(ex[i].origin, ex[i].referer,
+                                                                      ex[i].host)),
+                                  what.c_str());
+  }
+}
+
+// Origin z tym samym hostem co Host żądania to to samo pochodzenie
+static void test_origin_with_same_host_is_same_origin(void) {
+  const OriginExample ex[] = {
+      {"cyd-sky.local", "http://cyd-sky.local", "", OriginCheck::SameOrigin},
+      {"cyd-sky.local", "http://cyd-sky.local:80", "", OriginCheck::SameOrigin},
+      {"cyd-sky.local:80", "http://cyd-sky.local", "", OriginCheck::SameOrigin},
+      {"192.168.1.50", "http://192.168.1.50", "", OriginCheck::SameOrigin},
+      {"cyd-sky.local", "http://CYD-Sky.Local", "", OriginCheck::SameOrigin},
+      {"CYD-SKY.LOCAL", "http://cyd-sky.local", "", OriginCheck::SameOrigin},
+  };
+  assertOriginExamples(ex, sizeof(ex) / sizeof(ex[0]));
+}
+
+// Origin z innego hosta, innego schematu albo „null” to inne pochodzenie
+static void test_origin_from_elsewhere_is_cross_origin(void) {
+  const OriginExample ex[] = {
+      {"cyd-sky.local", "http://evil.example", "", OriginCheck::CrossOrigin},
+      {"cyd-sky.local", "http://192.168.1.50", "", OriginCheck::CrossOrigin},
+      {"cyd-sky.local", "https://cyd-sky.local", "", OriginCheck::CrossOrigin},
+      {"cyd-sky.local", "null", "", OriginCheck::CrossOrigin},
+      {"cyd-sky.local", "http://cyd-sky.local.evil.com", "", OriginCheck::CrossOrigin},
+      {"cyd-sky.local", "http://cyd-sky.local:8080", "", OriginCheck::CrossOrigin},
+      {"cyd-sky.local", "cyd-sky.local", "", OriginCheck::CrossOrigin},
+  };
+  assertOriginExamples(ex, sizeof(ex) / sizeof(ex[0]));
+}
+
+// Bez Origin decyduje host z Referer
+static void test_referer_alone_decides_when_origin_missing(void) {
+  const OriginExample ex[] = {
+      {"cyd-sky.local", "", "http://cyd-sky.local/?tab=general", OriginCheck::SameOrigin},
+      {"cyd-sky.local", "", "http://cyd-sky.local:80/", OriginCheck::SameOrigin},
+      {"cyd-sky.local", "", "http://evil.example/attack.html", OriginCheck::CrossOrigin},
+      {"cyd-sky.local", "", "http://cyd-sky.local.evil.com/x?h=y", OriginCheck::CrossOrigin},
+  };
+  assertOriginExamples(ex, sizeof(ex) / sizeof(ex[0]));
+}
+
+// Origin ma pierwszeństwo przed Referer
+static void test_origin_wins_over_referer(void) {
+  ASSERT_ENUM_EQ(OriginCheck::CrossOrigin,
+                 checkRequestOrigin("http://evil.example", "http://cyd-sky.local/", "cyd-sky.local"));
+}
+
+// Brak Origin i Referer (curl, wgrywanie OTA z PlatformIO) jest dozwolony
+static void test_no_origin_and_no_referer_is_allowed(void) {
+  const OriginCheck o = checkRequestOrigin("", "", "cyd-sky.local");
+  ASSERT_ENUM_EQ(OriginCheck::NoHeaders, o);
+  ASSERT_ENUM_EQ(UploadStart::Accept, decideUploadStart(o, true));
+}
+
+// Origin bez nagłówka Host nie przechodzi
+static void test_origin_present_but_no_host_is_cross_origin(void) {
+  ASSERT_ENUM_EQ(OriginCheck::CrossOrigin, checkRequestOrigin("http://cyd-sky.local", "", ""));
+}
+
+// Upload z innej strony jest odrzucany, zanim cokolwiek zostanie zapisane — nawet z dobrym hasłem
+static void test_cross_origin_upload_refused_before_credentials(void) {
+  const OriginCheck cross = checkRequestOrigin("http://evil.example", "", "cyd-sky.local");
+  ASSERT_ENUM_EQ(OriginCheck::CrossOrigin, cross);
+  ASSERT_ENUM_EQ(UploadStart::RefuseOrigin, decideUploadStart(cross, /*credentialsOk=*/true));
+  ASSERT_ENUM_EQ(UploadStart::RefuseOrigin, decideUploadStart(OriginCheck::CrossOrigin, false));
+  ASSERT_ENUM_EQ(UploadStart::RefuseAuth, decideUploadStart(OriginCheck::SameOrigin, false));
+  ASSERT_ENUM_EQ(UploadStart::Accept, decideUploadStart(OriginCheck::SameOrigin, true));
+  ASSERT_ENUM_EQ(UploadStart::Accept, decideUploadStart(OriginCheck::NoHeaders, true));
+  ASSERT_ENUM_EQ(UploadStart::RefuseAuth, decideUploadStart(OriginCheck::NoHeaders, false));
+}
+
+// Odrzucone żądanie zostawia jedną linię w logu
+static void test_cross_origin_log_line_names_path_and_origin(void) {
+  ASSERT_STR_EQ("[auth] cross-origin POST /save from http://evil.example refused",
+                crossOriginLogLine("POST", "/save", "http://evil.example", ""));
+  ASSERT_STR_EQ("[auth] cross-origin POST /update from http://evil.example/attack.html refused",
+                crossOriginLogLine("POST", "/update", "", "http://evil.example/attack.html"));
+  // Origin wins when both are there.
+  ASSERT_STR_EQ("[auth] cross-origin POST /lang from http://evil.example refused",
+                crossOriginLogLine("POST", "/lang", "http://evil.example", "http://cyd-sky.local/"));
+}
+
+// Odpowiedzi panelu zabraniają osadzania i nie otwierają CORS
+static void test_security_headers_deny_framing_and_allow_no_cors(void) {
+  std::vector<std::string> lines;
+  for (size_t i = 0; i < kSecurityHeaderCount; ++i) {
+    lines.push_back(std::string(kSecurityHeaders[i].name) + ": " + kSecurityHeaders[i].value);
+    ASSERT_NOT_CONTAINS(std::string(kSecurityHeaders[i].name), "Access-Control-");
+  }
+  ASSERT_CONTAINS(lines, "X-Frame-Options: DENY");
+  ASSERT_CONTAINS(lines, "Content-Security-Policy: frame-ancestors 'none'");
+}
+
+// -- edge cases (no scenario)
+
+static void test_origin_empty_string_treated_as_missing(void) {
+  // WebServer::header() returns "" for an absent header: "" Origin -> Referer decides.
+  ASSERT_ENUM_EQ(OriginCheck::SameOrigin,
+                 checkRequestOrigin("", "http://cyd-sky.local/", "cyd-sky.local"));
+  ASSERT_ENUM_EQ(OriginCheck::CrossOrigin,
+                 checkRequestOrigin("", "http://evil.example/", "cyd-sky.local"));
+}
+
+static void test_referer_with_fragment_and_no_path(void) {
+  ASSERT_ENUM_EQ(OriginCheck::SameOrigin,
+                 checkRequestOrigin("", "http://cyd-sky.local#x", "cyd-sky.local"));
+  ASSERT_ENUM_EQ(OriginCheck::SameOrigin,
+                 checkRequestOrigin("", "http://cyd-sky.local", "cyd-sky.local"));
+  ASSERT_ENUM_EQ(OriginCheck::SameOrigin,
+                 checkRequestOrigin("", "http://cyd-sky.local?tab=firmware", "cyd-sky.local"));
+}
+
+static void test_host_with_other_port_must_match_exactly(void) {
+  ASSERT_ENUM_EQ(OriginCheck::SameOrigin,
+                 checkRequestOrigin("http://cyd-sky.local:8080", "", "cyd-sky.local:8080"));
+  ASSERT_ENUM_EQ(OriginCheck::CrossOrigin,
+                 checkRequestOrigin("http://cyd-sky.local", "", "cyd-sky.local:8080"));
+  ASSERT_ENUM_EQ(OriginCheck::CrossOrigin,
+                 checkRequestOrigin("http://cyd-sky.local:8081", "", "cyd-sky.local:8080"));
+}
+
+static void test_userinfo_in_origin_is_cross(void) {
+  ASSERT_ENUM_EQ(OriginCheck::CrossOrigin,
+                 checkRequestOrigin("http://cyd-sky.local@evil.example", "", "cyd-sky.local"));
+  ASSERT_ENUM_EQ(OriginCheck::CrossOrigin,
+                 checkRequestOrigin("", "http://cyd-sky.local@evil.example/x", "cyd-sky.local"));
+  // A prefix of the host is not the host either.
+  ASSERT_ENUM_EQ(OriginCheck::CrossOrigin,
+                 checkRequestOrigin("http://cyd-sky.loca", "", "cyd-sky.local"));
+}
+
+static void test_log_line_without_any_header(void) {
+  ASSERT_STR_EQ("[auth] cross-origin POST /save from (none) refused",
+                crossOriginLogLine("POST", "/save", "", ""));
+}
+
 }  // namespace
 
 void run_web_auth_tests() {
@@ -170,4 +324,18 @@ void run_web_auth_tests() {
   RUN_TEST(test_right_password_is_allowed);
   RUN_TEST(test_locked_refuses_even_the_right_password);
   RUN_TEST(test_reset_hold);
+  RUN_TEST(test_origin_with_same_host_is_same_origin);
+  RUN_TEST(test_origin_from_elsewhere_is_cross_origin);
+  RUN_TEST(test_referer_alone_decides_when_origin_missing);
+  RUN_TEST(test_origin_wins_over_referer);
+  RUN_TEST(test_no_origin_and_no_referer_is_allowed);
+  RUN_TEST(test_origin_present_but_no_host_is_cross_origin);
+  RUN_TEST(test_cross_origin_upload_refused_before_credentials);
+  RUN_TEST(test_cross_origin_log_line_names_path_and_origin);
+  RUN_TEST(test_security_headers_deny_framing_and_allow_no_cors);
+  RUN_TEST(test_origin_empty_string_treated_as_missing);
+  RUN_TEST(test_referer_with_fragment_and_no_path);
+  RUN_TEST(test_host_with_other_port_must_match_exactly);
+  RUN_TEST(test_userinfo_in_origin_is_cross);
+  RUN_TEST(test_log_line_without_any_header);
 }

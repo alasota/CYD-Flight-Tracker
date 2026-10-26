@@ -76,6 +76,26 @@ AuthOutcome decideAuth(bool passwordSet, bool locked, bool sentCredentials, bool
   return o;
 }
 
+// TODO(spec 10): stub from test-author
+OriginCheck checkRequestOrigin(const std::string & /*origin*/, const std::string & /*referer*/,
+                               const std::string & /*host*/) {
+  return OriginCheck::NoHeaders;
+}
+
+// TODO(spec 10): stub from test-author
+UploadStart decideUploadStart(OriginCheck /*origin*/, bool /*credentialsOk*/) {
+  return UploadStart::Accept;
+}
+
+// TODO(spec 10): stub from test-author
+std::string crossOriginLogLine(const std::string & /*method*/, const std::string & /*path*/,
+                               const std::string & /*origin*/, const std::string & /*referer*/) {
+  return {};
+}
+
+// TODO(spec 10): stub from test-author
+const SecurityHeader kSecurityHeaders[kSecurityHeaderCount] = {{"", ""}, {"", ""}};
+
 ResetHoldState resetHoldState(uint32_t msSinceTouch, uint32_t heldMs) {
   if (msSinceTouch > kResetReleaseGraceMs) return ResetHoldState::Released;
   return heldMs >= kResetHoldMs ? ResetHoldState::Done : ResetHoldState::Holding;

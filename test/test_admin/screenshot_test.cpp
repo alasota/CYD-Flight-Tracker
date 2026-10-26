@@ -584,6 +584,156 @@ static void test_bridge_idle_rule_across_millis_rollover(void) {
   TEST_ASSERT_FALSE(rig.bridge.capturing(rig.now));
 }
 
+
+// ---- ScreenshotReturn: back to the screen shown before the capture (spec 10) ---
+//
+// A stand-in for main.cpp's UI: a Prepare job remembers the return target and
+// switches `shown` to a real screen (0..2; 3 and 4 are demo screens drawn
+// over the current one), every pass feeds capturing() into afterPass().
+
+constexpr int kRealScreens = 3;
+
+struct ReturnRig {
+  ShotRig rig;
+  ScreenshotReturn ret;
+  int shown;
+  int returns = 0;  // how many times afterPass() named a screen
+
+  explicit ReturnRig(int startScreen) : shown(startScreen) {
+    rig.onPause = [this] { uiPass(); };
+  }
+  ReturnRig(const ReturnRig &) = delete;
+  ReturnRig &operator=(const ReturnRig &) = delete;
+
+  bool uiPass() {
+    const Bridge::Job job = rig.bridge.takeJob();
+    if (job.kind == Bridge::Job::Prepare) {
+      ret.onPrepare(shown, job.screen, kRealScreens);
+      if (job.screen >= 0 && job.screen < kRealScreens) shown = job.screen;
+    } else if (job.kind == Bridge::Job::Band) {
+      rig.readBand(job, 0, job.rows);
+    }
+    if (job.kind != Bridge::Job::None) rig.bridge.finishJob(job, rig.now);
+    const bool capturing = rig.bridge.capturing(rig.now);
+    const int back = ret.afterPass(capturing);
+    if (back >= 0) {
+      shown = back;
+      ++returns;
+    }
+    return capturing;
+  }
+
+  // begin(screen) + every band, without end().
+  void captureAllBands(int screen) {
+    TEST_ASSERT_TRUE(rig.bridge.begin(screen, 2000));
+    std::vector<uint8_t> buf = poisonedBuffer();
+    for (int k = 0; k < screenshotBandCount(kShotH, kShotBandRows); ++k) {
+      const ScreenshotBand band = screenshotBand(kShotH, kShotBandRows, k);
+      rig.bridge.requestBand(band.y0, band.rows, shotStride(), buf.data());
+      TEST_ASSERT_TRUE(rig.bridge.waitBand(2000));
+    }
+  }
+};
+
+// Po zrzucie innego ekranu urządzenie wraca na ekran sprzed zrzutu
+static void test_screen_returns_to_previous_after_capture(void) {
+  ReturnRig r(0);
+  r.captureAllBands(2);
+  TEST_ASSERT_EQUAL_INT(2, r.shown);    // the capture shows screen 2
+  TEST_ASSERT_EQUAL_INT(0, r.returns);  // no return while capturing
+  r.rig.bridge.end();
+  TEST_ASSERT_FALSE(r.uiPass());
+  TEST_ASSERT_EQUAL_INT(0, r.shown);  // back on LOTY
+  TEST_ASSERT_EQUAL_INT(1, r.returns);
+  r.uiPass();
+  r.uiPass();
+  TEST_ASSERT_EQUAL_INT(1, r.returns);  // exactly once
+  TEST_ASSERT_EQUAL_INT(0, r.shown);
+}
+
+// Powrót następuje także, gdy klient zniknął w trakcie zrzutu
+static void test_screen_returns_after_abandoned_capture(void) {
+  ReturnRig r(2);
+  TEST_ASSERT_TRUE(r.rig.bridge.begin(1, 2000));
+  std::vector<uint8_t> buf = poisonedBuffer();
+  const ScreenshotBand band = screenshotBand(kShotH, kShotBandRows, 0);
+  r.rig.bridge.requestBand(band.y0, band.rows, shotStride(), buf.data());
+  TEST_ASSERT_TRUE(r.rig.bridge.waitBand(2000));
+  TEST_ASSERT_EQUAL_INT(1, r.shown);
+  // The client stops asking for bands; no end().
+  r.rig.onPause = nullptr;
+  const uint32_t t = r.rig.now;
+  r.rig.now = t + 5000;
+  TEST_ASSERT_TRUE(r.uiPass());  // still held at exactly 5 s
+  TEST_ASSERT_EQUAL_INT(0, r.returns);
+  r.rig.now = t + Bridge::kCaptureIdleMs + 1;
+  TEST_ASSERT_FALSE(r.uiPass());  // draws again
+  TEST_ASSERT_EQUAL_INT(2, r.shown);
+  TEST_ASSERT_EQUAL_INT(1, r.returns);
+}
+
+// Bez przełączenia ekranu nie ma do czego wracać
+static void test_no_return_when_capture_did_not_switch_screen(void) {
+  const int examples[] = {-1, 1, 3, 4};  // no screen arg, same screen, demo 3, demo 4
+  for (int screen : examples) {
+    ReturnRig r(1);
+    r.captureAllBands(screen);
+    r.rig.bridge.end();
+    r.uiPass();
+    r.uiPass();
+    const std::string what = "screen=" + std::to_string(screen);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r.returns, what.c_str());
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, r.shown, what.c_str());
+  }
+}
+
+// -- edge cases (no scenario)
+
+// screenshots.py asks for several screens in a row; when the next begin()
+// arrives before the UI saw the previous end() (no capturing true -> false
+// edge in between), the series returns to the screen shown before its first
+// capture, not to the series' previous capture screen.
+static void test_return_target_is_first_screen_of_capture_series(void) {
+  ReturnRig r(0);
+  r.captureAllBands(1);
+  r.rig.bridge.end();
+  r.captureAllBands(2);  // begin() before any UI pass after end()
+  TEST_ASSERT_EQUAL_INT(2, r.shown);
+  TEST_ASSERT_EQUAL_INT(0, r.returns);
+  r.rig.bridge.end();
+  r.uiPass();
+  TEST_ASSERT_EQUAL_INT(0, r.shown);
+  TEST_ASSERT_EQUAL_INT(1, r.returns);
+}
+
+// Two separate captures, the screen changed by touch in between: each goes
+// back to the screen shown before *it*.
+static void test_each_finished_capture_returns_to_its_own_previous_screen(void) {
+  ReturnRig r(0);
+  r.captureAllBands(1);
+  r.rig.bridge.end();
+  r.uiPass();
+  TEST_ASSERT_EQUAL_INT(0, r.shown);
+  r.shown = 2;  // the user taps RADAR
+  r.captureAllBands(0);
+  TEST_ASSERT_EQUAL_INT(0, r.shown);
+  r.rig.bridge.end();
+  r.uiPass();
+  TEST_ASSERT_EQUAL_INT(2, r.shown);
+  TEST_ASSERT_EQUAL_INT(2, r.returns);
+}
+
+static void test_return_not_triggered_without_prepare(void) {
+  ScreenshotReturn ret;
+  TEST_ASSERT_EQUAL_INT(-1, ret.afterPass(false));
+  TEST_ASSERT_EQUAL_INT(-1, ret.afterPass(true));
+  TEST_ASSERT_EQUAL_INT(-1, ret.afterPass(false));
+  // A demo index never arms a return either.
+  ret.onPrepare(0, 4, kRealScreens);
+  TEST_ASSERT_EQUAL_INT(-1, ret.afterPass(true));
+  TEST_ASSERT_EQUAL_INT(-1, ret.afterPass(false));
+}
+
 }  // namespace
 
 void run_screenshot_tests() {
@@ -611,5 +761,11 @@ void run_screenshot_tests() {
   RUN_TEST(test_bridge_take_job_without_request_changes_nothing);
   RUN_TEST(test_bridge_new_capture_after_idle_release);
   RUN_TEST(test_bridge_idle_rule_across_millis_rollover);
+  RUN_TEST(test_screen_returns_to_previous_after_capture);
+  RUN_TEST(test_screen_returns_after_abandoned_capture);
+  RUN_TEST(test_no_return_when_capture_did_not_switch_screen);
+  RUN_TEST(test_return_target_is_first_screen_of_capture_series);
+  RUN_TEST(test_each_finished_capture_returns_to_its_own_previous_screen);
+  RUN_TEST(test_return_not_triggered_without_prepare);
 
 }

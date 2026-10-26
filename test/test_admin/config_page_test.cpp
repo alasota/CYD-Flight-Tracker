@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 #include "config_page.h"
 #include "test_support.h"
@@ -207,13 +208,80 @@ static void test_web_language_switches_the_page_text(void) {
   std::string h = render(m);
   ASSERT_CONTAINS(h, "<html lang=\"en\">");
   ASSERT_CONTAINS(h, ">Location</button>");
-  ASSERT_CONTAINS(h, "class=\"on\" href=\"/lang?l=en\"");
+  ASSERT_CONTAINS(h, "<button class=\"on\">EN</button>");
 
   m.cfg.web_language = Language::PL;
   h = render(m);
   ASSERT_CONTAINS(h, "<html lang=\"pl\">");
   ASSERT_CONTAINS(h, ">Lokalizacja</button>");
-  ASSERT_CONTAINS(h, "class=\"on\" href=\"/lang?l=pl\"");
+  ASSERT_CONTAINS(h, "<button class=\"on\">PL</button>");
+}
+
+// The <form ...>...</form> elements posting to /lang, in page order.
+static std::vector<std::string> langForms(const std::string &h) {
+  std::vector<std::string> forms;
+  size_t at = 0;
+  while ((at = h.find("action=\"/lang\"", at)) != std::string::npos) {
+    const size_t start = h.rfind("<form", at);
+    const size_t end = h.find("</form>", at);
+    TEST_ASSERT_TRUE_MESSAGE(start != std::string::npos && end != std::string::npos,
+                             "action=\"/lang\" outside a <form>...</form>");
+    forms.push_back(h.substr(start, end + 7 - start));
+    at = end;
+  }
+  return forms;
+}
+
+// Przełącznik PL/EN to dwa formularze POST, bez linków GET
+static void test_language_switch_is_post_forms_without_lang_links(void) {
+  for (Language lang : {Language::PL, Language::EN}) {
+    ConfigPageModel m = baseModel();
+    m.cfg.web_language = lang;
+    const std::string h = render(m);
+    const std::vector<std::string> forms = langForms(h);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, static_cast<int>(forms.size()), languageCode(lang));
+    const char *codes[2] = {"pl", "en"};
+    const char *labels[2] = {">PL</button>", ">EN</button>"};
+    for (int i = 0; i < 2; ++i) {
+      const std::string &f = forms[static_cast<size_t>(i)];
+      ASSERT_CONTAINS(f, "method=\"post\"");
+      ASSERT_CONTAINS(f, std::string("name=\"l\" value=\"") + codes[i] + "\"");
+      ASSERT_CONTAINS(f, labels[i]);
+      const bool current = (lang == Language::PL) == (i == 0);
+      if (current) {
+        ASSERT_CONTAINS(f, "<button class=\"on\"");
+      } else {
+        ASSERT_NOT_CONTAINS(f, "class=\"on\"");
+      }
+    }
+    ASSERT_NOT_CONTAINS(h, "href=\"/lang?");
+    ASSERT_NOT_CONTAINS(h, "/lang?l=");
+  }
+}
+
+// Formularze języka wracają na tę samą zakładkę
+static void test_language_forms_carry_the_current_tab(void) {
+  ConfigPageModel m = baseModel();
+  m.tab = SettingsTab::Firmware;
+  const std::string h = render(m);
+  const std::vector<std::string> forms = langForms(h);
+  TEST_ASSERT_EQUAL_INT(2, static_cast<int>(forms.size()));
+  for (const std::string &f : forms) {
+    ASSERT_CONTAINS(f, "<input type=\"hidden\" name=\"tab\" value=\"firmware\">");
+    ASSERT_NOT_CONTAINS(f, "id=\"tab\"");  // the settings form's own hidden field keeps its id
+  }
+  // The tab script moves the forms' tab fields along, not link addresses.
+  ASSERT_CONTAINS(h, ".lang input[name=tab]");
+  ASSERT_NOT_CONTAINS(h, ".lang a");
+  ASSERT_NOT_CONTAINS(h, "a.href=");
+}
+
+// -- edge case (no scenario): the forms post to this device, not an absolute URL.
+static void test_lang_forms_have_no_external_action(void) {
+  const std::string h = render(baseModel());
+  ASSERT_NOT_CONTAINS(h, "action=\"http");
+  ASSERT_NOT_CONTAINS(h, "action=\"//");
+  TEST_ASSERT_EQUAL_INT(2, static_cast<int>(langForms(h).size()));
 }
 
 static void test_selects_reflect_both_languages_independently(void) {
@@ -921,6 +989,9 @@ void run_config_page_tests() {
   RUN_TEST(test_all_form_fields_present);
   RUN_TEST(test_only_the_active_tab_is_visible);
   RUN_TEST(test_web_language_switches_the_page_text);
+  RUN_TEST(test_language_switch_is_post_forms_without_lang_links);
+  RUN_TEST(test_language_forms_carry_the_current_tab);
+  RUN_TEST(test_lang_forms_have_no_external_action);
   RUN_TEST(test_selects_reflect_both_languages_independently);
   RUN_TEST(test_user_values_are_escaped);
   RUN_TEST(test_message_and_detail);
