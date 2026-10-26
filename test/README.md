@@ -60,6 +60,13 @@ so they stay put when `src/` gets reorganized. Each suite is one executable.
   `run_<module>_tests()` in that suite's `main.cpp` (`if (RUN_MODULE(<module>)) …`).
 - Built with `-Wall -Wextra -Werror` (tests and `src/`). Unused stub parameters:
   `const std::string & /*icao24*/`.
+- Native `SpinLock` is a no-op (the tests are single-threaded), so code shared between the
+  cores is templated on its lock (`LatestBox`, `Guarded`, `ScreenshotBridge`) and a threaded
+  test plugs in a `std::mutex` adapter. One such test exists:
+  `screenshot_test.cpp:test_bridge_concurrent_random_timeouts_never_touch_freed_buffers` — two
+  long-lived `std::thread`s, a fake clock, a seeded `std::mt19937`, never real time; its
+  `delete[]` variant is there for `native-asan` to catch a use-after-free. No `-pthread` flag
+  is needed (MinGW posix threads, glibc ≥ 2.34).
 
 ### Assertions
 

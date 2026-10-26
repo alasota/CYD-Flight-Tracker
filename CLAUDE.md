@@ -808,21 +808,42 @@ check). Now:
      a health / update / OTA change never copies them. `net_task` publishes only when
      `netStateDiffers()`. The UI turns a new one into redraw events with `diffNetState()`.
   2. `NetCommand` UI -> net: a FreeRTOS queue of 8 POD commands (`InstallTag` = YES on the
-     update question, `SkipTag` = NO); never blocks.
+     update question, `SkipTag` = NO); never blocks. A command the full queue refuses waits
+     in a one-slot `PendingCommand` in the UI (`submitCommand()`, a newer one replaces it) and
+     is retried at the top of every `loop()` pass (`retryPendingCommand()`), logged once:
+     `[update] command queue full, retrying`. (Before spec 09 a refused NO was simply lost and
+     the question came back after a reboot.)
   3. Atomics / `Guarded<T>` (a POD copied under a spinlock): `uiBeatMs`, `netBeatMs`,
      `pollingAllowed` (spec 03's night pause, decided by the UI), UI perf numbers, and the
      backlight status that `/light.json` reads (`backlight.cpp`).
 - **Rules:** code on core 0 never calls LovyanGFX; code on core 1 never does network I/O. Never
   allocate, free, log or do I/O while holding a `SpinLock` (it is a FreeRTOS critical section).
   `/screenshot.bmp` is the one place the web handler needs the panel: it asks the UI for bands of
-  16 rows into two buffers (`ScreenshotSource::begin/requestBand/waitBand/end`, `shot::` in
-  `main.cpp`) — the UI reads band k+1 while band k goes out; a timed-out request is cancelled
-  under the lock so the UI never writes into a freed buffer. The UI doesn't draw while a capture
-  runs.
+  16 rows into two buffers (`ScreenshotSource::begin/requestBand/waitBand/end`, forwarded by
+  `shot::` in `main.cpp` to a `ScreenshotBridge<SpinLock>`, pure + header-only in
+  `screenshot.h`) — the UI reads band k+1 while band k goes out. Every `begin()` /
+  `requestBand()` takes a new **generation** under the lock; a timeout or `end()` sets it to 0.
+  The UI (`takeJob()` / `writeRow()` / `finishJob()`) copies a row or marks a band done only
+  while its job's generation is still current, so a late band can neither write into a freed
+  buffer nor leave `BandDone` behind. The UI doesn't draw while a capture runs, and draws again
+  once the bridge is idle or nothing happened for > 5000 ms (`kCaptureIdleMs`, wrap-safe).
+  ⚠️ Found in review (spec 09): the old `cancelled` flag lost both races — a late `BandDone`
+  overwrote `Idle` (5 s without drawing), and a new `begin()` cleared the flag while the UI was
+  still writing to the previous request's freed buffer. The native test runs handler and UI on
+  two `std::thread`s with random timeouts (ASan in CI).
 - **Poll -> two snapshots** (`poll_pipeline`, pure, `buildDataSnapshot()`): phase A right after
   `/states/all` with no lookup budget (cache only, the rest `...`), phase B with the budgets; B
   is published only if it fetched something (`DataSnapshot::fetches`). Results are memoised per
   poll so B doesn't repeat A's lookups.
+- **Settings page between phase-B lookups** (spec 09): `LookupPorts::betweenFetches` is called
+  after every *uncached* lookup (a real hexdb.io request, never after a cache hit; empty = never
+  called, as in `cacheOnly()` phase A). `net_task` serves the web page there
+  (`serveBetweenFetches(busy, configPortalLoop, updateStarted)` — no nesting; returns false when
+  `configPortalRestartPending()` or `otaFlashSession().inProgress()`). False = stop: no more
+  uncached lookups in this snapshot (cached keys still resolve, the rest stays `...`); a stopped
+  B is still published if it fetched anything. A settings save made there reaches `cfg` only
+  after the poll (`seenSaveCount`). The web handler now runs nested inside `pollOpenSky()` —
+  watch `[perf] stack net=` against the 16 KB stack.
 - **hexdb.io keep-alive** (`hexdb_http`): one TLS session per phase B (`hexdbSessionEnd()`
   after it); a request on a connection the server closed is retried once, fresh. HTTPClient's
   destructor `stop()`s the socket — the HTTPClient has to live as long as the session.
@@ -1073,8 +1094,8 @@ each with a single responsibility:
   Also serves `GET /screenshot.bmp[?screen=N]`: the panel read back (LovyanGFX `readRect`,
   panel `readable = true`) and streamed as a 24-bit BMP — for UX reviews without a camera.
   Pixels come from the UI core in bands (`configPortalSetScreenshotSource()`, see "Concurrency —
-  two cores"); BMP header/row math and the bottom-up band order are the pure `screenshot` module
-  (native-tested). `?screen=N` switches to that screen first. `GET /perf.json`: `perf_stats`.
+  two cores"); BMP header/row math, the bottom-up band order and the handler <-> UI hand-over
+  (`ScreenshotBridge`, generation counter) are the pure `screenshot` module (native-tested). `?screen=N` switches to that screen first. `GET /perf.json`: `perf_stats`.
   Runs on core 0 (`net_task`).
 - `web_auth` — the panel password, pure: `validateWebPassword()` (8–64 printable ASCII, "" =
   none), `decidePasswordChange()` (the General tab's two fields + "remove"), `decideAuth()`
@@ -1093,13 +1114,16 @@ each with a single responsibility:
   percent / KB, "do not power off", then restarting / failed) and the password-reset hold +
   YES/NO confirm. Geometry/text pure and tested, drawing behind `#ifdef ARDUINO`.
 - `core_link` — what crosses between the cores: `LatestBox`, `Guarded<T>`, `SpinLock`,
-  `NetState` / `DataSnapshot` / `OtaProgress`, `NetCommand`, `diffNetState()`,
+  `NetState` / `DataSnapshot` / `OtaProgress`, `NetCommand` + `PendingCommand`
+  (`submitCommand()` / `retryPendingCommand()`), `diffNetState()`,
   `netStateDiffers()`, `uiSleepMs()`, `heartbeatStale()`; device globals behind `#ifdef ARDUINO`.
   See "Concurrency — two cores".
 - `net_task` — the network task on core 0 (device-only): owns WiFi, web page, OpenSky,
   hexdb.io, GitHub, OTA, the in-memory Config; publishes `NetState`, takes `NetCommand`s.
 - `poll_pipeline` — pure: one `/states/all` answer -> `DataSnapshot` (sort, budgeted lookups via
   injected `LookupPorts`, phases, airports, CPA + Screen 2's pick); phase A = `cacheOnly()`.
+  `LookupPorts::betweenFetches` (after each real fetch, false = stop) + the
+  `serveBetweenFetches()` guard.
   This used to be ~100 untested lines in `main.cpp`.
 - `perf_stats` — pure: `GapStats` (UI pass lateness, buckets, p99), `BusyStats`, the `[perf]`
   line and `/perf.json`.

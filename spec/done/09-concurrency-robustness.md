@@ -1,6 +1,6 @@
 # Spec 09 — Poprawki odporności: zrzut ekranu, kolejka komend, serwer WWW w trakcie lookupów
 
-Z przeglądu kodu 2026-10-25, punkty 1.3 i 1.5. Status: **w trakcie**. Niezależne od siebie;
+Z przeglądu kodu 2026-10-25, punkty 1.3 i 1.5. Status: **zrobione** 2026-10-26, wydane w vNEXT. Niezależne od siebie;
 każdy punkt = osobny commit z testem.
 
 ## 1. Wyścig w protokole zrzutu ekranu (`shot::` w `main.cpp`)
@@ -71,3 +71,39 @@ dalszych fetchy i z poprawnym (częściowym) snapshotem.
 2. Odświeżanie strony ustawień co 2 s przez 5 min: każde ładowanie < 1,5 s, także gdy w logu
    jest `phase B: N hexdb.io lookups`.
 3. `pio test -e native` zielone, w CI także `native-asan`.
+
+## Wynik
+
+Zrobione 2026-10-26 na gałęzi `spec/09-concurrency-robustness`, trzy commity (po jednym na punkt),
+każdy z testem. `pio test -e native`: 850 przypadków, 847 zielonych, 3 pominięte (istniejące
+wcześniej), 0 błędów; `pio run -e cyd`: 1 465 921 B (74,6 % slotu OTA); `check_bdd.py` bez uwag.
+Scenariusze BDD: `09-concurrency-robustness.feature`.
+
+1. **Zrzut ekranu** — `ScreenshotBridge<Lock>` w `src/screenshot.h` (header-only, szablon na
+   blokadzie jak `LatestBox`; w testach `std::mutex`). Każde `begin()` / `requestBand()` bierze
+   nową generację pod blokadą (0 pomijane przy zawinięciu licznika), timeout i `end()` ustawiają
+   ją na 0. UI kopiuje wiersz i ustawia `BeginDone` / `BandDone` tylko przy aktualnej generacji.
+   Timeout przed unieważnieniem sprawdza stan jeszcze raz pod blokadą (odpowiedź z tej samej
+   chwili się liczy). `main.cpp` zostało z `tft.readRect()` + BGR. Testy sekwencyjne (normalny
+   przebieg, timeout w trakcie pasa, spóźnione Prepare, stary pas vs nowy bufor, `end()`,
+   bezczynność 4999 / 5000 / 5001 ms) i współbieżny (dwa `std::thread`, losowe timeouty,
+   bufory w „cmentarzu” wypełnione wzorcem + wariant z prawdziwym `delete[]` dla ASan w CI).
+   **Odstępstwo:** bez `-pthread` w `platformio.ini` — linkuje się bez niego (MinGW, glibc ≥ 2.34
+   w CI); dodać, jeśli `native-asan` w CI by nie zlinkował.
+2. **Komendy** — `PendingCommand` + `submitCommand()` / `retryPendingCommand()` w `core_link`
+   (czyste). TAK i NIE idą przez nie, ponawianie na początku każdego `loop()`, log raz:
+   `[update] command queue full, retrying`. Nowsza komenda zastępuje czekającą (decyzja
+   właściciela; praktycznie nieosiągalne — pytanie jest raz na start).
+3. **Strona ustawień w trakcie fazy B** — `LookupPorts::betweenFetches` wołany po każdym
+   niezbuforowanym lookupie (nigdy po trafieniu w cache, nigdy w fazie A); `net_task` obsługuje
+   tam `configPortalLoop()` przez czysty `serveBetweenFetches()` (bez zagnieżdżenia; „stop”, gdy
+   ruszyła aktualizacja OTA). Po „stop” klucze z cache dalej się rozwiązują, reszta zostaje `...`;
+   przerwana faza B jest publikowana, jeśli coś pobrała (decyzja właściciela).
+
+**Do sprawdzenia na płytce (`@manual`)** — kryteria §4.1 i §4.2: 50 × przerwany `curl
+--max-time 0.3 /screenshot.bmp` (bez restartu, ekran rysuje ≤ 1 s po przerwaniu, `[perf]` bez
+przerw UI > 5 s); strona ustawień co 2 s przez 5 min < 1,5 s na ładowanie, także przy
+`phase B: N hexdb.io lookups`; zapis ustawień / *Sprawdź teraz* / wgranie OTA w trakcie fazy B.
+Przy okazji `[perf] stack net=` — `configPortalLoop()` działa teraz zagnieżdżone w
+`pollOpenSky()`; przy zapasie < ~2 KB podnieść `kNetTaskStackBytes`. Kryterium §4.3 (`native`
+zielone) spełnione lokalnie; `native-asan` sprawdza CI.
