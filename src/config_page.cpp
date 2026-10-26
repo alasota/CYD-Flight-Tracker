@@ -202,7 +202,7 @@ const char kStyle[] =
     "flex-shrink:0;margin-top:4px}"
     ".lang form{display:flex;margin:0}"
     ".lang button{padding:4px 11px;font:inherit;font-size:.78rem;font-weight:600;color:var(--muted);"
-    "background:none;border:0;cursor:pointer}"
+    "background:none;border:0;border-radius:0;cursor:pointer}"
     ".lang button.on{background:var(--accent);color:var(--on-accent)}"
     ".tabs{display:flex;flex-wrap:wrap;gap:4px;padding:4px;background:var(--field);"
     "border:1px solid var(--line);border-radius:12px;margin-bottom:20px}"
