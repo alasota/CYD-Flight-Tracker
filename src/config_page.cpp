@@ -313,8 +313,8 @@ const char kScript[] =
     "x.upload.onprogress=function(v){if(!v.lengthComputable)return;var p=Math.round(v.loaded*100/v.total);"
     "$('fwp').hidden=false;$('fwp').value=p;$('fws').textContent=T.up+' '+p+'%'};"
     "x.onload=function(){document.open();document.write(x.responseText);document.close()};"
-    "x.onerror=function(){$('fwb').disabled=false;$('fws').textContent=T.fail};"
-    "$('fwb').disabled=true;$('fws').textContent=T.up+'…';x.send(d)};"
+    "x.onerror=function(){window.upl=0;$('fwb').disabled=false;$('fws').textContent=T.fail};"
+    "window.upl=1;$('fwb').disabled=true;$('fws').textContent=T.up+'…';x.send(d)};"
     "show($('tab').value);calc();";
 
 // After a successful update: wait for the board to come back, then reload.
@@ -324,9 +324,12 @@ const char kRestartScript[] =
     ".catch(function(){setTimeout(p,2000)})},5000);";
 
 // While "check now" waits for its turn (after the poll): reload until it ran
-// (or expired, kUpdateManualCheckExpiryMs) — unless the user went to another tab.
+// (or expired, kUpdateManualCheckExpiryMs) — unless the user went to another tab
+// or started a firmware upload meanwhile (window.upl, set by the upload script):
+// leaving the page would abort the upload XHR.
 const char kCheckPendingScript[] =
-    "setTimeout(function(){if($('tab').value=='firmware')location.href='/?tab=firmware'},3000);";
+    "setTimeout(function(){if($('tab').value=='firmware'&&!window.upl)"
+    "location.href='/?tab=firmware'},3000);";
 
 class Writer {
  public:

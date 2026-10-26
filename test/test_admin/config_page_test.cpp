@@ -405,7 +405,10 @@ static void test_update_card_while_a_check_is_pending(void) {
   ASSERT_CONTAINS(h, "<span class=\"pill\" id=\"ups\"><span class=\"dot\"></span>"
                      "Checking GitHub\xE2\x80\xA6</span>");
   ASSERT_NOT_CONTAINS(h, "A newer version is available.");
-  ASSERT_CONTAINS(h, "if($('tab').value=='firmware')location.href='/?tab=firmware'");
+  ASSERT_CONTAINS(h, "if($('tab').value=='firmware'&&!window.upl)location.href='/?tab=firmware'");
+  // A firmware upload started meanwhile holds the reload off (spec 09 review #4).
+  ASSERT_CONTAINS(h, "window.upl=1;$('fwb').disabled=true;");
+  ASSERT_CONTAINS(h, "x.onerror=function(){window.upl=0;");
   ASSERT_CONTAINS(h, ">Check now</button>");
 
   m.cfg.web_language = Language::PL;
