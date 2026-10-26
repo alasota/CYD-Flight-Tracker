@@ -296,6 +296,17 @@ static void test_userinfo_in_origin_is_cross(void) {
                  checkRequestOrigin("http://cyd-sky.loca", "", "cyd-sky.local"));
 }
 
+static void test_origin_is_scheme_and_host_only(void) {
+  // A real Origin never carries a path; one that does isn't trusted. A
+  // Referer may (and the scheme is case-insensitive, as in any URL).
+  ASSERT_ENUM_EQ(OriginCheck::CrossOrigin,
+                 checkRequestOrigin("http://cyd-sky.local/", "", "cyd-sky.local"));
+  ASSERT_ENUM_EQ(OriginCheck::SameOrigin,
+                 checkRequestOrigin("HTTP://cyd-sky.local", "", "cyd-sky.local"));
+  ASSERT_ENUM_EQ(OriginCheck::CrossOrigin, checkRequestOrigin("http://", "", "cyd-sky.local"));
+  ASSERT_ENUM_EQ(OriginCheck::CrossOrigin, checkRequestOrigin("", "http:///x", "cyd-sky.local"));
+}
+
 static void test_log_line_without_any_header(void) {
   ASSERT_STR_EQ("[auth] cross-origin POST /save from (none) refused",
                 crossOriginLogLine("POST", "/save", "", ""));
@@ -337,5 +348,6 @@ void run_web_auth_tests() {
   RUN_TEST(test_referer_with_fragment_and_no_path);
   RUN_TEST(test_host_with_other_port_must_match_exactly);
   RUN_TEST(test_userinfo_in_origin_is_cross);
+  RUN_TEST(test_origin_is_scheme_and_host_only);
   RUN_TEST(test_log_line_without_any_header);
 }
