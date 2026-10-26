@@ -143,6 +143,27 @@ struct CheckGate {
 };
 bool canStartNetworkTask(const CheckGate &g);
 
+// ---- "Check now" / the development-versions switch (config page). The
+// handler only asks; releaseCheckLoop() runs the check after the poll — a
+// handler can run inside phase B (spec 09), next to the open hexdb.io TLS
+// session, where a second TLS session may not get its heap. At most one check
+// a minute (counted from when one ran); a request the gate never lets through
+// is dropped after kUpdateManualCheckExpiryMs, so the page stops waiting.
+constexpr uint32_t kUpdateManualCheckExpiryMs = 60000;
+struct ManualCheck {
+  bool queued = false;
+  uint32_t askedMs = 0;
+  bool ran = false;  // a manual check has run since boot
+  uint32_t lastRunMs = 0;
+};
+enum class ManualCheckAsk : uint8_t { Queued, AlreadyQueued, TooSoon };
+ManualCheckAsk askManualCheck(ManualCheck &m, uint32_t nowMs);
+// From releaseCheckLoop(): true = run the check now (counted as run). Drops
+// an expired request.
+bool takeManualCheck(ManualCheck &m, bool gateOpen, uint32_t nowMs);
+// The page shows "checking…" and reloads itself while this is true.
+bool manualCheckPending(const ManualCheck &m, uint32_t nowMs);
+
 // ---- What the config page and main.cpp see
 enum class UpdateStatus : uint8_t {
   NeverChecked,
@@ -214,13 +235,15 @@ UpdateState updateDemoState(bool withPrerelease);
 
 // Takes the settings (call again after they change).
 void releaseCheckBegin(const Config &cfg);
-// From loop(): starts a due check or an asked-for install when `gate` allows.
+// From loop(): starts an asked-for install, a "check now" or a due check when `gate` allows.
 // Blocks while it runs (~1-3 s for a check, ~30-60 s for an install, with
 // the OTA screen up), like an OpenSky poll.
 void releaseCheckLoop(const CheckGate &gate);
-// "Check now" (config page): runs at once unless the last check was under
-// kUpdateManualMinGapMs ago. Returns whether it ran.
-bool releaseCheckNow(const CheckGate &gate);
+// "Check now" (config page): queues a check for the next releaseCheckLoop()
+// (see ManualCheck — at most one a minute).
+ManualCheckAsk releaseCheckRequest();
+// A queued "check now" hasn't run yet.
+bool releaseCheckPending();
 // Queues an install of `tag` for the next releaseCheckLoop(). false: `tag`
 // is neither the latest release nor the shown development version, or an
 // install is already queued.

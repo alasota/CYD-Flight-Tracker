@@ -379,7 +379,6 @@ void netTask(void *) {
   otaObs.onStart = githubOtaOnStart;
   releaseSetOtaObserver(otaObs);
   releaseCheckBegin(*cfg);
-  configPortalSetUpdateGateSource(updateGate);
   configPortalSetPerfSource(perfJsonNow);
   publishIfChanged();
 
@@ -405,7 +404,7 @@ void netTask(void *) {
     }
     handleCommands();
     pollOpenSky();
-    releaseCheckLoop(updateGate());  // a due check / an asked-for install
+    releaseCheckLoop(updateGate());  // an asked-for install / "check now" / a due check
     publishIfChanged();
 
     perfIteration(millis() - t0);

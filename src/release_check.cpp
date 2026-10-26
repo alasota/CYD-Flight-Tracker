@@ -350,6 +350,35 @@ bool canStartNetworkTask(const CheckGate &g) {
          g.msUntilNextPoll >= kUpdateMinPollGapMs && g.maxFreeBlock >= kUpdateMinFreeBlock;
 }
 
+// ---- "Check now"
+
+ManualCheckAsk askManualCheck(ManualCheck &m, uint32_t nowMs) {
+  if (manualCheckPending(m, nowMs)) return ManualCheckAsk::AlreadyQueued;
+  if (m.ran && nowMs - m.lastRunMs < kUpdateManualMinGapMs) {
+    m.queued = false;
+    return ManualCheckAsk::TooSoon;
+  }
+  m.queued = true;
+  m.askedMs = nowMs;
+  return ManualCheckAsk::Queued;
+}
+
+bool takeManualCheck(ManualCheck &m, bool gateOpen, uint32_t nowMs) {
+  if (!manualCheckPending(m, nowMs)) {
+    m.queued = false;  // expired (or never asked)
+    return false;
+  }
+  if (!gateOpen) return false;
+  m.queued = false;
+  m.ran = true;
+  m.lastRunMs = nowMs;
+  return true;
+}
+
+bool manualCheckPending(const ManualCheck &m, uint32_t nowMs) {
+  return m.queued && nowMs - m.askedMs < kUpdateManualCheckExpiryMs;
+}
+
 // ---- Status
 
 WebStr updateStatusMessage(UpdateStatus s) {
@@ -474,8 +503,7 @@ UpdateState state;
 Config cfg;
 bool begun = false;
 uint32_t nextCheckAtMs = 0;
-bool manualEver = false;
-uint32_t lastManualMs = 0;
+ManualCheck manualCheck;  // "check now" / the development switch, run from releaseCheckLoop()
 std::string etagLatest;  // RAM only: a 304 answer doesn't count against GitHub's limit
 std::string etagList;
 std::string pendingInstallTag;
@@ -838,22 +866,22 @@ void releaseCheckLoop(const CheckGate &gate) {
     }
     return;
   }
+  // "Check now": here, after the poll — not in the page handler, which may run
+  // inside phase B next to the hexdb.io TLS session (spec 09).
+  CheckGate manual = gate;
+  manual.enabled = true;               // asked for by hand
+  manual.msUntilNextPoll = UINT32_MAX;  // the user is waiting; OpenSky can wait
+  if (takeManualCheck(manualCheck, canStartNetworkTask(manual), millis())) {
+    runCheck(/*useEtag=*/true);
+    return;
+  }
   if (static_cast<int32_t>(millis() - nextCheckAtMs) < 0) return;
   if (canStartNetworkTask(gate)) runCheck(/*useEtag=*/true);
 }
 
-bool releaseCheckNow(const CheckGate &gate) {
-  if (!begun) return false;
-  if (manualEver && millis() - lastManualMs < kUpdateManualMinGapMs) return false;
-  CheckGate g = gate;
-  g.enabled = true;
-  g.msUntilNextPoll = UINT32_MAX;
-  if (!canStartNetworkTask(g)) return false;
-  manualEver = true;
-  lastManualMs = millis();
-  runCheck(/*useEtag=*/true);
-  return true;
-}
+ManualCheckAsk releaseCheckRequest() { return askManualCheck(manualCheck, millis()); }
+
+bool releaseCheckPending() { return manualCheckPending(manualCheck, millis()); }
 
 bool releaseInstallRequest(const std::string &tag) {
   if (!pendingInstallTag.empty() || tag.empty() || tag == state.installed) return false;

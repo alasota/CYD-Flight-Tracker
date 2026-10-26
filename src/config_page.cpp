@@ -323,6 +323,11 @@ const char kRestartScript[] =
     "if(r.ok||r.status==401)location.href='/?tab=firmware';else setTimeout(p,2000)})"
     ".catch(function(){setTimeout(p,2000)})},5000);";
 
+// While "check now" waits for its turn (after the poll): reload until it ran
+// (or expired, kUpdateManualCheckExpiryMs) — unless the user went to another tab.
+const char kCheckPendingScript[] =
+    "setTimeout(function(){if($('tab').value=='firmware')location.href='/?tab=firmware'},3000);";
+
 class Writer {
  public:
   Writer(const HtmlSink &emit, Language lang) : emit_(emit), lang_(lang) {}
@@ -476,10 +481,11 @@ void updateCard(Writer &w, const ConfigPageModel &m, const std::string &installe
   }
   w.raw("</div>");
 
-  const bool good = u.status == UpdateStatus::UpToDate || u.status == UpdateStatus::Available;
+  const bool good = !m.updateCheckPending &&
+                    (u.status == UpdateStatus::UpToDate || u.status == UpdateStatus::Available);
   w.raw(good ? "<span class=\"pill ok\" id=\"ups\"><span class=\"dot\"></span>"
              : "<span class=\"pill\" id=\"ups\"><span class=\"dot\"></span>");
-  w.t(updateStatusMessage(u.status));
+  w.t(m.updateCheckPending ? WebStr::UpdChecking : updateStatusMessage(u.status));
   w.raw("</span>");
   if (u.checkedAt > 0) {
     w.raw("<div class=\"hint\" style=\"margin:-8px 0 14px\">");
@@ -1025,5 +1031,6 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.raw("\"};");
   w.raw(kScript);
   if (m.restarting) w.raw(kRestartScript);
+  else if (m.updateCheckPending) w.raw(kCheckPendingScript);
   w.raw("</script></body></html>");
 }

@@ -393,6 +393,25 @@ static void test_update_card_offers_the_newer_release(void) {
   ASSERT_NOT_CONTAINS(h, "id=\"upip\"");
 }
 
+// "Check now" queued, not run yet (spec 09 review): the card says so and the page reloads.
+static void test_update_card_while_a_check_is_pending(void) {
+  ConfigPageModel m = updateModel(false);
+  std::string h = render(m);
+  ASSERT_NOT_CONTAINS(h, "Checking GitHub");
+  ASSERT_NOT_CONTAINS(h, "location.href='/?tab=firmware'");
+
+  m.updateCheckPending = true;
+  h = render(m);
+  ASSERT_CONTAINS(h, "<span class=\"pill\" id=\"ups\"><span class=\"dot\"></span>"
+                     "Checking GitHub\xE2\x80\xA6</span>");
+  ASSERT_NOT_CONTAINS(h, "A newer version is available.");
+  ASSERT_CONTAINS(h, "if($('tab').value=='firmware')location.href='/?tab=firmware'");
+  ASSERT_CONTAINS(h, ">Check now</button>");
+
+  m.cfg.web_language = Language::PL;
+  ASSERT_CONTAINS(render(m), "Sprawdzam na GitHubie\xE2\x80\xA6</span>");
+}
+
 static void test_update_card_install_button_only_when_installable(void) {
   ConfigPageModel m = updateModel(false);
   for (UpdateStatus st : {UpdateStatus::UpToDate, UpdateStatus::NoChecksum, UpdateStatus::NoAsset,
@@ -907,6 +926,7 @@ void run_config_page_tests() {
   RUN_TEST(test_firmware_tab);
   RUN_TEST(test_restarting_page_reloads_itself);
   RUN_TEST(test_update_card_offers_the_newer_release);
+  RUN_TEST(test_update_card_while_a_check_is_pending);
   RUN_TEST(test_update_card_install_button_only_when_installable);
   RUN_TEST(test_update_card_development_channel);
   RUN_TEST(test_update_card_shows_a_failed_install);

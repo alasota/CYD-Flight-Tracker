@@ -127,11 +127,6 @@ void configPortalSetOtaObserver(const OtaObserver &observer);
 // leaves the display (and the network) alone meanwhile.
 bool configPortalRestartPending();
 
-// "Check now" on the Firmware tab needs what main.cpp knows (WiFi, clock,
-// heap, next OpenSky poll) — release_check's CheckGate, supplied on demand.
-struct CheckGate;
-using UpdateGateSource = CheckGate (*)();
-void configPortalSetUpdateGateSource(UpdateGateSource source);
 
 // GET /perf.json — perf_stats' JSON, supplied by net_task (503 until set).
 using PerfJsonSource = std::string (*)();
