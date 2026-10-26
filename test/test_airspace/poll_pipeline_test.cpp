@@ -1,7 +1,8 @@
-// poll_pipeline: one /states/all answer -> DataSnapshot. CLAUDE.md "Concurrency — two cores", spec/04.
+// poll_pipeline: one /states/all answer -> DataSnapshot, betweenFetches hook. CLAUDE.md "Concurrency — two cores", spec/04, spec 09.
 #include <unity.h>
 
 #include <cstdio>
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
@@ -10,6 +11,7 @@
 #include "fixtures.h"
 #include "lookup_cache.h"
 #include "poll_pipeline.h"
+#include "test_support.h"
 
 namespace {
 
@@ -268,6 +270,249 @@ static void test_caches_stay_bounded_over_200_polls(void) {
   }
 }
 
+// ---- betweenFetches: the settings page between phase-B lookups (spec 09 §3) ----
+
+// Two airborne aircraft, nothing cached: 2 aircraft + 2 routes + 3 airports
+// (AAA1 EPWA-LIRF, BBB2 EPWA-EGLL) = 7 hexdb.io requests in phase B.
+static std::vector<Aircraft> twoNewAircraft() {
+  return {makeAircraft("aaa001", "AAA1", 52.05f, 21.0f),
+          makeAircraft("bbb002", "BBB2", 52.10f, 21.0f)};
+}
+
+// stubPorts() with a route per callsign; the hook (if any) is set by the test.
+static LookupPorts hookPorts() {
+  LookupPorts p = stubPorts();
+  p.route = [](const std::string &k) {
+    calls.push_back("rt:" + k);
+    RouteInfo r;
+    r.found = true;
+    r.origin_icao = "EPWA";
+    r.dest_icao = k == "BBB2" ? "EGLL" : "LIRF";
+    return r;
+  };
+  return p;
+}
+
+// Records "hook" between the stub's fetch records; returns false on call
+// number `stopAt` (1-based, 0 = never).
+static int hookCalls = 0;
+static std::function<bool()> recordingHook(int stopAt = 0) {
+  hookCalls = 0;
+  return [stopAt] {
+    ++hookCalls;
+    calls.push_back("hook");
+    return stopAt == 0 || hookCalls != stopAt;
+  };
+}
+
+// True when `call` ("ac:x", "rt:x", "ap:x") is for a key the stub has cached.
+static bool isCachedCall(const std::string &call) {
+  const std::string key = call.substr(3);
+  if (call.rfind("ac:", 0) == 0) return knownAircraft.count(key) > 0;
+  if (call.rfind("rt:", 0) == 0) return knownRoutes.count(key) > 0;
+  if (call.rfind("ap:", 0) == 0) return knownAirports.count(key) > 0;
+  return false;
+}
+
+static const AircraftRow &rowOf(const DataSnapshot &s, const char *icao24) {
+  for (const AircraftRow &r : s.rows) {
+    if (r.aircraft.icao24 == icao24) return r;
+  }
+  TEST_FAIL_MESSAGE((std::string("no row for ") + icao24).c_str());
+  return s.rows.front();
+}
+
+// Hak jest wołany po każdym rzeczywistym zapytaniu hexdb.io
+static void test_between_fetches_called_once_per_fetch(void) {
+  LookupPorts ports = hookPorts();
+  ports.betweenFetches = recordingHook();
+  const DataSnapshot s = buildDataSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
+
+  TEST_ASSERT_EQUAL_UINT32(7, s.fetches);
+  TEST_ASSERT_EQUAL_INT(7, hookCalls);
+  // fetch, hook, fetch, hook, ... — each call right after its request.
+  TEST_ASSERT_EQUAL_size_t(14, calls.size());
+  for (size_t i = 0; i < calls.size(); ++i) {
+    if (i % 2 == 1) {
+      ASSERT_STR_EQ("hook", calls[i]);
+    } else if (calls[i] == "hook") {
+      TEST_FAIL_MESSAGE(("hook before its request, at " + std::to_string(i)).c_str());
+    }
+  }
+}
+
+// Trafienia w cache nie wołają haka
+static void test_between_fetches_not_called_for_cache_hits(void) {
+  for (const char *k : {"aaa001", "bbb002"}) knownAircraft.insert(k);
+  for (const char *k : {"AAA1", "BBB2"}) knownRoutes.insert(k);
+  for (const char *k : {"EPWA", "LIRF", "EGLL"}) knownAirports.insert(k);
+  LookupPorts ports = hookPorts();
+  ports.betweenFetches = recordingHook();
+
+  const DataSnapshot a = buildDataSnapshot(twoNewAircraft(), cacheOnly(params(4, 3)), ports, 0);
+  const DataSnapshot b = buildDataSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
+  TEST_ASSERT_EQUAL_UINT32(0, a.fetches);
+  TEST_ASSERT_EQUAL_UINT32(0, b.fetches);
+  TEST_ASSERT_EQUAL_INT(0, hookCalls);
+  TEST_ASSERT_FALSE(rowOf(b, "bbb002").dest_airport_pending);  // all of it resolved from cache
+}
+
+// Bez haka faza B działa jak dotąd
+static void test_between_fetches_optional(void) {
+  const LookupPorts ports = hookPorts();  // no betweenFetches
+  const DataSnapshot s = buildDataSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
+  TEST_ASSERT_EQUAL_UINT32(7, s.fetches);
+  const std::vector<std::string> expected = {"ac:aaa001", "ac:bbb002", "rt:AAA1", "rt:BBB2",
+                                             "ap:EPWA",   "ap:LIRF",   "ap:EGLL"};
+  TEST_ASSERT_EQUAL_size_t(expected.size(), calls.size());
+  for (size_t i = 0; i < expected.size(); ++i) ASSERT_STR_EQ(expected[i], calls[i]);
+  const AircraftRow &a = rowOf(s, "aaa001");
+  const AircraftRow &b = rowOf(s, "bbb002");
+  ASSERT_STR_EQ("Airline aaa001", a.info.airline);
+  ASSERT_STR_EQ("WAW", a.origin_airport.iata_code);
+  ASSERT_STR_EQ("FCO", a.dest_airport.iata_code);
+  TEST_ASSERT_FALSE(b.dest_airport_pending);
+  TEST_ASSERT_FALSE(b.route_pending);
+}
+
+// Hak każe przerwać — faza B kończy się bez dalszych zapytań, z częściowym snapshotem
+static void test_between_fetches_stop_ends_phase_b_with_partial_snapshot(void) {
+  // Two new aircraft plus one whose airframe, route and origin airport are cached.
+  std::vector<Aircraft> sky3 = twoNewAircraft();
+  sky3.push_back(makeAircraft("ccc003", "CCC3", 52.20f, 21.0f));
+  knownAircraft.insert("ccc003");
+  knownRoutes.insert("CCC3");
+  knownAirports.insert("EPWA");
+
+  const DataSnapshot ref = buildDataSnapshot(sky3, cacheOnly(params(4, 3)), hookPorts(), 0);
+  calls.clear();
+
+  LookupPorts ports = hookPorts();
+  ports.betweenFetches = recordingHook(/*stopAt=*/2);  // "an OTA update started"
+  const DataSnapshot s = buildDataSnapshot(sky3, params(4, 3), ports, 0);
+
+  // No hexdb.io request after the hook said stop (cached keys may still resolve).
+  size_t lastHook = 0;
+  for (size_t i = 0; i < calls.size(); ++i) {
+    if (calls[i] == "hook") lastHook = i;
+  }
+  TEST_ASSERT_EQUAL_INT(2, hookCalls);
+  for (size_t i = lastHook + 1; i < calls.size(); ++i) {
+    if (!isCachedCall(calls[i])) TEST_FAIL_MESSAGE(("request after stop: " + calls[i]).c_str());
+  }
+  TEST_ASSERT_EQUAL_UINT32(2, s.fetches);
+
+  // Fetched data is in, the rest is pending ("..."), not unknown ("--").
+  const AircraftRow &a = rowOf(s, "aaa001");
+  const AircraftRow &b = rowOf(s, "bbb002");
+  const AircraftRow &c = rowOf(s, "ccc003");
+  ASSERT_STR_EQ("Airline aaa001", a.info.airline);
+  ASSERT_STR_EQ("Airline bbb002", b.info.airline);
+  TEST_ASSERT_FALSE(a.info_pending);
+  TEST_ASSERT_TRUE(a.route_pending);
+  TEST_ASSERT_TRUE(b.route_pending);
+  TEST_ASSERT_FALSE(a.route.found);
+  // Cached data still reaches its row.
+  ASSERT_STR_EQ("Airline ccc003", c.info.airline);
+  TEST_ASSERT_TRUE(c.route.found);
+  ASSERT_STR_EQ("WAW", c.origin_airport.iata_code);
+  TEST_ASSERT_TRUE(c.dest_airport_pending);  // LIRF: not cached, not fetched
+
+  // Positions, distances, phases and the NOW pick as usual.
+  TEST_ASSERT_EQUAL_size_t(ref.rows.size(), s.rows.size());
+  for (size_t i = 0; i < ref.rows.size(); ++i) {
+    ASSERT_STR_EQ(ref.rows[i].aircraft.icao24, s.rows[i].aircraft.icao24);
+    TEST_ASSERT_TRUE(s.rows[i].has_distance);
+    TEST_ASSERT_EQUAL_FLOAT(ref.rows[i].distance_km, s.rows[i].distance_km);
+    ASSERT_ENUM_EQ(ref.rows[i].phase, s.rows[i].phase);
+  }
+  TEST_ASSERT_EQUAL_INT(ref.nowRowIndex, s.nowRowIndex);
+  TEST_ASSERT_TRUE(s.cpa.found);
+  TEST_ASSERT_EQUAL_FLOAT(ref.cpa.t_cpa_seconds, s.cpa.t_cpa_seconds);
+}
+
+// Hak wywołany w trakcie haka nic nie robi
+static void test_between_fetches_guard_ignores_nested_call(void) {
+  bool busy = false;
+  int outerServed = 0;
+  int nestedServed = 0;
+  bool nestedResult = false;
+  const std::function<bool()> noUpdate = [] { return false; };
+  const std::function<void()> nestedServe = [&] { ++nestedServed; };
+  const std::function<void()> outerServe = [&] {
+    ++outerServed;
+    nestedResult = serveBetweenFetches(busy, nestedServe, noUpdate);  // a handler re-entering
+  };
+
+  const bool outerResult = serveBetweenFetches(busy, outerServe, noUpdate);
+  TEST_ASSERT_EQUAL_INT(1, outerServed);
+  TEST_ASSERT_EQUAL_INT(0, nestedServed);  // the nested call doesn't serve the page
+  TEST_ASSERT_TRUE(nestedResult);          // ... and doesn't stop phase B
+  TEST_ASSERT_TRUE(outerResult);
+  TEST_ASSERT_FALSE(busy);
+}
+
+// Aktualizacja rozpoczęta w trakcie haka kończy fazę B
+// (Examples: wgrano firmware i czeka restart / trwa zapis obrazu OTA)
+static void test_between_fetches_stops_when_update_started(void) {
+  for (int example = 0; example < 2; ++example) {
+    bool restartPending = false;
+    bool otaInProgress = false;
+    bool busy = false;
+    int served = 0;
+    const bool result = serveBetweenFetches(
+        busy,
+        [&] {
+          ++served;
+          if (example == 0) restartPending = true;  // firmware uploaded, restart pending
+          else otaInProgress = true;                // OTA image being written
+        },
+        [&] { return restartPending || otaInProgress; });
+    TEST_ASSERT_EQUAL_INT(1, served);
+    TEST_ASSERT_FALSE_MESSAGE(result, example == 0 ? "restart pending" : "OTA in progress");
+    TEST_ASSERT_FALSE(busy);
+  }
+}
+
+// ---- betweenFetches edge cases (plan, no scenario) ---------------------------
+
+// "Stop" on the very first request: exactly one fetch.
+static void test_between_fetches_stop_on_first_fetch(void) {
+  LookupPorts ports = hookPorts();
+  ports.betweenFetches = recordingHook(/*stopAt=*/1);
+  const DataSnapshot s = buildDataSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
+  TEST_ASSERT_EQUAL_UINT32(1, s.fetches);
+  TEST_ASSERT_EQUAL_size_t(2, calls.size());
+  ASSERT_STR_EQ("hook", calls[1]);
+  TEST_ASSERT_TRUE(rowOf(s, "bbb002").info_pending);
+}
+
+// "Stop" during the airport stage keeps every aircraft / route already fetched.
+static void test_between_fetches_stop_in_airport_stage_keeps_fetched_info(void) {
+  LookupPorts ports = hookPorts();
+  ports.betweenFetches = recordingHook(/*stopAt=*/5);  // after the first airport
+  const DataSnapshot s = buildDataSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
+  TEST_ASSERT_EQUAL_UINT32(5, s.fetches);
+  TEST_ASSERT_EQUAL_INT(5, hookCalls);
+  for (const char *hex : {"aaa001", "bbb002"}) {
+    const AircraftRow &r = rowOf(s, hex);
+    TEST_ASSERT_FALSE(r.info_pending);
+    TEST_ASSERT_FALSE(r.route_pending);
+    TEST_ASSERT_TRUE(r.route.found);
+    ASSERT_STR_EQ("WAW", r.origin_airport.iata_code);  // EPWA, fetched before the stop
+    TEST_ASSERT_TRUE(r.dest_airport_pending);
+  }
+}
+
+// Phase A (cacheOnly) never calls the hook, even with uncached keys around.
+static void test_between_fetches_not_called_in_phase_a(void) {
+  LookupPorts ports = hookPorts();
+  ports.betweenFetches = recordingHook();
+  const DataSnapshot s = buildDataSnapshot(twoNewAircraft(), cacheOnly(params(4, 3)), ports, 0);
+  TEST_ASSERT_EQUAL_UINT32(0, s.fetches);
+  TEST_ASSERT_EQUAL_INT(0, hookCalls);
+}
+
 }  // namespace
 
 void run_poll_pipeline_tests() {
@@ -282,4 +527,13 @@ void run_poll_pipeline_tests() {
   RUN_TEST(test_ground_row_gets_no_phase);
   RUN_TEST(test_empty_sky);
   RUN_TEST(test_caches_stay_bounded_over_200_polls);
+  RUN_TEST(test_between_fetches_called_once_per_fetch);
+  RUN_TEST(test_between_fetches_not_called_for_cache_hits);
+  RUN_TEST(test_between_fetches_optional);
+  RUN_TEST(test_between_fetches_stop_ends_phase_b_with_partial_snapshot);
+  RUN_TEST(test_between_fetches_guard_ignores_nested_call);
+  RUN_TEST(test_between_fetches_stops_when_update_started);
+  RUN_TEST(test_between_fetches_stop_on_first_fetch);
+  RUN_TEST(test_between_fetches_stop_in_airport_stage_keeps_fetched_info);
+  RUN_TEST(test_between_fetches_not_called_in_phase_a);
 }

@@ -65,6 +65,16 @@ std::string netCommandTag(const NetCommand &c) {
   return std::string(c.tag, strnlen(c.tag, sizeof(c.tag)));
 }
 
+// TODO(spec 09): stub from test-author
+PendingCommand submitCommand(const NetCommand & /*c*/, const CommandSender & /*trySend*/) {
+  return {};
+}
+
+// TODO(spec 09): stub from test-author
+PendingCommand retryPendingCommand(PendingCommand /*p*/, const CommandSender & /*trySend*/) {
+  return {};
+}
+
 uint32_t msUntilPeriod(uint32_t nowMs, uint32_t lastMs, uint32_t periodMs) {
   const uint32_t elapsed = nowMs - lastMs;  // unsigned: rollover-safe
   return elapsed >= periodMs ? 0 : periodMs - elapsed;

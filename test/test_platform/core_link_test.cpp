@@ -1,10 +1,12 @@
-// core_link: LatestBox, Guarded, NetState diff, UI sleep. CLAUDE.md "Concurrency — two cores", spec/04.
+// core_link: LatestBox, Guarded, NetState diff, UI sleep, pending commands. CLAUDE.md "Concurrency — two cores", spec/04, spec 09.
 #include <unity.h>
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "core_link.h"
+#include "test_support.h"
 
 namespace {
 
@@ -382,6 +384,137 @@ static void test_ui_sleep_wakes_for_the_alert_countdown(void) {
   TEST_ASSERT_EQUAL_UINT32(3, uiSleepMs(w));
 }
 
+// ---- A command the queue didn't take waits and is retried (spec 09 §2) ---------
+
+// A fake FreeRTOS queue: refuses while `full`, records what it accepted and
+// how often it was asked.
+struct FakeQueue {
+  bool full = false;
+  int attempts = 0;
+  std::vector<NetCommand> accepted;
+  CommandSender sender() {
+    return [this](const NetCommand &c) {
+      ++attempts;
+      if (full) return false;
+      accepted.push_back(c);
+      return true;
+    };
+  }
+};
+
+static void assertCommand(NetCommandType type, const char *tag, const NetCommand &c) {
+  ASSERT_ENUM_EQ(type, c.type);
+  ASSERT_STR_EQ(tag, netCommandTag(c));
+}
+
+// Odpowiedź na pytanie o aktualizację czeka, aż kolejka ją przyjmie
+// (Examples: NIE -> SkipTag, TAK -> InstallTag)
+static void test_pending_command_sent_once_queue_accepts(void) {
+  for (NetCommandType type : {NetCommandType::SkipTag, NetCommandType::InstallTag}) {
+    FakeQueue q;
+    q.full = true;
+    PendingCommand p = submitCommand(makeNetCommand(type, "v1.8.0"), q.sender());
+    TEST_ASSERT_TRUE(p.waiting);
+    assertCommand(type, "v1.8.0", p.cmd);
+
+    for (int pass = 0; pass < 3; ++pass) {  // loop() passes while the queue is full
+      const int before = q.attempts;
+      p = retryPendingCommand(p, q.sender());
+      TEST_ASSERT_EQUAL_INT(before + 1, q.attempts);  // retried on every pass
+      TEST_ASSERT_TRUE(p.waiting);
+    }
+
+    q.full = false;
+    p = retryPendingCommand(p, q.sender());
+    TEST_ASSERT_FALSE(p.waiting);
+    p = retryPendingCommand(p, q.sender());  // and nothing more after that
+    TEST_ASSERT_EQUAL_size_t(1, q.accepted.size());
+    assertCommand(type, "v1.8.0", q.accepted[0]);
+  }
+}
+
+// Dopóki kolejka jest pełna, oczekująca komenda nie ginie
+static void test_pending_command_kept_while_queue_full(void) {
+  FakeQueue q;
+  q.full = true;
+  PendingCommand p;
+  p.waiting = true;
+  p.cmd = makeNetCommand(NetCommandType::SkipTag, "v1.8.0");
+  for (int i = 0; i < 100; ++i) {
+    p = retryPendingCommand(p, q.sender());
+    TEST_ASSERT_TRUE(p.waiting);
+    assertCommand(NetCommandType::SkipTag, "v1.8.0", p.cmd);
+  }
+  TEST_ASSERT_EQUAL_INT(100, q.attempts);
+  TEST_ASSERT_EQUAL_size_t(0, q.accepted.size());
+}
+
+// Bez oczekującej komendy ponawianie nic nie wysyła
+static void test_no_pending_command_sends_nothing(void) {
+  FakeQueue q;
+  const PendingCommand p = retryPendingCommand(PendingCommand{}, q.sender());
+  TEST_ASSERT_EQUAL_INT(0, q.attempts);
+  TEST_ASSERT_FALSE(p.waiting);
+  TEST_ASSERT_FALSE(p.logQueueFull);
+}
+
+// „command queue full, retrying” trafia do logu raz na komendę
+static void test_queue_full_logged_once_per_command(void) {
+  FakeQueue q;
+  q.full = true;
+  PendingCommand p = submitCommand(makeNetCommand(NetCommandType::SkipTag, "v1.8.0"), q.sender());
+  TEST_ASSERT_TRUE(p.logQueueFull);  // the first failed attempt
+  for (int i = 0; i < 10; ++i) {
+    p = retryPendingCommand(p, q.sender());
+    TEST_ASSERT_TRUE(p.waiting);
+    TEST_ASSERT_FALSE(p.logQueueFull);
+  }
+}
+
+// Kolejka ma miejsce — komenda idzie od razu, nic nie czeka
+static void test_command_sent_directly_when_queue_has_room(void) {
+  FakeQueue q;
+  const PendingCommand p =
+      submitCommand(makeNetCommand(NetCommandType::SkipTag, "v1.8.0"), q.sender());
+  TEST_ASSERT_EQUAL_size_t(1, q.accepted.size());
+  assertCommand(NetCommandType::SkipTag, "v1.8.0", q.accepted[0]);
+  TEST_ASSERT_FALSE(p.waiting);
+  TEST_ASSERT_FALSE(p.logQueueFull);
+}
+
+// Edge (plan): a tag longer than the slot is cut by makeNetCommand — the
+// waiting command keeps exactly that POD, byte for byte.
+static void test_pending_command_keeps_a_cut_long_tag(void) {
+  FakeQueue q;
+  q.full = true;
+  const NetCommand original = makeNetCommand(NetCommandType::InstallTag, std::string(40, 'v'));
+  PendingCommand p = submitCommand(original, q.sender());
+  TEST_ASSERT_TRUE(p.waiting);
+  q.full = false;
+  p = retryPendingCommand(p, q.sender());
+  TEST_ASSERT_EQUAL_size_t(1, q.accepted.size());
+  TEST_ASSERT_EQUAL_MEMORY(&original, &q.accepted[0], sizeof(NetCommand));
+  TEST_ASSERT_EQUAL_size_t(sizeof(original.tag) - 1, netCommandTag(q.accepted[0]).size());
+}
+
+// Edge (owner's answer, open question 2): a newer command replaces a waiting
+// one; only the newer is sent, and its own first failure is logged.
+static void test_newer_command_replaces_waiting_one(void) {
+  FakeQueue q;
+  q.full = true;
+  PendingCommand p = submitCommand(makeNetCommand(NetCommandType::SkipTag, "v1.8.0"), q.sender());
+  TEST_ASSERT_TRUE(p.waiting);
+  p = submitCommand(makeNetCommand(NetCommandType::InstallTag, "v1.9.0"), q.sender());
+  TEST_ASSERT_TRUE(p.waiting);
+  TEST_ASSERT_TRUE(p.logQueueFull);
+  assertCommand(NetCommandType::InstallTag, "v1.9.0", p.cmd);
+  q.full = false;
+  p = retryPendingCommand(p, q.sender());
+  TEST_ASSERT_FALSE(p.waiting);
+  TEST_ASSERT_EQUAL_size_t(1, q.accepted.size());
+  assertCommand(NetCommandType::InstallTag, "v1.9.0", q.accepted[0]);
+}
+
 }  // namespace
 
 void run_core_link_tests() {
@@ -408,6 +541,13 @@ void run_core_link_tests() {
   RUN_TEST(test_command_tag_round_trip);
   RUN_TEST(test_command_long_tag_is_cut_and_terminated);
   RUN_TEST(test_command_without_tag);
+  RUN_TEST(test_pending_command_sent_once_queue_accepts);
+  RUN_TEST(test_pending_command_kept_while_queue_full);
+  RUN_TEST(test_no_pending_command_sends_nothing);
+  RUN_TEST(test_queue_full_logged_once_per_command);
+  RUN_TEST(test_command_sent_directly_when_queue_has_room);
+  RUN_TEST(test_pending_command_keeps_a_cut_long_tag);
+  RUN_TEST(test_newer_command_replaces_waiting_one);
 
   RUN_TEST(test_ms_until_period);
   RUN_TEST(test_ms_until_next_minute);

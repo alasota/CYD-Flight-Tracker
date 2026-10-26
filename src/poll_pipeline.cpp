@@ -7,6 +7,12 @@
 #include "lookup_budget.h"
 #include "table_view.h"
 
+// TODO(spec 09): stub from test-author
+bool serveBetweenFetches(bool & /*busy*/, const std::function<void()> & /*serve*/,
+                         const std::function<bool()> & /*updateStarted*/) {
+  return true;
+}
+
 PipelineParams cacheOnly(PipelineParams p) {
   p.lookupBudget = 0;
   p.airportBudget = 0;
