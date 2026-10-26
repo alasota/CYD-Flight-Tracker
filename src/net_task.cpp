@@ -214,6 +214,17 @@ LookupPorts productionPorts() {
     if (it != memoAirport.end()) return it->second;
     return memoAirport[k] = lookupAirportCountry(k);
   };
+  // Between phase B's hexdb.io requests the settings page gets its turn —
+  // otherwise it waits for all of them (spec 09 §3). Not nested (a handler
+  // can't start another phase B); a firmware update started there ends
+  // phase B, the main loop then stays off the network until the restart.
+  // A settings save only reaches `cfg` after the poll (seenSaveCount).
+  p.betweenFetches = [] {
+    static bool inBetweenFetches = false;
+    return serveBetweenFetches(inBetweenFetches, configPortalLoop, [] {
+      return configPortalRestartPending() || otaFlashSession().inProgress();
+    });
+  };
   return p;
 }
 
@@ -275,7 +286,8 @@ void pollOpenSky() {
       buildDataSnapshot(poll.aircraft, cacheOnly(p), ports, polledAt));
   publishIfChanged();
 
-  // Phase B: the new hexdb.io lookups; published only if it fetched anything.
+  // Phase B: the new hexdb.io lookups; published only if it fetched anything
+  // (also when a firmware update stopped it halfway — the board restarts anyway).
   const uint32_t t0 = millis();
   DataSnapshot b = buildDataSnapshot(poll.aircraft, p, ports, polledAt);
   hexdbSessionEnd();
