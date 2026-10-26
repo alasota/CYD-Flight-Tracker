@@ -370,6 +370,10 @@ Firmware tabs nag until you set one:
   password; tick *Remove the password* to go back to none.
 - The browser uses HTTP *Digest* login, so the password itself doesn't cross the network.
 - Five wrong passwords in a row lock the page for 60 seconds.
+- Password or not, some random website you happen to open can't change anything behind your
+  back: the board refuses any change sent from another page (403), the settings page won't show
+  up framed inside someone else's site, and a screenshot no longer changes which screen the
+  board starts on. `curl` and `pio run -e cyd-ota -t upload` still work as before.
 - **Forgot it?** Hold a finger on the screen while you power the board up. After 5 seconds it
   asks *Remove the password?* — tap **YES**, and the page is open again (all other settings
   stay). Whoever can touch the board could reflash it anyway, so that's the trust boundary.

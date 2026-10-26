@@ -606,6 +606,11 @@ request — the summary text simply starts at x:208. (`drawVerticalDivider()` st
 - **Persistence**: current screen index saved to `config_store` as `last_screen` (0/1/2),
   restored on boot. This replaces the old boolean-ish `last_view` field from when there were
   only two screens (table/radar) — rename it, don't keep both fields around.
+  Whether a change is written depends on its cause (`ScreenChangeCause`,
+  `shouldPersistScreenChange()`): `Touch` always, `AutoCycle` at most every 10 min
+  (`kScreenPersistMinIntervalMs`), `Screenshot` **never** — a `/screenshot.bmp?screen=N` switch
+  is only for the capture, and the screen shown before it comes back afterwards (spec 10;
+  before, any web page could flip screens and wear the flash through NVS writes).
 - **Any screen change resets the auto-cycle timer** (see "Auto screen cycling" below) — whether
   the change came from a manual touch or an automatic switch. Without this, a manual tap could
   be immediately undone by an auto-switch a moment later, which would feel broken.
@@ -692,8 +697,11 @@ language / Jezyk wyswietlacza" select, values `pl` / `en`). Default: Polish.
 - Not translated: units (`m`, `km`, `m/s`, `MIN`), `--` placeholders, airline/aircraft names
   from hexdb.io.
 - **The config web page has its own language** (`Config::web_language`, NVS key `wlang`,
-  default PL), independent of the display's: PL/EN switch in the page header (`GET /lang?l=`)
-  and a select on the General tab. Its strings are a separate X-macro table, `web_i18n`
+  default PL), independent of the display's: PL/EN switch in the page header — two small
+  `<form method="post" action="/lang">` (hidden `l` + `tab`, the script keeps `tab` on the
+  current tab; `.lang button`, same look as the old links) — and a select on the General tab.
+  `GET /lang` answers 405 + `Allow: POST` (spec 10: a GET must not change anything, an
+  `<img src>` on any page could flip it). Its strings are a separate X-macro table, `web_i18n`
   (`WEB_I18N_STRINGS`, `webTr()`); they go into HTML/JS raw, so `web_i18n_test.cpp` forbids
   `" < > \ &` in them.
 
@@ -731,12 +739,30 @@ Spec: `spec/done/01-ota-updates.md` (roadmap #1). Released in v1.1.0, tested on 
   `CYD Sky Tracker`, user `admin` — Basic is accepted too), `AuthThrottle` lockout -> 429 +
   `Retry-After`. Upload callbacks check credentials *before* buffering/writing anything.
   Forgotten password: finger on the screen at power-up, 5 s, YES (`offerWebPasswordReset()`).
+- **Cross-site requests** (spec `spec/done/10-web-panel-security.md`): the password doesn't stop
+  CSRF — a browser sends its stored Digest login with a foreign page's form too. Every POST
+  handler (`/save`, `/restore`, `/upload_credentials`, `/update`, `/update/check`,
+  `/update/install`, `/update/prerelease`, `/lang`) calls `requireSameOrigin()` **before**
+  `authorize()`: `checkRequestOrigin(Origin, Referer, Host)` (`web_auth`, pure) — Origin decides,
+  else Referer's host; `http://` only, exact case-insensitive host[:port] match, `:80` = no
+  port; `null`, `https://`, userinfo (`cyd-sky.local@evil`), look-alike suffixes, an Origin
+  with a path or an empty Host -> `CrossOrigin` -> 403 `Cross-site request refused` + log
+  `[auth] cross-origin POST /save from http://evil.example refused`. **Neither header**
+  (`NoHeaders`: curl, `pio run -e cyd-ota -t upload`) is allowed. Upload callbacks decide at
+  `UPLOAD_FILE_START` with `decideUploadStart(origin, credentialsOk)` (origin first), so a
+  cross-site upload buffers nothing and never starts `OtaSession` (no "update failed" screen).
+- **No framing:** every response (route wrapper `secured<Handler>`, 401 / 429 / 403 / BMP / JSON
+  included) carries `kSecurityHeaders`: `X-Frame-Options: DENY` and
+  `Content-Security-Policy: frame-ancestors 'none'`. No `Access-Control-*` header anywhere
+  (tested, so it stays that way).
 - ⚠️ **arduino-esp32 2.x `WebServer` pitfall:** a route registered with an upload callback gets
   that callback for **any** POST body — a non-multipart one (e.g. the empty probe `curl
   --digest` sends first) arrives as "raw", and `server.upload()` then dereferences null and
   crashes the board. Every upload callback starts with `if (!isMultipartRequest()) return;`
-  (needs `collectHeaders({"Content-Type"})`), and handlers take the buffered file with
-  `takeUpload()` so a later request can't reuse a stale one.
+  (needs `Content-Type` in `collectHeaders()`), and handlers take the buffered file with
+  `takeUpload()` so a later request can't reuse a stale one. `collectHeaders()` *replaces* the
+  list — it is `Content-Type, Origin, Referer, Host` now; dropping `Content-Type` brings the
+  crash back.
 
 ## New versions from GitHub (release_check)
 
@@ -840,6 +866,13 @@ check). Now:
   overwrote `Idle` (5 s without drawing), and a new `begin()` cleared the flag while the UI was
   still writing to the previous request's freed buffer. The native test runs handler and UI on
   two `std::thread`s with random timeouts (ASan in CI).
+  `?screen=N` switches the display only for the capture (spec 10): `ScreenshotReturn`
+  (`screenshot.h`, UI side) remembers the screen shown before on the Prepare job — only for a
+  real switch (0..2 and not the current one; the demo screens 3 / 4 and no `screen` leave
+  nothing) and only the first of a capture series — and `afterPass(capturing)` gives it back
+  once, when capturing ends (`end()`, timeout or the 5 s idle rule). `main.cpp` then
+  `nav.set()`s it with `ScreenChangeCause::Screenshot`: repainted, never written to NVS. An
+  alert message closed by a capture stays closed.
 - **Poll -> two snapshots** (`poll_pipeline`, pure, `buildDataSnapshot()`): phase A right after
   `/states/all` with no lookup budget (cache only, the rest `...`), phase B with the budgets; B
   is published only if it fetched something (`DataSnapshot::fetches`). Results are memoised per
@@ -1104,12 +1137,17 @@ each with a single responsibility:
   panel `readable = true`) and streamed as a 24-bit BMP — for UX reviews without a camera.
   Pixels come from the UI core in bands (`configPortalSetScreenshotSource()`, see "Concurrency —
   two cores"); BMP header/row math, the bottom-up band order and the handler <-> UI hand-over
-  (`ScreenshotBridge`, generation counter) are the pure `screenshot` module (native-tested). `?screen=N` switches to that screen first. `GET /perf.json`: `perf_stats`.
+  (`ScreenshotBridge`, generation counter) are the pure `screenshot` module (native-tested). `?screen=N` switches to that screen for the capture only (not saved, the previous screen
+  comes back afterwards). `GET /perf.json`: `perf_stats`.
+  Every POST route is origin-checked before the password, every response carries the
+  anti-framing headers, `/lang` is POST only (see "Firmware updates (OTA) & panel password").
   Runs on core 0 (`net_task`).
 - `web_auth` — the panel password, pure: `validateWebPassword()` (8–64 printable ASCII, "" =
   none), `decidePasswordChange()` (the General tab's two fields + "remove"), `decideAuth()`
   (allow / 401 challenge / 429 locked), `AuthThrottle` (5 wrong in a row -> 60 s lock), the
-  power-up reset gesture timing (`resetHoldState()`).
+  power-up reset gesture timing (`resetHoldState()`), and cross-site protection:
+  `checkRequestOrigin()` (`SameOrigin` / `CrossOrigin` / `NoHeaders`), `decideUploadStart()`
+  (origin first, then the password), `crossOriginLogLine()`, `kSecurityHeaders`.
 - `ota_update` — pure OTA logic: `checkImageHeader()` (0xE9 magic, chip id, `0xFF` = the merged
   `-full.bin`), `checkImageSize()`, `FirmwareMarkerScanner` (finds `CYDSKY-FW1|board=…|v=…`
   across chunk boundaries), `OtaSession` (start/feed/finish/abort over an `OtaWriter`
