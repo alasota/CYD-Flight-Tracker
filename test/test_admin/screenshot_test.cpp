@@ -488,14 +488,14 @@ static ConcurrentRun runConcurrentCaptures(int captures, bool reallyFree, uint32
 static void test_bridge_concurrent_random_timeouts_never_touch_freed_buffers(void) {
   const ConcurrentRun kept = runConcurrentCaptures(10000, /*reallyFree=*/false, 9u);
   TEST_ASSERT_EQUAL_INT(0, kept.poisonBroken);  // no write after a buffer was retired
-  TEST_ASSERT_TRUE(kept.completed > 0);          // the run did capture something
-  TEST_ASSERT_TRUE(kept.aborted > 0);            // ... and did interrupt something
+  TEST_ASSERT_GREATER_THAN_INT(0, kept.completed);  // the run did capture something
+  TEST_ASSERT_GREATER_THAN_INT(0, kept.aborted);  // ... and did interrupt something
   TEST_ASSERT_EQUAL_INT(0, kept.badBands);       // every finished capture is complete
   TEST_ASSERT_FALSE(kept.capturingAfter);        // the UI draws again afterwards
 
   // The same with real delete[] — a late write is a use-after-free for ASan (CI).
   const ConcurrentRun freed = runConcurrentCaptures(2000, /*reallyFree=*/true, 10u);
-  TEST_ASSERT_TRUE(freed.completed > 0);
+  TEST_ASSERT_GREATER_THAN_INT(0, freed.completed);
   TEST_ASSERT_EQUAL_INT(0, freed.badBands);
   TEST_ASSERT_FALSE(freed.capturingAfter);
 }
