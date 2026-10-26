@@ -116,6 +116,41 @@ bool credentialsOk() {
   return sentCredentials() && server.authenticate(kWebAuthUser, webPassword.c_str());
 }
 
+// Where a state-changing request came from (spec 10 §2.1): Origin, else
+// Referer, against Host. Headers collected in configPortalBegin().
+OriginCheck requestOrigin() {
+  return checkRequestOrigin(server.header("Origin").c_str(), server.header("Referer").c_str(),
+                            server.header("Host").c_str());
+}
+
+// Every POST handler starts with this, before authorize(): true = go on;
+// false = a cross-site request, 403 sent and logged. A browser sends Origin
+// with every cross-site POST, and its stored Digest login with it — so the
+// password alone doesn't stop a foreign page's form. No Origin and no
+// Referer (curl, `pio run -e cyd-ota -t upload`) is allowed.
+bool requireSameOrigin() {
+  if (requestOrigin() != OriginCheck::CrossOrigin) return true;
+  Serial.println(crossOriginLogLine("POST", server.uri().c_str(), server.header("Origin").c_str(),
+                                    server.header("Referer").c_str())
+                     .c_str());
+  server.send(403, "text/plain", "Cross-site request refused");
+  return false;
+}
+
+// Queued before every response of the panel (WebServer sends them with the
+// next send()): the page may not be shown in a frame on another site.
+void sendSecurityHeaders() {
+  for (const SecurityHeader &h : kSecurityHeaders) server.sendHeader(h.name, h.value);
+}
+
+// Route wrapper: every handler's response — 401 / 429 / 403 included —
+// carries the security headers, without each handler having to remember.
+template <void (*Handler)()>
+void secured() {
+  sendSecurityHeaders();
+  Handler();
+}
+
 // Every handler starts with this: true = go on; false = a 401 Digest
 // challenge or a 429 (too many wrong passwords) has been sent.
 bool authorize() {
@@ -255,7 +290,7 @@ WebStr passwordProblem(const PasswordChange &c) {
 }
 
 void handleSave() {
-  if (!authorize()) return;
+  if (!requireSameOrigin() || !authorize()) return;
   Config cfg = loadConfig();
 
   // Reject malformed numeric input instead of silently treating it as 0
@@ -539,8 +574,10 @@ void handleUploadChunk() {
   if (upload.status == UPLOAD_FILE_START) {
     uploadBuffer.clear();
     uploadTooLarge = false;
-    // Not logged in: buffer nothing; the handler then answers 401.
-    uploadAuthorized = credentialsOk();
+    // From another site or not logged in: buffer nothing; the handler then
+    // answers 403 / 401.
+    uploadAuthorized =
+        decideUploadStart(requestOrigin(), credentialsOk()) == UploadStart::Accept;
     uploadReceived = uploadAuthorized;
   } else if (!uploadAuthorized) {
     return;
@@ -566,7 +603,7 @@ std::string takeUpload(bool *tooLarge) {
 }
 
 void handleCredentialsUpload() {
-  if (!authorize()) return;
+  if (!requireSameOrigin() || !authorize()) return;
   bool tooLarge = false;
   const std::string body = takeUpload(&tooLarge);
   Config cfg = loadConfig();
@@ -605,7 +642,7 @@ void handleBackupDownload() {
 // POST /restore (multipart, field backup_file) — applies a backup file on
 // top of the current settings and saves them.
 void handleRestore() {
-  if (!authorize()) return;
+  if (!requireSameOrigin() || !authorize()) return;
   bool tooLarge = false;
   const std::string body = takeUpload(&tooLarge);
   Config cfg = loadConfig();
@@ -639,13 +676,15 @@ void handleRestore() {
 
 // POST /update — upload callback: streams the file into the spare app slot
 // (OtaSession checks header, size and the Sky Tracker marker first). Without
-// a valid login nothing at all is written; handleUpdateDone() answers 401.
+// a valid login, or sent from another site, nothing at all is written;
+// handleUpdateDone() answers 401 / 403.
 void handleUpdateChunk() {
   if (!isMultipartRequest()) return;  // see isMultipartRequest()
   HTTPUpload &upload = server.upload();
   switch (upload.status) {
     case UPLOAD_FILE_START: {
-      otaAuthorized = credentialsOk();
+      otaAuthorized =
+          decideUploadStart(requestOrigin(), credentialsOk()) == UploadStart::Accept;
       if (!otaAuthorized) return;
       const size_t declared =
           static_cast<size_t>(std::strtoul(server.arg("size").c_str(), nullptr, 10));
@@ -681,7 +720,9 @@ void handleUpdateChunk() {
 }
 
 void handleUpdateDone() {
-  if (!authorize()) {
+  // A refused upload (origin or password) wrote nothing; answer without
+  // touching the OTA session, so the display shows no "update failed".
+  if (!requireSameOrigin() || !authorize()) {
     otaAuthorized = false;
     return;
   }
@@ -738,14 +779,14 @@ void requestCheckAndAnswer() {
 
 // POST /update/check — "check now".
 void handleUpdateCheck() {
-  if (!authorize()) return;
+  if (!requireSameOrigin() || !authorize()) return;
   requestCheckAndAnswer();
 }
 
 // POST /update/install (tag=...) — queues the install; the download starts in
 // the next loop() pass, after this page has reached the browser.
 void handleUpdateInstall() {
-  if (!authorize()) return;
+  if (!requireSameOrigin() || !authorize()) return;
   const std::string tag = server.arg("tag").c_str();
   if (!releaseInstallRequest(tag)) {
     ConfigPageModel model;
@@ -771,7 +812,7 @@ void handleUpdateInstall() {
 // POST /update/prerelease (on=0|1) — "show development versions", saved on
 // its own and followed by a fresh check.
 void handleUpdatePrerelease() {
-  if (!authorize()) return;
+  if (!requireSameOrigin() || !authorize()) return;
   const bool on = server.arg("on") == "1";
   saveUpdateShowPrerelease(on);
   ++saveCount;  // main.cpp reloads the config and hands it to release_check
@@ -790,24 +831,25 @@ void configPortalBegin() {
   refreshPassword();
   ota = &otaFlashSession();
   // Kept per request besides Authorization (always kept): Content-Type, for
-  // isMultipartRequest().
-  static const char *kHeaders[] = {"Content-Type"};
-  server.collectHeaders(kHeaders, 1);
+  // isMultipartRequest() — never drop it, see there; Origin / Referer / Host
+  // for requireSameOrigin().
+  static const char *kHeaders[] = {"Content-Type", "Origin", "Referer", "Host"};
+  server.collectHeaders(kHeaders, sizeof(kHeaders) / sizeof(kHeaders[0]));
 
-  server.on("/", HTTP_GET, handleRoot);
-  server.on("/save", HTTP_POST, handleSave);
-  server.on("/lang", HTTP_GET, handleLang);
-  server.on("/screenshot.bmp", HTTP_GET, handleScreenshot);
-  server.on("/light.json", HTTP_GET, handleLight);
-  server.on("/perf.json", HTTP_GET, handlePerf);
-  server.on("/upload_credentials", HTTP_POST, handleCredentialsUpload, handleUploadChunk);
-  server.on("/backup.json", HTTP_GET, handleBackupDownload);
-  server.on("/restore", HTTP_POST, handleRestore, handleUploadChunk);
-  server.on("/update", HTTP_POST, handleUpdateDone, handleUpdateChunk);
-  server.on("/update/check", HTTP_POST, handleUpdateCheck);
-  server.on("/update/install", HTTP_POST, handleUpdateInstall);
-  server.on("/update/prerelease", HTTP_POST, handleUpdatePrerelease);
-  server.onNotFound(handleNotFound);
+  server.on("/", HTTP_GET, secured<handleRoot>);
+  server.on("/save", HTTP_POST, secured<handleSave>);
+  server.on("/lang", HTTP_GET, secured<handleLang>);
+  server.on("/screenshot.bmp", HTTP_GET, secured<handleScreenshot>);
+  server.on("/light.json", HTTP_GET, secured<handleLight>);
+  server.on("/perf.json", HTTP_GET, secured<handlePerf>);
+  server.on("/upload_credentials", HTTP_POST, secured<handleCredentialsUpload>, handleUploadChunk);
+  server.on("/backup.json", HTTP_GET, secured<handleBackupDownload>);
+  server.on("/restore", HTTP_POST, secured<handleRestore>, handleUploadChunk);
+  server.on("/update", HTTP_POST, secured<handleUpdateDone>, handleUpdateChunk);
+  server.on("/update/check", HTTP_POST, secured<handleUpdateCheck>);
+  server.on("/update/install", HTTP_POST, secured<handleUpdateInstall>);
+  server.on("/update/prerelease", HTTP_POST, secured<handleUpdatePrerelease>);
+  server.onNotFound(secured<handleNotFound>);
   server.begin();
 
   MDNS.addService("http", "tcp", 80);
