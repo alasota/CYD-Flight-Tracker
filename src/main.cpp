@@ -258,14 +258,14 @@ static void updateShownHealth() {
 }
 
 // Persist (debounced) + redraw after screen_nav reports the active screen
-// changed. `userInitiated` is true for a touch, false for an auto-cycle
-// advance — auto-cycle screen writes are rate-limited (review notes 5.9).
-static void onScreenChanged(bool userInitiated) {
+// changed. A touch persists at once, an auto-cycle advance rate-limited
+// (review notes 5.9), a screenshot's switch never (spec 10).
+static void onScreenChanged(ScreenChangeCause cause) {
   currentPage = 0;
   lastScreenChangeMs = millis();  // any change resets the auto-cycle timer
 
   if (nav.current() != lastPersistedScreen &&
-      shouldPersistScreenChange(userInitiated, millis() - lastScreenPersistMs,
+      shouldPersistScreenChange(cause, millis() - lastScreenPersistMs,
                                 kScreenPersistMinIntervalMs)) {
     saveLastScreen(nav.current());  // targeted single-key write (see config_store)
     lastPersistedScreen = nav.current();
@@ -339,7 +339,7 @@ static void handleTap(int16_t x, int16_t y) {
   // Screens switch only via the bottom nav buttons.
   NavHit hit = navHitTest(x, y, screenW, screenH);
   if (hit.action == NavAction::JumpTo) {
-    if (nav.set(hit.target)) onScreenChanged(/*userInitiated=*/true);
+    if (nav.set(hit.target)) onScreenChanged(ScreenChangeCause::Touch);
     return;
   }
 
@@ -616,17 +616,23 @@ static void screenshotPrepare(int screenIndex) {
     return;
   }
   if (alertScreen.open) closeAlertMessage();  // a normal screen was asked for
-  if (screenIndex >= 0 && nav.set(screenIndex)) onScreenChanged(/*userInitiated=*/true);
+  if (screenIndex >= 0 && nav.set(screenIndex)) onScreenChanged(ScreenChangeCause::Screenshot);
   const uint8_t mask = computeRedrawMask(pendingRedraw, nav.current());
   if (mask != 0 && cfg().home_configured) applyRedraw(mask);
   pendingRedraw = RedrawEvents{};
 }
 
+// The screen to put back once a ?screen=N capture is over (spec 10).
+static ScreenshotReturn shotReturn;
+
 // UI side: answers whatever the handler asked for. True while a capture runs.
+// When it is over (end(), timeout or the 5 s idle rule), the screen shown
+// before the capture comes back — repainted, not saved.
 static bool serviceScreenshot() {
   using Job = ScreenshotBridge<SpinLock>::Job;
   const Job job = shot::bridge.takeJob();
   if (job.kind == Job::Prepare) {
+    shotReturn.onPrepare(nav.current(), job.screen, kScreenCount);
     screenshotPrepare(job.screen);
   } else if (job.kind == Job::Band) {
     static lgfx::rgb888_t line[320];
@@ -644,7 +650,10 @@ static bool serviceScreenshot() {
     }
   }
   shot::bridge.finishJob(job, millis());
-  return shot::bridge.capturing(millis());
+  const bool capturing = shot::bridge.capturing(millis());
+  const int back = shotReturn.afterPass(capturing);
+  if (back >= 0 && nav.set(back)) onScreenChanged(ScreenChangeCause::Screenshot);
+  return capturing;
 }
 
 // --- Perf: UI loop gaps (perf_stats), handed to net_task once a minute --------
@@ -871,7 +880,7 @@ void loop() {
     if (shouldAutoAdvance(millis() - lastScreenChangeMs, cfg().auto_cycle_interval_s,
                           deferHold)) {
       nav.next();                                // 3 distinct screens, wraps
-      onScreenChanged(/*userInitiated=*/false);  // resets the timer + page, forces redraw
+      onScreenChanged(ScreenChangeCause::AutoCycle);  // resets the timer + page, forces redraw
     }
   }
 

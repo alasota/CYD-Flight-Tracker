@@ -107,16 +107,11 @@ bool shouldAutoAdvance(uint32_t elapsedMs, uint32_t intervalS, bool deferHold);
 // which is plenty for a decorative feature.
 constexpr uint32_t kScreenPersistMinIntervalMs = 10UL * 60UL * 1000UL;
 
-// Whether to write `last_screen` to NVS right now. A user-initiated change
-// always persists; an auto-cycle change persists only if at least
-// `minIntervalMs` has passed since the last write. Pure — `msSinceLastPersist`
-// is injected — native-tested.
-bool shouldPersistScreenChange(bool userInitiated, uint32_t msSinceLastPersist,
-                               uint32_t minIntervalMs);
-
-// Why the active screen changed (spec 10 §2.2). A screenshot's switch
-// (/screenshot.bmp?screen=N) is temporary and never written to NVS; a touch
-// always is; an auto-cycle advance at most every `minIntervalMs`.
+// Why the active screen changed, and whether to write `last_screen` to NVS
+// right now (spec 10 §2.2): a touch always persists; an auto-cycle advance
+// only if at least `minIntervalMs` has passed since the last write; a
+// screenshot's switch (/screenshot.bmp?screen=N) is temporary and never
+// written. Pure — `msSinceLastPersist` is injected — native-tested.
 enum class ScreenChangeCause : uint8_t { Touch, AutoCycle, Screenshot };
 bool shouldPersistScreenChange(ScreenChangeCause cause, uint32_t msSinceLastPersist,
                                uint32_t minIntervalMs);

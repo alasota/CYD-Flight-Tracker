@@ -100,17 +100,17 @@ bool shouldAutoAdvance(uint32_t elapsedMs, uint32_t intervalS, bool deferHold) {
   return static_cast<uint64_t>(elapsedMs) >= intervalMs;
 }
 
-bool shouldPersistScreenChange(bool userInitiated, uint32_t msSinceLastPersist,
-                               uint32_t minIntervalMs) {
-  if (userInitiated) return true;
-  return msSinceLastPersist >= minIntervalMs;
-}
-
-// TODO(spec 10): stub from test-author — today's behaviour (a screenshot counts as a touch)
 bool shouldPersistScreenChange(ScreenChangeCause cause, uint32_t msSinceLastPersist,
                                uint32_t minIntervalMs) {
-  return shouldPersistScreenChange(cause != ScreenChangeCause::AutoCycle, msSinceLastPersist,
-                                   minIntervalMs);
+  switch (cause) {
+    case ScreenChangeCause::Touch:
+      return true;
+    case ScreenChangeCause::AutoCycle:
+      return msSinceLastPersist >= minIntervalMs;
+    case ScreenChangeCause::Screenshot:
+      return false;  // only for the capture, the screen goes back afterwards
+  }
+  return false;
 }
 
 bool alertBadgeHit(int16_t x, int16_t y, const HeaderZones &zones) {
