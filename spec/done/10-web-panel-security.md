@@ -120,6 +120,6 @@ zestawów zielone; `pio run -e cyd`: 1 470 513 B (74,8 % slotu OTA, ok. +600 B);
 **Do sprawdzenia na płytce (`@manual`):** kryteria 1–4 — formularz i upload z obcej strony
 (403, ustawienia bez zmian, brak ekranu OTA, linia w logu), normalna praca panelu z hasłem i bez
 (zapis, PL/EN na tej samej zakładce, upload danych, przywracanie, OTA z zakładki i
-`pio run -e cyd-ota -t upload`), `curl -i .../lang` → 405, `curl -I /` z nagłówkami, panel
+`pio run -e cyd-ota -t upload`), `curl -i .../lang` → 405, `curl -si -o /dev/null -D - http://cyd-sky.local/` z nagłówkami, panel
 w `<iframe>` zablokowany, `tools/screenshots.py --device` → ekran sprzed zrzutu, po restarcie
 ekran wybrany ręcznie.
