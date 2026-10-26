@@ -76,25 +76,74 @@ AuthOutcome decideAuth(bool passwordSet, bool locked, bool sentCredentials, bool
   return o;
 }
 
-// TODO(spec 10): stub from test-author
-OriginCheck checkRequestOrigin(const std::string & /*origin*/, const std::string & /*referer*/,
-                               const std::string & /*host*/) {
-  return OriginCheck::NoHeaders;
+namespace {
+
+// "http://Host:80/path?q#f" -> "host" (lowercased, ":80" dropped). Returns ""
+// when it isn't a plain http URL with a host: other scheme, no scheme,
+// "null", userinfo ("http://cyd-sky.local@evil.example" names evil.example),
+// or — with `allowTail` false (Origin) — anything after the authority.
+std::string httpAuthority(const std::string &url, bool allowTail) {
+  static const char kScheme[] = "http://";
+  const size_t schemeLen = sizeof(kScheme) - 1;
+  if (url.size() <= schemeLen) return {};
+  for (size_t i = 0; i < schemeLen; ++i) {
+    const char c = url[i];
+    const char lower = (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+    if (lower != kScheme[i]) return {};
+  }
+  const size_t end = url.find_first_of("/?#", schemeLen);
+  if (end != std::string::npos && !allowTail) return {};
+  return url.substr(schemeLen, end == std::string::npos ? std::string::npos : end - schemeLen);
 }
 
-// TODO(spec 10): stub from test-author
-UploadStart decideUploadStart(OriginCheck /*origin*/, bool /*credentialsOk*/) {
-  return UploadStart::Accept;
+// host[:port] as compared: lowercase, ":80" = no port. "" = unusable.
+std::string normalizeHost(std::string authority) {
+  if (authority.empty() || authority.find('@') != std::string::npos) return {};
+  for (char &c : authority) {
+    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+  }
+  static const char kDefaultPort[] = ":80";
+  const size_t portLen = sizeof(kDefaultPort) - 1;
+  if (authority.size() > portLen &&
+      authority.compare(authority.size() - portLen, portLen, kDefaultPort) == 0) {
+    authority.erase(authority.size() - portLen);
+  }
+  return authority;
 }
 
-// TODO(spec 10): stub from test-author
-std::string crossOriginLogLine(const std::string & /*method*/, const std::string & /*path*/,
-                               const std::string & /*origin*/, const std::string & /*referer*/) {
-  return {};
+}  // namespace
+
+OriginCheck checkRequestOrigin(const std::string &origin, const std::string &referer,
+                               const std::string &host) {
+  std::string from;
+  if (!origin.empty()) {
+    from = normalizeHost(httpAuthority(origin, /*allowTail=*/false));
+  } else if (!referer.empty()) {
+    from = normalizeHost(httpAuthority(referer, /*allowTail=*/true));
+  } else {
+    return OriginCheck::NoHeaders;
+  }
+  const std::string own = normalizeHost(host);
+  if (from.empty() || own.empty()) return OriginCheck::CrossOrigin;
+  return from == own ? OriginCheck::SameOrigin : OriginCheck::CrossOrigin;
 }
 
-// TODO(spec 10): stub from test-author
-const SecurityHeader kSecurityHeaders[kSecurityHeaderCount] = {{"", ""}, {"", ""}};
+UploadStart decideUploadStart(OriginCheck origin, bool credentialsOk) {
+  if (origin == OriginCheck::CrossOrigin) return UploadStart::RefuseOrigin;
+  return credentialsOk ? UploadStart::Accept : UploadStart::RefuseAuth;
+}
+
+std::string crossOriginLogLine(const std::string &method, const std::string &path,
+                               const std::string &origin, const std::string &referer) {
+  const std::string &from = !origin.empty() ? origin : referer;
+  return "[auth] cross-origin " + method + " " + path + " from " +
+         (from.empty() ? std::string("(none)") : from) + " refused";
+}
+
+const SecurityHeader kSecurityHeaders[kSecurityHeaderCount] = {
+    {"X-Frame-Options", "DENY"},
+    {"Content-Security-Policy", "frame-ancestors 'none'"},
+};
 
 ResetHoldState resetHoldState(uint32_t msSinceTouch, uint32_t heldMs) {
   if (msSinceTouch > kResetReleaseGraceMs) return ResetHoldState::Released;
