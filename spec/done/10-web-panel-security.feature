@@ -177,7 +177,7 @@ Feature: Bezpieczeństwo panelu WWW — żądania z innych stron odrzucone, żad
   Scenario: Upload firmware z obcej strony jest odrzucany bez zapisu do flash
     Given strona testowa z innego hosta z formularzem multipart POST na http://cyd-sky.local/update
     When użytkownik wysyła plik firmware
-    Then odpowiedź to 403, w logu nie ma "[ota] start", a urządzenie się nie restartuje
+    Then odpowiedź to 403, w logu nie ma "[ota] upload", a urządzenie się nie restartuje
 
   @manual
   Scenario: Panel działa jak dotąd z własnej strony i z PlatformIO
@@ -205,4 +205,4 @@ Feature: Bezpieczeństwo panelu WWW — żądania z innych stron odrzucone, żad
     Given strona testowa z innego hosta z <iframe src="http://cyd-sky.local/">
     When użytkownik otwiera ją w przeglądarce
     Then ramka jest pusta (przeglądarka zgłasza odmowę osadzenia)
-    And curl -I http://cyd-sky.local/ pokazuje X-Frame-Options: DENY i Content-Security-Policy: frame-ancestors 'none', bez Access-Control-Allow-Origin
+    And "curl -si -o /dev/null -D - http://cyd-sky.local/" pokazuje X-Frame-Options: DENY i Content-Security-Policy: frame-ancestors 'none', bez Access-Control-Allow-Origin
