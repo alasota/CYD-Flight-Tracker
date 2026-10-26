@@ -200,9 +200,10 @@ const char kStyle[] =
     ".sub{color:var(--muted);font-size:.875rem;margin-top:2px}"
     ".lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;"
     "flex-shrink:0;margin-top:4px}"
-    ".lang a{padding:4px 11px;font-size:.78rem;font-weight:600;color:var(--muted);"
-    "text-decoration:none}"
-    ".lang a.on{background:var(--accent);color:var(--on-accent)}"
+    ".lang form{display:flex;margin:0}"
+    ".lang button{padding:4px 11px;font:inherit;font-size:.78rem;font-weight:600;color:var(--muted);"
+    "background:none;border:0;cursor:pointer}"
+    ".lang button.on{background:var(--accent);color:var(--on-accent)}"
     ".tabs{display:flex;flex-wrap:wrap;gap:4px;padding:4px;background:var(--field);"
     "border:1px solid var(--line);border-radius:12px;margin-bottom:20px}"
     ".tabs button{flex:1 1 auto;white-space:nowrap;padding:9px 8px;background:none;border:0;border-radius:9px;"
@@ -280,7 +281,7 @@ const char kScript[] =
     "document.querySelectorAll('section[data-tab]').forEach(function(s){s.hidden=s.dataset.tab!=t});"
     "document.querySelectorAll('.tabs button').forEach(function(b){b.classList.toggle('on',b.dataset.t==t)});"
     "$('tab').value=t;$('save').hidden=t=='backup'||t=='firmware';"
-    "document.querySelectorAll('.lang a').forEach(function(a){a.href='/lang?l='+a.dataset.l+'&tab='+t})}"
+    "document.querySelectorAll('.lang input[name=tab]').forEach(function(i){i.value=t})}"
     "document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){show(b.dataset.t)}});"
     "function cost(r){var a=4*r*r;return a<=25?1:a<=100?2:a<=400?3:4}"
     "function calc(){"
@@ -706,10 +707,17 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.raw("</head><body><div class=\"wrap\"><header><div><h1>Sky Tracker</h1><div class=\"sub\">");
   w.t(WebStr::Subtitle);
   w.raw(" · cyd-sky.local</div></div><nav class=\"lang\">");
-  w.raw(lang == Language::PL ? "<a data-l=\"pl\" class=\"on\" href=\"/lang?l=pl\">PL</a>"
-                             : "<a data-l=\"pl\" href=\"/lang?l=pl\">PL</a>");
-  w.raw(lang == Language::EN ? "<a data-l=\"en\" class=\"on\" href=\"/lang?l=en\">EN</a>"
-                             : "<a data-l=\"en\" href=\"/lang?l=en\">EN</a>");
+  // PL/EN switch: two small POST forms (spec 10 §2.2 — no state change via
+  // GET), each back to the tab shown (show() keeps the hidden `tab` current).
+  for (Language l : {Language::PL, Language::EN}) {
+    w.raw("<form method=\"post\" action=\"/lang\"><input type=\"hidden\" name=\"l\" value=\"");
+    w.raw(languageCode(l));
+    w.raw("\"><input type=\"hidden\" name=\"tab\" value=\"");
+    w.raw(settingsTabId(m.tab));
+    w.raw(l == lang ? "\"><button class=\"on\">" : "\"><button>");
+    w.raw(l == Language::PL ? "PL" : "EN");
+    w.raw("</button></form>");
+  }
   w.raw("</nav></header>");
 
   if (m.hasMessage) {
