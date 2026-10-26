@@ -95,8 +95,9 @@ uint32_t configPortalSaveCount();
 //   requestBand    the UI fills `rows` BMP rows of `stride` bytes into `out`,
 //                  bottom row of the band first (BMP is bottom-up)
 //   waitBand       ... and this waits for it; false on timeout — the request
-//                  is then cancelled, so `out` may be freed
-//   end()          drawing resumes
+//                  is then invalidated, the UI never writes into `out` again,
+//                  so it may be freed
+//   end()          drawing resumes; a band still outstanding is invalidated too
 // requestBand returns at once, so the next band is read off the panel while
 // the previous one goes out over TCP. Until set, the endpoint answers 503.
 struct ScreenshotSource {
