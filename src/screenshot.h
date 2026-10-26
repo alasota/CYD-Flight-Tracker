@@ -233,8 +233,25 @@ class ScreenshotBridge {
 // nothing to return to. UI side only, no lock.
 class ScreenshotReturn {
  public:
-  // TODO(spec 10): stub from test-author
-  void onPrepare(int /*currentScreen*/, int /*requestedScreen*/, int /*screenCount*/) {}
-  // TODO(spec 10): stub from test-author
-  int afterPass(bool /*capturing*/) { return -1; }
+  // A capture series (begin() again before the UI saw the previous end())
+  // keeps the screen shown before its first capture.
+  void onPrepare(int currentScreen, int requestedScreen, int screenCount) {
+    if (requestedScreen < 0 || requestedScreen >= screenCount) return;  // none / demo
+    if (requestedScreen == currentScreen || armed_) return;
+    armed_ = true;
+    back_ = currentScreen;
+  }
+
+  int afterPass(bool capturing) {
+    const bool ended = wasCapturing_ && !capturing;
+    wasCapturing_ = capturing;
+    if (!ended || !armed_) return -1;
+    armed_ = false;
+    return back_;
+  }
+
+ private:
+  bool armed_ = false;
+  int back_ = -1;
+  bool wasCapturing_ = false;
 };
