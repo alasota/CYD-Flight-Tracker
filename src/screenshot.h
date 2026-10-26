@@ -12,6 +12,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <utility>
 
@@ -66,14 +67,44 @@ class ScreenshotBridge {
   explicit ScreenshotBridge(Hooks h) : hooks_(std::move(h)) {}
 
   // ---- handler side (core 0)
-  // TODO(spec 09): stub from test-author
-  bool begin(int /*screenIndex*/, uint32_t /*timeoutMs*/) { return false; }
-  // TODO(spec 09): stub from test-author
-  void requestBand(int /*y0*/, int /*rows*/, uint32_t /*stride*/, uint8_t * /*out*/) {}
-  // TODO(spec 09): stub from test-author
-  bool waitBand(uint32_t /*timeoutMs*/) { return false; }
-  // TODO(spec 09): stub from test-author
-  void end() {}
+
+  // Asks the UI to switch to `screenIndex` (-1 = keep) and stop drawing;
+  // false = no answer within `timeoutMs` (the request is then dropped).
+  bool begin(int screenIndex, uint32_t timeoutMs) {
+    lock_.lock();
+    gen_ = nextGeneration();
+    screen_ = screenIndex;
+    state_.store(BeginAsked);
+    lock_.unlock();
+    if (hooks_.wakeUi) hooks_.wakeUi();
+    return waitFor(BeginDone, timeoutMs);
+  }
+
+  // Asks for `rows` BMP rows from `y0` into `out` (bottom row first); returns
+  // at once — waitBand() waits.
+  void requestBand(int y0, int rows, uint32_t stride, uint8_t *out) {
+    lock_.lock();
+    gen_ = nextGeneration();
+    y0_ = y0;
+    rows_ = rows;
+    stride_ = stride;
+    out_ = out;
+    state_.store(BandAsked);
+    lock_.unlock();
+    if (hooks_.wakeUi) hooks_.wakeUi();
+  }
+
+  // False on timeout: the band is invalidated, the UI never writes into
+  // `out` again, so the handler may free it.
+  bool waitBand(uint32_t timeoutMs) { return waitFor(BandDone, timeoutMs); }
+
+  // The capture is over (or abandoned): invalidates whatever is outstanding,
+  // the UI draws again.
+  void end() {
+    lock_.lock();
+    invalidate();
+    lock_.unlock();
+  }
 
   // ---- UI side (core 1)
   struct Job {
@@ -85,28 +116,107 @@ class ScreenshotBridge {
     uint32_t stride = 0;
     uint32_t gen = 0;
   };
-  // TODO(spec 09): stub from test-author
-  Job takeJob() { return {}; }
+
+  // What the handler asks for (None: nothing). Leaves the state alone —
+  // finishJob() moves it on.
+  Job takeJob() {
+    Job job;
+    lock_.lock();
+    const int st = state_.load();
+    if (st == BeginAsked || st == BandAsked) {
+      job.kind = st == BeginAsked ? Job::Prepare : Job::Band;
+      job.screen = screen_;
+      job.y0 = y0_;
+      job.rows = rows_;
+      job.stride = stride_;
+      job.gen = gen_;
+    }
+    lock_.unlock();
+    return job;
+  }
+
   // Copies row `i` of the job's band into the handler's buffer — only while
   // the job's generation is still current. False = abandon the band.
-  // TODO(spec 09): stub from test-author
-  bool writeRow(const Job & /*job*/, int /*i*/, const uint8_t * /*bgr*/, size_t /*n*/) {
-    return false;
+  bool writeRow(const Job &job, int i, const uint8_t *bgr, size_t n) {
+    lock_.lock();
+    const bool current = job.gen != 0 && gen_ == job.gen && out_ != nullptr;
+    if (current) std::memcpy(out_ + static_cast<size_t>(i) * job.stride, bgr, n);
+    lock_.unlock();
+    return current;
   }
-  // TODO(spec 09): stub from test-author
-  void finishJob(const Job & /*job*/, uint32_t /*nowMs*/) {}
+
+  // The job is done: BeginDone / BandDone — only if it is still the current
+  // request (a late answer to a timed-out or ended one changes nothing).
+  void finishJob(const Job &job, uint32_t nowMs) {
+    if (job.kind == Job::None) return;
+    lock_.lock();
+    const bool current = job.gen != 0 && gen_ == job.gen;
+    if (current) state_.store(job.kind == Job::Prepare ? BeginDone : BandDone);
+    lock_.unlock();
+    if (!current) return;
+    if (job.kind == Job::Prepare) capturing_ = true;
+    lastActivityMs_ = nowMs;
+  }
+
   // True while a capture runs (the UI doesn't draw): false once Idle, or
   // more than kCaptureIdleMs since the last activity.
-  // TODO(spec 09): stub from test-author
-  bool capturing(uint32_t /*nowMs*/) { return false; }
+  bool capturing(uint32_t nowMs) {
+    if (state_.load() == Idle) capturing_ = false;  // end() / timeout: draw again
+    if (capturing_ && nowMs - lastActivityMs_ > kCaptureIdleMs) capturing_ = false;
+    return capturing_;
+  }
 
-  // TODO(spec 09): stub from test-author
-  State stateForTesting() const { return Idle; }
+  State stateForTesting() const { return static_cast<State>(state_.load()); }
   // Starts the generation counter at `g` (wraparound tests).
-  // TODO(spec 09): stub from test-author
-  void setGenerationForTesting(uint32_t /*g*/) {}
+  void setGenerationForTesting(uint32_t g) {
+    lock_.lock();
+    genCounter_ = g;
+    lock_.unlock();
+  }
 
  private:
+  // Under lock_. Generation 0 means "nothing valid", so the wrap skips it.
+  uint32_t nextGeneration() {
+    if (++genCounter_ == 0) ++genCounter_;
+    return genCounter_;
+  }
+  // Under lock_.
+  void invalidate() {
+    gen_ = 0;
+    out_ = nullptr;
+    state_.store(Idle);
+  }
+
+  // Handler side: polls `state_` (one `pause` per step) until `wanted`. On
+  // timeout the request is invalidated under the lock — unless the UI
+  // finished it at that very moment.
+  bool waitFor(int wanted, uint32_t timeoutMs) {
+    const uint32_t t0 = hooks_.nowMs();
+    while (state_.load() != wanted) {
+      if (hooks_.nowMs() - t0 > timeoutMs) {
+        lock_.lock();
+        const bool done = state_.load() == wanted;
+        if (!done) invalidate();
+        lock_.unlock();
+        return done;
+      }
+      if (hooks_.pause) hooks_.pause();
+    }
+    return true;
+  }
+
   Hooks hooks_;
   Lock lock_;
+  // Shared: written under lock_ (state_ is also read without it).
+  std::atomic<int> state_{Idle};
+  uint32_t genCounter_ = 0;
+  uint32_t gen_ = 0;  // the current request; 0 = none
+  int screen_ = -1;
+  int y0_ = 0;
+  int rows_ = 0;
+  uint32_t stride_ = 0;
+  uint8_t *out_ = nullptr;
+  // UI side only.
+  bool capturing_ = false;
+  uint32_t lastActivityMs_ = 0;
 };

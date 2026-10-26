@@ -558,66 +558,30 @@ static void offerWebPasswordReset(Config &bootCfg) {
 
 // --- /screenshot.bmp: the web handler (core 0) asks, this loop reads -------
 //
-// One request at a time. The handler waits by polling `state` (1 ms steps);
-// a timed-out request is cancelled under the lock, so the UI never writes
-// into a buffer the handler has already freed.
+// One request at a time, handed over by ScreenshotBridge (screenshot.h): the
+// handler waits by polling (1 ms steps); every request carries a generation,
+// and a timed-out or ended one is invalidated under the lock, so a band this
+// loop is still reading never writes into a buffer the handler has freed nor
+// leaves "done" behind (spec 09 §1).
 
 namespace shot {
 
-enum State : int { Idle = 0, BeginAsked, BeginDone, BandAsked, BandDone };
+ScreenshotBridge<SpinLock> bridge(ScreenshotBridge<SpinLock>::Hooks{
+    [] { return static_cast<uint32_t>(millis()); }, [] { core_link::wakeUi(); },
+    [] { vTaskDelay(1); }});
 
-std::atomic<int> state{Idle};
-SpinLock lock;
-bool cancelled = false;  // under `lock`
-int screen = -1;
-int y0 = 0, rows = 0;
-uint32_t stride = 0;
-uint8_t *out = nullptr;
-bool capturing = false;  // UI side: no drawing until end() (a consistent image)
-uint32_t lastActivityMs = 0;
-constexpr uint32_t kCaptureIdleMs = 5000;  // the client went away: draw again
+// ---- called on core 0 (config_portal's handler) — ScreenshotSource wants
+// plain function pointers.
 
-bool waitFor(int wanted, uint32_t timeoutMs) {
-  const uint32_t t0 = millis();
-  while (state.load() != wanted) {
-    if (millis() - t0 > timeoutMs) {
-      lock.lock();
-      cancelled = true;
-      lock.unlock();
-      state.store(Idle);
-      return false;
-    }
-    vTaskDelay(1);
-  }
-  return true;
-}
-
-// ---- called on core 0 (config_portal's handler)
-
-bool begin(int screenIndex, uint32_t timeoutMs) {
-  lock.lock();
-  cancelled = false;
-  screen = screenIndex;
-  lock.unlock();
-  state.store(BeginAsked);
-  core_link::wakeUi();
-  return waitFor(BeginDone, timeoutMs);
-}
+bool begin(int screenIndex, uint32_t timeoutMs) { return bridge.begin(screenIndex, timeoutMs); }
 
 void requestBand(int bandY0, int bandRows, uint32_t rowStride, uint8_t *dst) {
-  lock.lock();
-  y0 = bandY0;
-  rows = bandRows;
-  stride = rowStride;
-  out = dst;
-  lock.unlock();
-  state.store(BandAsked);
-  core_link::wakeUi();
+  bridge.requestBand(bandY0, bandRows, rowStride, dst);
 }
 
-bool waitBand(uint32_t timeoutMs) { return waitFor(BandDone, timeoutMs); }
+bool waitBand(uint32_t timeoutMs) { return bridge.waitBand(timeoutMs); }
 
-void end() { state.store(Idle); }
+void end() { bridge.end(); }
 
 }  // namespace shot
 
@@ -652,37 +616,27 @@ static void screenshotPrepare(int screenIndex) {
 
 // UI side: answers whatever the handler asked for. True while a capture runs.
 static bool serviceScreenshot() {
-  const int st = shot::state.load();
-  if (st == shot::BeginAsked) {
-    screenshotPrepare(shot::screen);
-    shot::capturing = true;
-    shot::lastActivityMs = millis();
-    shot::state.store(shot::BeginDone);
-  } else if (st == shot::BandAsked) {
+  using Job = ScreenshotBridge<SpinLock>::Job;
+  const Job job = shot::bridge.takeJob();
+  if (job.kind == Job::Prepare) {
+    screenshotPrepare(job.screen);
+  } else if (job.kind == Job::Band) {
     static lgfx::rgb888_t line[320];
     static uint8_t bgr[320 * 3];
     const int w = static_cast<int>(tft.width());
-    for (int i = 0; i < shot::rows; ++i) {
-      const int y = shot::y0 + shot::rows - 1 - i;  // bottom row of the band first (BMP)
+    for (int i = 0; i < job.rows; ++i) {
+      const int y = job.y0 + job.rows - 1 - i;  // bottom row of the band first (BMP)
       tft.readRect(0, y, w, 1, line);
       for (int x = 0; x < w; ++x) {
         bgr[3 * x + 0] = line[x].b;
         bgr[3 * x + 1] = line[x].g;
         bgr[3 * x + 2] = line[x].r;
       }
-      shot::lock.lock();
-      if (!shot::cancelled) std::memcpy(shot::out + i * shot::stride, bgr, 3 * w);
-      shot::lock.unlock();
+      if (!shot::bridge.writeRow(job, i, bgr, 3 * w)) break;  // timed out / ended: drop it
     }
-    shot::lastActivityMs = millis();
-    shot::state.store(shot::BandDone);
-  } else if (st == shot::Idle && shot::capturing) {
-    shot::capturing = false;  // end(): draw again
   }
-  if (shot::capturing && millis() - shot::lastActivityMs > shot::kCaptureIdleMs) {
-    shot::capturing = false;
-  }
-  return shot::capturing;
+  shot::bridge.finishJob(job, millis());
+  return shot::bridge.capturing(millis());
 }
 
 // --- Perf: UI loop gaps (perf_stats), handed to net_task once a minute --------
