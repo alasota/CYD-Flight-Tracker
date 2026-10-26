@@ -360,6 +360,54 @@ static void test_network_gate(void) {
 
 // ---- Status
 
+// "Check now" is only queued by the handler; releaseCheckLoop() runs it (spec 09 review).
+static void test_manual_check_is_queued_and_run_from_the_loop(void) {
+  ManualCheck m;
+  TEST_ASSERT_FALSE(manualCheckPending(m, 1000));
+  TEST_ASSERT_FALSE(takeManualCheck(m, /*gateOpen=*/true, 1000));  // nothing asked
+
+  ASSERT_ENUM_EQ(ManualCheckAsk::Queued, askManualCheck(m, 1000));
+  TEST_ASSERT_TRUE(manualCheckPending(m, 1000));
+  ASSERT_ENUM_EQ(ManualCheckAsk::AlreadyQueued, askManualCheck(m, 1500));
+  // Gate closed (phase B's TLS session, the next poll): it waits.
+  TEST_ASSERT_FALSE(takeManualCheck(m, /*gateOpen=*/false, 2000));
+  TEST_ASSERT_TRUE(manualCheckPending(m, 2000));
+  // Gate open: runs once.
+  TEST_ASSERT_TRUE(takeManualCheck(m, /*gateOpen=*/true, 3000));
+  TEST_ASSERT_FALSE(manualCheckPending(m, 3000));
+  TEST_ASSERT_FALSE(takeManualCheck(m, /*gateOpen=*/true, 3001));
+}
+
+static void test_manual_check_at_most_once_a_minute(void) {
+  ManualCheck m;
+  askManualCheck(m, 1000);
+  TEST_ASSERT_TRUE(takeManualCheck(m, true, 10000));  // ran at 10000
+  ASSERT_ENUM_EQ(ManualCheckAsk::TooSoon, askManualCheck(m, 10000 + kUpdateManualMinGapMs - 1));
+  TEST_ASSERT_FALSE(manualCheckPending(m, 10000 + kUpdateManualMinGapMs - 1));
+  ASSERT_ENUM_EQ(ManualCheckAsk::Queued, askManualCheck(m, 10000 + kUpdateManualMinGapMs));
+  TEST_ASSERT_TRUE(takeManualCheck(m, true, 10000 + kUpdateManualMinGapMs));
+}
+
+static void test_manual_check_request_expires(void) {
+  ManualCheck m;
+  askManualCheck(m, 5000);
+  TEST_ASSERT_TRUE(manualCheckPending(m, 5000 + kUpdateManualCheckExpiryMs - 1));
+  TEST_ASSERT_FALSE(manualCheckPending(m, 5000 + kUpdateManualCheckExpiryMs));
+  TEST_ASSERT_FALSE(takeManualCheck(m, true, 5000 + kUpdateManualCheckExpiryMs));
+  // An expired request never ran, so it doesn't count against the minute.
+  ASSERT_ENUM_EQ(ManualCheckAsk::Queued, askManualCheck(m, 5000 + kUpdateManualCheckExpiryMs + 1));
+}
+
+static void test_manual_check_across_millis_wrap(void) {
+  ManualCheck m;
+  const uint32_t t = 0xFFFFFFFFu - 1000u;
+  askManualCheck(m, t);
+  TEST_ASSERT_TRUE(manualCheckPending(m, t + 2000u));  // wrapped
+  TEST_ASSERT_TRUE(takeManualCheck(m, true, t + 2000u));
+  ASSERT_ENUM_EQ(ManualCheckAsk::TooSoon, askManualCheck(m, t + 3000u));
+  ASSERT_ENUM_EQ(ManualCheckAsk::Queued, askManualCheck(m, t + 2000u + kUpdateManualMinGapMs));
+}
+
 static void test_every_status_has_a_message(void) {
   for (int i = 0; i < kUpdateStatusCount; ++i) {
     const WebStr id = updateStatusMessage(static_cast<UpdateStatus>(i));
@@ -502,6 +550,10 @@ void run_release_check_tests() {
   RUN_TEST(test_rate_limit_wait);
   RUN_TEST(test_next_check_delay);
   RUN_TEST(test_network_gate);
+  RUN_TEST(test_manual_check_is_queued_and_run_from_the_loop);
+  RUN_TEST(test_manual_check_at_most_once_a_minute);
+  RUN_TEST(test_manual_check_request_expires);
+  RUN_TEST(test_manual_check_across_millis_wrap);
   RUN_TEST(test_every_status_has_a_message);
   RUN_TEST(test_status_for_release);
   RUN_TEST(test_prompt_only_for_an_available_release);

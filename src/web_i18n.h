@@ -202,6 +202,9 @@
   X(UpdPublished, "opublikowane", "published")                                                      \
   X(UpdChecked, "sprawdzono", "checked")                                                            \
   X(UpdCheckNow, "Sprawdź teraz", "Check now")                                                      \
+  X(UpdChecking, "Sprawdzam na GitHubie…", "Checking GitHub…")                                    \
+  X(UpdCheckTooSoon, "Sprawdzono przed chwilą — następne sprawdzenie za minutę.",                   \
+    "Checked a moment ago — the next check is possible in a minute.")                               \
   X(UpdInstall, "Zainstaluj", "Install")                                                            \
   X(UpdBackToRelease, "Wróć do wydania", "Go back to release")                                      \
   X(UpdWhatsNew, "Co nowego", "What is new")                                                        \

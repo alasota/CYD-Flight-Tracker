@@ -73,6 +73,9 @@ struct ConfigPageModel {
   bool restarting = false;
   // Updates from GitHub (release_check), for the Firmware tab's first card.
   UpdateState update;
+  // "Check now" was asked for and hasn't run yet (manualCheckPending()): the
+  // card says "checking…" and the page reloads itself until it has.
+  bool updateCheckPending = false;
   // The version shown as installed; "" = firmwareVersion(). (The demo
   // screenshot renders a made-up one.)
   std::string installedVersion;

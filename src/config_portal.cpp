@@ -154,7 +154,6 @@ bool authorize() {
 
 // ---- Firmware update (POST /update): the shared flash session (ota_update).
 OtaSession *ota = nullptr;  // set in configPortalBegin()
-UpdateGateSource updateGateSource = nullptr;  // see configPortalSetUpdateGateSource()
 bool otaAuthorized = false;
 size_t otaLastNotified = 0;
 bool restartPending = false;
@@ -170,6 +169,7 @@ void sendPage(ConfigPageModel model, int status = 200) {
   model.quota = openSkyQuota();
   model.quotaResetInS = quotaSecondsUntilReset(model.quota, millis());
   model.update = releaseUpdateState();
+  model.updateCheckPending = releaseCheckPending();
   model.installedVersion = firmwareVersion();
   model.light = backlightStatus(model.cfg);
   // The same alerts as the display's "!" (net_task computes them the same way).
@@ -718,12 +718,28 @@ void handleUpdateDone() {
 
 // ---- Updates from GitHub (release_check)
 
-// POST /update/check — "check now"; back to the Firmware tab either way.
-void handleUpdateCheck() {
-  if (!authorize()) return;
-  if (updateGateSource != nullptr) releaseCheckNow(updateGateSource());
+// "Check now" only queues the check: release_check runs it in net_task's loop
+// after the poll. This handler may run inside phase B (betweenFetches), where
+// the hexdb.io TLS session still holds its heap. Back to the Firmware tab,
+// which says "checking…" and reloads until the answer is in — or why not.
+void requestCheckAndAnswer() {
+  if (releaseCheckRequest() == ManualCheckAsk::TooSoon) {
+    ConfigPageModel model;
+    model.cfg = loadConfig();
+    model.tab = SettingsTab::Firmware;
+    model.hasMessage = true;
+    model.message = WebStr::UpdCheckTooSoon;
+    sendPage(model);
+    return;
+  }
   server.sendHeader("Location", "/?tab=firmware");
   server.send(303, "text/plain", "");
+}
+
+// POST /update/check — "check now".
+void handleUpdateCheck() {
+  if (!authorize()) return;
+  requestCheckAndAnswer();
 }
 
 // POST /update/install (tag=...) — queues the install; the download starts in
@@ -761,9 +777,7 @@ void handleUpdatePrerelease() {
   ++saveCount;  // main.cpp reloads the config and hands it to release_check
   Config cfg = loadConfig();
   releaseCheckBegin(cfg);
-  if (updateGateSource != nullptr) releaseCheckNow(updateGateSource());
-  server.sendHeader("Location", "/?tab=firmware");
-  server.send(303, "text/plain", "");
+  requestCheckAndAnswer();
 }
 
 }  // namespace
@@ -819,7 +833,6 @@ void configPortalSetScreenshotSource(const ScreenshotSource &source) { screensho
 
 void configPortalSetOtaObserver(const OtaObserver &observer) { otaObserver = observer; }
 
-void configPortalSetUpdateGateSource(UpdateGateSource source) { updateGateSource = source; }
 
 void configPortalSetPerfSource(PerfJsonSource source) { perfSource = source; }
 
