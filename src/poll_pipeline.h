@@ -38,6 +38,11 @@ struct LookupPorts {
   std::function<AircraftInfo(const std::string &icao24)> aircraft;
   std::function<RouteInfo(const std::string &callsign)> route;
   std::function<AirportInfo(const std::string &icaoCode)> airport;
+  // Called right after every lookup that was not cached (a real hexdb.io
+  // request) — net_task serves the settings page there (spec 09 §3).
+  // Returns false = stop: no more uncached lookups in this call (cached keys
+  // still resolve, the rest is *_pending). Empty = never called.
+  std::function<bool()> betweenFetches;
 };
 
 struct PipelineParams {
@@ -57,3 +62,9 @@ DataSnapshot buildDataSnapshot(const std::vector<Aircraft> &aircraft, const Pipe
 
 // Phase A's params: the same, with no new lookups allowed.
 PipelineParams cacheOnly(PipelineParams p);
+
+// net_task's betweenFetches hook, pure: `busy` -> a nested call, return true
+// (go on) without serving; else serve() once (with `busy` set) and return
+// false ("stop phase B") when a firmware update started meanwhile.
+bool serveBetweenFetches(bool &busy, const std::function<void()> &serve,
+                         const std::function<bool()> &updateStarted);

@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -198,6 +199,23 @@ static_assert(std::is_trivially_copyable<NetCommand>::value, "goes through a Fre
 
 NetCommand makeNetCommand(NetCommandType type, const std::string &tag = std::string());
 std::string netCommandTag(const NetCommand &c);
+
+// A command the queue didn't take (full) waits here, in the UI, and is
+// retried on every loop() pass — a NO / YES on the update question must not
+// get lost (spec 09 §2). One slot: a newer command replaces a waiting one.
+struct PendingCommand {
+  bool waiting = false;
+  NetCommand cmd;
+  bool logQueueFull = false;  // log "command queue full, retrying" now (first failure only)
+};
+using CommandSender = std::function<bool(const NetCommand &)>;
+
+// Tries to send `c`; if `trySend` refuses, it waits in the returned slot
+// (logQueueFull = true on that first failure).
+PendingCommand submitCommand(const NetCommand &c, const CommandSender &trySend);
+// Retries a waiting command; `trySend` isn't called when nothing waits.
+// logQueueFull is always false (logged once, at submit).
+PendingCommand retryPendingCommand(PendingCommand p, const CommandSender &trySend);
 
 // ---- UI loop pacing ---------------------------------------------------------
 
