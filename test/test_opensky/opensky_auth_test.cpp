@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cstdio>
 
-#include "opensky_auth.h"
+#include "opensky/domain/opensky_auth.h"
 #include "test_support.h"
 
 namespace {

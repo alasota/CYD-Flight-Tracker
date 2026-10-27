@@ -4,7 +4,7 @@
 #include <string>
 
 #include "github_fixtures.h"
-#include "release_check.h"
+#include "admin/domain/firmware/release_check.h"
 #include "test_support.h"
 
 namespace {

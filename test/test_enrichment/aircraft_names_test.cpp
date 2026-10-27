@@ -4,8 +4,8 @@
 #include <cstring>
 #include <string>
 
-#include "aircraft_names.h"
-#include "lcars_theme.h"  // isFontSafeText()
+#include "enrichment/domain/aircraft_names.h"
+#include "display/domain/theme/lcars_theme.h"  // isFontSafeText()
 
 namespace {
 

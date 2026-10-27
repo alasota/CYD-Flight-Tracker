@@ -3,11 +3,11 @@
 
 #include <cstring>
 
-#include "screen_nav.h"  // kScreen* indices
-#include "status_bar.h"
-#include "lcars_theme.h"  // palette constants
+#include "display/domain/screen_nav.h"  // kScreen* indices
+#include "display/domain/screens/status_bar.h"
+#include "display/domain/theme/lcars_theme.h"  // palette constants
 #include "test_support.h"
-#include "time_sync.h"
+#include "platform/time_sync.h"
 
 namespace {
 

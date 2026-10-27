@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "perf_stats.h"
+#include "platform/perf_stats.h"
 #include "test_support.h"
 
 namespace {

@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "config_backup.h"
+#include "admin/domain/config_backup.h"
 #include "fixtures.h"
 #include "json_assert.h"
 #include "test_support.h"

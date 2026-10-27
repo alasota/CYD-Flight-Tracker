@@ -2,7 +2,7 @@
 #include <unity.h>
 
 #include "fixtures.h"
-#include "table_view.h"
+#include "display/domain/screens/table_view.h"
 #include "test_support.h"
 
 namespace {

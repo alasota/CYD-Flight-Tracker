@@ -1,7 +1,7 @@
 // flight_phase: takeoff / landing / overflight classification. docs/screens.md "Flight phase".
 #include <unity.h>
 
-#include "flight_phase.h"
+#include "airspace/domain/flight_phase.h"
 #include "test_support.h"
 
 namespace {

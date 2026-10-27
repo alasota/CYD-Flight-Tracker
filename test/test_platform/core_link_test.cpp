@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "core_link.h"
+#include "platform/core_link.h"
 #include "test_support.h"
 
 namespace {

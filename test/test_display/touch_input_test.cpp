@@ -3,7 +3,7 @@
 
 #include <initializer_list>
 
-#include "touch_input.h"
+#include "display/domain/touch_input.h"
 
 namespace {
 

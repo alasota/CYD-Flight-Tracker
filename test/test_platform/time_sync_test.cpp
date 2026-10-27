@@ -1,7 +1,7 @@
 // time_sync: date / time formatting from an injected time_t. docs/screens.md "Time".
 #include <unity.h>
 
-#include "time_sync.h"
+#include "platform/time_sync.h"
 
 namespace {
 

@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "sun_times.h"
+#include "shared/sun_times.h"
 #include "test_support.h"
 
 namespace {

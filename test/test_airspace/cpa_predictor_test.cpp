@@ -1,7 +1,7 @@
 // cpa_predictor: closest-point-of-approach time. docs/screens.md "Flight ETA".
 #include <unity.h>
 
-#include "cpa_predictor.h"
+#include "airspace/domain/cpa_predictor.h"
 
 namespace {
 

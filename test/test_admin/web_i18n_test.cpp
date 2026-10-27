@@ -4,7 +4,7 @@
 #include <cstring>
 #include <initializer_list>
 
-#include "web_i18n.h"
+#include "admin/app/web_i18n.h"
 
 namespace {
 

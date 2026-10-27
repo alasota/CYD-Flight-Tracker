@@ -1,8 +1,8 @@
 // redraw_policy: events -> regions to repaint. CLAUDE.md "Redraw policy".
 #include <unity.h>
 
-#include "redraw_policy.h"
-#include "screen_nav.h"  // kScreen* indices
+#include "display/domain/redraw_policy.h"
+#include "display/domain/screen_nav.h"  // kScreen* indices
 
 namespace {
 
