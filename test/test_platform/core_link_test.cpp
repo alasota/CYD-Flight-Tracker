@@ -284,7 +284,7 @@ static void test_default_net_command_is_none(void) {
 }
 
 static void test_command_without_tag(void) {
-  const NetCommand c = makeNetCommand(NetCommandType::RefreshNow);
+  const NetCommand c = makeNetCommand(NetCommandType::SkipTag);
   TEST_ASSERT_EQUAL_STRING("", netCommandTag(c).c_str());
 }
 
