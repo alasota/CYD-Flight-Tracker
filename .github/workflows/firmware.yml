@@ -76,11 +76,18 @@ jobs:
 
       - name: BDD scenarios are backed by tests, harness tools tested
         # Every Scenario in spec/**/*.feature names its Unity test or is @manual.
+        # test_check_comments.py's RepoTest also pins the cleaned-up comments and docs (spec 11).
         run: |
           python tools/test_check_bdd.py
           python tools/test_release_plan.py
           python tools/test_build_site.py
+          python tools/test_check_comments.py
           python tools/check_bdd.py
+
+      - name: Comment and doc-reference check (warnings only)
+        # Removed symbols, main.cpp credited in net_task modules, doc references that miss a
+        # heading, CLAUDE.md size. Prints findings, exits 0 (--strict would fail the build).
+        run: python tools/check_comments.py
 
       - name: Build firmware
         env:
