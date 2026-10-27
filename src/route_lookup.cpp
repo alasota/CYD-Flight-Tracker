@@ -148,7 +148,7 @@ HexdbFetchResult httpGet(const char *url) {
 
 HexdbFetchResult httpFetchRoute(const std::string &callsign) {
   // Built into a fixed buffer instead of concatenating Arduino Strings
-  // (see CLAUDE.md review notes 4.2) — callsigns are at most 8 chars.
+  // (see docs/review-notes-2026.md 4.2) — callsigns are at most 8 chars.
   char url[96];
   int written =
       std::snprintf(url, sizeof(url), "https://hexdb.io/api/v1/route/icao/%s", callsign.c_str());

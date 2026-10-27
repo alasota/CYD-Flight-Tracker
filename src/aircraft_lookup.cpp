@@ -48,7 +48,7 @@ AircraftInfo lookupAircraftWithFetcher(const std::string &icao24, AircraftFetchF
     // Transient failure (timeout, WiFi drop, hexdb.io unreachable, non-200
     // status) — do NOT cache. A confirmed answer (hit or genuine miss) is
     // what's safe to remember forever; a failed attempt isn't one, so a
-    // later poll gets to try again — see CLAUDE.md review notes 1.2.
+    // later poll gets to try again — see docs/review-notes-2026.md 1.2.
     return AircraftInfo{};
   }
 
@@ -83,7 +83,7 @@ FetchResult httpFetchAircraftJson(const std::string &icao24) {
   FetchResult result;
 
   // Built into a fixed buffer instead of concatenating Arduino Strings
-  // (see CLAUDE.md review notes 4.2) — icao24 is always exactly 6 hex
+  // (see docs/review-notes-2026.md 4.2) — icao24 is always exactly 6 hex
   // chars, so this buffer has generous headroom.
   char url[64];
   int written = std::snprintf(url, sizeof(url), "https://hexdb.io/api/v1/aircraft/%s",

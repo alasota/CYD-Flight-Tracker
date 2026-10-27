@@ -49,7 +49,7 @@ bool tokenNeedsRefresh(const TokenState &token, uint32_t now_ms, uint32_t refres
 
 // True if `now_ms` is still before the deadline `until_ms` (e.g. a 429
 // rate-limit cooldown), correctly handling millis() rollover the same way
-// tokenNeedsRefresh() does — see CLAUDE.md review notes 1.4 (the original
+// tokenNeedsRefresh() does — see docs/review-notes-2026.md 1.4 (the original
 // `now < until` comparison here was NOT rollover-safe).
 bool isBeforeDeadline(uint32_t now_ms, uint32_t until_ms);
 
@@ -58,7 +58,7 @@ bool isBeforeDeadline(uint32_t now_ms, uint32_t until_ms);
 // subtraction keeps it correct across a millis() rollover. Factored out of
 // openSkyClientPoll()'s adapter so the "never hammer the API faster than
 // the configured interval" rule (CLAUDE.md "Rate limits") is native-tested
-// rather than living only in device-only code — see review notes 3.3.
+// rather than living only in device-only code — see docs/review-notes-2026.md 3.3.
 bool shouldPollNow(uint32_t now_ms, uint32_t last_poll_ms, bool ever_polled, uint32_t interval_ms);
 
 // Milliseconds until shouldPollNow() turns true (0 = due now) — lets other
@@ -91,7 +91,7 @@ struct Aircraft {
 // airspace is a few tens of KB; this is a defensive cap against an
 // unexpectedly huge or corrupted body consuming unbounded heap during JSON
 // parsing — ArduinoJson's JsonDocument has no capacity limit of its own
-// (see CLAUDE.md review notes 4.3).
+// (see docs/review-notes-2026.md 4.3).
 constexpr size_t kMaxStatesResponseBytes = 65536;  // 64 KB
 
 // Parses a /states/all JSON response body into an Aircraft list. Tolerant
@@ -121,7 +121,7 @@ bool inferOnGround(const Aircraft &ac);
 // non-negative integer, otherwise `default_backoff_s`. The result is
 // clamped to `max_backoff_s` so a bogus/hostile header value (e.g.
 // "999999999") can't wedge the client into a multi-day silence — see
-// review notes 1.4.
+// docs/review-notes-2026.md 1.4.
 uint32_t parseRetryAfterSeconds(const std::string &header_value, uint32_t default_backoff_s,
                                 uint32_t max_backoff_s = 3600);
 
@@ -132,7 +132,7 @@ std::string urlEncode(const std::string &value);
 // Outcome of one poll attempt. The distinction between "polled OK, nothing
 // in range" and "poll failed" matters: net_task keeps the last good
 // DataSnapshot on a failure instead of blanking the screen, and surfaces
-// a header tag — see CLAUDE.md review notes 1.2/1.3/1.4.
+// a header tag — see docs/review-notes-2026.md 1.2/1.3/1.4.
 enum class OpenSkyPollStatus {
   NotDue,        // interval hasn't elapsed — `aircraft` is empty, ignore it
   Ok,            // fresh data in `aircraft` (may legitimately be empty)
@@ -155,7 +155,7 @@ struct Config;  // config_store.h — full type only needed by the .cpp
 
 // Fetches aircraft currently in the bounding box around the configured
 // home, using `cfg` for home/radius/credentials (no internal loadConfig()
-// — the caller owns config now, see review notes 4.3). Ensures a fresh
+// — the caller owns config now, see docs/review-notes-2026.md 4.3). Ensures a fresh
 // OAuth token first when credentials are set (falls back to anonymous
 // otherwise). A 401/403 with a token gets one token refresh + retry; if the
 // fresh token is rejected too, the login state goes LoginFailed and the same

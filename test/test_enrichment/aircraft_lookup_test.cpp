@@ -52,7 +52,7 @@ static void test_parse_empty_body(void) {
 
 static void test_parse_rejects_oversized_body(void) {
   // Padding well past kMaxLookupResponseBytes — the size check must
-  // reject it before any parsing is attempted (review notes 4.3).
+  // reject it before any parsing is attempted (docs/review-notes-2026.md 4.3).
   std::string oversized(kMaxLookupResponseBytes + 1, 'x');
   AircraftInfo info = parseAircraftLookupResponse(oversized);
   TEST_ASSERT_FALSE(info.found);
@@ -79,7 +79,7 @@ static FetchResult stubFetchNotFound(const std::string & /*icao24*/) {
 }
 
 // Simulates a transient transport failure (timeout, WiFi drop, hexdb.io
-// unreachable, non-200 status) — see review notes 1.2.
+// unreachable, non-200 status) — see docs/review-notes-2026.md 1.2.
 static FetchResult stubFetchTransportFailure(const std::string & /*icao24*/) {
   gFetchCallCount++;
   return FetchResult{};  // response_ok=false
@@ -126,7 +126,7 @@ static void test_lookup_does_not_cache_transport_failure(void) {
   AircraftInfo second = lookupAircraftWithFetcher("abcdef", stubFetchTransportFailure);
 
   // Every call retries over HTTP — a failed attempt must not get "stuck"
-  // as a permanent false negative (review notes 1.2).
+  // as a permanent false negative (docs/review-notes-2026.md 1.2).
   TEST_ASSERT_EQUAL_INT(2, gFetchCallCount);
   TEST_ASSERT_FALSE(first.found);
   TEST_ASSERT_FALSE(second.found);

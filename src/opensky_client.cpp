@@ -216,7 +216,7 @@ TokenOutcome fetchTokenTracked(const Config &cfg) {
 // One /states/all attempt, with the 200-response body parsed inline
 // straight from the socket (streaming + an ArduinoJson field filter) so a
 // big busy-airspace response never has to exist in RAM as one contiguous
-// String + std::string + document all at once — see review notes 4.1.
+// String + std::string + document all at once — see docs/review-notes-2026.md 4.1.
 struct StatesAttempt {
   bool transport_ok = false;  // got any HTTP response at all
   int code = 0;               // HTTP status when transport_ok
@@ -243,7 +243,7 @@ bool fetchToken(const std::string &client_id, const std::string &client_secret, 
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
   // Built into a fixed buffer instead of concatenating Arduino Strings
-  // (see CLAUDE.md review notes 4.2) — client_id/secret are short OAuth
+  // (see docs/review-notes-2026.md 4.2) — client_id/secret are short OAuth
   // client identifiers, so this buffer has generous headroom.
   std::string encodedId = urlEncode(client_id);
   std::string encodedSecret = urlEncode(client_secret);
@@ -286,7 +286,7 @@ StatesAttempt requestStatesOnce(const BoundingBox &bbox, const std::string &bear
   StatesAttempt att;
 
   // Built into a fixed buffer instead of concatenating Arduino Strings
-  // (see CLAUDE.md review notes 4.2).
+  // (see docs/review-notes-2026.md 4.2).
   char url[192];
   int urlWritten = std::snprintf(url, sizeof(url), "%s?lamin=%.4f&lomin=%.4f&lamax=%.4f&lomax=%.4f",
                                   kStatesUrlBase, static_cast<double>(bbox.lamin),
@@ -311,7 +311,7 @@ StatesAttempt requestStatesOnce(const BoundingBox &bbox, const std::string &bear
     return att;
   }
   if (!bearerToken.empty()) {
-    // std::string on the heap, not a 2KB stack buffer (review notes 4.2) —
+    // std::string on the heap, not a 2KB stack buffer (docs/review-notes-2026.md 4.2) —
     // a bearer JWT is ~1KB and net_task's 16 KB stack also carries TLS.
     std::string authHeader = "Bearer ";
     authHeader += bearerToken;
@@ -449,7 +449,7 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
   if (att.code == 401 || att.code == 403) {
     // Rejected even without a token (a rejected token already fell back to
     // anonymous above) — surface it instead of silently going empty forever
-    // (review notes 1.3).
+    // (docs/review-notes-2026.md 1.3).
     Serial.printf("[opensky_client] /states/all rejected (http=%d, %s)\n", att.code,
                   bearer ? "account" : "anonymous");
     result.status = OpenSkyPollStatus::AuthError;

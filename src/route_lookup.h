@@ -29,7 +29,7 @@ struct RouteInfo {
 // Hard ceiling on how large a route-lookup response body
 // parseRouteLookupResponse() will attempt to parse — a real response is a
 // few dozen bytes (same defensive-cap pattern as aircraft_lookup — see
-// CLAUDE.md review notes 4.3).
+// docs/review-notes-2026.md 4.3).
 constexpr size_t kMaxRouteResponseBytes = 4096;
 
 // Parses hexdb.io's GET /api/v1/route/icao/{callsign} response body, e.g.
@@ -66,7 +66,7 @@ AirportInfo parseAirportLookupResponse(const std::string &json);
 // below. `response_ok` is true for any *definitive* answer from hexdb.io —
 // a 200 (found) or a 404 (confirmed not found) both count, since either is
 // safe to cache forever; anything else (timeout, 5xx, connection failure)
-// is not a real answer and must not be cached — see CLAUDE.md review notes
+// is not a real answer and must not be cached — see docs/review-notes-2026.md
 // 1.2, applied here the same way it was retrofitted onto aircraft_lookup
 // once the live API turned out to answer "not found" with a genuine 404
 // rather than a 200-with-error-body.
@@ -92,7 +92,7 @@ RouteInfo lookupRouteWithFetcher(const std::string &callsign, RouteFetchFn fetch
 // True if `callsign` already has a cached route result (hit or confirmed
 // miss) — lets a caller bound how many *new* route lookups it attempts in
 // one go, same reasoning as aircraft_lookup's aircraftLookupIsCached() (see
-// CLAUDE.md review notes 1.1). Pure — just a cache query.
+// docs/review-notes-2026.md 1.1). Pure — just a cache query.
 bool routeLookupIsCached(const std::string &callsign);
 
 // True if `airport_code` (ICAO) already has a cached airport result — so

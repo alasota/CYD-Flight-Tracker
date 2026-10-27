@@ -61,7 +61,7 @@ void wifiManagerBegin() {
 
   // Let the ESP32 core auto-reconnect and remember the last network across
   // reboots — the firmware's own nudge in wifiManagerLoop() is only a
-  // backstop for when this stalls (CLAUDE.md review notes 1.5).
+  // backstop for when this stalls (docs/review-notes-2026.md 1.5).
   WiFi.persistent(true);
   WiFi.setAutoReconnect(true);
 
@@ -97,7 +97,7 @@ void wifiManagerLoop() {
   // The portal timed out without ever connecting — WiFiManager doesn't
   // retry on its own, so without this the device would be stuck reporting
   // "Connecting" forever with no portal open and nothing actually trying
-  // to connect (see CLAUDE.md review notes 1.3). Reopen it instead.
+  // to connect (see docs/review-notes-2026.md 1.3). Reopen it instead.
   if (shouldRestartConnection(portalWasActive, portalActiveNow, connected)) {
     wm.autoConnect(kPortalApName);
     portalActiveNow = wm.getConfigPortalActive();

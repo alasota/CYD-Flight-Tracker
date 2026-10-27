@@ -27,14 +27,14 @@ const char *wifiStatusLabel(WifiStatus status);
 // was open a moment ago and has just closed (timed out) without a
 // successful connection. Without this, the device gets stuck reporting
 // "Connecting" forever with nothing actually trying to connect and no
-// portal to reconfigure it from — see CLAUDE.md review notes 1.3. Pure —
+// portal to reconfigure it from — see docs/review-notes-2026.md 1.3. Pure —
 // tested under `pio test -e native`.
 bool shouldRestartConnection(bool portal_was_active, bool portal_active_now, bool wifi_connected);
 
 // Grace period after losing the link before the firmware nudges a
 // reconnect itself, and the minimum gap between those nudges. The ESP32
 // WiFi core auto-reconnects on its own; this is a backstop for when it
-// gives up or stalls (see CLAUDE.md review notes 1.5).
+// gives up or stalls (see docs/review-notes-2026.md 1.5).
 constexpr uint32_t kReconnectGraceMs = 10UL * 1000UL;
 constexpr uint32_t kReconnectIntervalMs = 15UL * 1000UL;
 

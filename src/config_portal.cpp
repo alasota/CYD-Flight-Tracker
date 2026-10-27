@@ -196,9 +196,9 @@ uint32_t restartAtMs = 0;
 constexpr uint32_t kRestartDelayMs = 1500;  // lets the answer page reach the browser
 
 // Streams the config page (config_page's renderer) straight to the client as
-// a chunked response instead of building one large String (see CLAUDE.md
-// review notes 4.1). renderConfigPage() never emits an empty chunk — a
-// zero-length sendContent() would end the chunked stream early.
+// a chunked response instead of building one large String (see
+// docs/review-notes-2026.md 4.1). renderConfigPage() never emits an empty
+// chunk — a zero-length sendContent() would end the chunked stream early.
 void sendPage(ConfigPageModel model, int status = 200) {
   // The OpenSky tab shows what OpenSky last said about the day's credits.
   model.quota = openSkyQuota();
@@ -302,7 +302,7 @@ void handleSave() {
 
   // Reject malformed numeric input instead of silently treating it as 0
   // (which sanitizeConfig would then just clamp to a "valid-looking"
-  // value with no feedback to the user) — see CLAUDE.md review notes 1.6.
+  // value with no feedback to the user) — see docs/review-notes-2026.md 1.6.
   // Rejected fields keep their previous value.
   // Labels of the rejected fields, shown in the page's own language.
   std::vector<WebStr> rejected;
@@ -457,7 +457,7 @@ void handleSave() {
   }
 
   // The user has now been through the settings form at least once — see
-  // CLAUDE.md review notes 1.5. This is what the UI checks (it reaches the
+  // docs/review-notes-2026.md 1.5. This is what the UI checks (it reaches the
   // display through NetState) to tell "not configured yet" apart from
   // "home really is at (0,0)".
   cfg.home_configured = true;

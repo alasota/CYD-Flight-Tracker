@@ -99,7 +99,7 @@ struct Config {
   // flag there's no way to tell "user hasn't configured their home
   // location yet" apart from "user's home really is at 0,0", so the
   // firmware would happily poll/display aircraft around Null Island with
-  // no indication anything needs setting up. See CLAUDE.md review notes
+  // no indication anything needs setting up. See docs/review-notes-2026.md
   // 1.5.
   bool home_configured = false;
 };

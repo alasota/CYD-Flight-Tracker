@@ -6,7 +6,7 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 
-#include "net_config.h"  // shared HTTP timeouts (review notes 5.1)
+#include "net_config.h"  // shared HTTP timeouts (docs/review-notes-2026.md 5.1)
 
 namespace {
 

@@ -197,7 +197,7 @@ static void test_lookup_airport_fetches_separately_per_code(void) {
   TEST_ASSERT_EQUAL_INT(2, gAirportFetchCallCount);
 }
 
-// ---- routeLookupIsCached (review notes 1.1 pattern) ------------------------
+// ---- routeLookupIsCached (docs/review-notes-2026.md 1.1 pattern) -----------
 
 static void test_route_is_cached_reflects_confirmed_results_only(void) {
   TEST_ASSERT_FALSE(routeLookupIsCached("EIN17A"));

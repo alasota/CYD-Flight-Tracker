@@ -26,7 +26,7 @@ static void test_status_label_matches_status(void) {
   TEST_ASSERT_EQUAL_STRING("DISCONNECTED", wifiStatusLabel(WifiStatus::Disconnected));
 }
 
-// ---- shouldRestartConnection (portal timeout dead-end, review notes 1.3) --
+// ---- shouldRestartConnection (portal timeout dead-end, docs/review-notes-2026.md 1.3) --
 
 static void test_should_restart_when_portal_just_closed_unconnected(void) {
   TEST_ASSERT_TRUE(shouldRestartConnection(/*was*/ true, /*now*/ false, /*connected*/ false));
@@ -46,7 +46,7 @@ static void test_should_not_restart_when_portal_was_never_active(void) {
   TEST_ASSERT_FALSE(shouldRestartConnection(false, false, false));
 }
 
-// ---- shouldAttemptReconnect (link-loss backstop, review notes 1.5) -------
+// ---- shouldAttemptReconnect (link-loss backstop, docs/review-notes-2026.md 1.5) -------
 
 static void test_no_reconnect_while_connected(void) {
   TEST_ASSERT_FALSE(shouldAttemptReconnect(/*connected*/ true, /*portal*/ false, 999999, 999999));
