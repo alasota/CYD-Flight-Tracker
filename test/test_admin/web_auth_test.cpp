@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "test_support.h"
-#include "web_auth.h"
+#include "admin/domain/web_auth.h"
 
 namespace {
 

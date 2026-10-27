@@ -2,7 +2,7 @@
 #include <unity.h>
 
 #include "test_support.h"
-#include "wifi_manager.h"
+#include "platform/wifi_manager.h"
 
 namespace {
 

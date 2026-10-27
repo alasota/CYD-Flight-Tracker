@@ -1,9 +1,9 @@
 // service_screen: OTA progress / password reset screens. docs/architecture.md "Firmware updates (OTA)", spec/01.
 #include <unity.h>
 
-#include "i18n.h"
-#include "lcars_theme.h"
-#include "service_screen.h"
+#include "display/domain/i18n.h"
+#include "display/domain/theme/lcars_theme.h"
+#include "display/domain/screens/service_screen.h"
 #include "test_support.h"
 
 namespace {

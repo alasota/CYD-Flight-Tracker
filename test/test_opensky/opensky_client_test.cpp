@@ -1,7 +1,7 @@
 // opensky_client: bbox, credits, token timing, /states/all parsing. docs/data-sources.md "OpenSky".
 #include <unity.h>
 
-#include "opensky_client.h"
+#include "opensky/domain/opensky_client.h"
 
 namespace {
 

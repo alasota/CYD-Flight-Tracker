@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "ota_update.h"
+#include "admin/domain/firmware/ota_update.h"
 #include "test_support.h"
 
 namespace {

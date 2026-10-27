@@ -1,11 +1,11 @@
 // aircraft_lookup: hexdb.io aircraft parsing + cache. docs/data-sources.md "Aircraft identification".
 #include <unity.h>
 
-#include "aircraft_lookup.h"
+#include "enrichment/domain/aircraft_lookup.h"
 
 #include <string>
 
-#include "lookup_cache.h"
+#include "enrichment/domain/lookup_cache.h"
 
 namespace {
 

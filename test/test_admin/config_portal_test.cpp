@@ -1,7 +1,7 @@
 // config_portal: bbox area, credit tiers, form helpers. CLAUDE.md "Code conventions" (config_portal).
 #include <unity.h>
 
-#include "config_portal.h"
+#include "admin/app/config_portal.h"
 
 namespace {
 

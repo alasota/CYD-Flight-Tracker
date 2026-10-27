@@ -1,7 +1,7 @@
 // opensky_quota: X-Rate-Limit headers -> credits left. docs/data-sources.md "Rate limits".
 #include <unity.h>
 
-#include "opensky_quota.h"
+#include "opensky/domain/opensky_quota.h"
 #include "test_support.h"
 
 namespace {

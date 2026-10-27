@@ -2,8 +2,8 @@
 #include <unity.h>
 #include <string>
 
-#include "screen_nav.h"
-#include "table_view.h"  // tableFirstRowY()
+#include "display/domain/screen_nav.h"
+#include "display/domain/screens/table_view.h"  // tableFirstRowY()
 #include "test_support.h"
 
 namespace {

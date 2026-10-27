@@ -1,7 +1,7 @@
 // screenshot: BMP header + band order of /screenshot.bmp, ScreenshotBridge (spec 09 §1). CLAUDE.md "Code conventions" (screenshot).
 #include <unity.h>
 
-#include "screenshot.h"
+#include "display/app/screenshot.h"
 
 #include <algorithm>
 #include <atomic>

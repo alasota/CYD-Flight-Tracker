@@ -1,7 +1,7 @@
 // config_store: defaults, sanitizing, NVS keys. CLAUDE.md "Code conventions" (config_store).
 #include <unity.h>
 
-#include "config_store.h"
+#include "admin/domain/config_store.h"
 #include "test_support.h"
 
 namespace {

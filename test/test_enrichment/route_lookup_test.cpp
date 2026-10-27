@@ -1,11 +1,11 @@
 // route_lookup: hexdb.io route / airport parsing + caches. docs/data-sources.md "Route & airport lookup".
 #include <unity.h>
 
-#include "route_lookup.h"
+#include "enrichment/domain/route_lookup.h"
 
 #include <string>
 
-#include "lookup_cache.h"
+#include "enrichment/domain/lookup_cache.h"
 
 namespace {
 

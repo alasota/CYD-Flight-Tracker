@@ -1,9 +1,9 @@
 // flight_screen: Screen 2 countdown + NOW pick. docs/screens.md "Screen 2 — Flight".
 #include <unity.h>
 
-#include "cpa_predictor.h"
-#include "flight_screen.h"
-#include "table_view.h"  // AircraftRow
+#include "airspace/domain/cpa_predictor.h"
+#include "display/domain/screens/flight_screen.h"
+#include "display/domain/screens/table_view.h"  // AircraftRow
 #include "test_support.h"
 
 #include <vector>
