@@ -98,7 +98,7 @@ static void test_should_use_oauth(void) {
   TEST_ASSERT_FALSE(shouldUseOAuth("", ""));
 }
 
-// ---- isBeforeDeadline (429 backoff, review notes 1.4) ----------------------
+// ---- isBeforeDeadline (429 backoff, docs/review-notes-2026.md 1.4) ---------
 
 static void test_is_before_deadline_simple_cases(void) {
   TEST_ASSERT_TRUE(isBeforeDeadline(100, 200));   // now is before the deadline
@@ -207,7 +207,7 @@ static void test_parse_states_response_skips_short_state_vectors(void) {
 static void test_parse_states_response_rejects_oversized_body(void) {
   // Padding well past kMaxStatesResponseBytes — even though it isn't
   // valid JSON, the size check must reject it before any parsing is
-  // attempted (see CLAUDE.md review notes 4.3).
+  // attempted (see docs/review-notes-2026.md 4.3).
   std::string oversized(kMaxStatesResponseBytes + 1, 'x');
   std::vector<Aircraft> aircraft = parseStatesResponse(oversized);
   TEST_ASSERT_TRUE(aircraft.empty());
@@ -228,7 +228,7 @@ static void test_parse_retry_after_missing_or_invalid_uses_default(void) {
 
 static void test_parse_retry_after_clamps_absurd_values(void) {
   // A hostile/buggy header must not wedge the client into days of silence
-  // (review notes 1.4) — clamped to the 3600s cap.
+  // (docs/review-notes-2026.md 1.4) — clamped to the 3600s cap.
   TEST_ASSERT_EQUAL_UINT32(3600, parseRetryAfterSeconds("999999999", 60));
   TEST_ASSERT_EQUAL_UINT32(3600, parseRetryAfterSeconds("99999999999999999999", 60));
   TEST_ASSERT_EQUAL_UINT32(120, parseRetryAfterSeconds("120", 60));  // in range, untouched
@@ -247,7 +247,7 @@ static void test_ms_until_next_poll(void) {
   TEST_ASSERT_EQUAL_UINT32(9996u, msUntilNextPoll(4999u, 0xFFFFFFFFu - 4u, true, 15000));
 }
 
-// ---- shouldPollNow (interval gating, review notes 3.3) ------------------
+// ---- shouldPollNow (interval gating, docs/review-notes-2026.md 3.3) -----
 
 static void test_should_poll_now_first_call_always_polls(void) {
   TEST_ASSERT_TRUE(shouldPollNow(0, 0, /*ever_polled*/ false, 15000));

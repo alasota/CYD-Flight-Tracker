@@ -110,7 +110,7 @@ static int currentPage = 0;
 // mask by computeRedrawMask() at the end of loop(), then cleared.
 static RedrawEvents pendingRedraw;
 
-// last_screen NVS-write debouncing (review notes 5.9).
+// last_screen NVS-write debouncing (docs/review-notes-2026.md 5.9).
 static int lastPersistedScreen = 0;
 static uint32_t lastScreenPersistMs = 0;
 
@@ -119,7 +119,7 @@ static uint32_t lastScreenPersistMs = 0;
 static OpenSkyHealth shownHealth = OpenSkyHealth::Ok;
 
 // Height of the table's page-back / page-forward tap strips — table_view's
-// own row height, so the two can't drift apart (review notes 5.5).
+// own row height, so the two can't drift apart (docs/review-notes-2026.md 5.5).
 static const int16_t kPageTapZoneHeight = tableRowHeightPx();
 
 static const Config &cfg() { return *net->cfg; }
@@ -130,7 +130,7 @@ static const std::vector<AircraftRow> &rows() {
 }
 
 // Screen 2's aircraft's CPA, extrapolated from the poll to "now"
-// (cpa_predictor owns the math — review notes 3.4).
+// (cpa_predictor owns the math — docs/review-notes-2026.md 3.4).
 static CpaPrediction currentCpa() {
   if (net->data == nullptr) return CpaPrediction{};
   return extrapolateCpa(net->data->cpa, millis() - net->data->polledAtMs);
@@ -209,7 +209,7 @@ static void applyRedraw(uint8_t mask) {
 }
 
 // Shown instead of a screen while config_store's home_configured is still
-// false (review notes 1.5/1.6). Redrawn on every full-redraw event.
+// false (docs/review-notes-2026.md 1.5/1.6). Redrawn on every full-redraw event.
 static void showSetupPrompt() {
   int16_t screenW = static_cast<int16_t>(tft.width());
   int16_t screenH = static_cast<int16_t>(tft.height());
@@ -259,7 +259,7 @@ static void updateShownHealth() {
 
 // Persist (debounced) + redraw after screen_nav reports the active screen
 // changed. A touch persists at once, an auto-cycle advance rate-limited
-// (review notes 5.9), a screenshot's switch never (spec 10).
+// (docs/review-notes-2026.md 5.9), a screenshot's switch never (spec 10).
 static void onScreenChanged(ScreenChangeCause cause) {
   currentPage = 0;
   lastScreenChangeMs = millis();  // any change resets the auto-cycle timer

@@ -93,13 +93,13 @@ static void test_parse_credentials_json_rejects_empty_string(void) {
 
 static void test_parse_credentials_json_rejects_oversized_body(void) {
   // Padding well past kMaxCredentialsJsonBytes — the size check must
-  // reject it before any parsing is attempted (review notes 4.3).
+  // reject it before any parsing is attempted (docs/review-notes-2026.md 4.3).
   std::string oversized(kMaxCredentialsJsonBytes + 1, 'x');
   OpenSkyCredentials creds = parseOpenSkyCredentialsJson(oversized);
   TEST_ASSERT_FALSE(creds.ok);
 }
 
-// ---- isValidFloatString (review notes 1.6) ---------------------------------
+// ---- isValidFloatString (docs/review-notes-2026.md 1.6) --------------------
 
 static void test_valid_float_string_accepts_typical_values(void) {
   TEST_ASSERT_TRUE(isValidFloatString("51.5074"));
@@ -118,7 +118,7 @@ static void test_valid_float_string_rejects_garbage(void) {
   TEST_ASSERT_FALSE(isValidFloatString(" "));
 }
 
-// ---- isValidUnsignedIntString (review notes 1.6) ---------------------------
+// ---- isValidUnsignedIntString (docs/review-notes-2026.md 1.6) --------------
 
 static void test_valid_unsigned_int_string_accepts_digits(void) {
   TEST_ASSERT_TRUE(isValidUnsignedIntString("15"));

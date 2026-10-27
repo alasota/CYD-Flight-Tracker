@@ -137,7 +137,7 @@ constexpr int kTableRowsPerPage = 5;
 
 // Accessors so other modules (e.g. main.cpp's touch tap-zone sizing) stay
 // in sync with these instead of hardcoding their own copies — see
-// CLAUDE.md review notes 5.5.
+// docs/review-notes-2026.md 5.5.
 int tableRowsPerPage();   // kTableRowsPerPage (5)
 int16_t tableRowHeightPx();  // the 19px row step
 int16_t tableFirstRowY();    // 116 — y of the first data row

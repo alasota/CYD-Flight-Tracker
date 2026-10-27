@@ -15,7 +15,7 @@ static void test_default_config_has_sane_values(void) {
   TEST_ASSERT_EQUAL_UINT32(15, cfg.auto_cycle_interval_s);
   TEST_ASSERT_TRUE(cfg.opensky_client_id.empty());
   TEST_ASSERT_TRUE(cfg.opensky_client_secret.empty());
-  // Never-configured by default — see review notes 1.5: (0,0) is a real
+  // Never-configured by default — see docs/review-notes-2026.md 1.5: (0,0) is a real
   // place, so this flag is the only way to tell "not set up yet" apart
   // from "home really is at 0,0".
   TEST_ASSERT_FALSE(cfg.home_configured);

@@ -32,7 +32,7 @@ struct OpenSkyCredentials {
 // Hard ceiling on how large a credentials JSON body
 // parseOpenSkyCredentialsJson() will attempt to parse — matches the config
 // page's own upload size cap, but enforced here too so the function is
-// self-defending regardless of caller (see CLAUDE.md review notes 4.3).
+// self-defending regardless of caller (see docs/review-notes-2026.md 4.3).
 constexpr size_t kMaxCredentialsJsonBytes = 4096;
 
 // Parses that JSON file's contents (uploaded via the config page — see
@@ -46,7 +46,7 @@ OpenSkyCredentials parseOpenSkyCredentialsJson(const std::string &json);
 // strtof()). Used by the config form to reject malformed lat/lon/radius
 // input instead of silently treating it as 0, which sanitizeConfig would
 // then just clamp up to a "valid-looking" value with no feedback to the
-// user — see CLAUDE.md review notes 1.6. Pure — tested under
+// user — see docs/review-notes-2026.md 1.6. Pure — tested under
 // `pio test -e native`.
 bool isValidFloatString(const std::string &s);
 

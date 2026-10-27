@@ -102,7 +102,7 @@ bool shouldAutoAdvance(uint32_t elapsedMs, uint32_t intervalS, bool deferHold);
 // was NOT user-initiated (i.e. an auto-cycle advance). Manual taps persist
 // immediately; auto-cycle — which can fire every few seconds — is
 // rate-limited to this so it doesn't wear the flash writing the same key
-// thousands of times a day (see CLAUDE.md review notes 5.9). 10 minutes:
+// thousands of times a day (see docs/review-notes-2026.md 5.9). 10 minutes:
 // on a reboot you resume within 10 min of where auto-cycle left off,
 // which is plenty for a decorative feature.
 constexpr uint32_t kScreenPersistMinIntervalMs = 10UL * 60UL * 1000UL;

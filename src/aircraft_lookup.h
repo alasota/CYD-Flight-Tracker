@@ -21,7 +21,7 @@ struct AircraftInfo {
 // Hard ceiling on how large a hexdb.io response body
 // parseAircraftLookupResponse() will attempt to parse. A real response is
 // a few hundred bytes; this is a defensive cap against an unexpectedly
-// huge or corrupted body (see CLAUDE.md review notes 4.3).
+// huge or corrupted body (see docs/review-notes-2026.md 4.3).
 constexpr size_t kMaxLookupResponseBytes = 4096;
 
 // Parses a hexdb.io GET /api/v1/aircraft/{icao24} JSON response body into
@@ -36,7 +36,7 @@ AircraftInfo parseAircraftLookupResponse(const std::string &json);
 // Result of one fetch attempt, used by lookupAircraftWithFetcher() below.
 // `response_ok` distinguishes "we got a definitive HTTP 200 back" from any
 // other outcome (timeout, WiFi drop, DNS failure, non-200 status) — see
-// CLAUDE.md review notes 1.2: only a confirmed response is safe to cache
+// docs/review-notes-2026.md 1.2: only a confirmed response is safe to cache
 // forever, since caching a *transient* failure the same way as a genuine
 // hexdb.io miss would permanently blacklist an aircraft that simply had
 // bad luck on its first lookup.
@@ -56,7 +56,7 @@ using AircraftFetchFn = FetchResult (*)(const std::string &icao24);
 // hit or a genuine hexdb.io miss — a miss (military/private/very new
 // registration) won't start resolving mid-boot either, so there's no
 // reason to keep re-fetching it. A *failed* fetch attempt (response_ok ==
-// false) is deliberately NOT cached — see CLAUDE.md review notes 1.2 — so
+// false) is deliberately NOT cached — see docs/review-notes-2026.md 1.2 — so
 // a later poll can retry once conditions improve. Pure aside from the
 // injected `fetch` call — no direct HTTP/WiFi dependency — tested under
 // `pio test -e native` with a stub.
@@ -76,7 +76,7 @@ AircraftInfo lookupAircraftWithFetcher(const std::string &icao24, AircraftFetchF
 // i.e. calling lookupAircraft()/lookupAircraftWithFetcher() for it would
 // NOT perform an HTTP request. Lets a caller bound how many *new* lookups
 // it attempts in one go (each is a blocking HTTP round trip) without
-// skipping ones that are already free — see CLAUDE.md review notes 1.1,
+// skipping ones that are already free — see docs/review-notes-2026.md 1.1,
 // and poll_pipeline's per-poll lookup budget (lookup_budget). Pure — just a cache query.
 bool aircraftLookupIsCached(const std::string &icao24);
 

@@ -41,7 +41,7 @@ std::string statusBarClock(std::time_t localEpoch, bool timeSynced);
 // silent failure (persistent 401, exhausted rate-limit credits, a dead
 // network) isn't invisible — the aircraft list on screen may be stale
 // (net_task keeps the last good DataSnapshot rather than blanking it). See
-// CLAUDE.md review notes 1.2/1.3/1.4.
+// docs/review-notes-2026.md 1.2/1.3/1.4.
 enum class OpenSkyHealth {
   Ok,            // last poll succeeded
   RateLimited,   // 429 — credits exhausted, backing off
