@@ -1,6 +1,6 @@
 # Spec 11 — Porządki: martwy kod, nieaktualne komentarze, dokumentacja
 
-Z przeglądu kodu 2026-10-25, sekcja 2. Status: **w trakcie**. Robić **przed** spec 12
+Z przeglądu kodu 2026-10-25, sekcja 2. Status: **zrobione** 2026-10-27, wydane w vNEXT. Robić **przed** spec 12
 (reorganizacja) — mniej plików do przenoszenia i mniej fałszywych zależności.
 
 Zasada z CLAUDE.md (przypadek `computeStardate()`): nieużywany kod usuwa się razem z testami,
@@ -70,3 +70,44 @@ Nowy podział:
 3. Żaden komentarz poza `main.cpp` nie przypisuje `main.cpp` pracy, którą robi `net_task`.
 4. CLAUDE.md < 250 linii, każdy usunięty fragment jest w jednym z plików `docs/` (albo był
    nieaktualny — wtedy wymieniony w opisie commita).
+
+## Wynik
+
+Zrobione 2026-10-27 na gałęzi `spec/11-cleanup-dead-code-docs`.
+
+1. **Build i testy, rozmiar** — `pio test -e native`: sześć zestawów zielonych; `pio run -e cyd`:
+   Flash 1 470 345 B (przed: 1 470 425 B, −80 B), `firmware.bin` 1 476 928 B (−80 B), RAM bez
+   zmian (62 028 B). Mało, bo `--gc-sections` już wcześniej wyrzucał nieużywane funkcje.
+2. **Martwy kod** — usunięte razem z testami: `viewToggleButtonBounds` + `kToggleButton*`,
+   `drawViewToggleButton`, `drawElbowFrame`, `elbowArcPoint` / `ElbowArcPoint`,
+   `drawVerticalDivider`, `drawPanel` + `kPanelCornerRadius`, `phaseIcon`,
+   `formatSummaryIdentity`, `LCARS_MAGENTA/CYAN/AMBER/ROSE/PALE_BLUE`, `NetCommandType::RefreshNow`
+   (domyślnie teraz `None`); poza listą §1, za zgodą właściciela: `drawElbow`,
+   `drawHeaderBlock`, `LCARS_BLUE_VIOLET`, `LCARS_FONT_NUMERIC`. `LCARS_ORANGE` zostaje
+   (`THEME_WARNING`). Domyślny kolor odliczania: `THEME_CONTENT_SECONDARY`. Grep w `src/` i
+   `test/` pilnuje `RepoTest.test_removed_symbols_absent_from_src_and_test`.
+3. **Komentarze** — w modułach rdzenia 0 żaden komentarz nie przypisuje pracy `main.cpp` /
+   `loopTask` (`RepoTest.test_no_net_module_comment_mentions_main_cpp`); nagłówki
+   `featured_panel.h`, `flight_screen.h`, `radar_view.h`, `status_bar.h`, `table_view.h`,
+   `redraw_policy.h`, `lcars_theme.h` opisują obecny układ i odsyłają do stałych / dokumentacji.
+   Nowy `tools/check_comments.py` (+ `tools/test_check_comments.py`): w CI sam skrypt tylko
+   ostrzega, a jego `RepoTest` blokuje (decyzja właściciela 2).
+4. **Dokumentacja** — CLAUDE.md: 1549 → 243 linie (zasady + tabela „Where things are”).
+   Reszta w `docs/screens.md`, `docs/data-sources.md`, `docs/architecture.md` (obecna
+   architektura; spec 12 ją przepisze), `docs/history.md`; `review-notes.md` →
+   `docs/review-notes-2026.md`. ~200 odwołań `CLAUDE.md "X"` w `src/` / `test/` wskazuje teraz
+   pliki `docs/`, `check_comments.py --strict` czysty. Sprzeczności rozstrzygnięte według kodu
+   (nagłówek 15 px, krok wierszy 17 px, kolumna ODL zamiast LINIA, liliowy nagłówek tabeli,
+   ekran 2 wg „Current behaviour”, `rssiToBars()` tylko w historii, hexdb.io przez endpointy
+   ICAO); lista usuniętych nieaktualnych fragmentów jest w opisie commita „Split CLAUDE.md…”.
+   `lib/README` usunięty, `include/README` to jedno zdanie. Agenci (`.claude/agents`,
+   `conventions.md`) czytają CLAUDE.md + plik `docs/` swojego obszaru.
+
+Odstępstwa: `docs/architecture.md` powstał już teraz (spec przewidywał go dopiero po spec 12) —
+na niego przeszły OTA, aktualizacje z GitHuba, jasność, alerty, bezpieczeństwo panelu, CI i
+harness (decyzja właściciela 3). Zakres `docs-writer` w `conventions.md` obejmuje odtąd
+`docs/*.md` — tam są teraz szczegóły, które wcześniej były w CLAUDE.md.
+
+`@manual`: przegląd, czy każdy usunięty z CLAUDE.md fragment jest w `docs/` albo na liście w
+commicie (reviewer); ekrany po wgraniu wersji dev wyglądają jak przedtem (zmiana nie dotyka
+rysowania, zrzuty ekranu niepotrzebne); rozmiar firmware'u — zmierzony wyżej.
