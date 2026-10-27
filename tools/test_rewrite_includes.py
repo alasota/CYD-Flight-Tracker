@@ -110,6 +110,27 @@ class MoveTableTest(unittest.TestCase):
         self.assertEqual([], renamed)
 
 
+class MoveCliTest(unittest.TestCase):
+    def test_move_runs_git_mv_drops_empty_folders_and_skips_done_ones(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_tree(tmp, {"src/table_view.h": "#pragma once\n",
+                             "src/fonts/lcars_efont.h": "#pragma once\n"})
+            subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+            subprocess.run(["git", "add", "src"], cwd=tmp, check=True)
+            code, out = run_cli(tmp, "--move")
+            self.assertEqual(0, code, out)
+            self.assertIn("moved 2 file(s)", out)
+            self.assertTrue((Path(tmp) / "src/display/domain/screens/table_view.h").is_file())
+            self.assertTrue((Path(tmp) / "src/display/domain/theme/fonts/lcars_efont.h").is_file())
+            self.assertFalse((Path(tmp) / "src/fonts").exists())
+            staged = subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=tmp,
+                                    capture_output=True, text=True, check=True).stdout
+            self.assertIn("src/display/domain/screens/table_view.h", staged)
+            code, out = run_cli(tmp, "--move")
+            self.assertEqual(0, code, out)
+            self.assertIn("moved 0 file(s)", out)
+
+
 class RewriteTest(unittest.TestCase):
     INDEX_PATHS = ["display/domain/screens/table_view.h", "platform/core_link.h",
                    "display/domain/theme/fonts/lcars_efont.h"]
