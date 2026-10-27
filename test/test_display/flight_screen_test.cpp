@@ -138,6 +138,12 @@ static void test_labels_follow_language(void) {
                            computeCountdownDisplay(cpaAt(240.0f), Language::EN, true).statusLabel.c_str());
 }
 
+// Scenario: Domyślny kolor odliczania to rola z motywu, nie stała ze starej palety
+static void test_countdown_default_color_is_theme_role(void) {
+  const CountdownDisplay d;
+  TEST_ASSERT_EQUAL_HEX16(THEME_CONTENT_SECONDARY, d.color);
+}
+
 static void test_numbers_and_colors_do_not_depend_on_language(void) {
   for (float t : {-5.0f, 0.0f, 7.0f, 42.0f, 240.0f}) {
     CountdownDisplay pl = computeCountdownDisplay(cpaAt(t), Language::PL, true);
@@ -312,5 +318,6 @@ void run_flight_screen_tests() {
   RUN_TEST(test_minutes_rounds_to_nearest_minute);
   RUN_TEST(test_the_four_preview_values);
   RUN_TEST(test_rounding_to_nearest_second);
+  RUN_TEST(test_countdown_default_color_is_theme_role);
 
 }
