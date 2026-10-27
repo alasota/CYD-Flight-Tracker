@@ -77,6 +77,9 @@ Input: the version (`vX.Y.Z`), the included PRs (titles, bodies), `specs_to_move
 3. ROADMAP.md: every included feature PR has its `## Done` row with "Done in vX.Y.Z"; add a
    missing one from the PR body (EN + `<!-- pl: -->`), move a leftover "In progress" row. Fixes
    don't get rows. Parse check as above.
+   A stage of a staged spec (status `**etap N z M …**`, N < M) is not a finished feature: its
+   row stays under "next" (the verdict names the stage), its status stays `etap N z M`, never
+   `**zrobione**` — `release_plan.py` keeps it in `planned/` until the last stage.
 4. Project page / README: a released feature the page or README doesn't mention yet and should
    (see feature mode 2 and 6) — add it briefly. Otherwise leave them.
 5. Commit: `Release vX.Y.Z: specs to done, version in roadmap and docs`. Report what changed.

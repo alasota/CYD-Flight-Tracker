@@ -199,7 +199,7 @@ two cores". Spec: `spec/done/04-dual-core.md`.
 
 ## Versioning, CI and the harness
 
-- Version = git tag (`tools/pio_version.py` → `FW_VERSION`, only in `firmware/version.cpp`),
+- Version = git tag (`tools/pio_version.py` → `FW_VERSION`, only in `admin/domain/firmware/version.cpp`),
   shown in the settings page footer. Workflows: `firmware.yml` (tests, checks + layer report,
   build, artifacts), `site.yml` (project page), `release.yml` (tag `v*` → GitHub Release + page),
   `pr.yml` (a `-dev.N` pre-release per PR). Details: docs/architecture.md "Versioning & CI".
