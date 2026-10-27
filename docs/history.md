@@ -160,3 +160,17 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   old Screen 2 spec next to its "current behaviour", `rssiToBars()` described as existing). It
   became a < 250-line rule book plus the files in `docs/`. `tools/check_comments.py` keeps the
   comments' doc references pointing at real headings.
+- **Flat `src/` → context folders** (spec 12, stage 1). By 2026 `src/` held ~90 flat files; the
+  names didn't say what was domain logic, an integration or a screen, and dependencies ran the
+  wrong way (`core_link.h` including `table_view.h` for `AircraftRow`, `config_store.h`
+  including `backlight.h`) — nothing stopped it. The 2026 review proposed contexts and layers
+  with a dependency table (spec 12 §4–§5). It is done in seven stages so each PR stays
+  reviewable and the board behaves the same after each: stage 1 only moved the files with
+  `git mv`, unsplit and unrenamed, and rewrote the includes to full paths by script
+  (`tools/rewrite_includes.py`) — a diff of pure renames + include lines, `git log --follow`
+  intact, firmware +256 B (link order). A file went where its pure half will live; splitting
+  the `#ifdef ARDUINO` halves out (stage 3) and renaming (stage 6) would have hidden real
+  changes in a 90-file move. `tools/check_layers.py` only reports (55 findings after stage 1)
+  until stage 7 — making it block before the types move would have stopped every PR. The
+  efont tables went to `display/domain/theme/fonts/`, not `adapters/` as §4.4 first said: they
+  are pure data read by `fonts_test`, and `native` doesn't compile `adapters/`.

@@ -1,9 +1,54 @@
 # Architecture — how the firmware is put together
 
-The current architecture in detail: the two cores, the settings page, updates, brightness, the
-"!" alerts, CI and the agent harness. The rules a session must follow are in CLAUDE.md; this
-file is the reference behind them. (Spec 12 will reorganise the code into contexts and rewrite
-this file around them.)
+The current architecture in detail: the source layout, the two cores, the settings page,
+updates, brightness, the "!" alerts, CI and the agent harness. The rules a session must follow
+are in CLAUDE.md; this file is the reference behind them. (Spec 12 reorganises the code into
+contexts in seven stages; stage 1 — folders, full-path includes, layer report — is done. Stage 7
+rewrites this file around the contexts.)
+
+## Source layout (spec 12)
+
+Spec: `spec/planned/12-code-reorganization-ddd.md` (§4 contexts, §5 dependency table, §8
+stages). Stage 1 moved the files with `git mv`, **unsplit and unrenamed**; stages 2–7 move types,
+split pure / hardware halves, add the `app/` layer, rename to the glossary and make the layer
+check block CI.
+
+- **Folders:** `src/<context>/<layer>/` — contexts `airspace` (flight phase, CPA, the poll
+  pipeline), `enrichment` (hexdb.io lookups, caches, names), `opensky` (client, login, credits),
+  `display` (screens, theme, fonts, i18n, touch, backlight, redraw), `admin` (settings, page,
+  backup, password, alerts; `admin/domain/firmware/` = OTA, release check, version); layers
+  `domain/` (pure), `app/` (use cases, pure), `adapters/` (SDK / hardware only). Plus `shared/`
+  (`sun_times`), `platform/` (`core_link`, `time_sync`, `wifi_manager`, `perf_stats`,
+  `net_config`) and the root `src/app/` (`main.cpp`, `net_task` — composition roots, one per
+  core). Subfolders: `display/domain/screens/`, `display/domain/theme/` (+ `fonts/`).
+- **Placement rule in stage 1:** a file sits where its pure half will live, named as before; its
+  `#ifdef ARDUINO` half stays inside until stage 3 moves it to `adapters/`. Only files that are
+  entirely hardware are in `adapters/` / root `app/` already (`enrichment/adapters/hexdb_http`,
+  `admin/adapters/github_ca.h`, `app/net_task`, `app/main.cpp`). `include/LGFX_CYD.hpp` and
+  `include/touch_calibration.h` stay in `include/` until stage 3.
+- **Includes** are full paths from `src/` (`#include "display/domain/i18n.h"`), in `src/` and
+  `test/` alike; `-I src` is in `env:cyd` and `env:native` (`cyd-ota`, `native-asan` inherit).
+  `test/support/` headers and test-local headers (`github_fixtures.h`) stay short.
+- **`native` filter:** `+<*> -<app/> -<*/adapters/> -<platform/*_esp32.cpp>` — `-<app/>` matches
+  only the root `src/app/`, not `admin/app/`.
+- **`tools/check_layers.py`** classifies each file (`classify()`) and checks every `#include`
+  against the §5 table (`ALLOWED`): domain sees `shared/` and other domains as the table allows,
+  `*/app` and `*/adapters` their own context, tests anything but `adapters/`, root `app/` and SDK
+  headers; SDK headers (`Arduino.h`, `WiFi*.h`, `LovyanGFX.hpp`, `esp_*`, `freertos/…` …) only in
+  `adapters/`, root `app/` and inside `#ifdef ARDUINO` in `platform/`. Stage-1 decisions: the §5
+  footnotes count as allowed; the table's missing rows were filled in (`enrichment/app` may see
+  `airspace` domain / app — it implements its port; `opensky/app` only its own context).
+  Output `path:line: from -> to ("include")`, a count per pair and a total; exit 0, `--strict`
+  exits 1 (stage 7 turns that on in CI). Stage 1 ends with **55 findings** — SDK includes inside
+  `#ifdef` in domain files, `admin/domain -> admin/app` (`device_alerts`), domain → adapters
+  (`hexdb_http.h`, `github_ca.h`, `LGFX_CYD.hpp`), domain / app → platform (`time_sync.h`,
+  `core_link.h`, `net_config.h`); each later stage should lower it. A short include (resolving
+  only from the file's own folder) and a file outside any context are findings too;
+  `tools/test_check_layers.py`'s `LayoutTest` keeps the tree free of them and the `RUN_TEST(`
+  count ≥ 874.
+- **`tools/rewrite_includes.py`** — the move table (`MOVES`) and the include rewriter: `--move`
+  (`git mv` per entry, skips done ones), default rewrites short includes in place, `--check` exits
+  1 if anything would change. Kept until stage 7: stages 2 / 3 move files again with a new `MOVES`.
 
 ## Concurrency — two cores (core_link, net_task)
 
@@ -187,9 +232,9 @@ Spec: `spec/done/02-github-release-check.md`.
   polls and with heap to spare (`canStartNetworkTask()`: WiFi, clock synced, ≥ 5 s to the next
   poll, ≥ 50 KB free block). Setting `update_check_enabled` (NVS `updchk`, default on) only
   *checks*; installing always needs a YES. A failed connect is retried once.
-- **TLS is verified here** (unlike OpenSky / hexdb.io): `src/github_ca.h` holds the *root* CAs
-  (Sectigo E46/R46 + USERTrust ECC/RSA for github.com / api.github.com, ISRG X1/X2 for
-  release-assets.githubusercontent.com). `firmware.yml` warns when a host stops verifying
+- **TLS is verified here** (unlike OpenSky / hexdb.io): `src/admin/adapters/github_ca.h` holds
+  the *root* CAs (Sectigo E46/R46 + USERTrust ECC/RSA for github.com / api.github.com, ISRG
+  X1/X2 for release-assets.githubusercontent.com). `firmware.yml` warns when a host stops verifying
   against them — then add the new root and release. Every URL and every redirect hop must pass
   `isAllowedUpdateUrl()` (https, GitHub hosts, our repo's paths) before connecting; redirects
   are followed by hand. The repo is a compile-time constant, never a setting.
@@ -316,8 +361,9 @@ green dot, red "!").
 
 - **Version = git tag.** `tools/pio_version.py` (PlatformIO `extra_scripts = pre:`) runs
   `git describe --tags --always --dirty` (or takes `$FW_VERSION`) and passes it as the
-  `FW_VERSION` macro to `src/version.cpp` only (build middleware — a new version recompiles one
-  file). `firmwareVersion()` returns it, `"dev"` when not injected (native tests). Shown only in
+  `FW_VERSION` macro to `src/admin/domain/firmware/version.cpp` only (build middleware on the
+  pattern `*version.cpp`, which must match one file; a new version recompiles only it).
+  `firmwareVersion()` returns it, `"dev"` when not injected (native tests). Shown only in
   the settings page footer, not on the display. The script also writes
   `.pio/build/cyd/cyd-sky-tracker-<version>.bin` (copy of firmware.bin) and `version.txt`.
 - **Partitions:** `min_spiffs.csv` — two 1.875 MB OTA slots, NVS at the same offset as before.
@@ -328,10 +374,12 @@ green dot, red "!").
   bump).
 - **GitHub Actions — four workflows** (`.github/workflows/`):
   - `firmware.yml` — push to main / manual, and reusable (`workflow_call`, inputs `version` =
-    forced `FW_VERSION`, `ref` = commit): `pio test -e native`, `pio test -e native-asan`, the
-    Python tool tests (`tools/test_check_bdd.py`, `tools/test_release_plan.py`,
-    `tools/test_build_site.py`, `tools/test_check_comments.py`), the BDD check
-    (`tools/check_bdd.py`), the comment check (`tools/check_comments.py`, warnings only),
+    forced `FW_VERSION`, `ref` = commit): the layer report (`tools/check_layers.py`, report
+    only, before the tests — "Source layout"), `pio test -e native`, `pio test -e native-asan`,
+    the Python tool tests (`tools/test_check_bdd.py`, `test_release_plan.py`,
+    `test_build_site.py`, `test_check_comments.py`, `test_check_layers.py`,
+    `test_rewrite_includes.py`, `test_subset_efont.py`), the BDD check (`tools/check_bdd.py`),
+    the comment check (`tools/check_comments.py`, warnings only),
     builds, uploads artifact `cyd-sky-tracker-<version>` with `cyd-sky-tracker-<version>.bin`
     (app, OTA or 0x10000), `…-full.bin` (merged image, 0x0), `bootloader.bin`,
     `partitions.bin`, `boot_app0.bin`, `version.txt`, `SHA256SUMS.txt`.
@@ -431,6 +479,11 @@ The summary is in CLAUDE.md "Spec → PR harness"; shared agent rules in
   docs need it (`docs-writer` release mode: specs still in `planned/` to `done/`, the `vNEXT`
   placeholder → the version, ROADMAP rows, project page / README for released features),
   rebase-merged when green → annotated tag on main's HEAD → watches `release.yml`.
+- **Specs built in stages** (spec 12): one spec, one PR per stage on the same `spec/NN-…`
+  branch name. The status line `Status: **etap N z M …` with N < M keeps the spec in
+  `planned/` even though its branch was merged (`release_plan.py`'s `STAGE_STATUS`); a
+  `**zrobione` status still moves it. Each stage gets a "Wynik etapu N" in the spec and its
+  version in `spec/README.md`'s "Stan" (`etap 1/7: vX.Y.Z`).
 - **The `vNEXT` placeholder:** branches don't know their version, so docs write a bare
   placeholder (ROADMAP's "Done in" rows, spec status, `spec/README.md`, `docs/*.md`);
   `/release` fills it in (`release_plan.py --fill vX.Y.Z`), the project page shows it as "the
