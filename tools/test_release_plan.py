@@ -1,8 +1,10 @@
 """Tests for tools/release_plan.py (the pure part):  python tools/test_release_plan.py"""
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import release_plan as rp  # noqa: E402
@@ -153,6 +155,15 @@ class PlaceholderTest(unittest.TestCase):
         text = "Done in vNEXT: x <!-- pl: Zrobione w vNEXT: y --> (write `vNEXT` here)"
         self.assertEqual("Done in v1.7.0: x <!-- pl: Zrobione w v1.7.0: y --> (write `vNEXT` here)",
                          rp.fill_placeholder(text, "v1.7.0"))
+
+    def test_vnext_in_docs_is_listed(self):
+        # Spec 11 moved most of CLAUDE.md into docs/*.md; a vNEXT there must be filled too.
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "docs").mkdir()
+            (Path(d) / "docs" / "screens.md").write_text("Added in vNEXT.", encoding="utf-8")
+            (Path(d) / "docs" / "history.md").write_text("write `vNEXT` here", encoding="utf-8")
+            with mock.patch.object(rp, "REPO_DIR", Path(d)):
+                self.assertEqual(["docs/screens.md"], rp.vnext_files())
 
 
 if __name__ == "__main__":

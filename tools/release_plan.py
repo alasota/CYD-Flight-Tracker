@@ -44,7 +44,8 @@ PLACEHOLDER = "vNEXT"
 # A placeholder is a bare vNEXT; `vNEXT` in backticks is text about it (CLAUDE.md, READMEs).
 BARE_VNEXT = re.compile(r"(?<![`\w])vNEXT(?![`\w])")
 # Files where vNEXT may stand for the coming version.
-VNEXT_GLOBS = ["ROADMAP.md", "README.md", "CLAUDE.md", "spec/**/*.md", "site/**/*.html"]
+VNEXT_GLOBS = ["ROADMAP.md", "README.md", "CLAUDE.md", "docs/**/*.md", "spec/**/*.md",
+               "site/**/*.html"]
 
 
 # ---- pure ---------------------------------------------------------------------------
