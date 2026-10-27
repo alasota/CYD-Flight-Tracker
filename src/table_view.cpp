@@ -130,7 +130,7 @@ namespace {
 // Fixed layout from CLAUDE.md "Screen 1", below the featured panel
 // (y:18..95). The cyan LOTY/FLIGHTS sub-header strip was removed on request;
 // the space went to roomier rows.
-constexpr int16_t kColHeaderY = 98;    // orange column labels, y:98..113
+constexpr int16_t kColHeaderY = 98;    // lilac column-header bar, y:98..113
 constexpr int16_t kColHeaderH = kTableHeaderHeightPx;
 constexpr int16_t kFirstRowY = 116;    // rows at 116,133,150,167,184 (last ends y:201)
 constexpr int16_t kRowStep = 17;       // 1px above the 16px Font2 text; must end by 215

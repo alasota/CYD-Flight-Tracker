@@ -52,7 +52,7 @@ struct AircraftRow {
 
   // "Still loading" vs "confirmed unknown": a lookup that the per-poll
   // budget hasn't reached yet is *pending* (shown as "..."); a lookup that
-  // ran and found nothing is not (shown as "--"). Set by main.cpp.
+  // ran and found nothing is not (shown as "--"). Set by poll_pipeline.
   bool info_pending = false;   // aircraft_lookup (airline / type)
   bool route_pending = false;  // route_lookup (origin / destination)
 
@@ -70,7 +70,7 @@ struct AircraftRow {
 // table_view actually draws — the "connect Aircraft + AircraftInfo +
 // RouteInfo" step CLAUDE.md's table_view input contract describes. A key
 // with no entry in the corresponding map (lookup still pending, or
-// main.cpp simply never called it for that row) produces a
+// poll_pipeline simply never ran it for that row) produces a
 // default-constructed AircraftInfo/RouteInfo (found == false), which
 // drawTablePage()/featured_panel render as "--" rather than dropping the
 // row, per CLAUDE.md. Distance and phase are NOT computed here — call
@@ -142,7 +142,7 @@ int tableRowsPerPage();   // kTableRowsPerPage (5)
 int16_t tableRowHeightPx();  // the 19px row step
 int16_t tableFirstRowY();    // 116 — y of the first data row
 
-// One table column — the single source of truth shared by the orange
+// One table column — the single source of truth shared by the lilac
 // column-header row and the data rows, so header labels can never drift
 // out of alignment with the data under them (CLAUDE.md "Screen 1" column
 // table). `x`/`w` are absolute px on the 320px-wide frame; columns are
@@ -204,16 +204,16 @@ std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int 
 
 #include "LGFX_CYD.hpp"
 
-// Draws Screen 1's content area (everything below the 25px status_bar
-// header) across a `screenWidth`-px display, at the fixed coordinates
-// CLAUDE.md "Screen 1" specifies:
-//   - featured_panel for the single closest aircraft in `rows` (or its
-//     "no aircraft in range" placeholder if `rows` is empty), y:18..95;
-//   - an orange column
-//     header row at y:98-113 (labels aligned to the columns);
-//   - exactly kTableRowsPerPage (5) data rows from y:116 at a 19px step
-//     — flight, airline, origin IATA, destination IATA, aircraft type,
-//     phase icon — for everyone *except* the featured aircraft.
+// Draws Screen 1's content area (LCARS_CONTENT_TOP..BOTTOM) across a
+// `screenWidth`-px display, at the fixed coordinates CLAUDE.md "Screen 1"
+// specifies (kColHeaderY / kFirstRowY / kRowStep in table_view.cpp):
+//   - featured_panel for the first aircraft in `rows` (or its "no aircraft
+//     in range" placeholder if `rows` is empty);
+//   - a lilac (THEME_TABLE_HEADER) column-header row, labels aligned to
+//     the columns (tableColumns());
+//   - exactly kTableRowsPerPage (5) data rows — flight, distance, origin
+//     IATA, destination IATA, aircraft type, phase icon — for everyone
+//     *except* the featured aircraft.
 // `rows` must already be annotated (annotateDistances()), classified
 // (classifyPhases()), and sorted (sortRowsByDistance()).
 // `page` is

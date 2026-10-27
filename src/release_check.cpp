@@ -727,7 +727,7 @@ std::string fetchSumFor(const std::string &sumsUrl, const std::string &name) {
 }
 
 OtaResult download(const ReleaseInfo &r, const std::string &sha256) {
-  static uint8_t buf[4096];  // static: not on loopTask's 8 KB stack
+  static uint8_t buf[4096];  // static: not on net_task's stack
   WiFiClientSecure client;
   HTTPClient http;
   const int code = openFollowingRedirects(client, http, r.assetUrl);

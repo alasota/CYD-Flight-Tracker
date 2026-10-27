@@ -1,6 +1,5 @@
 // poll_pipeline — turns one /states/all answer into what the screens show
-// (spec/done/04-dual-core.md §5.4). Moved out of main.cpp's loop(), where it had no
-// test at all.
+// (spec/done/04-dual-core.md §5.4). Pure, runs in net_task.
 //
 // Steps (unchanged from the single-core firmware): rows nearest-first
 // (airborne, then ground, then no position), hexdb.io airline/type + route

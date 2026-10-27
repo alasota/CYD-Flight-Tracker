@@ -11,8 +11,7 @@
 // poll.
 //
 // Pure — the "is this key cached?" tests are injected — so the whole
-// prioritisation policy is covered by `pio test -e native` instead of
-// living untested inside main.cpp (review notes 3.2).
+// prioritisation policy is covered by `pio test -e native`.
 #pragma once
 
 #include <functional>
@@ -21,8 +20,7 @@
 
 // Default new-fetch ceiling per poll, shared between the two lookup kinds.
 // Small on purpose (see above); a busy sky still fully resolves within a
-// handful of polls. Was an ad-hoc `kMaxNewLookupsPerPoll = 5` buried in
-// main.cpp (review notes 5.2).
+// handful of polls.
 constexpr int kDefaultLookupBudget = 2;
 
 // New hexdb.io airport lookups allowed per poll (IATA codes for every table

@@ -1,7 +1,6 @@
-// featured_panel — Screen 1's top zone (y:28..105), spotlighting the
-// closest aircraft inside an LCARS elbow frame (LCARS_MAGENTA, swept
-// top-left corner — lcars_theme::drawElbowFrame). The identity text comes
-// from aircraft_summary (identity line + WithCountry route line); this
+// featured_panel — Screen 1's top zone (y:18..95), spotlighting the
+// nearest airborne aircraft; text and stat chips on black, no frame. The
+// identity text comes from aircraft_summary (identity line + route line); this
 // module adds only its own altitude / speed / distance stat chips and the
 // "no aircraft in range" placeholder. See CLAUDE.md "Screen 1 — Flights".
 //
@@ -28,7 +27,7 @@ struct AircraftRow;
 // `pio test -e native`.
 
 // Fixed vertical bounds of the featured panel on the 320x240 frame, per
-// CLAUDE.md "Screen 1" ("Featured flight section, y: 28 to 105px").
+// CLAUDE.md "Screen 1" (featured flight section, y:18..95).
 // table_view starts its table section immediately below.
 int16_t featuredPanelTopPx();     // 18
 int16_t featuredPanelHeightPx();  // 77 (18..95)

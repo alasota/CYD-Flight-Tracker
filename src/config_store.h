@@ -48,8 +48,7 @@ struct Config {
   // config_portal.
   bool auto_cycle_enabled = false;
   uint32_t auto_cycle_interval_s = 15;
-  // flight_phase thresholds (CLAUDE.md "Flight phase") — previously
-  // hardcoded in main.cpp. near_airport_km is really "near HOME" (this
+  // flight_phase thresholds (CLAUDE.md "Flight phase"). near_airport_km is really "near HOME" (this
   // project has no airport coordinate database). Defaults match CLAUDE.md:
   // ~15 km, and ~1.5 m/s for the climb/descent cutoff.
   float near_airport_km = 15.0f;

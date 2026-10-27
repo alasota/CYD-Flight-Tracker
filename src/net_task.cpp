@@ -117,7 +117,7 @@ void reloadConfig() {
   releaseCheckBegin(*cfg);
 }
 
-// ---- GitHub gate (was main.cpp's updateGate()) ----------------------------
+// ---- GitHub gate ----------------------------------------------------------
 
 CheckGate updateGate() {
   CheckGate g;
