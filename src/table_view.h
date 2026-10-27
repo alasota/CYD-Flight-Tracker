@@ -129,9 +129,9 @@ struct FeaturedSplit {
 // single-row input -> that row featured, rest empty. Pure.
 FeaturedSplit splitFeaturedAndRest(const std::vector<AircraftRow> &rows);
 
-// Screen 1's table shows **exactly 5** data rows at a fixed 19px step
-// (rows at y = 116, 135, 154, 173, 192), per docs/screens.md "Screen 1" — no
-// height-derived row count any more. More than 5 aircraft in range are
+// Screen 1's table shows **exactly 5** data rows at a fixed step
+// (tableFirstRowY() / tableRowHeightPx()), per docs/screens.md "Screen 1" —
+// no height-derived row count. More than 5 aircraft in range are
 // paged through via touch (getPageSlice()), not scrolled.
 constexpr int kTableRowsPerPage = 5;
 
@@ -139,7 +139,7 @@ constexpr int kTableRowsPerPage = 5;
 // in sync with these instead of hardcoding their own copies — see
 // docs/review-notes-2026.md 5.5.
 int tableRowsPerPage();   // kTableRowsPerPage (5)
-int16_t tableRowHeightPx();  // the 19px row step
+int16_t tableRowHeightPx();  // the row step (kRowStep in table_view.cpp)
 int16_t tableFirstRowY();    // 116 — y of the first data row
 
 // One table column — the single source of truth shared by the lilac

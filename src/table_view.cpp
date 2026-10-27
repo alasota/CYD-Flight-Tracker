@@ -133,17 +133,17 @@ namespace {
 constexpr int16_t kColHeaderY = 98;    // lilac column-header bar, y:98..113
 constexpr int16_t kColHeaderH = kTableHeaderHeightPx;
 constexpr int16_t kFirstRowY = 116;    // rows at 116,133,150,167,184 (last ends y:201)
-constexpr int16_t kRowStep = 17;       // 1px above the 16px Font2 text; must end by 215
+constexpr int16_t kRowStep = 17;       // LCARS_FONT_TABLE (14px) + gap; must end by 215
 static_assert(kFirstRowY + kTableRowsPerPage * kRowStep <= LCARS_CONTENT_BOTTOM,
               "table rows must end above the bottom nav");
 
-// Columns: flight, airline, origin, destination, aircraft type, phase icon
+// Columns: flight, distance, origin, destination, aircraft type, phase icon
 // (see docs/screens.md "Screen 1" — altitude/speed/distance moved to
 // featured_panel's pills, shown only for the one closest aircraft).
 // Sized for the efont fonts (7px per character in the 14px rows, 5px in the
 // header): LOT fits an 8-char callsign, ODL. "123km", SKĄD/DOKĄD a 3-letter
 // IATA code, TYP a ~12-char friendly type name ("777-300ER"), FAZA the
-// phase triangle and its "PHASE" label. The airline column was dropped:
+// phase icon (16px pixel art) and its "PHASE" label. The airline column was dropped:
 // the callsign already names the airline, and distance tells you where to
 // look.
 constexpr TableColumn kColumns[kTableColumnCount] = {
@@ -243,8 +243,8 @@ void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t 
 
 // Lilac column-header row: each label at its own column's x (same
 // kColumns as the data rows), with a 1px black "|" divider at every
-// column boundary. Font0 (8px) — Font2 is taller than the 15px strip
-// allows with padding, and too wide for SKAD/DOKAD/FAZA.
+// column boundary. LCARS_FONT_SMALL (efont 10px): the body font is taller
+// than the strip allows with padding, and too wide for SKĄD/DOKĄD/FAZA.
 void drawColumnHeader(LGFX &gfx, int16_t screenWidth, const std::string &pageLabel) {
   gfx.fillRect(0, kColHeaderY, screenWidth, kColHeaderH, THEME_TABLE_HEADER);
   gfx.setFont(LCARS_FONT_SMALL);
@@ -283,13 +283,12 @@ void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t scre
     drawFeaturedPanelEmpty(gfx, screenWidth, health);
   }
 
-  // Lilac column-header row at y:98..113, labels aligned to the data
-  // columns (ASCII only: bitmap fonts don't carry the Polish diacritics —
-  // so "SKAD"/"DOKAD", not "SKĄD"/"DOKĄD").
+  // Lilac column-header row (kColHeaderY), labels aligned to the data
+  // columns; efont carries the Polish letters, so "SKĄD"/"DOKĄD".
   const int pageCount = getPageCount(static_cast<int>(split.rest.size()), kTableRowsPerPage);
   drawColumnHeader(gfx, screenWidth, tablePageLabel(page, pageCount));
 
-  // Exactly 5 data rows from y:116 (19px step), over the list *without* the featured
+  // Exactly 5 data rows (kFirstRowY, kRowStep), over the list *without* the featured
   // aircraft; paging swaps which 5 (not scrolling).
   std::vector<AircraftRow> pageRows = getPageSlice(split.rest, page, kTableRowsPerPage);
   drawTableRows(gfx, pageRows, screenWidth);
