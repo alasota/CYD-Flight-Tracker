@@ -1,6 +1,6 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
-Z przeglądu kodu 2026-10-25, sekcje 2–3. Status: **do zrobienia**. Jedna specyfikacja dla całej
+Z przeglądu kodu 2026-10-25, sekcje 2–3. Status: **w trakcie** (etap 1). Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -103,7 +103,8 @@ Tłumaczy świat OpenSky (tablice `states` z polami po indeksach, OAuth, nagłó
   stronicowanie tabeli), `update_prompt_flow`, `ota_screen_flow`, `alert_screen_flow`
   (spec 08), `password_reset_flow`, `screenshot_bridge` (spec 09), `ui_perf`.
 - `adapters/`: `lgfx/` (wszystkie `draw*()`, `LGFX_CYD.hpp` z `include/`), `touch_xpt2046`,
-  `backlight_ldr` (ADC + PWM), `fonts/` (wygenerowany `lcars_efont.c`).
+  `backlight_ldr` (ADC + PWM). Wygenerowane fonty (`lcars_efont.c`) to czyste dane czytane przez
+  `fonts_test` — leżą w `display/domain/theme/fonts/`.
 
 ### 4.5 `admin` — Administracja urządzeniem (**pomocniczy**)
 
