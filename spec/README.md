@@ -5,7 +5,7 @@
 
 Numery są stałe (kolejność powstania, nie priorytet); priorytet jest w [ROADMAP.md](../ROADMAP.md).
 Gotowa specyfikacja przechodzi do `done/` (`git mv`) razem z ostatnim commitem implementacji;
-wtedy też poprawić odnośniki `spec/planned/…` w `src/`, CLAUDE.md i testach.
+wtedy też poprawić odnośniki `spec/planned/…` w `src/`, CLAUDE.md, `docs/` i testach.
 
 Implementacja: `/implement NN` (albo `/implement #<issue>`) — agenci na osobnej gałęzi, aż do
 PR (CLAUDE.md „Spec → PR harness”). Do czasu wydania kolumna „Stan” i linia „Status” mówią
@@ -27,6 +27,6 @@ dostaje ją od agenta (`NN` = kolejny wolny numer, „Źródło: issue #N”).
 | 08 | [Ostrzeżenia urządzenia („!”)](done/08-device-alerts.md) | done | v1.5.1 |
 | 09 | [Odporność: zrzut ekranu, komendy, WWW w trakcie lookupów](done/09-concurrency-robustness.md) | done | v1.8.0 |
 | 10 | [Bezpieczeństwo panelu WWW](done/10-web-panel-security.md) | done | v1.9.0 |
-| 11 | [Porządki: martwy kod, komentarze, dokumentacja](planned/11-cleanup-dead-code-docs.md) | planned | w trakcie |
+| 11 | [Porządki: martwy kod, komentarze, dokumentacja](done/11-cleanup-dead-code-docs.md) | done | vNEXT |
 | 12 | [Reorganizacja kodu (DDD)](planned/12-code-reorganization-ddd.md) | planned | czeka (po 07, 11) |
 | 13 | [Strona projektu: historia zmian, zrzuty panelu, opis funkcji](done/13-project-page-layout.md) | done | v1.7.0 |
