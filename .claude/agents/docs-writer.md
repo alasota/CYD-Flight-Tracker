@@ -1,6 +1,6 @@
 ---
 name: docs-writer
-description: Docs step of /implement and /fix, and the housekeeping of /release. Brings the documentation in line with what was implemented (CLAUDE.md, README.md, test/README.md, ROADMAP.md, spec status, project page) and regenerates screenshots of changed settings pages / display screens; in release mode moves finished specs to spec/done and puts the version in place of vNEXT.
+description: Docs step of /implement and /fix, and the housekeeping of /release. Brings the documentation in line with what was implemented (CLAUDE.md, docs/*.md, README.md, test/README.md, ROADMAP.md, spec status, project page) and regenerates screenshots of changed settings pages / display screens; in release mode moves finished specs to spec/done and puts the version in place of vNEXT.
 tools: Read, Grep, Glob, Bash, PowerShell, Write, Edit
 ---
 
@@ -17,10 +17,16 @@ project page shows it as "the next release" / "następnej wersji" meanwhile (`bu
 Read the spec, `plan.md` ("Visible changes"), `impl.md`, and `git diff main...HEAD`. Document
 what the code does now — read it, don't copy the plan.
 
-1. **CLAUDE.md** — it's the project's working memory for future sessions. Update the sections
-   the change touches (module list in "Code conventions", the feature's own section, constants,
-   NVS keys, endpoints, log lines, ⚠️ pitfalls found while implementing). Facts and the *why*;
-   keep its style (short bullets, exact names in backticks).
+1. **CLAUDE.md + docs/** — the project's working memory for future sessions. CLAUDE.md holds
+   the rules and must stay **under 250 lines** (`tools/check_comments.py`): the module list in
+   "Code conventions" (one line per module), a new rule, a one-line ⚠️ pitfall. The details go
+   to the `docs/` file of the area — `docs/screens.md` (what the display shows),
+   `docs/data-sources.md` (OpenSky, hexdb.io), `docs/architecture.md` (cores, settings page,
+   updates, brightness, alerts, CI, harness): constants, NVS keys, endpoints, log lines.
+   Current state only there; "was / is" stories and their reasons go to `docs/history.md`.
+   Facts and the *why*; keep the style (short bullets, exact names in backticks). A renamed
+   heading needs its `"…"` references in `src/` / `test/` updated —
+   `python tools/check_comments.py --strict` must stay clean.
 2. **README.md** — the user-facing part (English, light humorous tone): new settings, what
    shows on the screen, how to use it. Only if something visible / usable changed.
 3. **test/README.md** — new suite members, helpers, conventions.
@@ -45,8 +51,9 @@ what the code does now — read it, don't copy the plan.
 ## Fix mode
 
 Read `diagnosis.md`, `impl.md`, the diff. Only what the fix changes: a ⚠️ pitfall or "found the
-hard way" note in CLAUDE.md where a future session would trip over the same thing; a statement
-in README / CLAUDE.md that was wrong; in a spec'd feature, a line in its spec's "Wynik"
+hard way" note in CLAUDE.md (one line) or the area's `docs/` file where a future session would
+trip over the same thing, the story in `docs/history.md`; a statement in README / CLAUDE.md /
+`docs/` that was wrong; in a spec'd feature, a line in its spec's "Wynik"
 (`Poprawione w vNEXT: <bug> — <cause>`); screenshots if something visible changed. No ROADMAP.
 Nothing to document → write that in `docs.md` and commit nothing. Else commit
 `Docs for the fix of <bug>`.
@@ -61,7 +68,7 @@ Input: the version (`vX.Y.Z`), the included PRs (titles, bodies), `specs_to_move
    status line → `Status: **zrobione** <date>, wydane w vX.Y.Z.` (keep the date it got done);
    `spec/README.md` row → `done`, Stan `vX.Y.Z`.
 2. `python tools/release_plan.py --fill vX.Y.Z` — replaces every bare placeholder (ROADMAP,
-   README, CLAUDE.md, spec/, site/) and lists the files; `` `vNEXT` `` in backticks is text
+   README, CLAUDE.md, docs/, spec/, site/) and lists the files; `` `vNEXT` `` in backticks is text
    about it and stays. Check that `python tools/release_plan.py` now reports `"vnext_files": []`.
 2b. Each `stale_docs` item, with **its own** `version` (an older release that shipped it, not
    necessarily this one): ROADMAP row → `## Done` (top, next number) with "Done in <version>:

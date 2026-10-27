@@ -48,8 +48,9 @@ must turn green without being changed. Then verify yourself: `pio test -e native
 
 ## 4. Docs — agent `docs-writer` (fix mode)
 
-Only what the fix changes: a ⚠️ pitfall or a "found the hard way" note in CLAUDE.md where the
-next session would trip over the same thing, a corrected statement in README / CLAUDE.md, the
+Only what the fix changes: a ⚠️ pitfall in CLAUDE.md (one line) or the area's `docs/` file where
+the next session would trip over the same thing, the story in `docs/history.md`, a corrected
+statement in README / CLAUDE.md / `docs/`, the
 spec's "Wynik" if the bug was in a spec'd feature (a line "Poprawione w vNEXT: …"), screenshots
 if something visible changed. No ROADMAP entry. Skip the agent when there's nothing to document —
 say so in the PR.

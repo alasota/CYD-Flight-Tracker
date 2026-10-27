@@ -52,7 +52,10 @@ so they stay put when `src/` gets reorganized. Each suite is one executable.
 - A `<module>_test.cpp` has its tests and helpers in an anonymous namespace and exactly one
   public function, `void run_<module>_tests()`, which starts with `UnitySetTestFile(__FILE__)`
   (so failures name this file, not `main.cpp`) and calls `RUN_TEST(...)`.
-- The first line of the file says what it tests and where CLAUDE.md / a spec describes it.
+- The first line of the file says what it tests and where it is described — a spec, CLAUDE.md
+  or a `docs/` file, cited by heading: `docs/screens.md "Screen 1"`, `CLAUDE.md "Testing"`.
+  `python tools/check_comments.py` checks every such reference hits a real heading (its
+  `RepoTest` in `tools/test_check_comments.py` fails CI otherwise).
 - `setUp()` / `tearDown()` exist only in each suite's `main.cpp`. `setUp()` calls
   `resetAllForTesting()`: clears the hexdb.io caches and the fixture stubs, sets the display
   language back to Polish. A module with new global state adds its reset there.

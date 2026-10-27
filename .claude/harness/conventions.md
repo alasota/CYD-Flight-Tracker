@@ -1,7 +1,9 @@
 # Spec → PR harness: shared rules for every agent
 
-Read this before you start. The project rules are in `CLAUDE.md` (read the sections the plan
-names), the test rules in `test/README.md`. This file only adds what the harness needs.
+Read this before you start. The project rules are in `CLAUDE.md`; the details of each area are
+in the `docs/` file it links ("Where things are": `docs/screens.md`, `docs/data-sources.md`,
+`docs/architecture.md`, `docs/history.md`) — read the sections the plan names. The test rules
+are in `test/README.md`. This file only adds what the harness needs.
 
 ## The run
 
@@ -20,7 +22,7 @@ time (agents don't spawn agents):
 | `bug-investigator` (/fix) | `.claude/work/<slug>/diagnosis.md`, the failing regression test (+ a stub if needed) | the fix itself |
 | `test-author` | `test/**`, declarations + neutral stubs in `src/*.h` / `src/*.cpp` so the tests compile and fail | real logic in `src/` |
 | `implementer` | `src/**`, `platformio.ini`, tools; tests only to fix a test that is provably wrong (say so) | the `.feature`, the spec's requirements |
-| `docs-writer` (feature / fix / release mode) | `CLAUDE.md`, `README.md`, `test/README.md`, `ROADMAP.md`, `spec/**` status, `site/`, `docs/screenshots/` | `src/`, `test/` |
+| `docs-writer` (feature / fix / release mode) | `CLAUDE.md`, `docs/*.md` (screens, data sources, architecture, history), `README.md`, `test/README.md`, `ROADMAP.md`, `spec/**` status, `site/`, `docs/screenshots/` | `src/`, `test/` |
 | `reviewer` | `.claude/work/<slug>/review.md` | everything else (read-only) |
 
 Hand-over between agents is through `.claude/work/<slug>/` (git-ignored): `plan.md` (analyst),
@@ -41,6 +43,10 @@ left, anything that needs the owner's decision — short.
 - `native-asan` doesn't run on Windows (no sanitizer runtime) — CI runs it.
 - Firmware build: `pio run -e cyd`. It must stay under the OTA slot (1.875 MB).
 - `python tools/check_bdd.py` — every scenario backed by a test; `--list` / `--manual FILE`.
+- `python tools/check_comments.py` — comments' doc references (`docs/screens.md "Screen 1"`,
+  `CLAUDE.md "Testing"`) must hit a real heading, no removed symbols, no `main.cpp` in core-0
+  modules, CLAUDE.md < 250 lines. Its `RepoTest` (`tools/test_check_comments.py`) blocks CI.
+  Renaming a docs heading means updating the comments that cite it.
 - Files may have CRLF or LF line endings; keep what the file has.
 - The board is usually at `cyd-sky.local` (password in `$CYD_WEB_PASSWORD`, may be empty).
   **Never flash or reconfigure the board without the orchestrator having asked the owner.**
