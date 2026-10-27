@@ -171,9 +171,9 @@ void handleCommands() {
         saveUpdateSkippedTag(tag);
         reloadConfig();
         break;
-      case NetCommandType::RefreshNow:
+      case NetCommandType::None:
       default:
-        break;  // the poll runs as soon as its interval allows anyway
+        break;
     }
   }
 }

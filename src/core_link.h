@@ -186,14 +186,13 @@ RedrawEvents diffNetState(const NetState *prev, const NetState &next);
 // ---- UI -> net commands ----------------------------------------------------
 
 enum class NetCommandType : uint8_t {
-  None,        // TODO(spec 11): stub from test-author — make it the default, drop RefreshNow
+  None,        // nothing to do (a default-constructed command)
   InstallTag,  // YES on the display's update question
   SkipTag,     // NO: never ask about this version again
-  RefreshNow,  // a touch woke the screen at night: fresh data (interval permitting)
 };
 
 struct NetCommand {
-  NetCommandType type = NetCommandType::RefreshNow;
+  NetCommandType type = NetCommandType::None;
   char tag[32] = {};  // always NUL-terminated; longer tags are cut
 };
 static_assert(std::is_trivially_copyable<NetCommand>::value, "goes through a FreeRTOS queue");
