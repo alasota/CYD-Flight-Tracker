@@ -2,12 +2,12 @@
 // airport-country enrichment via hexdb.io. Mirrors aircraft_lookup's
 // design: a size-limited in-RAM cache (lookup_cache, LRU) per key in front of
 // the NVS copy (lookup_store), so a given callsign/airport code is only ever
-// fetched once. See CLAUDE.md "Aircraft identification" (route
+// fetched once. See docs/data-sources.md "Aircraft identification" (route
 // lookup listed there as a nice-to-have) and hexdb.io's documented REST
 // API (https://hexdb.io/). No TFT/drawing code, no OpenSky polling logic.
 //
-// NOTE: CLAUDE.md's own text names hexdb.io's route endpoint as
-// "route/icao/{callsign}" — that's what's implemented here (not
+// NOTE: docs/data-sources.md "Route & airport lookup" suggests the IATA
+// route endpoint; this module calls "route/icao/{callsign}" (not
 // "route/iata/"), since OpenSky callsigns (e.g. "DLH9LH") are ICAO-style
 // and hexdb.io's /iata/ route variant expects an IATA-style callsign this
 // project never has.

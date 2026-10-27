@@ -1,4 +1,4 @@
-// route_lookup: hexdb.io route / airport parsing + caches. CLAUDE.md "Route & airport lookup".
+// route_lookup: hexdb.io route / airport parsing + caches. docs/data-sources.md "Route & airport lookup".
 #include <unity.h>
 
 #include "route_lookup.h"

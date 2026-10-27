@@ -1,6 +1,6 @@
 // opensky_client — OpenSky Network REST API client: OAuth2 token fetch/
-// refresh, bounding-box math, /states/all polling + parsing. See CLAUDE.md
-// "Data source: OpenSky Network REST API". No TFT/drawing code here (see
+// refresh, bounding-box math, /states/all polling + parsing. See docs/data-sources.md
+// "OpenSky". No TFT/drawing code here (see
 // CLAUDE.md "Code conventions") — returns a plain Aircraft list for
 // whatever view module ends up consuming it.
 #pragma once
@@ -41,7 +41,7 @@ struct TokenState {
 };
 
 // True if `token` must be (re)fetched now. Refreshes proactively
-// `refresh_margin_s` before expiry (default 60s, per CLAUDE.md
+// `refresh_margin_s` before expiry (default 60s, per docs/data-sources.md
 // "Authentication") rather than waiting for a 401. `now_ms` and
 // `token.obtained_at_ms` are millis()-style values — unsigned subtraction
 // keeps this correct across a millis() rollover (~49 days uptime).
@@ -57,7 +57,7 @@ bool isBeforeDeadline(uint32_t now_ms, uint32_t until_ms);
 // if at least `interval_ms` has elapsed since the last one. Unsigned
 // subtraction keeps it correct across a millis() rollover. Factored out of
 // openSkyClientPoll()'s adapter so the "never hammer the API faster than
-// the configured interval" rule (CLAUDE.md "Rate limits") is native-tested
+// the configured interval" rule (docs/data-sources.md "Rate limits") is native-tested
 // rather than living only in device-only code — see docs/review-notes-2026.md 3.3.
 bool shouldPollNow(uint32_t now_ms, uint32_t last_poll_ms, bool ever_polled, uint32_t interval_ms);
 
@@ -67,7 +67,7 @@ uint32_t msUntilNextPoll(uint32_t now_ms, uint32_t last_poll_ms, bool ever_polle
                          uint32_t interval_ms);
 
 // False (anonymous access) when either credential is empty — the fallback
-// mode described in CLAUDE.md "Authentication".
+// mode described in docs/data-sources.md "Authentication".
 bool shouldUseOAuth(const std::string &client_id, const std::string &client_secret);
 
 struct Aircraft {
@@ -116,7 +116,7 @@ constexpr float kTaxiSpeedMps = 15.0f;
 // screen (featured slot, phase, Screen 2 pick) agrees. Pure — native-tested.
 bool inferOnGround(const Aircraft &ac);
 
-// Backoff duration after a 429, per CLAUDE.md "Rate limits": the
+// Backoff duration after a 429, per docs/data-sources.md "Rate limits": the
 // X-Rate-Limit-Retry-After-Seconds header value if present and a valid
 // non-negative integer, otherwise `default_backoff_s`. The result is
 // clamped to `max_backoff_s` so a bogus/hostile header value (e.g.
@@ -168,9 +168,9 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg);
 // Non-blocking poll scheduler: call every loop() iteration with the
 // caller's cached Config. Runs at most one fetchAircraftStates() per
 // cfg.poll_interval_s (shouldPollNow()), never faster even if called more
-// often — CLAUDE.md's "never hammer the API faster than the configured
-// interval". Returns {NotDue} without touching the network when a poll
-// isn't due yet; otherwise returns the fetch result.
+// often — never hammer the API faster than the configured interval
+// (docs/data-sources.md "Rate limits"). Returns {NotDue} without touching
+// the network when a poll isn't due yet; otherwise returns the fetch result.
 OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const Config &cfg);
 
 // Credits left / time until the pool renews, from the headers of the last

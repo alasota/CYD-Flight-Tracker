@@ -872,7 +872,7 @@ void loop() {
     pendingRedraw.minuteChanged = true;
   }
 
-  // --- Auto screen cycling (CLAUDE.md "Auto screen cycling") ------------
+  // --- Auto screen cycling (docs/screens.md "Auto screen cycling") ------------
   if (cfg().auto_cycle_enabled && cfg().home_configured &&
       !backlightDecision().screen_off) {  // nobody sees a dark screen change
     CpaPrediction cpa = currentCpa();

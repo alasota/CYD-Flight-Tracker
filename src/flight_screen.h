@@ -1,7 +1,6 @@
 // flight_screen — draws Screen 2 ("Flight"): the nearest aircraft's
 // identity plus one big number — how many seconds until it's overhead.
-// See CLAUDE.md "Screen 2 — Flight" and "Flight ETA — closest point of
-// approach".
+// See docs/screens.md "Screen 2 — Flight" and "Flight ETA".
 //
 // Three fixed zones in the content area (LCARS_CONTENT_TOP..BOTTOM, between
 // the header and the bottom nav; exact y values are the k* constants in
@@ -37,7 +36,7 @@ struct AircraftRow;
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
 
-// Fixed zone geometry from CLAUDE.md "Screen 2" — absolute y on the
+// Fixed zone geometry from docs/screens.md "Screen 2" — absolute y on the
 // 320x240 frame.
 int16_t flightIdentityTopPx();      // 18
 int16_t flightIdentityHeightPx();   // 70  (18..88): identity, route, stats lines
@@ -83,7 +82,7 @@ struct CountdownDisplay {
   bool colorCoded = true;  // false in the empty state ("no colour-coding")
 };
 
-// Classifies `cpa` per CLAUDE.md "Screen 2" (labels shown PL / EN, from i18n):
+// Classifies `cpa` per docs/screens.md "Screen 2" (labels shown PL / EN, from i18n):
 //   not found, or t_cpa_seconds < -10  -> Empty, "--", white, not colour-coded:
 //        `anyAircraft` ? "NIE PRZELECI NAD TOBĄ" | "NOT PASSING OVERHEAD"
 //                      : "BRAK LOTÓW W ZASIĘGU" | "NO FLIGHTS IN RANGE"

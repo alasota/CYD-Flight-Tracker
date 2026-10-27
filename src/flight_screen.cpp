@@ -13,7 +13,7 @@ constexpr int16_t kStatusHeight = 25;      // y:190..215 (bottom nav: 215..240)
 constexpr int16_t kCountdownHeight = kStatusTop - 4 - kCountdownTop;  // 94 (y:92..186)
 
 // Empty-state colour — deliberately outside the urgency palette
-// ("no colour-coding" in CLAUDE.md).
+// ("no colour-coding", docs/screens.md "Screen 2").
 constexpr uint16_t kEmptyColor = THEME_CONTENT_PRIMARY;  // white
 }  // namespace
 
@@ -112,7 +112,7 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang
 #include <Arduino.h>  // Serial, ESP.getFreeHeap()
 
 namespace {
-constexpr int16_t kSideMargin = 10;   // identity panel x:10..(w-10), per CLAUDE.md
+constexpr int16_t kSideMargin = 10;   // identity panel x:10..(w-10)
 constexpr int16_t kTextInset = 6;     // = aircraft_summary's text margin, so lines align
 constexpr int16_t kStatsLineOffset = 46;  // 3rd line (identity +6, route +26)
 constexpr int16_t kArrowSize = 12;
@@ -121,7 +121,7 @@ constexpr int16_t kSuffixGap = 6;
 
 // Big-glyph font per countdown mode. Font8 is the ~75px 7-seg-style
 // numerals font (digits + ":.-" only — hence the separate suffix draw);
-// Minutes mode is "smaller than the seconds giant-digit size" (CLAUDE.md)
+// Minutes mode is "smaller than the seconds giant-digit size" (docs/screens.md)
 // so it uses the heading font scaled 2x instead.
 const lgfx::IFont *bigFont(CountdownDisplay::Mode mode) {
   return (mode == CountdownDisplay::Mode::Minutes) ? LCARS_FONT_HEADING : &fonts::Font8;

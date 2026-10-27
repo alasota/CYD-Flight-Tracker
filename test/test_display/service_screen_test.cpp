@@ -1,4 +1,4 @@
-// service_screen: OTA progress / password reset screens. CLAUDE.md "Firmware updates (OTA)", spec/01.
+// service_screen: OTA progress / password reset screens. docs/architecture.md "Firmware updates (OTA)", spec/01.
 #include <unity.h>
 
 #include "i18n.h"

@@ -1,4 +1,4 @@
-// screen_nav: screen order, nav tabs, hit tests, auto-cycle. CLAUDE.md "Screen navigation", "Auto screen cycling".
+// screen_nav: screen order, nav tabs, hit tests, auto-cycle. docs/screens.md "Screen navigation", "Auto screen cycling".
 #include <unity.h>
 #include <string>
 
@@ -145,7 +145,7 @@ static void test_nothing_above_the_nav_band_navigates(void) {
 }
 
 static void test_nav_bar_touch_band_extends_above_the_visual_bar(void) {
-  // CLAUDE.md: the bar only *draws* from y:215 but taps from y:210 count
+  // docs/screens.md "Screen navigation": the bar only *draws* from y:215 but taps from y:210 count
   // as the nav bar (a little slack for an imprecise finger). A tap at y in 210..215 is
   // visually still the content area above the bar, yet hits a nav segment.
   for (int16_t y = kNavTouchTop; y < kContentBottom; ++y) {
@@ -275,7 +275,7 @@ static void test_nav_tab_out_of_range_is_empty(void) {
 // ---- shouldDeferAutoSwitch: hold condition for Screen 2 ----------------
 //
 // defer <=> currentScreen==FLIGHT && cpaFound && -5 < tCpa < 6
-// (both bounds strict — see CLAUDE.md "Auto screen cycling").
+// (both bounds strict — see docs/screens.md "Auto screen cycling").
 
 static void test_defer_only_on_flight_screen(void) {
   TEST_ASSERT_TRUE(shouldDeferAutoSwitch(kScreenFlight, true, 3.0f));

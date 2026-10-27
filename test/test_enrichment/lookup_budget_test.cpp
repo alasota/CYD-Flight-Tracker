@@ -1,4 +1,4 @@
-// lookup_budget: per-poll lookup budget planning. CLAUDE.md "Screen 1" (lookup budget).
+// lookup_budget: per-poll lookup budget planning. docs/screens.md "Screen 1" (lookup budget).
 #include <unity.h>
 
 #include <set>

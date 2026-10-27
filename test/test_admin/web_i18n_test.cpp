@@ -1,4 +1,4 @@
-// web_i18n: web page string table. CLAUDE.md "Language — Polish / English" (web_i18n).
+// web_i18n: web page string table. CLAUDE.md "Language" (web_i18n).
 #include <unity.h>
 
 #include <cstring>

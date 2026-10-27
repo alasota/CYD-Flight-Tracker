@@ -1,4 +1,4 @@
-// status_bar: header bar zones, texts, health colour. CLAUDE.md "Screen chrome".
+// status_bar: header bar zones, texts, health colour. docs/screens.md "Screen chrome".
 #include <unity.h>
 
 #include <cstring>

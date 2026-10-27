@@ -2,8 +2,8 @@
 // run in net_task on core 0 (spec/done/04-dual-core.md), so they no longer freeze
 // the screen — but the web page, the OpenSky schedule and the GitHub check
 // share that one task, so every HTTPClient call still has a hard deadline
-// rather than inheriting HTTPClient's untuned default — see CLAUDE.md review
-// notes 1.1 / 5.1. One definition here instead of a private copy in
+// rather than inheriting HTTPClient's untuned default — see
+// docs/review-notes-2026.md 1.1 / 5.1. One definition here instead of a private copy in
 // opensky_client, aircraft_lookup, route_lookup and hexdb_http.
 #pragma once
 

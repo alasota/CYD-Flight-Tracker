@@ -1,4 +1,4 @@
-// opensky_quota: X-Rate-Limit headers -> credits left. CLAUDE.md "Rate limits / credits".
+// opensky_quota: X-Rate-Limit headers -> credits left. docs/data-sources.md "Rate limits".
 #include <unity.h>
 
 #include "opensky_quota.h"

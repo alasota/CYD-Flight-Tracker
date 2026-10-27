@@ -1,4 +1,4 @@
-// web_auth: panel password, digest decision, throttle, cross-site origin check (spec 10). CLAUDE.md "Firmware updates (OTA) & panel password".
+// web_auth: panel password, digest decision, throttle, cross-site origin check (spec 10). docs/architecture.md "Firmware updates (OTA)".
 #include <unity.h>
 
 #include <string>

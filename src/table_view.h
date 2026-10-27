@@ -1,5 +1,5 @@
-// table_view — draws Screen 1 (aircraft table), per CLAUDE.md
-// "Visualization concept — Screen 1". Composes featured_panel (the
+// table_view — draws Screen 1 (aircraft table), per docs/screens.md
+// "Screen 1 — Flights". Composes featured_panel (the
 // closest aircraft, spotlighted) with a paginated table of the rest. Uses
 // lcars_theme for all chrome (panels/pills/fonts/colors) — defines none of
 // its own. Zero networking code, zero calls into
@@ -68,15 +68,15 @@ struct AircraftRow {
 // Joins OpenSky state vectors with their hexdb.io aircraft lookups (by
 // icao24) and route lookups (by callsign), producing the AircraftRow list
 // table_view actually draws — the "connect Aircraft + AircraftInfo +
-// RouteInfo" step CLAUDE.md's table_view input contract describes. A key
+// RouteInfo" step of table_view's input contract (CLAUDE.md "Code conventions"). A key
 // with no entry in the corresponding map (lookup still pending, or
 // poll_pipeline simply never ran it for that row) produces a
 // default-constructed AircraftInfo/RouteInfo (found == false), which
 // drawTablePage()/featured_panel render as "--" rather than dropping the
-// row, per CLAUDE.md. Distance and phase are NOT computed here — call
-// annotateDistances() then classifyPhases() (then sortRowsByDistance()) on
-// the result afterward. Pure — no HTTP call happens here, just the join —
-// tested under `pio test -e native`.
+// row (docs/data-sources.md "Aircraft identification"). Distance and phase
+// are NOT computed here — call annotateDistances() then classifyPhases()
+// (then sortRowsByDistance()) on the result afterward. Pure — no HTTP call
+// happens here, just the join — tested under `pio test -e native`.
 std::vector<AircraftRow> buildEnrichedRecords(
     const std::vector<Aircraft> &aircraft, const std::map<std::string, AircraftInfo> &infoByIcao24,
     const std::map<std::string, RouteInfo> &routeByCallsign);
@@ -93,14 +93,14 @@ void annotateDistances(std::vector<AircraftRow> &rows, float home_lat, float hom
 // each row's own (already annotated) distance_km as the "distance to
 // nearest airport" input — this project has no airport coordinate
 // database, only country codes (route_lookup), so distance from HOME is
-// what's actually available; see CLAUDE.md "Flight phase". Rows with
+// what's actually available; see docs/screens.md "Flight phase". Rows with
 // has_distance == false get Phase::NONE (nothing meaningful to classify)
 // rather than a misleading guess. Call after annotateDistances().
 void classifyPhases(std::vector<AircraftRow> &rows, float near_airport_km,
                      float climb_threshold_mps);
 
 // Sorts `rows` ascending by distance_km — closest aircraft first, per
-// CLAUDE.md "sort by distance ascending (closest aircraft on top)". Call
+// docs/screens.md "Screen 1" (closest aircraft on top). Call
 // annotateDistances() first. Rows with has_distance == false sort last
 // (nothing to rank them by); otherwise stable (equal distances keep their
 // relative order).
@@ -130,7 +130,7 @@ struct FeaturedSplit {
 FeaturedSplit splitFeaturedAndRest(const std::vector<AircraftRow> &rows);
 
 // Screen 1's table shows **exactly 5** data rows at a fixed 19px step
-// (rows at y = 116, 135, 154, 173, 192), per CLAUDE.md "Screen 1" — no
+// (rows at y = 116, 135, 154, 173, 192), per docs/screens.md "Screen 1" — no
 // height-derived row count any more. More than 5 aircraft in range are
 // paged through via touch (getPageSlice()), not scrolled.
 constexpr int kTableRowsPerPage = 5;
@@ -144,7 +144,7 @@ int16_t tableFirstRowY();    // 116 — y of the first data row
 
 // One table column — the single source of truth shared by the lilac
 // column-header row and the data rows, so header labels can never drift
-// out of alignment with the data under them (CLAUDE.md "Screen 1" column
+// out of alignment with the data under them (docs/screens.md "Screen 1" column
 // table). `x`/`w` are absolute px on the 320px-wide frame; columns are
 // contiguous (each starts where the previous ends).
 struct TableColumn {
@@ -205,7 +205,7 @@ std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int 
 #include "LGFX_CYD.hpp"
 
 // Draws Screen 1's content area (LCARS_CONTENT_TOP..BOTTOM) across a
-// `screenWidth`-px display, at the fixed coordinates CLAUDE.md "Screen 1"
+// `screenWidth`-px display, at the fixed coordinates docs/screens.md "Screen 1"
 // specifies (kColHeaderY / kFirstRowY / kRowStep in table_view.cpp):
 //   - featured_panel for the first aircraft in `rows` (or its "no aircraft
 //     in range" placeholder if `rows` is empty);

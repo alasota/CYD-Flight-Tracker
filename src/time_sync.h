@@ -1,6 +1,6 @@
 // time_sync — NTP wall-clock sync (configTzTime for Europe/Warsaw) plus
-// pure, testable date/time formatting helpers. See CLAUDE.md
-// "Time & WiFi status" and "Code conventions".
+// pure, testable date/time formatting helpers. See docs/screens.md
+// "Time" and CLAUDE.md "Code conventions".
 //
 // Split per CLAUDE.md "Testing": the formatting functions below take a
 // time_t as a parameter (never read the wall clock internally) and have
@@ -15,7 +15,7 @@
 
 // POSIX TZ rule for Europe/Warsaw — CET (UTC+1) with CEST (UTC+2) summer
 // time, DST starting last Sunday of March and ending last Sunday of
-// October at 03:00 local. Stable long-standing EU rule; see CLAUDE.md.
+// October at 03:00 local. Stable long-standing EU rule; see docs/screens.md "Time".
 constexpr const char *TZ_WARSAW = "CET-1CEST,M3.5.0,M10.5.0/3";
 
 // ---- Pure logic (no Arduino/network dependency) — tested under

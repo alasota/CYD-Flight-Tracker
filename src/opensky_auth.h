@@ -47,7 +47,7 @@ enum class TokenOutcome : uint8_t {
 };
 TokenOutcome classifyTokenResponse(int httpCode, bool hasAccessToken);
 
-// OpenSky's daily credit allowance (CLAUDE.md "Rate limits"): 4000 with an
+// OpenSky's daily credit allowance (docs/data-sources.md "Rate limits"): 4000 with an
 // account, 400 anonymous — and in LoginFailed, which runs anonymously.
 constexpr uint32_t kOpenSkyAccountDailyLimit = 4000;
 constexpr uint32_t kOpenSkyAnonymousDailyLimit = 400;

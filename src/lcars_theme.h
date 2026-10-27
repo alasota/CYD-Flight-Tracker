@@ -1,6 +1,6 @@
 // lcars_theme — shared LCARS-inspired color palette and role colours, the
 // phase-icon pixel art, direction arrow, pill and bottom-nav drawing
-// helpers, text fitting, and font choices. See CLAUDE.md "Design language".
+// helpers, text fitting, and font choices. See docs/screens.md "Design language".
 // This is the only place in the project that defines colors/shapes/fonts —
 // every view module calls into this rather than picking its own.
 #pragma once
@@ -22,7 +22,7 @@ constexpr uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b) {
   return static_cast<uint16_t>(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
 }
 
-// The project's palette — the exact RGB565 values from CLAUDE.md "Design
+// The project's palette — the exact RGB565 values from docs/screens.md "Design
 // language" ("exact values, not vague color names"). Every screen spec
 // (Screen 1/2/3) refers to these names, so they are the canonical set;
 // define colors once here rather than scattering raw hex literals.
@@ -30,7 +30,7 @@ constexpr uint16_t LCARS_BLACK = 0x0000;    // background
 constexpr uint16_t LCARS_ORANGE = 0xFC00;   // (original palette — now only THEME_WARNING)
 constexpr uint16_t LCARS_YELLOW = 0xFFE0;   // radar home crosshair, "imminent" countdown, rate-limit
 
-// Colour scheme "variant A" (CLAUDE.md "Design language"): warm chrome
+// Colour scheme "variant A" (docs/screens.md "Design language"): warm chrome
 // (header + bottom-nav buttons) vs. cool content (flight data, tables,
 // radar), so navigation and data never look alike.
 constexpr uint16_t LCARS_PEACH = rgb565(0xFF, 0x99, 0x66);        // 0xFCCC
@@ -62,11 +62,11 @@ constexpr uint16_t THEME_CONTENT_MUTED = LCARS_LAVENDER;     // radar rings & la
 constexpr uint16_t THEME_PILL_FILL = LCARS_NAVY;             // altitude/speed/distance chips
 constexpr uint16_t THEME_TABLE_HEADER = LCARS_LILAC;         // table column-header bar
 
-// Shared header-bar height (see CLAUDE.md "Screen chrome"): status_bar
+// Shared header-bar height (see docs/screens.md "Screen chrome"): status_bar
 // draws y:0..LCARS_HEADER_HEIGHT — a slim 15px strip (Font0 text).
 constexpr int16_t LCARS_HEADER_HEIGHT = 15;
 
-// Height of the persistent bottom nav bar (CLAUDE.md "Screen navigation"):
+// Height of the persistent bottom nav bar (docs/screens.md "Screen navigation"):
 // big 25px buttons (Font2 labels), drawn at y:215..240. (screen_nav gives
 // its touch hit-zone a little more vertical slack than that.)
 constexpr int16_t LCARS_BOTTOM_NAV_HEIGHT = 25;
@@ -166,7 +166,7 @@ using TextMeasure = std::function<int(const std::string &)>;
 
 // `text` cut down so that measure(result) <= maxPx — the one truncation
 // helper for every place a string must not spill out of its cell/panel
-// (CLAUDE.md "Screen 1": table cells, the identity line, Screen 3's
+// (docs/screens.md "Screen 1": table cells, the identity line, Screen 3's
 // airline row):
 //   - already fits                -> returned unchanged.
 //   - otherwise                   -> longest head + "..." that fits, with
@@ -249,7 +249,7 @@ void drawPillButton(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint1
                      uint16_t textColor, const char *text);
 
 // The persistent bottom navigation bar (present on all three screens -
-// CLAUDE.md "Screen navigation"): `kScreenCount` equal-width segments, the
+// docs/screens.md "Screen navigation"): `kScreenCount` equal-width segments, the
 // active one highlighted. Segment geometry comes straight from
 // screen_nav's bottomNavSegment(), so the drawn indicators line up exactly
 // with navHitTest()'s JumpTo hit zones. Drawn as folder tabs hanging from a

@@ -1,4 +1,4 @@
-// table_view: Screen 1 table: columns, rows, sorting, distance. CLAUDE.md "Screen 1 — Flights".
+// table_view: Screen 1 table: columns, rows, sorting, distance. docs/screens.md "Screen 1 — Flights".
 #include <unity.h>
 
 #include "fixtures.h"
@@ -95,7 +95,7 @@ static void test_build_enriched_records_found_false_when_lookup_missing(void) {
 
 static void test_build_enriched_records_missing_route_renders_as_dash(void) {
   // Airline/type lookup resolved, but route_lookup hasn't (yet) — the two
-  // enrichment sources fail independently, per CLAUDE.md.
+  // enrichment sources fail independently (docs/data-sources.md "Route & airport lookup").
   Aircraft ac;
   ac.icao24 = "4010ee";
   ac.callsign = "DLH9LH";
@@ -328,7 +328,7 @@ static void test_display_order_all_on_ground_still_nearest_first(void) {
   TEST_ASSERT_EQUAL_STRING("A", rows[0].aircraft.callsign.c_str());
 }
 
-// ---- fixed table geometry (CLAUDE.md "Screen 1") ----------------------------
+// ---- fixed table geometry (docs/screens.md "Screen 1") ----------------------------
 
 static void test_table_shows_exactly_five_rows_per_page(void) {
   TEST_ASSERT_EQUAL_INT(5, kTableRowsPerPage);
@@ -336,7 +336,7 @@ static void test_table_shows_exactly_five_rows_per_page(void) {
 }
 
 static void test_table_row_step_is_17px_from_y116(void) {
-  // Rows at y = 116, 133, 150, 167, 184 — a 17px step from y:116 (CLAUDE.md
+  // Rows at y = 116, 133, 150, 167, 184 — a 17px step from y:116 (docs/screens.md
   // "Screen 1": tight rows, 1px above the 16px Font2 text).
   TEST_ASSERT_EQUAL_INT(17, tableRowHeightPx());
   TEST_ASSERT_EQUAL_INT(116, tableFirstRowY());
@@ -346,7 +346,7 @@ static void test_table_row_step_is_17px_from_y116(void) {
   TEST_ASSERT_TRUE(lastRowY + tableRowHeightPx() <= 215);
 }
 
-// ---- column layout (CLAUDE.md "Screen 1" column table) ----------------------
+// ---- column layout (docs/screens.md "Screen 1" column table) ----------------------
 
 static void test_phase_icon_fits_the_phase_column_and_row(void) {
   const TableColumn &phase = tableColumns()[5];

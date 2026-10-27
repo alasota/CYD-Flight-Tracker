@@ -6,7 +6,7 @@
 
 namespace {
 constexpr int16_t kPanelTop = LCARS_CONTENT_TOP;  // 18
-constexpr int16_t kPanelHeight = 77;  // y:18..95 per CLAUDE.md "Screen 1"
+constexpr int16_t kPanelHeight = 77;  // y:18..95 per docs/screens.md "Screen 1"
 }  // namespace
 
 int16_t featuredPanelTopPx() { return kPanelTop; }

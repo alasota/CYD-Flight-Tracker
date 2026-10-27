@@ -1,4 +1,4 @@
-// touch_input: raw touch -> screen mapping. CLAUDE.md "Screen navigation" (touch calibration).
+// touch_input: raw touch -> screen mapping. docs/screens.md "Screen navigation" (touch calibration).
 #include <unity.h>
 
 #include <initializer_list>

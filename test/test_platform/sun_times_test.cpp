@@ -1,4 +1,4 @@
-// sun_times: sunrise / sunset equation. CLAUDE.md "Brightness & night mode", spec/03.
+// sun_times: sunrise / sunset equation. docs/architecture.md "Brightness & night mode", spec/03.
 #include <unity.h>
 
 #include <cstdio>

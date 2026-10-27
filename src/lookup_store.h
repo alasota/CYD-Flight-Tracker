@@ -1,8 +1,8 @@
 // lookup_store — persists the hexdb.io lookup caches (aircraft, route,
 // airport) in NVS, so after a reboot the device doesn't start from a screen
 // full of "..." and doesn't re-ask hexdb.io for answers it already had
-// (CLAUDE.md: "ideally NVS-backed" cache — an aircraft's airline/type
-// practically never changes).
+// (docs/data-sources.md "Aircraft identification": NVS-backed cache — an
+// aircraft's airline/type practically never changes).
 //
 // Records are stored as short text: a version digit and the fields joined
 // with the ASCII unit separator (0x1F). Confirmed misses are stored too
