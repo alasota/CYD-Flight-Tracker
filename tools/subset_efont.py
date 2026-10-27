@@ -5,7 +5,8 @@ LovyanGFX's efontJA_* fonts carry ~10,800 glyphs each (kanji, kana, ...) and
 take ~1.05 MB of flash together. The display only ever draws printable ASCII,
 the 18 Polish letters and a few symbols (see isFontSafeText() in
 lcars_theme). This script copies exactly those glyphs, byte for byte, out of
-LovyanGFX's U8g2-format arrays into src/fonts/lcars_efont.c — so every pixel
+LovyanGFX's U8g2-format arrays into
+src/display/domain/theme/fonts/lcars_efont.c — so every pixel
 and every metric (the 23-byte header is kept, only glyph count and section
 offsets change) is identical to the original fonts.
 
@@ -25,7 +26,9 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE = os.path.join(REPO, ".pio", "libdeps", "cyd", "LovyanGFX", "src", "lgfx", "Fonts",
                       "efont", "lgfx_efont_ja.c")
 COPYRIGHT = os.path.join(os.path.dirname(SOURCE), "COPYRIGHT.txt")
-OUT_C = os.path.join(REPO, "src", "fonts", "lcars_efont.c")
+OUT_C = os.path.join(REPO, "src", "display", "domain", "theme", "fonts", "lcars_efont.c")
+# The generated .c includes its header by the full path from src/ (spec 12, -I src).
+INCLUDE_LINE = '#include "display/domain/theme/fonts/lcars_efont.h"'
 
 # (array in LovyanGFX, array written here, role)
 FONTS = [
@@ -214,7 +217,7 @@ def main():
         f.write(" * the characters the display draws:\n *   %s\n" % chars)
         f.write(" * Glyph bitmaps and font metrics are copied unchanged.\n *\n")
         f.write(" * Font data: efont, " + "\n * ".join(copyright_text.splitlines()) + "\n */\n")
-        f.write('#include "lcars_efont.h"\n\n')
+        f.write(INCLUDE_LINE + "\n\n")
         f.write("\n".join(parts))
     print("wrote", os.path.relpath(OUT_C, REPO))
 

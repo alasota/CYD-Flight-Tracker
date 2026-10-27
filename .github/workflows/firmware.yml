@@ -67,6 +67,11 @@ jobs:
         # esptool pinned: v5 renamed merge_bin / --flash_mode to merge-bin / --flash-mode.
         run: pip install --upgrade platformio "esptool==4.11.0"
 
+      - name: Layer check (report only)
+        # Includes that break spec 12's dependency table (context / layer), SDK headers
+        # outside adapters, short includes. Prints findings, exits 0 until stage 7 makes it blocking.
+        run: python tools/check_layers.py
+
       - name: Unit tests (native)
         run: pio test -e native
 
@@ -82,6 +87,9 @@ jobs:
           python tools/test_release_plan.py
           python tools/test_build_site.py
           python tools/test_check_comments.py
+          python tools/test_check_layers.py
+          python tools/test_rewrite_includes.py
+          python tools/test_subset_efont.py
           python tools/check_bdd.py
 
       - name: Comment and doc-reference check (warnings only)
@@ -102,20 +110,20 @@ jobs:
           grep -a -q "CYDSKY-FW1|board=cyd-r|v=$VERSION" .pio/build/cyd/firmware.bin
 
       - name: Check the update CA roots against GitHub
-        # release_check trusts only the roots in src/github_ca.h. When GitHub
-        # moves to another CA, updates from the device stop working (safely —
-        # nothing gets installed); this warns early. Never fails the build.
+        # release_check trusts only the roots in src/admin/adapters/github_ca.h.
+        # When GitHub moves to another CA, updates from the device stop working
+        # (safely — nothing gets installed); this warns early. Never fails the build.
         continue-on-error: true
         run: |
           set -uo pipefail
-          awk '/BEGIN CERTIFICATE/,/END CERTIFICATE/' src/github_ca.h > /tmp/github_ca.pem
+          awk '/BEGIN CERTIFICATE/,/END CERTIFICATE/' src/admin/adapters/github_ca.h > /tmp/github_ca.pem
           for host in api.github.com github.com release-assets.githubusercontent.com objects.githubusercontent.com; do
             if echo | openssl s_client -connect "$host:443" -servername "$host" \
                  -CAfile /tmp/github_ca.pem -verify_return_error 2>/dev/null \
                  | grep -q "Verify return code: 0 (ok)"; then
               echo "$host: ok"
             else
-              echo "::warning title=GitHub CA changed::$host no longer verifies against src/github_ca.h — add its new root CA (spec/done/02-github-release-check.md)"
+              echo "::warning title=GitHub CA changed::$host no longer verifies against src/admin/adapters/github_ca.h — add its new root CA (spec/done/02-github-release-check.md)"
             fi
           done
 
