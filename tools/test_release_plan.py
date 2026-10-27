@@ -71,6 +71,22 @@ class SpecsToMoveTest(unittest.TestCase):
         self.assertEqual(["spec/planned/06-login.md", "spec/planned/10-web.md",
                           "spec/planned/11-clean.md"], moved)
 
+    # Scenario: Specyfikacja wdrażana etapami zostaje w planned/ po scaleniu jednego etapu
+    def test_staged_spec_stays_planned_until_its_last_stage(self):
+        path = "spec/planned/12-code-reorganization-ddd.md"
+        staged = {path: "# Spec 12\n\nZ przeglądu. Status: **etap 1 z 7 zrobiony (vNEXT)**, "
+                        "etapy 2–7 do zrobienia.\n"}
+        self.assertEqual([], rp.specs_to_move(list(staged), {"12"}, staged.__getitem__))
+        done = {path: "# Spec 12\n\nZ przeglądu. Status: **zrobione** 2026-12-01\n"}
+        self.assertEqual([path], rp.specs_to_move(list(done), {"12"}, done.__getitem__))
+
+    def test_last_stage_moves_and_unmerged_stage_stays(self):
+        path = "spec/planned/12-ddd.md"
+        last = {path: "# Spec 12\nStatus: **etap 7 z 7 zrobiony (vNEXT)**, zrobione\n"}
+        self.assertEqual([path], rp.specs_to_move(list(last), {"12"}, last.__getitem__))
+        second = {path: "# Spec 12\nStatus: **etap 2 z 7 zrobiony (v1.12.0)**\n"}
+        self.assertEqual([], rp.specs_to_move(list(second), set(), second.__getitem__))
+
 
 class UnreleasedTest(unittest.TestCase):
     def test_pr_whose_merge_commit_is_in_the_latest_tag_is_not_listed_again(self):
