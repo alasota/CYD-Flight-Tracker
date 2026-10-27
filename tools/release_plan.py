@@ -158,10 +158,14 @@ def stale_docs(roadmap, spec_readme, done_specs):
 
 
 DONE_STATUS = re.compile(r"Status:\s*\*\*(zrobione|zaimplementowane|done)", re.I)
+# A spec built in stages (spec 12: "Status: **etap 1 z 7 zrobiony (vNEXT)**") stays in planned/
+# while stages are left, even though its spec/NN-… branch was merged for one of them.
+STAGE_STATUS = re.compile(r"Status:\s*\*\*etap\s+(\d+)\s+z\s+(\d+)", re.I)
 
 
 def specs_to_move(planned_files, merged_spec_numbers, read):
-    """spec/planned/NN-*.md (and its .feature) that should go to spec/done/."""
+    """spec/planned/NN-*.md (and its .feature) that should go to spec/done/: status done, or
+    its branch merged — unless the status names a stage before the last."""
     out = []
     for path in sorted(planned_files):
         name = Path(path).name
@@ -169,7 +173,13 @@ def specs_to_move(planned_files, merged_spec_numbers, read):
             continue
         nn = name[:2]
         head = read(path)[:600]
-        if nn in merged_spec_numbers or DONE_STATUS.search(head):
+        if DONE_STATUS.search(head):
+            out.append(path)
+            continue
+        stage = STAGE_STATUS.search(head)
+        if stage and int(stage.group(1)) < int(stage.group(2)):
+            continue
+        if nn in merged_spec_numbers:
             out.append(path)
     return out
 
