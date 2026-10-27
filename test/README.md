@@ -28,7 +28,12 @@ Rarer now than with 41 executables, but it still happens.
 ## Layout
 
 The six suites follow the contexts of [spec 12](../spec/planned/12-code-reorganization-ddd.md),
-so they stay put when `src/` gets reorganized. Each suite is one executable.
+so they stayed put when `src/` moved into `src/<context>/<layer>/` (stage 1). Each suite is one
+executable. Test files include `src/` headers by **full path** (`#include
+"enrichment/domain/lookup_cache.h"`, `-I src`) and never an `adapters/`, root `app/` or SDK
+header — `tools/check_layers.py` reports it, `tools/test_check_layers.py`'s `LayoutTest`
+fails on a short include. `native` links everything in `src/` except root `app/`,
+`*/adapters/` and `platform/*_esp32.cpp` (docs/architecture.md "Source layout").
 
 | Suite | What | Modules (`<module>_test.cpp`) |
 |---|---|---|
@@ -36,8 +41,11 @@ so they stay put when `src/` gets reorganized. Each suite is one executable.
 | `test_enrichment` | aircraft / route / airport data (hexdb.io, caches, NVS) | aircraft_lookup, route_lookup, lookup_cache, lookup_store, lookup_budget, aircraft_names, place_names |
 | `test_opensky` | the OpenSky data source | opensky_client, opensky_quota, opensky_auth |
 | `test_display` | screens, theme, navigation, touch, brightness, display texts | table_view, featured_panel, flight_screen, radar_view, radar_geometry, aircraft_summary, status_bar, service_screen, screen_nav, redraw_policy, touch_input, lcars_theme, fonts, backlight, i18n |
-| `test_admin` | settings, web panel, backups, password, updates | config_page, config_portal, config_backup, config_store, web_auth, web_i18n, ota_update, release_check, version, screenshot, device_alerts |
+| `test_admin` | settings, web panel, backups, password, updates | config_page, config_portal, config_backup, config_store, web_auth, web_i18n, ota_update, release_check, version, screenshot¹, device_alerts |
 | `test_platform` | concurrency, perf, WiFi, time | core_link, perf_stats, wifi_manager, time_sync, sun_times |
+
+¹ `screenshot` lives in `src/display/app/` but its test stays in `test_admin` for now (the
+settings page serves the screenshot; spec 12 stage 1 moved no test files).
 
 `support/` (on the include path via `-I test/support`, header-only):
 

@@ -1,6 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
-Z przeglądu kodu 2026-10-25, sekcje 2–3. Status: **w trakcie** (etap 1). Jedna specyfikacja dla całej
+Z przeglądu kodu 2026-10-25, sekcje 2–3.
+Status: **etap 1 z 7 zrobiony (vNEXT)**, etapy 2–7 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -217,9 +218,9 @@ a ekran czyta z niego tylko swoje obiekty.
 ## 8. Etapy (każdy = osobny PR, testy zielone, firmware działa na płytce)
 
 1. **Szkielet.** Katalogi, `git mv` plików bez dzielenia, `-I src`, include'y z pełną ścieżką
-   (skrypt `tools/rewrite_includes.py`, jednorazowy). `build_src_filter` dla `native`:
-   `+<*> -<app/> -<*/adapters/> -<platform/*_esp32.cpp>`. `check_layers.py` w trybie raportu.
-   Diff: tylko przeniesienia i include'y.
+   (skrypt `tools/rewrite_includes.py`, zostaje do etapu 7 — etapy 2–3 znów przenoszą pliki).
+   `build_src_filter` dla `native`: `+<*> -<app/> -<*/adapters/> -<platform/*_esp32.cpp>`.
+   `check_layers.py` w trybie raportu. Diff: tylko przeniesienia i include'y.
 2. **Przeniesienie źle położonych typów.** `AircraftRow` z `table_view.h`, `OpenSkyHealth` ze
    `status_bar.h`, `computeDistanceBearing`, `compassPoint`, `openSkyCreditCost`, UTF-8 /
    `fitToWidth`, `inferOnGround`, `pickNowAircraft`, `sortRowsForDisplay` do kontekstów z §4.
@@ -234,6 +235,39 @@ a ekran czyta z niego tylko swoje obiekty.
    `TrackedFlight` itd.), automatycznie (`sed` + kompilacja), bez innych zmian w tym commicie.
 7. **Egzekwowanie.** `check_layers.py` blokuje CI; `docs/architecture.md` (konteksty, tabela
    z §5, słownik z §3) i sekcja „Code conventions” w CLAUDE.md zastąpiona krótkim odsyłaczem.
+
+### Wynik etapu 1 (2026-10-27, wydany w vNEXT)
+
+- **Katalogi:** 94 pliki przeniesione `git mv` (94 rename'y w gicie, bez podziału i zmian
+  nazw) do `src/<kontekst>/<warstwa>/` + `shared/`, `platform/`, `app/`; tabela przeniesień to
+  `MOVES` w `tools/rewrite_includes.py`. Plik trafił tam, gdzie będzie jego czysta połowa;
+  połowy `#ifdef ARDUINO` czekają na etap 3. Od razu w `adapters/` / `app/` tylko pliki w
+  całości sprzętowe (`hexdb_http`, `github_ca.h`, `net_task`, `main.cpp`).
+- **Include'y z pełną ścieżką** w `src/` i `test/` (`-I src` w `cyd` i `native`); diff `src/`:
+  94 pliki, 228+/228− (same linie include + 4 komentarze ze ścieżką fontów).
+  `rewrite_includes.py --check` = 0, `LayoutTest` pilnuje, że tak zostanie.
+- **`native`:** `build_src_filter = +<*> -<app/> -<*/adapters/> -<platform/*_esp32.cpp>`;
+  wszystkie 6 grup zielone, 876 przypadków jak przed etapem, `RUN_TEST(` = 874 (≥ 874).
+- **Firmware:** `firmware.bin` 1 476 928 → 1 477 184 B (+256 B, kolejność linkowania), Flash
+  used +268 B, RAM +16 B — w granicy ± 1 KB; te same biblioteki w grafie zależności.
+- **`tools/check_layers.py`** w CI (krok „Layer check (report only)” przed testami native):
+  **55 naruszeń** na koniec etapu 1 — punkt odniesienia dla etapów 2–7 (m.in. 10 ×
+  `display/domain -> display/adapters` przez `LGFX_CYD.hpp`, 6 × `admin/domain -> admin/app`
+  z `device_alerts`, 19 × SDK w `domain/` / `admin/app` pod `#ifdef ARDUINO`, domain / app →
+  `platform` przez `time_sync.h`, `core_link.h`, `net_config.h`). Brak naruszeń testów,
+  skróconych include'ów i plików poza kontekstem.
+- **`tools/release_plan.py`:** status `**etap N z M` z N < M zostawia specyfikację w `planned/`
+  mimo scalonej gałęzi `spec/12-…`.
+- **Odstępstwa (decyzje właściciela 2026-10-27):** fonty w `display/domain/theme/fonts/`, nie
+  w `adapters/` (§4.4 poprawiony); `screenshot` w `display/app/`, jego test na razie w
+  `test_admin`; `rewrite_includes.py` zostaje do etapu 7; `include/LGFX_CYD.hpp` i
+  `touch_calibration.h` zostają w `include/` do etapu 3; przypisy ¹ ² z §5 `check_layers.py`
+  traktuje jako dozwolone (nie da się ich sprawdzić po include'ach); brakujące wiersze §5
+  uzupełnione: `enrichment/app` (własny + `airspace` domain / app), `opensky/app` (własny),
+  testy (bez `adapters/`, korzeni i SDK).
+- **`@manual`:** test płytki po wgraniu przez USB (trzy ekrany, dotyk, panel WWW, wersja w
+  stopce, `/perf.json`, `/screenshot.bmp`, jedna aktualizacja OTA) — do zrobienia przed
+  scaleniem; rozmiar firmware zmierzony lokalnie (wyżej).
 
 ## 9. Testy
 
