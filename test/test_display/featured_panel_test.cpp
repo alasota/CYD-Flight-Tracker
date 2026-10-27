@@ -1,4 +1,4 @@
-// featured_panel: Screen 1 featured panel geometry + stat chips. CLAUDE.md "Screen 1 — Flights".
+// featured_panel: Screen 1 featured panel geometry + stat chips. docs/screens.md "Screen 1 — Flights".
 #include <unity.h>
 
 #include "featured_panel.h"
@@ -9,7 +9,7 @@ namespace {
 // featured_panel's text formatting now lives in aircraft_summary
 // (fitSummaryIdentity / formatSummaryRoute — covered by
 // test_aircraft_summary). What remains pure here is the panel's fixed
-// on-frame geometry from CLAUDE.md "Screen 1" ("y: 18 to 95px").
+// on-frame geometry from docs/screens.md "Screen 1" ("y: 18 to 95px").
 
 static void test_featured_panel_top_is_18(void) {
   TEST_ASSERT_EQUAL_INT(18, featuredPanelTopPx());

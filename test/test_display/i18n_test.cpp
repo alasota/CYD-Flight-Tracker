@@ -1,4 +1,4 @@
-// i18n: PL / EN display string table. CLAUDE.md "Language — Polish / English".
+// i18n: PL / EN display string table. CLAUDE.md "Language".
 #include <unity.h>
 
 #include <cstring>

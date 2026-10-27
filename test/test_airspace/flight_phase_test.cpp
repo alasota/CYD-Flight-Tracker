@@ -1,4 +1,4 @@
-// flight_phase: takeoff / landing / overflight classification. CLAUDE.md "Flight phase".
+// flight_phase: takeoff / landing / overflight classification. docs/screens.md "Flight phase".
 #include <unity.h>
 
 #include "flight_phase.h"
@@ -25,7 +25,7 @@ static void test_landing_near_airport_descending(void) {
 }
 
 static void test_far_from_airport_has_no_phase(void) {
-  // CLAUDE.md "Flight phase": beyond near_airport_km -> NONE, no icon. (The
+  // docs/screens.md "Flight phase": beyond near_airport_km -> NONE, no icon. (The
   // first implementation returned OVERFLIGHT here, so every distant aircraft
   // showed the same icon and the FAZA column told you nothing.)
   ASSERT_ENUM_EQ(Phase::NONE, classifyPhase(50.0f, 10.0f, false, 5.0f, 3.0f));

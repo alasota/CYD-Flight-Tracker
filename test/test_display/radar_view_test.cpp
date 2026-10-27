@@ -1,4 +1,4 @@
-// radar_view: Screen 3 layout + summary panel. CLAUDE.md "Screen 3 — Radar".
+// radar_view: Screen 3 layout + summary panel. docs/screens.md "Screen 3 — Radar".
 #include <unity.h>
 
 #include "radar_view.h"
@@ -44,7 +44,7 @@ static void test_layout_margin_too_large_yields_zero_radius(void) {
 }
 
 static void test_screen3_radar_zone_resolves_to_spec_center_and_radius(void) {
-  // CLAUDE.md "Screen 3": radar zone x:0..190, y:18..215 (h 197), 10px
+  // docs/screens.md "Screen 3": radar zone x:0..190, y:18..215 (h 197), 10px
   // margin -> center (95,117), radius 85 — the exact values
   // radar_geometry::polarToScreen()/ring math is tested against.
   RadarLayout layout = computeRadarLayout(0, 18, 190, 197, 10);

@@ -1,5 +1,5 @@
 // radar_geometry — pure polar-to-screen math for Screen 2's radar plot
-// (see CLAUDE.md "Screen 2 — Radar"): home at center, aircraft as blips
+// (see docs/screens.md "Screen 3 — Radar"): home at center, aircraft as blips
 // positioned by bearing + distance. Zero LovyanGFX/Arduino dependency —
 // tested under `pio test -e native`. A future `radar_view` module is
 // expected to call into this the way `table_view` calls into

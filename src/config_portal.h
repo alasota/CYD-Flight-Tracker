@@ -16,7 +16,7 @@
 float bboxAreaSqDeg(float radius_deg);
 
 // OpenSky /states/all credit cost per call for that bbox area, per
-// CLAUDE.md "Rate limits / credits": <=25 sq deg = 1, <=100 = 2, <=400 = 3,
+// docs/data-sources.md "Rate limits": <=25 sq deg = 1, <=100 = 2, <=400 = 3,
 // >400 = 4. Pure — tested under `pio test -e native`.
 int openSkyCreditCost(float radius_deg);
 

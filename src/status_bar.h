@@ -1,5 +1,5 @@
 // status_bar — draws the header bar shared by all three screens, per
-// CLAUDE.md "Screen chrome" (three zones, nothing filled, statusBarZones()):
+// docs/screens.md "Screen chrome" (three zones, nothing filled, statusBarZones()):
 // the app name on the left, the device-alert "!" next to it when an alert
 // is active, a health dot (statusBarHealthColor()) + the number of aircraft
 // in range ("7 LOTÓW" / "7 FLIGHTS") in the middle, and the date

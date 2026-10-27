@@ -1,10 +1,10 @@
 // aircraft_lookup — icao24 -> airline/aircraft_type/registration enrichment
 // via hexdb.io, with a size-limited in-RAM cache (lookup_cache, LRU) in front
 // of the NVS copy (lookup_store), so a given icao24 is only ever fetched
-// once. See CLAUDE.md "Aircraft identification: airline + flight +
-// model". No TFT/drawing code, no OpenSky polling logic — sits purely
-// between opensky_client's output and the view modules, and takes only a
-// plain icao24 string as input (no dependency on opensky_client itself).
+// once. See docs/data-sources.md "Aircraft identification". No TFT/drawing
+// code, no OpenSky polling logic — sits purely between opensky_client's
+// output and the view modules, and takes only a plain icao24 string as
+// input (no dependency on opensky_client itself).
 #pragma once
 
 #include <cstddef>
@@ -50,14 +50,15 @@ struct FetchResult {
 using AircraftFetchFn = FetchResult (*)(const std::string &icao24);
 
 // Core lookup logic: consults (and fills) the in-RAM cache first so a given
-// icao24 is fetched via `fetch` only once while it stays cached — see CLAUDE.md
-// "be a good citizen" towards hexdb.io's free service. A confirmed
-// response (fetch()'s response_ok == true) is cached whether it's a real
-// hit or a genuine hexdb.io miss — a miss (military/private/very new
-// registration) won't start resolving mid-boot either, so there's no
-// reason to keep re-fetching it. A *failed* fetch attempt (response_ok ==
-// false) is deliberately NOT cached — see docs/review-notes-2026.md 1.2 — so
-// a later poll can retry once conditions improve. Pure aside from the
+// icao24 is fetched via `fetch` only once while it stays cached — be a good
+// citizen towards hexdb.io's free service (docs/data-sources.md "Aircraft
+// identification"). A confirmed response (fetch()'s response_ok == true)
+// is cached whether it's a real hit or a genuine hexdb.io miss — a miss
+// (military/private/very new registration) won't start resolving mid-boot
+// either, so there's no reason to keep re-fetching it. A *failed* fetch
+// attempt (response_ok == false) is deliberately NOT cached — see
+// docs/review-notes-2026.md 1.2 — so a later poll can retry once conditions
+// improve. Pure aside from the
 // injected `fetch` call — no direct HTTP/WiFi dependency — tested under
 // `pio test -e native` with a stub.
 //

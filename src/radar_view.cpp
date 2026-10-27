@@ -19,7 +19,7 @@ RadarLayout computeRadarLayout(int16_t x, int16_t y, int16_t w, int16_t h, int16
 
   layout.radius_px = static_cast<int16_t>(diameter / 2);
   // Round the centre to nearest so an odd content height (y:18..215 -> 197)
-  // lands on CLAUDE.md's stated (95, 117) rather than 1px low.
+  // lands on docs/screens.md's "Screen 3" (95, 117) rather than 1px low.
   layout.center_x = static_cast<int16_t>(x + (w + 1) / 2);
   layout.center_y = static_cast<int16_t>(y + (h + 1) / 2);
   return layout;
@@ -61,7 +61,7 @@ std::string radarSummaryStats(const AircraftRow &row, Language lang) {
 
 namespace {
 
-// Fixed content-area layout on the 320x240 frame — CLAUDE.md "Screen 3".
+// Fixed content-area layout on the 320x240 frame — docs/screens.md "Screen 3".
 constexpr int16_t kContentTop = LCARS_CONTENT_TOP;                          // 18
 constexpr int16_t kContentHeight = LCARS_CONTENT_BOTTOM - LCARS_CONTENT_TOP;  // 197 (y:18..215)
 

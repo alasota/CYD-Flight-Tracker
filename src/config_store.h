@@ -14,16 +14,16 @@
 #include "backlight.h"  // NightMode
 #include "i18n.h"       // Language
 
-// Clamps the auto-cycle interval (see CLAUDE.md "Auto screen cycling") to
+// Clamps the auto-cycle interval (see docs/screens.md "Auto screen cycling") to
 // a sane floor — a few seconds minimum, so the display can't be
 // configured to flip faster than the eye can follow, and never zero
-// (CLAUDE.md's "must be > 0"). No ceiling: a very long interval is a
-// legitimate "basically don't cycle" choice. Pure — no NVS access — so
-// it's covered by native tests.
+// (docs/screens.md "Auto screen cycling": must be > 0). No ceiling: a very
+// long interval is a legitimate "basically don't cycle" choice. Pure — no
+// NVS access — so it's covered by native tests.
 uint32_t clampAutoCycleIntervalS(uint32_t interval_s);
 
 // Clamps a persisted screen index to a valid screen_nav index
-// (0 = Flights, 1 = Flight, 2 = Radar — see CLAUDE.md "Screen
+// (0 = Flights, 1 = Flight, 2 = Radar — see docs/screens.md "Screen
 // navigation"). Any out-of-range value (NVS never written, or a stale
 // value left behind by a future format change) falls back to 0 (Flights).
 int clampLastScreen(int raw);
@@ -32,25 +32,25 @@ struct Config {
   float home_lat = 0.0f;
   float home_lon = 0.0f;
   // Bounding-box half-width in degrees. Default keeps the resulting OpenSky
-  // bbox in the 1-credit tier (<=25 sq deg) — see CLAUDE.md "Rate limits".
+  // bbox in the 1-credit tier (<=25 sq deg) — see docs/data-sources.md "Rate limits".
   float radius_deg = 2.5f;
   uint32_t poll_interval_s = 15;
   std::string opensky_client_id;
   std::string opensky_client_secret;
   // Which of the three screens was showing at last power-down (0/1/2),
   // restored on boot — replaces the old two-screen `last_view` boolean now
-  // that there are three screens (see CLAUDE.md "Screen navigation").
+  // that there are three screens (see docs/screens.md "Screen navigation").
   int last_screen = 0;
-  // Auto screen cycling (CLAUDE.md "Auto screen cycling"). Off by default;
+  // Auto screen cycling (docs/screens.md "Auto screen cycling"). Off by default;
   // when enabled, the active screen advances every auto_cycle_interval_s
   // seconds (the Screen 2 "imminent overhead" deferral lives in
   // screen_nav::shouldDeferAutoSwitch()). Both are user-configurable via
   // config_portal.
   bool auto_cycle_enabled = false;
   uint32_t auto_cycle_interval_s = 15;
-  // flight_phase thresholds (CLAUDE.md "Flight phase"). near_airport_km is really "near HOME" (this
-  // project has no airport coordinate database). Defaults match CLAUDE.md:
-  // ~15 km, and ~1.5 m/s for the climb/descent cutoff.
+  // flight_phase thresholds (docs/screens.md "Flight phase"). near_airport_km
+  // is really "near HOME" (this project has no airport coordinate database).
+  // Defaults match the docs: ~15 km, and ~1.5 m/s for the climb/descent cutoff.
   float near_airport_km = 15.0f;
   float climb_rate_threshold_mps = 1.5f;
   // On-screen language (CLAUDE.md "Language"), chosen on the config page.
@@ -109,8 +109,8 @@ Config defaultConfig();
 
 // Clamps a caller-supplied config to safe ranges (lat/lon to valid degrees,
 // radius floor/ceiling, a minimum poll interval so the firmware can't be
-// configured to hammer the OpenSky API faster than CLAUDE.md allows). Pure —
-// no NVS access — so it's covered by native tests.
+// configured to hammer the OpenSky API faster than docs/data-sources.md
+// "Rate limits" allows). Pure — no NVS access — so it's covered by native tests.
 Config sanitizeConfig(const Config &cfg);
 
 float clampRadiusDeg(float radius_deg);

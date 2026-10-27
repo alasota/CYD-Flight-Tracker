@@ -1,4 +1,4 @@
-// aircraft_lookup: hexdb.io aircraft parsing + cache. CLAUDE.md "Aircraft identification".
+// aircraft_lookup: hexdb.io aircraft parsing + cache. docs/data-sources.md "Aircraft identification".
 #include <unity.h>
 
 #include "aircraft_lookup.h"

@@ -1,4 +1,4 @@
-// cpa_predictor: closest-point-of-approach time. CLAUDE.md "Flight ETA".
+// cpa_predictor: closest-point-of-approach time. docs/screens.md "Flight ETA".
 #include <unity.h>
 
 #include "cpa_predictor.h"

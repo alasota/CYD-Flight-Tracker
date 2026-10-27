@@ -1,7 +1,6 @@
 // cpa_predictor — pure closest-point-of-approach time math for Screen 2
 // ("Flight"), answering "how many seconds until the nearest aircraft is
-// directly overhead". See CLAUDE.md "Flight ETA — closest point of
-// approach".
+// directly overhead". See docs/screens.md "Flight ETA".
 //
 // Straight-line (constant-velocity) extrapolation only — real aircraft
 // turn, so accuracy degrades the further out you extrapolate. Acceptable
@@ -43,7 +42,7 @@ CpaPrediction predictCpa(double home_lat, double home_lon, double ac_lat, double
                          double speed_mps, double track_deg);
 
 // Advances a previously-computed prediction forward by `elapsed_ms` of
-// wall-clock — the "local ticking between polls" from CLAUDE.md "Flight
+// wall-clock — the "local ticking between polls" from docs/screens.md "Flight
 // ETA". OpenSky data only refreshes every poll_interval, but Screen 2's
 // countdown should tick every second, so main.cpp re-derives the current
 // t_cpa from the last polled value plus the millis() elapsed since that

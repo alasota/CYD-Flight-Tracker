@@ -1,4 +1,4 @@
-// ota_update: image header, marker scanner, OtaSession. CLAUDE.md "Firmware updates (OTA)", spec/01.
+// ota_update: image header, marker scanner, OtaSession. docs/architecture.md "Firmware updates (OTA)", spec/01.
 #include <unity.h>
 
 #include <algorithm>

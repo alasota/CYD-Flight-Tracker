@@ -1,4 +1,4 @@
-// flight_screen: Screen 2 countdown + NOW pick. CLAUDE.md "Screen 2 — Flight".
+// flight_screen: Screen 2 countdown + NOW pick. docs/screens.md "Screen 2 — Flight".
 #include <unity.h>
 
 #include "cpa_predictor.h"
@@ -17,7 +17,7 @@ static CpaPrediction cpaAt(float t) {
   return p;
 }
 
-// ---- fixed zone geometry (CLAUDE.md "Screen 2") --------------------------
+// ---- fixed zone geometry (docs/screens.md "Screen 2") --------------------------
 
 static void test_zone_geometry_matches_spec(void) {
   TEST_ASSERT_EQUAL_INT(18, flightIdentityTopPx());

@@ -127,7 +127,7 @@ FeaturedSplit splitFeaturedAndRest(const std::vector<AircraftRow> &rows) {
 }
 
 namespace {
-// Fixed layout from CLAUDE.md "Screen 1", below the featured panel
+// Fixed layout from docs/screens.md "Screen 1", below the featured panel
 // (y:18..95). The cyan LOTY/FLIGHTS sub-header strip was removed on request;
 // the space went to roomier rows.
 constexpr int16_t kColHeaderY = 98;    // lilac column-header bar, y:98..113
@@ -138,7 +138,7 @@ static_assert(kFirstRowY + kTableRowsPerPage * kRowStep <= LCARS_CONTENT_BOTTOM,
               "table rows must end above the bottom nav");
 
 // Columns: flight, airline, origin, destination, aircraft type, phase icon
-// (see CLAUDE.md "Screen 1" — altitude/speed/distance moved to
+// (see docs/screens.md "Screen 1" — altitude/speed/distance moved to
 // featured_panel's pills, shown only for the one closest aircraft).
 // Sized for the efont fonts (7px per character in the 14px rows, 5px in the
 // header): LOT fits an 8-char callsign, ODL. "123km", SKĄD/DOKĄD a 3-letter

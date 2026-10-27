@@ -1,4 +1,4 @@
-// radar_geometry: polar -> screen mapping, ring distances. CLAUDE.md "Screen 3".
+// radar_geometry: polar -> screen mapping, ring distances. docs/screens.md "Screen 3".
 #include <unity.h>
 
 #include <cmath>
@@ -151,7 +151,7 @@ static void test_ring_distances_zero_or_negative_count_is_empty(void) {
 }
 
 // ---- polarToScreen: Screen 3's real plot geometry ------------------------
-// center (95,127), radius 85px (see CLAUDE.md "Screen 3 — Radar"). Scan
+// center (95,127), radius 85px (see docs/screens.md "Screen 3 — Radar"). Scan
 // radius is set to 85 km here so distance maps 1:1 to pixels, keeping the
 // expected coordinates exact.
 static constexpr int16_t kS3Cx = 95;

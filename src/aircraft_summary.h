@@ -52,7 +52,7 @@ std::string summaryType(const AircraftRow &row);     // aircraft type
 // featured panel and Screen 2 (Screen 3 draws the fields on separate rows
 // with the helpers above), cut to fit `maxPx`. No phase marker: the phase
 // icon is drawn separately at a fixed right-aligned spot so it can never be
-// pushed off-screen (CLAUDE.md "Screen 1" featured panel). Shrinks in this
+// pushed off-screen (docs/screens.md "Screen 1" featured panel). Shrinks in this
 // order until it fits:
 //   1. "<flight>  <airline>  <type>"   unchanged if it fits;
 //   2. airline cut with "..." to the remaining width;

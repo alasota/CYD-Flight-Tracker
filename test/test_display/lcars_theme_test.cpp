@@ -1,4 +1,4 @@
-// lcars_theme: palette, fitToWidth, phase icons, font set. CLAUDE.md "Design language".
+// lcars_theme: palette, fitToWidth, phase icons, font set. docs/screens.md "Design language".
 #include <unity.h>
 
 #include "lcars_theme.h"
@@ -20,7 +20,7 @@ static void test_rgb565_black_and_white(void) {
 }
 
 static void test_canonical_palette_values(void) {
-  // The exact RGB565 values mandated by CLAUDE.md "Design language" —
+  // The exact RGB565 values mandated by docs/screens.md "Design language" —
   // every screen spec refers to these by name, so pin them precisely.
   TEST_ASSERT_EQUAL_HEX16(0x0000, LCARS_BLACK);
   TEST_ASSERT_EQUAL_HEX16(0xFC00, LCARS_ORANGE);

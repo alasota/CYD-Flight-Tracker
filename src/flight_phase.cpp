@@ -6,7 +6,7 @@ Phase classifyPhase(float distance_km, float vertical_rate_mps, bool on_ground,
     return Phase::NONE;
   }
 
-  // Beyond near_airport_km there is no phase to show (CLAUDE.md "Flight
+  // Beyond near_airport_km there is no phase to show (docs/screens.md "Flight
   // phase"). The first version fell through to OVERFLIGHT here, so every
   // distant aircraft got the same icon and the FAZA column meant nothing.
   if (distance_km > near_airport_km) {

@@ -19,7 +19,7 @@ static void test_default_config_has_sane_values(void) {
   // place, so this flag is the only way to tell "not set up yet" apart
   // from "home really is at 0,0".
   TEST_ASSERT_FALSE(cfg.home_configured);
-  // flight_phase thresholds — CLAUDE.md "Flight phase" defaults.
+  // flight_phase thresholds — docs/screens.md "Flight phase" defaults.
   TEST_ASSERT_EQUAL_FLOAT(15.0f, cfg.near_airport_km);
   TEST_ASSERT_EQUAL_FLOAT(1.5f, cfg.climb_rate_threshold_mps);
 }
@@ -131,7 +131,7 @@ static void test_sanitize_config_clamps_last_screen(void) {
 }
 
 static void test_clamp_auto_cycle_interval_enforces_minimum(void) {
-  // CLAUDE.md "Auto screen cycling": user-configurable, but must be > 0 —
+  // docs/screens.md "Auto screen cycling": user-configurable, but must be > 0 —
   // and in practice not so short the screen flips faster than the eye can
   // follow. Floor is 3s; anything below snaps up to it.
   TEST_ASSERT_EQUAL_UINT32(3, clampAutoCycleIntervalS(0));

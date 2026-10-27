@@ -1,4 +1,4 @@
-// release_check: GitHub release check: versions, JSON, URL allow-list. CLAUDE.md "New versions from GitHub", spec/02.
+// release_check: GitHub release check: versions, JSON, URL allow-list. docs/architecture.md "New versions from GitHub", spec/02.
 #include <unity.h>
 
 #include <string>

@@ -1,4 +1,4 @@
-// backlight: auto brightness, night window, touch wake. CLAUDE.md "Brightness & night mode", spec/03.
+// backlight: auto brightness, night window, touch wake. docs/architecture.md "Brightness & night mode", spec/03.
 #include <unity.h>
 
 #include "backlight.h"

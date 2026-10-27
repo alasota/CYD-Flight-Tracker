@@ -2,7 +2,7 @@
 // nearest airborne aircraft; text and stat chips on black, no frame. The
 // identity text comes from aircraft_summary (identity line + route line); this
 // module adds only its own altitude / speed / distance stat chips and the
-// "no aircraft in range" placeholder. See CLAUDE.md "Screen 1 — Flights".
+// "no aircraft in range" placeholder. See docs/screens.md "Screen 1 — Flights".
 //
 // Zero networking code — draws from an already-enriched AircraftRow
 // (table_view's type) plus the two AirportInfo results for its route's
@@ -27,7 +27,7 @@ struct AircraftRow;
 // `pio test -e native`.
 
 // Fixed vertical bounds of the featured panel on the 320x240 frame, per
-// CLAUDE.md "Screen 1" (featured flight section, y:18..95).
+// docs/screens.md "Screen 1" (featured flight section, y:18..95).
 // table_view starts its table section immediately below.
 int16_t featuredPanelTopPx();     // 18
 int16_t featuredPanelHeightPx();  // 77 (18..95)

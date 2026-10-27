@@ -1,4 +1,4 @@
-// radar_view — draws Screen 3 ("Radar"), per CLAUDE.md "Screen 3 —
+// radar_view — draws Screen 3 ("Radar"), per docs/screens.md "Screen 3 —
 // Radar": a left-hand radar plot (home at center, concentric distance
 // rings, aircraft as blips positioned by bearing + distance) and, with no
 // divider in between, a right-hand nearest-aircraft summary panel.
@@ -36,7 +36,7 @@ struct RadarLayout {
 RadarLayout computeRadarLayout(int16_t x, int16_t y, int16_t w, int16_t h, int16_t margin);
 
 // Converts a scan radius in degrees (config_store's Config::radius_deg —
-// see CLAUDE.md "Rate limits") to an approximate straight-line km value,
+// see docs/data-sources.md "Rate limits") to an approximate straight-line km value,
 // for use as radar_geometry's max_distance_km — this is the "convert
 // degrees to km at the call site, not inside radar_geometry" step
 // radar_geometry's own header asks for. Uses the same ~111.2 km/degree
@@ -76,7 +76,7 @@ std::string radarSummaryStats(const AircraftRow &row, Language lang);
 #include "LGFX_CYD.hpp"
 
 // Draws Screen 3's content area (LCARS_CONTENT_TOP..BOTTOM) across a
-// `screenWidth`-px display, at the fixed CLAUDE.md "Screen 3" layout (the
+// `screenWidth`-px display, at the fixed docs/screens.md "Screen 3" layout (the
 // k* constants in radar_view.cpp):
 //   - radar plot   x:0..190   — home crosshair (LCARS_YELLOW) at center
 //     (95,117), 3 concentric rings (radar_geometry::computeRingDistances)

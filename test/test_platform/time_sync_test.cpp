@@ -1,4 +1,4 @@
-// time_sync: date / time formatting from an injected time_t. CLAUDE.md "Time & WiFi status".
+// time_sync: date / time formatting from an injected time_t. docs/screens.md "Time".
 #include <unity.h>
 
 #include "time_sync.h"

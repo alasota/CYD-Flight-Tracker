@@ -1,4 +1,4 @@
-// aircraft_summary: shared identity / route lines. CLAUDE.md "Screen 1 — Flights" (identity line).
+// aircraft_summary: shared identity / route lines. docs/screens.md "Screen 1 — Flights" (identity line).
 #include <unity.h>
 
 #include "aircraft_summary.h"

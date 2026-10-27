@@ -1,5 +1,5 @@
 // opensky_quota — how many OpenSky API credits are left today, from the
-// headers OpenSky puts on every /states/all answer (CLAUDE.md "Rate limits"):
+// headers OpenSky puts on every /states/all answer (docs/data-sources.md "Rate limits"):
 //   200 + X-Rate-Limit-Remaining: <n>            -> n credits left
 //   429 + X-Rate-Limit-Retry-After-Seconds: <s>  -> exhausted, pool renews in s
 // opensky_client keeps the latest state (openSkyQuota()); it shows up in the
