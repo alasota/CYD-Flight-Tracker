@@ -265,9 +265,11 @@ a ekran czyta z niego tylko swoje obiekty.
   traktuje jako dozwolone (nie da się ich sprawdzić po include'ach); brakujące wiersze §5
   uzupełnione: `enrichment/app` (własny + `airspace` domain / app), `opensky/app` (własny),
   testy (bez `adapters/`, korzeni i SDK).
-- **`@manual`:** test płytki po wgraniu przez USB (trzy ekrany, dotyk, panel WWW, wersja w
-  stopce, `/perf.json`, `/screenshot.bmp`, jedna aktualizacja OTA) — do zrobienia przed
-  scaleniem; rozmiar firmware zmierzony lokalnie (wyżej).
+- **`@manual`:** płytka po wgraniu przez USB (2026-10-27): trzy ekrany z lotem na żywo
+  (`/screenshot.bmp?screen=0..2`), wersja gałęzi w stopce panelu, `/perf.json` po 2 min:
+  przerwa pętli UI maks. 74 ms, 0 wolnych przejść, sterta 146 KB (największy blok 59 KB), bez
+  restartów. Dotyk i jedna aktualizacja OTA — do sprawdzenia przez właściciela (build `-dev`).
+  Rozmiar firmware zmierzony lokalnie (wyżej).
 
 ## 9. Testy
 

@@ -20,7 +20,7 @@ time (agents don't spawn agents):
 |---|---|---|
 | `spec-analyst` | `.claude/work/<slug>/plan.md`, `spec/planned/<NN-name>.feature`, a new spec file for an issue | `src/`, `test/` |
 | `bug-investigator` (/fix) | `.claude/work/<slug>/diagnosis.md`, the failing regression test (+ a stub if needed) | the fix itself |
-| `test-author` | `test/**`, declarations + neutral stubs in `src/*.h` / `src/*.cpp` so the tests compile and fail | real logic in `src/` |
+| `test-author` | `test/**`, declarations + neutral stubs in `src/**` (`.h` / `.cpp`) so the tests compile and fail | real logic in `src/` |
 | `implementer` | `src/**`, `platformio.ini`, tools; tests only to fix a test that is provably wrong (say so) | the `.feature`, the spec's requirements |
 | `docs-writer` (feature / fix / release mode) | `CLAUDE.md`, `docs/*.md` (screens, data sources, architecture, history), `README.md`, `test/README.md`, `ROADMAP.md`, `spec/**` status, `site/`, `docs/screenshots/` | `src/`, `test/` |
 | `reviewer` | `.claude/work/<slug>/review.md` | everything else (read-only) |
