@@ -48,12 +48,9 @@ std::string summaryFlight(const AircraftRow &row);   // callsign
 std::string summaryAirline(const AircraftRow &row);  // RegisteredOwners
 std::string summaryType(const AircraftRow &row);     // aircraft type
 
-// "<flight>  <airline>  <type>  <phase icon>" — the one-line identity used
-// by Screen 1's featured panel and Screen 2. Screen 3 draws its three
-// fields on separate rows and calls the field helpers above instead.
-std::string formatSummaryIdentity(const AircraftRow &row);
-
-// The identity line *without* the phase icon, cut to fit `maxPx` — the
+// The one-line identity "<flight>  <airline>  <type>" used by Screen 1's
+// featured panel and Screen 2 (Screen 3 draws the fields on separate rows
+// with the helpers above), cut to fit `maxPx`. No phase marker: the phase
 // icon is drawn separately at a fixed right-aligned spot so it can never be
 // pushed off-screen (CLAUDE.md "Screen 1" featured panel). Shrinks in this
 // order until it fits:

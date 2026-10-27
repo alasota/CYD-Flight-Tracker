@@ -53,23 +53,6 @@ static void test_airline_dashes_when_lookup_found_but_string_empty(void) {
   TEST_ASSERT_EQUAL_STRING("LOT", summaryAirline(row).c_str());
 }
 
-// ---- formatSummaryIdentity ------------------------------------------
-
-static void test_identity_contains_all_fields_and_phase(void) {
-  std::string line = formatSummaryIdentity(makeRow());
-  ASSERT_CONTAINS(line, "LOT281");
-  ASSERT_CONTAINS(line, "LOT Polish Airlines");
-  ASSERT_CONTAINS(line, "B738");
-  ASSERT_CONTAINS(line, phaseIcon(Phase::TAKEOFF));
-}
-
-static void test_identity_phase_icon_varies(void) {
-  AircraftRow takeoff = makeRow();
-  AircraftRow landing = makeRow();
-  landing.phase = Phase::LANDING;
-  TEST_ASSERT_TRUE(formatSummaryIdentity(takeoff) != formatSummaryIdentity(landing));
-}
-
 // ---- formatSummaryRoute: the two RouteFormat variants -----------------
 
 static void test_route_with_country(void) {
@@ -337,8 +320,6 @@ void run_aircraft_summary_tests() {
   RUN_TEST(test_fields_fall_back_to_dashes);
   RUN_TEST(test_airline_dashes_when_lookup_found_but_string_empty);
 
-  RUN_TEST(test_identity_contains_all_fields_and_phase);
-  RUN_TEST(test_identity_phase_icon_varies);
 
   RUN_TEST(test_route_with_country);
   RUN_TEST(test_route_codes_only);
