@@ -96,7 +96,7 @@ RouteInfo lookupRouteWithFetcher(const std::string &callsign, RouteFetchFn fetch
 bool routeLookupIsCached(const std::string &callsign);
 
 // True if `airport_code` (ICAO) already has a cached airport result — so
-// main.cpp can budget *new* airport lookups per poll (cache hits are free).
+// poll_pipeline can budget *new* airport lookups per poll (cache hits are free).
 bool airportLookupIsCached(const std::string &airport_code);
 
 // Put an already-known result (e.g. loaded from NVS by lookup_store) into

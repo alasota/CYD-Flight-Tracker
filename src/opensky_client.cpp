@@ -312,7 +312,7 @@ StatesAttempt requestStatesOnce(const BoundingBox &bbox, const std::string &bear
   }
   if (!bearerToken.empty()) {
     // std::string on the heap, not a 2KB stack buffer (review notes 4.2) —
-    // a bearer JWT is ~1KB and loopTask's stack is only 8KB.
+    // a bearer JWT is ~1KB and net_task's 16 KB stack also carries TLS.
     std::string authHeader = "Bearer ";
     authHeader += bearerToken;
     http.addHeader("Authorization", authHeader.c_str());

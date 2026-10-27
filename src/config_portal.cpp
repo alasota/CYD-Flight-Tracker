@@ -457,8 +457,9 @@ void handleSave() {
   }
 
   // The user has now been through the settings form at least once — see
-  // CLAUDE.md review notes 1.5. This is what main.cpp checks to tell
-  // "not configured yet" apart from "home really is at (0,0)".
+  // CLAUDE.md review notes 1.5. This is what the UI checks (it reaches the
+  // display through NetState) to tell "not configured yet" apart from
+  // "home really is at (0,0)".
   cfg.home_configured = true;
 
   saveConfig(cfg);  // sanitizes internally (see config_store)
@@ -665,7 +666,7 @@ void handleRestore() {
   }
 
   saveConfig(r.config);  // sanitizes internally (see config_store)
-  ++saveCount;           // main.cpp reloads: language, home location, ...
+  ++saveCount;           // net_task reloads: language, home location, ...
   refreshPassword();     // a backup with secrets carries the panel password
 
   Config saved = loadConfig();  // its web_language may just have changed
@@ -822,7 +823,7 @@ void handleUpdatePrerelease() {
   if (!requireSameOrigin() || !authorize()) return;
   const bool on = server.arg("on") == "1";
   saveUpdateShowPrerelease(on);
-  ++saveCount;  // main.cpp reloads the config and hands it to release_check
+  ++saveCount;  // net_task reloads the config (and the UI gets it via NetState)
   Config cfg = loadConfig();
   releaseCheckBegin(cfg);
   requestCheckAndAnswer();

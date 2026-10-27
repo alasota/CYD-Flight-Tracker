@@ -1,8 +1,8 @@
 // radar_view — draws Screen 3 ("Radar"), per CLAUDE.md "Screen 3 —
 // Radar": a left-hand radar plot (home at center, concentric distance
-// rings, aircraft as blips positioned by bearing + distance), an
-// LCARS_ORANGE vertical divider, and a right-hand nearest-aircraft
-// summary panel. Re-skinned in lcars_theme's palette — that's what
+// rings, aircraft as blips positioned by bearing + distance) and, with no
+// divider in between, a right-hand nearest-aircraft summary panel.
+// Re-skinned in lcars_theme's palette — that's what
 // distinguishes it from a plain radar scope, not the polar-plot math
 // (which lives in radar_geometry, reused here rather than duplicated).
 // Static plot for v1 — no sweep-line animation. Zero networking code:
@@ -25,8 +25,8 @@
 // Center and radius (px) of the largest circle that fits within
 // [x, y, w, h] with `margin` px of padding on every side — the single
 // source of truth for where drawRadarView() places the plot. Screen 3
-// calls this with the fixed radar zone (x:0..190, y:28..225) and a 10px
-// margin, which resolves to center (95, 127) / radius 85 — the values
+// calls this with the fixed radar zone (x:0..190, LCARS_CONTENT_TOP..BOTTOM)
+// and a 10px margin, which resolves to center (95, 117) / radius 85 — the values
 // radar_geometry's polarToScreen()/ring math is exercised with.
 struct RadarLayout {
   int16_t center_x = 0;
@@ -75,19 +75,21 @@ std::string radarSummaryStats(const AircraftRow &row, Language lang);
 
 #include "LGFX_CYD.hpp"
 
-// Draws Screen 3's content area (below the 25px status_bar header) across
-// a `screenWidth`-px display, at the fixed CLAUDE.md "Screen 3" layout:
+// Draws Screen 3's content area (LCARS_CONTENT_TOP..BOTTOM) across a
+// `screenWidth`-px display, at the fixed CLAUDE.md "Screen 3" layout (the
+// k* constants in radar_view.cpp):
 //   - radar plot   x:0..190   — home crosshair (LCARS_YELLOW) at center
-//     (95,127), 3 concentric rings (radar_geometry::computeRingDistances)
-//     at r=28/57/85 with km labels, and a ~5px LCARS_CYAN blip per row
-//     with a known distance/bearing (positioned via polarToScreen); a row
-//     beyond `radius_deg` range is clamped to the outer ring and drawn
-//     dimmer/smaller (radar_geometry::ScreenPoint::clamped);
-//   - divider      x:192..200 — an 8px vertical LCARS_ORANGE bar;
-//   - summary panel x:200..320 (no frame) with three rows for the nearest
-//     aircraft (rows.front()): callsign, airline, "WAW -> FCO" route (IATA
-//     only, no country codes — RouteFormat::CodesOnly, from the row's own
-//     airports).
+//     (95,117), 3 concentric rings (radar_geometry::computeRingDistances)
+//     at r=28/57/85 with km labels, and a sky (THEME_CONTENT_SECONDARY)
+//     blip with a heading tick per airborne row with a known
+//     distance/bearing (positioned via polarToScreen), a small muted square
+//     for ground traffic; a row beyond `radius_deg` range is clamped to the
+//     outer ring and drawn dimmer/smaller
+//     (radar_geometry::ScreenPoint::clamped); the summary panel's aircraft
+//     gets a white ring;
+//   - summary panel x:200..320, text from x:208 (no frame, no divider) with
+//     five rows for the nearest aircraft (rows.front()): callsign, airline,
+//     origin city, "-> destination" city, compass + distance + altitude.
 // `rows` must already be annotated (annotateDistances()) and sorted
 // (sortRowsByDistance()).
 // Empty-range state (`rows` empty): the radar still draws its empty rings

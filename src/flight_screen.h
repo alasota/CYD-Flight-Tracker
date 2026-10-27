@@ -3,17 +3,18 @@
 // See CLAUDE.md "Screen 2 — Flight" and "Flight ETA — closest point of
 // approach".
 //
-// Three fixed zones on the 320x240 frame, below the 25px status_bar
-// header:
-//   - identity panel   y:28..78   — same LCARS_MAGENTA elbow frame as
-//                                    featured_panel, text via aircraft_summary
-//   - countdown zone    y:82..195  — giant digits, colour-coded by urgency
-//   - status strip      y:200..225 — a text label matching the countdown state
+// Three fixed zones in the content area (LCARS_CONTENT_TOP..BOTTOM, between
+// the header and the bottom nav; exact y values are the k* constants in
+// flight_screen.cpp):
+//   - identity panel  — text only, no frame (as featured_panel): identity,
+//                       route and stats lines via aircraft_summary
+//   - countdown zone  — giant digits, colour-coded by urgency
+//   - status strip    — a text label matching the countdown state
 //
 // Zero networking code — draws from an already-enriched AircraftRow
 // (table_view's type), its two route-endpoint AirportInfos, and a
 // cpa_predictor::CpaPrediction. The between-polls "local ticking" of the
-// countdown is main.cpp's job (see CLAUDE.md) — this module just renders
+// countdown is the UI's job (main.cpp) — this module just renders
 // whatever CpaPrediction it's handed.
 #pragma once
 
@@ -75,11 +76,11 @@ struct CountdownDisplay {
   Mode mode = Mode::Empty;
   std::string bigText;      // large glyphs: "45", "-3", "~4", "--"
   std::string suffixText;   // smaller trailing text: "s", "MIN", or ""
-  std::string statusLabel;  // text for the y:200 status strip
+  std::string statusLabel;  // text for the status strip
   std::string caption;      // small line above the digits: "NAD TOBĄ ZA" while
                             // the CPA is still ahead (t > 0), else ""
   uint16_t color = THEME_CONTENT_SECONDARY;  // big-text + label colour
-  bool colorCoded = true;       // false in the empty state ("no colour-coding")
+  bool colorCoded = true;  // false in the empty state ("no colour-coding")
 };
 
 // Classifies `cpa` per CLAUDE.md "Screen 2" (labels shown PL / EN, from i18n):
@@ -105,12 +106,12 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang
 #include "LGFX_CYD.hpp"
 
 // Draws all three zones for a `screenWidth`-px display. `hasNearest` ==
-// false (no aircraft in range) draws the identity frame empty and forces
+// false (no aircraft in range) leaves the identity panel empty and forces
 // the countdown/status into their empty state regardless of `cpa`.
 void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
                       const CpaPrediction &cpa, int16_t screenWidth, OpenSkyHealth health);
 
-// Repaints only the countdown zone + status strip (y:82..225) — the 1 Hz
+// Repaints only the countdown zone + status strip — the 1 Hz
 // tick path (CLAUDE.md "Redraw policy"), leaving the identity panel,
 // header and bottom nav untouched. Renders into an off-screen 8-bit
 // LGFX_Sprite and pushes it in one go so the digits don't flicker; if the

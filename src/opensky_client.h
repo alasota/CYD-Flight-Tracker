@@ -130,8 +130,8 @@ uint32_t parseRetryAfterSeconds(const std::string &header_value, uint32_t defaul
 std::string urlEncode(const std::string &value);
 
 // Outcome of one poll attempt. The distinction between "polled OK, nothing
-// in range" and "poll failed" matters: main.cpp keeps the last good
-// aircraft list on a failure instead of blanking the screen, and surfaces
+// in range" and "poll failed" matters: net_task keeps the last good
+// DataSnapshot on a failure instead of blanking the screen, and surfaces
 // a header tag — see CLAUDE.md review notes 1.2/1.3/1.4.
 enum class OpenSkyPollStatus {
   NotDue,        // interval hasn't elapsed — `aircraft` is empty, ignore it

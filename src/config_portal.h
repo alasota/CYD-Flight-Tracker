@@ -2,7 +2,7 @@
 // OpenSky client_id/client_secret/auto-cycle settings, reachable via mDNS
 // at cyd-sky.local (see
 // CLAUDE.md "Code conventions"). Submissions are persisted through
-// config_store (Milestone 2).
+// config_store.
 #pragma once
 
 #include <cstddef>
@@ -81,12 +81,12 @@ void configPortalLoop();
 bool configPortalIsActive();
 
 // Incremented every time the settings are saved (settings form or
-// credentials upload). main.cpp compares it against the value it last saw
+// credentials upload). net_task compares it against the value it last saw
 // to reload the config straight away — e.g. so a language change shows up
 // on screen immediately rather than at the next OpenSky poll.
 uint32_t configPortalSaveCount();
 
-// Where GET /screenshot.bmp gets its pixels — supplied by main.cpp, so this
+// Where GET /screenshot.bmp gets its pixels — supplied by the UI, so this
 // module stays free of display code. The display belongs to the UI core
 // (spec/done/04-dual-core.md §5.7), so these are requests to it, made from the web
 // handler on the network core:
@@ -123,8 +123,9 @@ struct OtaObserver {
 };
 void configPortalSetOtaObserver(const OtaObserver &observer);
 
-// True between a successful update and the restart it triggers — main.cpp
-// leaves the display (and the network) alone meanwhile.
+// True between a successful update and the restart it triggers — net_task
+// stays off the network meanwhile, and the UI keeps the OTA service screen
+// up (it sees this as NetState::restartPending).
 bool configPortalRestartPending();
 
 

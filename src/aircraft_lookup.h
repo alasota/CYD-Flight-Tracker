@@ -77,7 +77,7 @@ AircraftInfo lookupAircraftWithFetcher(const std::string &icao24, AircraftFetchF
 // NOT perform an HTTP request. Lets a caller bound how many *new* lookups
 // it attempts in one go (each is a blocking HTTP round trip) without
 // skipping ones that are already free — see CLAUDE.md review notes 1.1,
-// and main.cpp's per-poll lookup budget. Pure — just a cache query.
+// and poll_pipeline's per-poll lookup budget (lookup_budget). Pure — just a cache query.
 bool aircraftLookupIsCached(const std::string &icao24);
 
 // Puts an already-known result (e.g. loaded from NVS by lookup_store) into

@@ -1,15 +1,15 @@
 // status_bar — draws the header bar shared by all three screens, per
-// CLAUDE.md "Screen chrome": a rounded block on the left showing how many
-// aircraft are in range ("7 LOTOW" / "7 FLIGHTS"), coloured by OpenSky data
-// health (orange OK / yellow rate-limited / magenta error), then the date
-// (DD.MM.YYYY) + the real wall-clock time (from time_sync) to its right in
-// LCARS_CYAN. The screen name is no longer in the header — it's on the
-// bottom-nav buttons. Occupies y:0..LCARS_HEADER_HEIGHT, full width. **No
-// WiFi signal bars** (CLAUDE.md; rssiToBars() has no home in this layout).
+// CLAUDE.md "Screen chrome" (three zones, nothing filled, statusBarZones()):
+// the app name on the left, the device-alert "!" next to it when an alert
+// is active, a health dot (statusBarHealthColor()) + the number of aircraft
+// in range ("7 LOTÓW" / "7 FLIGHTS") in the middle, and the date
+// (DD.MM.YYYY) + time (from time_sync) on the right. The screen name is on
+// the bottom-nav tabs, not here. Occupies y:0..LCARS_HEADER_HEIGHT, full
+// width, with a 1px rule along its bottom edge.
 //
-// Called once per frame from main.cpp *before* it dispatches to whichever
-// screen is active — screens draw their content starting at
-// y = LCARS_HEADER_HEIGHT and don't know status_bar exists.
+// Drawn by the UI (main.cpp) when the redraw mask has kRedrawHeader —
+// screens draw their content from LCARS_CONTENT_TOP and don't know
+// status_bar exists.
 #pragma once
 
 #include <ctime>
@@ -40,7 +40,7 @@ std::string statusBarClock(std::time_t localEpoch, bool timeSynced);
 // Health of the OpenSky data feed, surfaced as a short header tag so a
 // silent failure (persistent 401, exhausted rate-limit credits, a dead
 // network) isn't invisible — the aircraft list on screen may be stale
-// (main.cpp keeps the last good data rather than blanking it). See
+// (net_task keeps the last good DataSnapshot rather than blanking it). See
 // CLAUDE.md review notes 1.2/1.3/1.4.
 enum class OpenSkyHealth {
   Ok,            // last poll succeeded

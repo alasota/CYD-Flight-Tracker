@@ -164,7 +164,7 @@ bool takeManualCheck(ManualCheck &m, bool gateOpen, uint32_t nowMs);
 // The page shows "checking…" and reloads itself while this is true.
 bool manualCheckPending(const ManualCheck &m, uint32_t nowMs);
 
-// ---- What the config page and main.cpp see
+// ---- What the config page and the display (via NetState) see
 enum class UpdateStatus : uint8_t {
   NeverChecked,
   UpToDate,

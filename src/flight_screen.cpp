@@ -135,7 +135,7 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
                       const CpaPrediction &cpa, int16_t screenWidth, OpenSkyHealth health) {
   const int16_t cx = static_cast<int16_t>(screenWidth / 2);
 
-  // ---- Identity panel, y:28..78 — text only, no frame (same as Screen 1).
+  // ---- Identity panel (kIdentityTop, kIdentityHeight) — text only, no frame (same as Screen 1).
   const int16_t frameW = static_cast<int16_t>(screenWidth - 2 * kSideMargin);
 
   if (hasNearest) {
@@ -190,7 +190,7 @@ void renderCountdown(lgfx::LovyanGFX &gfx, const CountdownDisplay &cd, int16_t o
     digitsTop = static_cast<int16_t>(kCountdownTop + kCaptionHeight);
   }
 
-  // ---- Countdown zone, y:92..186 — big number, small suffix, centered.
+  // ---- Countdown zone (kCountdownTop, kCountdownHeight) — big number, small suffix, centered.
   const int16_t countdownCy = static_cast<int16_t>(
       digitsTop + (kCountdownTop + kCountdownHeight - digitsTop) / 2 + yOff);
 
@@ -222,7 +222,7 @@ void renderCountdown(lgfx::LovyanGFX &gfx, const CountdownDisplay &cd, int16_t o
   }
   gfx.setTextSize(1);  // don't leak scale to later draws
 
-  // ---- Status strip, y:200..225 — label matching the countdown state.
+  // ---- Status strip (kStatusTop, kStatusHeight) — label matching the countdown state.
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_center);
   gfx.setTextColor(cd.color, LCARS_BLACK);
@@ -230,7 +230,7 @@ void renderCountdown(lgfx::LovyanGFX &gfx, const CountdownDisplay &cd, int16_t o
                  static_cast<int16_t>(kStatusTop + kStatusHeight / 2 + yOff));
 }
 
-// Off-screen buffer for the countdown zone + status strip (y:82..225),
+// Off-screen buffer for the countdown zone + status strip,
 // created once — at boot via flightScreenReserveSprite(), before WiFi and the
 // network task start allocating — and kept for the life of the program.
 // Created on the first visit to the NOW screen instead, it landed in the

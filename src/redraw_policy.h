@@ -13,8 +13,8 @@
 // Bit flags. kRedrawFull implies everything (fillScreen + header + content
 // + bottom nav) and is never combined with the others.
 constexpr uint8_t kRedrawFull = 1 << 0;        // fillScreen + all chrome + content
-constexpr uint8_t kRedrawContent = 1 << 1;     // content area y:28..225 only
-constexpr uint8_t kRedrawHeader = 1 << 2;      // header bar only (count block, date, time)
+constexpr uint8_t kRedrawContent = 1 << 1;     // content area (LCARS_CONTENT_TOP..BOTTOM) only
+constexpr uint8_t kRedrawHeader = 1 << 2;      // header bar only (count, health dot, "!", clock)
 constexpr uint8_t kRedrawCountdown = 1 << 3;   // Screen 2 countdown zone + status strip only
 
 // What happened since the last redraw.

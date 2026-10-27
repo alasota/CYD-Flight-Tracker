@@ -18,8 +18,8 @@ RadarLayout computeRadarLayout(int16_t x, int16_t y, int16_t w, int16_t h, int16
   if (diameter < 0) diameter = 0;
 
   layout.radius_px = static_cast<int16_t>(diameter / 2);
-  // Round the centre to nearest so an odd content height (y:28..225 -> 197)
-  // lands on CLAUDE.md's stated (95, 127) rather than 1px low.
+  // Round the centre to nearest so an odd content height (y:18..215 -> 197)
+  // lands on CLAUDE.md's stated (95, 117) rather than 1px low.
   layout.center_x = static_cast<int16_t>(x + (w + 1) / 2);
   layout.center_y = static_cast<int16_t>(y + (h + 1) / 2);
   return layout;
@@ -163,8 +163,8 @@ void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg
 }
 
 void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, OpenSkyHealth health) {
-  // No frame (dropped by request) — the orange divider alone separates the
-  // panel from the radar. Keep any long text from spilling past the panel.
+  // No frame and no divider (both dropped by request). Keep any long text
+  // from spilling past the panel into the radar.
   gfx.setClipRect(static_cast<int16_t>(kSummaryX + kSummaryInset), kContentTop,
                   static_cast<int16_t>(kSummaryW - 2 * kSummaryInset), kContentHeight);
 
