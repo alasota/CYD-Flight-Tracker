@@ -153,6 +153,9 @@ citizen, cache everything, never re-fetch a known key.
   0x1F; confirmed misses stored too), then hexdb.io. An entry that falls out of RAM comes back
   from NVS, not from hexdb.io. A RAM capacity must hold one poll's working set. When NVS is
   full, that kind's namespace is wiped (settings live in their own namespace).
+- **LRU detail:** `LookupCache::find()` refreshes an entry, `contains()` doesn't — the per-poll
+  budget asks about every aircraft, and asking isn't using. `put()` drops the least recently
+  used when full.
 - **Budget** (`lookup_budget`, `planLookups()`, nearest rows first): per poll all cache hits
   (RAM or NVS, free) plus `kDefaultLookupBudget` (2) new aircraft / route fetches and
   `kDefaultAirportLookupBudget` (3) new airport fetches. The rest shows `...` and gets its turn

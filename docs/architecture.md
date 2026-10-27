@@ -121,6 +121,10 @@ Spec: `spec/done/01-ota-updates.md`. Released in v1.1.0.
   `firmwareMarker()`; `FW_BOARD` defaults to `cyd-r` — builds for other CYD variants will set it
   per env and reject a mismatch). `firmware.yml` greps the built `.bin` for it. Builds older
   than v1.1.0 have no marker: going back to them needs USB / the web installer.
+- **Image checks** (`ota_update`, pure, behind an `OtaWriter` seam — `Update` on the board, a
+  fake in tests): `checkImageHeader()` wants the 0xE9 magic and this chip's id, and refuses a
+  leading `0xFF` (the merged `-full.bin`, meant for 0x0); `checkImageSize()`;
+  `FirmwareMarkerScanner` finds the marker even across chunk boundaries.
 - **Display:** `config_portal` and `release_check` draw nothing; their `OtaObserver` callbacks
   (start / every 16 KB / end, on core 0) go to `net_task`, which publishes them as
   `NetState::ota` (`OtaProgress`, phase + seq); the UI draws `service_screen` from it. The
@@ -136,7 +140,9 @@ Spec: `spec/done/01-ota-updates.md`. Released in v1.1.0.
   restarted (`shouldRestartForRollback()`), so the bootloader goes back to the previous slot.
   OpenSky trouble never rolls back. Verified with an image that `abort()`s after 8 s and one
   whose UI loop hangs after 8 s: both came back on the previous slot.
-- **Password:** `Config::web_password` (NVS `wpass`), optional (default none). When set, every
+- **Password:** `Config::web_password` (NVS `wpass`), optional (default none);
+  `validateWebPassword()` accepts 8–64 printable ASCII characters, `""` = no password.
+  When set, every
   route calls `authorize()` first: HTTP Digest (`WebServer::authenticate`, realm
   `CYD Sky Tracker`, user `admin` — Basic accepted too); `AuthThrottle` (5 wrong in a row →
   60 s lock) → 429 + `Retry-After`. Upload callbacks check credentials *before* buffering or
