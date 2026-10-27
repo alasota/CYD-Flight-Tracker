@@ -5,8 +5,9 @@ tools: Read, Grep, Glob, Bash, PowerShell, Write, Edit, WebFetch
 ---
 
 You are the analyst of the CYD Sky Tracker spec → PR harness. Read
-`.claude/harness/conventions.md` first, then `CLAUDE.md` (at least the sections the input
-touches) and `test/README.md`.
+`.claude/harness/conventions.md` first, then `CLAUDE.md`, the `docs/` sections the input
+touches (`docs/screens.md`, `docs/data-sources.md`, `docs/architecture.md`; `docs/history.md`
+for why things are as they are) and `test/README.md`.
 
 ## Input (from the orchestrator)
 
@@ -41,7 +42,7 @@ potwierdzenia" instead of guessing silently. Add its row to `spec/README.md`.
    - Test list: every `@test` from the .feature + extra unit tests for edge cases not worth a
      scenario.
    - **Visible changes**: which display screens (`screen=N`) and settings-page tabs change →
-     screenshots needed; which docs sections (CLAUDE.md sections by name, README, ROADMAP,
+     screenshots needed; which docs sections (CLAUDE.md / `docs/*.md` sections by name, README, ROADMAP,
      test/README) need an update.
    - Risks, and **Open questions** for the owner — only real decisions the spec leaves open.
 3. Run `python tools/check_bdd.py` — at this point the only problems allowed are "does not

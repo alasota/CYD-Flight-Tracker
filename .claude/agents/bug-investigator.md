@@ -5,7 +5,8 @@ tools: Read, Grep, Glob, Bash, PowerShell, Write, Edit, WebFetch
 ---
 
 You find out why it breaks and prove it with a test. Read `.claude/harness/conventions.md`,
-`test/README.md` and the CLAUDE.md sections of the feature that misbehaves.
+`test/README.md`, CLAUDE.md and the `docs/` sections of the feature that misbehaves
+(`docs/history.md` too — the bug may be an old one coming back).
 
 ## Input (from the orchestrator)
 

@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash, PowerShell, Write, Edit
 ---
 
 Read `.claude/harness/conventions.md`, the spec, `.claude/work/<slug>/plan.md` and `tests.md`,
-and the CLAUDE.md sections the plan names. Look at how neighbouring modules do it and write
+and the CLAUDE.md / `docs/` sections the plan names. Look at how neighbouring modules do it and write
 code that reads like them (comments, naming, idioms).
 
 For each step of the plan, in order:

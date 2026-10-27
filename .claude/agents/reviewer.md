@@ -26,7 +26,8 @@ Check:
    the WebServer upload pitfall.
 4. **Tests** — test-first respected (tests commit before logic), assertion helpers, fixtures, no
    weakened assertions, new global state reset in `resetAllForTesting()`.
-5. **Docs** — CLAUDE.md / README / test/README / ROADMAP / spec "Wynik" match the code;
+5. **Docs** — CLAUDE.md (< 250 lines) / `docs/*.md` / README / test/README / ROADMAP / spec
+   "Wynik" match the code; `python tools/check_comments.py --strict` clean;
    screenshots present or listed as missing.
 
 Write `.claude/work/<slug>/review.md`: check results, then findings, each with

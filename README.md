@@ -415,6 +415,11 @@ nobody has to relive the trauma of untangling API calls from `tft.drawPixel()` a
 screen no longer holds its breath while a server thinks. The two halves share nothing but a
 snapshot of the data (handed over by swapping one pointer) and a few small commands.
 
+Want the gory details? [CLAUDE.md](CLAUDE.md) has the house rules, and [docs/](docs/) has the
+rest: [what each screen shows](docs/screens.md), [where the data comes from](docs/data-sources.md),
+[how the firmware is put together](docs/architecture.md) and — our favourite —
+[everything we got wrong first](docs/history.md).
+
 For the curious (and for bug reports): `http://cyd-sky.local/perf.json` and the `[perf]` line
 in the serial log, once a minute, show how responsive the screen is (`ui gap max` — the
 longest the display waited, in ms), how busy the network side is, the free memory, and how many hexdb.io answers are kept in RAM
