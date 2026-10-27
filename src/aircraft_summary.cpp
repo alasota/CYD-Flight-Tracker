@@ -42,12 +42,6 @@ std::string summaryType(const AircraftRow &row) {
   return row.info_pending ? kPendingText : kUnknownText;
 }
 
-std::string formatSummaryIdentity(const AircraftRow &row) {
-  std::string line = summaryFlight(row) + "  " + summaryAirline(row) + "  " + summaryType(row) + "  ";
-  line += phaseIcon(row.phase);
-  return line;
-}
-
 std::string fitSummaryIdentity(const AircraftRow &row, int maxPx, const TextMeasure &measure) {
   static const std::string kGap = "  ";
   const std::string flight = summaryFlight(row);

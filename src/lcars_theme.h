@@ -1,15 +1,15 @@
-// lcars_theme — shared LCARS-inspired color palette, panel/elbow/pill
-// drawing helpers, and font choices. See CLAUDE.md "Design language". This
-// is the only place in the project that defines colors/shapes/fonts —
-// table_view and (later) radar_view call into this rather than picking
-// their own.
+// lcars_theme — shared LCARS-inspired color palette and role colours, the
+// phase-icon pixel art, direction arrow, pill and bottom-nav drawing
+// helpers, text fitting, and font choices. See CLAUDE.md "Design language".
+// This is the only place in the project that defines colors/shapes/fonts —
+// every view module calls into this rather than picking its own.
 #pragma once
 
 #include <cstdint>
 #include <functional>
 #include <string>
 
-#include "flight_phase.h"  // Phase — for phaseIcon()
+#include "flight_phase.h"  // Phase — for phaseColor() / phaseIconKind()
 #include "i18n.h"          // Language, tr() — bottom-nav labels
 #include "touch_input.h"   // Rect — shared tappable-region type
 
@@ -28,8 +28,6 @@ constexpr uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b) {
 // define colors once here rather than scattering raw hex literals.
 constexpr uint16_t LCARS_BLACK = 0x0000;    // background
 constexpr uint16_t LCARS_ORANGE = 0xFC00;   // (original palette — now only THEME_WARNING)
-constexpr uint16_t LCARS_MAGENTA = 0xF81F;  // (original palette — no longer used on screen)
-constexpr uint16_t LCARS_CYAN = 0x07FF;     // (original palette — no longer used on screen)
 constexpr uint16_t LCARS_YELLOW = 0xFFE0;   // radar home crosshair, "imminent" countdown, rate-limit
 
 // Colour scheme "variant A" (CLAUDE.md "Design language"): warm chrome
@@ -82,51 +80,12 @@ constexpr int16_t LCARS_SCREEN_HEIGHT = 240;  // landscape panel height
 constexpr int16_t LCARS_CONTENT_TOP = LCARS_HEADER_HEIGHT + 3;  // 3px gap below the header
 constexpr int16_t LCARS_CONTENT_BOTTOM = LCARS_SCREEN_HEIGHT - LCARS_BOTTOM_NAV_HEIGHT;
 
-// Bottom-nav inactive-segment fill - a dim slate so unselected segments
-// read as recessed against LCARS_BLACK while the active one (LCARS_ORANGE)
-// pops. Not part of CLAUDE.md's five-colour palette (that's the canonical
-// set above); this is a supporting shade, same role as the legacy tints.
+// Bottom-nav inactive-tab fill - a dim slate so unselected tabs read as
+// recessed against LCARS_BLACK while the active one (peach,
+// THEME_CHROME_ACCENT) pops. A supporting shade, not one of the palette
+// colours above.
 constexpr uint16_t LCARS_NAV_INACTIVE = 0x2124;
 constexpr uint16_t THEME_CHROME_RECESSED = LCARS_NAV_INACTIVE;  // inactive nav tab fill
-
-// --- Legacy palette (predates the canonical values above). Still
-// referenced by featured_panel / table_view / radar_view / main; those
-// modules should migrate to the canonical names, after which these can be
-// removed. Kept for now so this change stays scoped to lcars_theme.
-constexpr uint16_t LCARS_AMBER = rgb565(0xFF, 0x99, 0x00);        // ~ LCARS_ORANGE
-constexpr uint16_t LCARS_BLUE_VIOLET = rgb565(0x99, 0x66, 0xFF);  // pill buttons
-constexpr uint16_t LCARS_ROSE = rgb565(0xFF, 0x66, 0x66);         // ~ LCARS_MAGENTA
-constexpr uint16_t LCARS_PALE_BLUE = rgb565(0x99, 0xCC, 0xFF);    // ~ LCARS_CYAN
-
-// A point on the elbow's connecting arc, relative to the arc's center.
-struct ElbowArcPoint {
-  int16_t x = 0;
-  int16_t y = 0;
-};
-
-// Point at `angle_deg` (standard math convention: 0 = +x axis/east, 90 =
-// +y axis/south — i.e. clockwise on screen, since y grows downward) on a
-// circle of the given radius, rounded to the nearest pixel. Used to
-// size/position drawElbow()'s straight bar segments so they meet its
-// curve without a gap or overlap. Pure — no TFT dependency — tested under
-// `pio test -e native`.
-ElbowArcPoint elbowArcPoint(int16_t radius, float angle_deg);
-
-// On-screen bounds of the view-toggle button placeholder (top-right
-// corner) for a `screenWidth` x `screenHeight` display. Pure — shared by
-// drawViewToggleButton() below and touch hit-testing (touch_input's
-// hitTest()) so the drawn button and its tap target never disagree. Will
-// eventually toggle table_view/radar_view; for now it only logs a Serial
-// message (see main.cpp) — see CLAUDE.md "Visualization concept".
-Rect viewToggleButtonBounds(int16_t screenWidth, int16_t screenHeight);
-
-// One-character glyph for a flight phase — the single place this project
-// decides how a Phase looks on screen, so featured_panel and table_view
-// (both of which display a phase icon per CLAUDE.md "Screen 1") can't
-// silently disagree. Kept ASCII (bitmap GLCD/BMP fonts generally only
-// cover 0x20-0x7E — see table_view's orDash()) rather than a fancier
-// glyph. Pure — no TFT dependency — tested under `pio test -e native`.
-char phaseIcon(Phase phase);
 
 // Colour for a phase icon — takeoff green, landing peach, overflight sky,
 // no phase muted lavender — so takeoff/landing stand out from plain text.
@@ -258,7 +217,7 @@ constexpr uint16_t LCARS_RUNWAY_GREY = rgb565(0x80, 0x80, 0x80);
 // Unity (see CLAUDE.md "Testing") — this module is almost entirely draw
 // calls, which is expected for a theme/chrome module. Requires the LGFX
 // device type, so this whole section (unlike other modules' adapters) is
-// guarded in the header too, keeping the palette/elbowArcPoint() above
+// guarded in the header too, keeping the palette and pure helpers above
 // free of any ESP32/LovyanGFX dependency for `pio test -e native`.
 #ifdef ARDUINO
 
@@ -268,25 +227,12 @@ constexpr uint16_t LCARS_RUNWAY_GREY = rgb565(0x80, 0x80, 0x80);
 // table_view/radar_view reference these instead of picking their own.
 extern const lgfx::IFont *const LCARS_FONT_HEADING;  // panel/header titles
 extern const lgfx::IFont *const LCARS_FONT_BODY;     // table rows, labels
-extern const lgfx::IFont *const LCARS_FONT_NUMERIC;  // altitude/speed readouts (7-seg style)
 extern const lgfx::IFont *const LCARS_FONT_SMALL;    // 10px labels for thin strips (header, column header)
 extern const lgfx::IFont *const LCARS_FONT_TABLE;    // table rows: efont 14px (Polish letters)
 extern const lgfx::IFont *const LCARS_FONT_CLOCK;    // header clock: DejaVu12 (13px line, ASCII digits only)
 
 // Adapter: a TextMeasure that measures with `gfx`'s *current* font/size.
 TextMeasure gfxTextMeasure(lgfx::LovyanGFX &gfx);
-
-// Rounded-rectangle panel — the basic content-block shape used throughout
-// both views.
-void drawPanel(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
-
-// The LCARS "elbow": a vertical bar of `barWidth` running down from
-// (x, y) for `height` pixels, curving at the top-left into a horizontal
-// header bar of the same thickness running right for `headerWidth`
-// pixels. The persistent frame element shared by both views (see
-// CLAUDE.md "Design language" — chrome stays constant across screens).
-void drawElbow(LGFX &gfx, int16_t x, int16_t y, int16_t height, int16_t headerWidth,
-               int16_t barWidth, uint16_t color);
 
 // Draws phaseIconRows(kind) centred on (cx, cy), one fastHLine per run of
 // same-coloured pixels. Draws nothing for PhaseIconKind::NONE.
@@ -301,46 +247,6 @@ void drawDirectionArrow(LGFX &gfx, float bearingDeg, int16_t cx, int16_t cy, int
 // h/2) with text centered inside. Used for the stat pills.
 void drawPillButton(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t fillColor,
                      uint16_t textColor, const char *text);
-
-// Draws the view-toggle button placeholder at viewToggleButtonBounds().
-// Purely visual — tapping it is handled by main.cpp (touch_input::hitTest()
-// against viewToggleButtonBounds()), not by this module.
-void drawViewToggleButton(LGFX &gfx, int16_t screenWidth, int16_t screenHeight);
-
-// The LCARS swept-corner "elbow frame": a hollow rectangular border
-// `thickness` px thick around (x, y, w, h), with the top-left corner
-// swept into a quarter-circle of radius `cornerRadius` instead of a plain
-// right angle. The other three corners stay square. This is the frame
-// around Screen 1's featured panel, Screen 2's identity panel and Screen
-// 3's summary panel (all `LCARS_MAGENTA`) — see CLAUDE.md "Design
-// language" / "Visualization concept".
-//
-// Drawn as four `fillRect` edges plus one `fillArc` quarter-annulus for
-// the corner (inner radius `cornerRadius - thickness`, outer
-// `cornerRadius`, swept 180deg->270deg — the top-left quadrant — per
-// LovyanGFX 1.2.28's fillArc(x, y, r0, r1, angle0, angle1, color) —
-// verified in src/lgfx/v1/LGFXBase.{hpp,cpp}: it forwards to
-// fillEllipseArc(), which swaps r0/r1 so inner/outer order doesn't
-// matter; angles are degrees, 0 = east, increasing clockwise with screen
-// y down). The seam
-// geometry is exposed pure via elbowArcPoint() for tests.
-void drawElbowFrame(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h,
-                    int16_t cornerRadius, int16_t thickness, uint16_t color);
-
-// Vertical accent/divider bar — a filled `thickness`-px-wide column of
-// height `h` at (x, y). Screen 3 uses one in `LCARS_ORANGE` (x:192,
-// 8px wide, full content height) as the split between the radar and the
-// summary panel; also the generic "elbow sidebar" motif.
-void drawVerticalDivider(LGFX &gfx, int16_t x, int16_t y, int16_t h, int16_t thickness,
-                         uint16_t color);
-
-// Header-bar name block: a filled rounded rectangle (`fillRoundRect`,
-// corner radius `cornerRadius`) with `label` centered inside in
-// LCARS_FONT_SMALL (8px — the header is only 15px tall). Screen chrome uses
-// this on the left of the header for the aircraft count, coloured by feed
-// health — see CLAUDE.md "Screen chrome".
-void drawHeaderBlock(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, int16_t cornerRadius,
-                     uint16_t fillColor, uint16_t textColor, const char *label);
 
 // The persistent bottom navigation bar (present on all three screens -
 // CLAUDE.md "Screen navigation"): `kScreenCount` equal-width segments, the
