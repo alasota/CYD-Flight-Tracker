@@ -186,6 +186,7 @@ RedrawEvents diffNetState(const NetState *prev, const NetState &next);
 // ---- UI -> net commands ----------------------------------------------------
 
 enum class NetCommandType : uint8_t {
+  None,        // TODO(spec 11): stub from test-author — make it the default, drop RefreshNow
   InstallTag,  // YES on the display's update question
   SkipTag,     // NO: never ask about this version again
   RefreshNow,  // a touch woke the screen at night: fresh data (interval permitting)

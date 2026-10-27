@@ -39,6 +39,14 @@ static void test_canonical_palette_values(void) {
   TEST_ASSERT_EQUAL_HEX16(0xFFE0, LCARS_YELLOW);
 }
 
+// Scenario: Pomarańczowy LCARS zostaje jako kolor ostrzeżenia „!”
+static void test_lcars_orange_stays_as_warning_colour(void) {
+  // Spec 11 removes the unused palette colours; LCARS_ORANGE survives as the
+  // warning "!" colour.
+  TEST_ASSERT_EQUAL_HEX16(LCARS_ORANGE, THEME_WARNING);
+  TEST_ASSERT_EQUAL_HEX16(0xFC00, THEME_WARNING);
+}
+
 static void test_lcars_header_height(void) {
   // Slim header (same height the bottom nav used to have).
   TEST_ASSERT_EQUAL_INT(15, LCARS_HEADER_HEIGHT);
@@ -510,6 +518,7 @@ void run_lcars_theme_tests() {
   RUN_TEST(test_rgb565_black_and_white);
   RUN_TEST(test_rgb565_palette_constants);
   RUN_TEST(test_canonical_palette_values);
+  RUN_TEST(test_lcars_orange_stays_as_warning_colour);
   RUN_TEST(test_lcars_header_height);
   RUN_TEST(test_lcars_bottom_nav_height);
 

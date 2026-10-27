@@ -120,10 +120,11 @@ static void test_fit_identity_unchanged_when_it_fits(void) {
                            fitSummaryIdentity(makeRow(), 33, kOnePx).c_str());
 }
 
-static void test_fit_identity_excludes_phase_icon(void) {
-  // The icon is drawn separately at a fixed right-aligned spot.
-  std::string line = fitSummaryIdentity(makeRow(), 200, kOnePx);
-  ASSERT_NOT_CONTAINS(line, phaseIcon(Phase::TAKEOFF));
+// Scenario: Linia identyfikacji nie zawiera znaku fazy lotu — ikona jest rysowana osobno
+static void test_fit_identity_has_no_phase_marker(void) {
+  // makeRow(): LOT281, LOT Polish Airlines, B738, taking off. The phase icon is
+  // drawn separately at a fixed right-aligned spot, so the text has no marker.
+  ASSERT_STR_EQ("LOT281  LOT Polish Airlines  B738", fitSummaryIdentity(makeRow(), 200, kOnePx));
 }
 
 static void test_fit_identity_truncates_airline_first(void) {
@@ -325,7 +326,7 @@ void run_aircraft_summary_tests() {
   RUN_TEST(test_row_route_endpoint_pending);
 
   RUN_TEST(test_fit_identity_unchanged_when_it_fits);
-  RUN_TEST(test_fit_identity_excludes_phase_icon);
+  RUN_TEST(test_fit_identity_has_no_phase_marker);
   RUN_TEST(test_fit_identity_truncates_airline_first);
   RUN_TEST(test_fit_identity_drops_airline_when_no_room_for_it);
   RUN_TEST(test_fit_identity_then_truncates_type);

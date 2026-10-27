@@ -276,6 +276,13 @@ static void test_command_long_tag_is_cut_and_terminated(void) {
   TEST_ASSERT_EQUAL_CHAR('\0', c.tag[sizeof(c.tag) - 1]);
 }
 
+// Scenario: Domyślnie utworzona komenda sieciowa nic nie zleca
+static void test_default_net_command_is_none(void) {
+  const NetCommand c;
+  ASSERT_ENUM_EQ(NetCommandType::None, c.type);
+  ASSERT_STR_EQ("", netCommandTag(c));
+}
+
 static void test_command_without_tag(void) {
   const NetCommand c = makeNetCommand(NetCommandType::RefreshNow);
   TEST_ASSERT_EQUAL_STRING("", netCommandTag(c).c_str());
@@ -540,6 +547,7 @@ void run_core_link_tests() {
   RUN_TEST(test_differs);
   RUN_TEST(test_command_tag_round_trip);
   RUN_TEST(test_command_long_tag_is_cut_and_terminated);
+  RUN_TEST(test_default_net_command_is_none);
   RUN_TEST(test_command_without_tag);
   RUN_TEST(test_pending_command_sent_once_queue_accepts);
   RUN_TEST(test_pending_command_kept_while_queue_full);
