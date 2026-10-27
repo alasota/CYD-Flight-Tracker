@@ -340,6 +340,17 @@ class FindIncludesTest(unittest.TestCase):
                 '#include "shared/sun_times.h"\n')
         self.assertEqual([(6, "shared/sun_times.h", False, False)], self.names(text))
 
+    def test_strings_and_raw_strings_do_not_hide_or_fake_includes(self):
+        # A "/*" inside a string doesn't open a comment; a raw string's lines aren't directives.
+        text = ('const char *a = "/* not a comment";\n'
+                'const char *b = R"(\n#include "fake.h"\n)";\n'
+                '#include "shared/sun_times.h"\n')
+        self.assertEqual([(5, "shared/sun_times.h", False, False)], self.names(text))
+
+    def test_opensky_app_sees_its_own_context_only(self):
+        self.assertEqual({"shared", "opensky/domain", "opensky/app"},
+                         check_layers.allowed_targets("opensky/app"))
+
     def test_ifdef_arduino_else_endif(self):
         text = ("#ifdef ARDUINO\n#include <A.h>\n#else\n#include <B.h>\n#endif\n"
                 "#include <C.h>\n")
