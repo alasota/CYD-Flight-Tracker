@@ -1,6 +1,6 @@
 # Spec 11 — Porządki: martwy kod, nieaktualne komentarze, dokumentacja
 
-Z przeglądu kodu 2026-10-25, sekcja 2. Status: **zrobione** 2026-10-27, wydane w vNEXT. Robić **przed** spec 12
+Z przeglądu kodu 2026-10-25, sekcja 2. Status: **zrobione** 2026-10-27, wydane w v1.10.0. Robić **przed** spec 12
 (reorganizacja) — mniej plików do przenoszenia i mniej fałszywych zależności.
 
 Zasada z CLAUDE.md (przypadek `computeStardate()`): nieużywany kod usuwa się razem z testami,
