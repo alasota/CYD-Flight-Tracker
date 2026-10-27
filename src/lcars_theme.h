@@ -63,11 +63,13 @@ constexpr uint16_t THEME_PILL_FILL = LCARS_NAVY;             // altitude/speed/d
 constexpr uint16_t THEME_TABLE_HEADER = LCARS_LILAC;         // table column-header bar
 
 // Shared header-bar height (see docs/screens.md "Screen chrome"): status_bar
-// draws y:0..LCARS_HEADER_HEIGHT — a slim 15px strip (Font0 text).
+// draws y:0..LCARS_HEADER_HEIGHT — a slim strip (LCARS_FONT_SMALL name,
+// LCARS_FONT_CLOCK date/time).
 constexpr int16_t LCARS_HEADER_HEIGHT = 15;
 
 // Height of the persistent bottom nav bar (docs/screens.md "Screen navigation"):
-// big 25px buttons (Font2 labels), drawn at y:215..240. (screen_nav gives
+// folder tabs with LCARS_FONT_BODY labels, drawn from LCARS_CONTENT_BOTTOM
+// to the bottom edge. (screen_nav gives
 // its touch hit-zone a little more vertical slack than that.)
 constexpr int16_t LCARS_BOTTOM_NAV_HEIGHT = 25;
 
