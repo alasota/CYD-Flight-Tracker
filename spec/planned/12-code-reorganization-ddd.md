@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **etap 1 z 7 zrobiony (vNEXT)**, etapy 2–7 do zrobienia. Jedna specyfikacja dla całej
+Status: **etap 1 z 7 zrobiony (v1.11.0)**, etapy 2–7 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -236,7 +236,7 @@ a ekran czyta z niego tylko swoje obiekty.
 7. **Egzekwowanie.** `check_layers.py` blokuje CI; `docs/architecture.md` (konteksty, tabela
    z §5, słownik z §3) i sekcja „Code conventions” w CLAUDE.md zastąpiona krótkim odsyłaczem.
 
-### Wynik etapu 1 (2026-10-27, wydany w vNEXT)
+### Wynik etapu 1 (2026-10-27, wydany w v1.11.0)
 
 - **Katalogi:** 94 pliki przeniesione `git mv` (94 rename'y w gicie, bez podziału i zmian
   nazw) do `src/<kontekst>/<warstwa>/` + `shared/`, `platform/`, `app/`; tabela przeniesień to
