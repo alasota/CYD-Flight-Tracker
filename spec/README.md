@@ -28,5 +28,5 @@ dostaje ją od agenta (`NN` = kolejny wolny numer, „Źródło: issue #N”).
 | 09 | [Odporność: zrzut ekranu, komendy, WWW w trakcie lookupów](done/09-concurrency-robustness.md) | done | v1.8.0 |
 | 10 | [Bezpieczeństwo panelu WWW](done/10-web-panel-security.md) | done | v1.9.0 |
 | 11 | [Porządki: martwy kod, komentarze, dokumentacja](done/11-cleanup-dead-code-docs.md) | done | v1.10.0 |
-| 12 | [Reorganizacja kodu (DDD)](planned/12-code-reorganization-ddd.md) | planned | etap 1/7: vNEXT |
+| 12 | [Reorganizacja kodu (DDD)](planned/12-code-reorganization-ddd.md) | planned | etap 1/7: v1.11.0 |
 | 13 | [Strona projektu: historia zmian, zrzuty panelu, opis funkcji](done/13-project-page-layout.md) | done | v1.7.0 |
