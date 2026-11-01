@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **etap 2 z 8 zrobiony (vNEXT)**, etap 1 wydany w v1.11.0, etapy 3–8 do zrobienia. Jedna specyfikacja dla całej
+Status: **etap 2 z 8 zrobiony (v1.11.1)**, etap 1 wydany w v1.11.0, etapy 3–8 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -326,7 +326,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   restartów. Dotyk i jedna aktualizacja OTA — do sprawdzenia przez właściciela (build `-dev`).
   Rozmiar firmware zmierzony lokalnie (wyżej).
 
-### Wynik etapu 2 (2026-11-01, wydany w vNEXT)
+### Wynik etapu 2 (2026-11-01, wydany w v1.11.1)
 
 - **Katalogi:** 80 plików przeniesionych `git mv` (80 rename'ów w gicie): `<kontekst>/domain/` →
   `core/`, `<kontekst>/app/` → `services/`, `src/app/` → `src/main/`; `admin/app/` rozdzielony
