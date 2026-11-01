@@ -67,6 +67,17 @@ _add("admin/app", *_pair("config_page"), *_pair("web_i18n"), *_pair("config_port
 _add("admin/adapters", "github_ca.h")
 _add("app", "main.cpp", *_pair("net_task"))
 
+# TODO(spec 12): stub from test-author — the stage-2 table, STAGES and final_path() are filled
+# in by the implementer (plan "Tool design"); MOVES stays the stage-1 table until then.
+MOVES_STAGE_1 = MOVES
+MOVES_STAGE_2 = {}
+STAGES = (MOVES_STAGE_1, MOVES_STAGE_2)
+
+
+def final_path(stage0_path):
+    """Path relative to src/ that the stage-0 file `stage0_path` has after the last stage."""
+    return stage0_path  # TODO(spec 12): stub from test-author
+
 _QUOTED_INCLUDE_RE = re.compile(r'^([ \t]*#[ \t]*include[ \t]*")([^"\r\n]+)(")', re.M)
 
 
