@@ -3,6 +3,7 @@
 #include "enrichment/core/aircraft_names.h"  // airlineForCallsign(), friendlyAircraftType()
 #include "enrichment/core/place_names.h"     // placeName()
 #include "display/core/screens/table_view.h"      // full AircraftRow definition
+#include "display/core/text/fit_to_width.h"      // fitToWidth()
 
 namespace {
 

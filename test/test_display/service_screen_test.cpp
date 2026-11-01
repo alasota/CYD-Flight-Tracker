@@ -2,6 +2,8 @@
 #include <unity.h>
 
 #include "display/core/i18n.h"
+#include "display/core/text/font_set.h"  // isFontSafeText()
+#include "display/core/text/utf8.h"      // utf8Length()
 #include "display/core/theme/lcars_theme.h"
 #include "display/core/screens/service_screen.h"
 #include "test_support.h"

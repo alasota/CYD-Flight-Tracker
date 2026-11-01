@@ -6,7 +6,8 @@
 
 #include "admin/core/config_page.h"  // SettingsTab, openSkyDailyCredits()
 #include "admin/core/device_alerts.h"
-#include "display/core/theme/lcars_theme.h"  // THEME_ALERT / THEME_WARNING, isFontSafeText()
+#include "display/core/text/font_set.h"  // isFontSafeText()
+#include "display/core/theme/lcars_theme.h"  // THEME_ALERT / THEME_WARNING
 #include "test_support.h"
 
 namespace {

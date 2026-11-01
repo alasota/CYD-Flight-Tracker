@@ -12,7 +12,7 @@
 //      ("Rome-Fiumicino International Airport" -> "Rome-Fiumicino");
 //   3. the IATA code, then the ICAO code.
 //
-// All output is font-safe text (lcars_theme::isFontSafeText(): ASCII + the
+// All output is font-safe text (font_set's isFontSafeText(): ASCII + the
 // Polish letters). hexdb.io airport names are folded to ASCII (asciiFold()),
 // since they can contain any accent or dash the fonts may not have.
 //

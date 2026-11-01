@@ -3,6 +3,7 @@
 
 #include "fixtures.h"
 #include "display/core/screens/table_view.h"
+#include "display/core/text/utf8.h"  // utf8Length()
 #include "test_support.h"
 
 namespace {

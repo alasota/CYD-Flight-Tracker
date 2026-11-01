@@ -170,6 +170,7 @@ std::string alertCloseLabel(uint32_t secondsLeft, Language lang) {
 
 #ifdef ARDUINO
 
+#include "display/core/text/fit_to_width.h"
 #include "display/core/theme/lcars_theme.h"
 
 namespace {

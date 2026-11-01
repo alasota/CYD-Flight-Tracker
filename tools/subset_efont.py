@@ -4,7 +4,7 @@
 LovyanGFX's efontJA_* fonts carry ~10,800 glyphs each (kanji, kana, ...) and
 take ~1.05 MB of flash together. The display only ever draws printable ASCII,
 the 18 Polish letters and a few symbols (see isFontSafeText() in
-lcars_theme). This script copies exactly those glyphs, byte for byte, out of
+src/display/core/text/font_set). This script copies exactly those glyphs, byte for byte, out of
 LovyanGFX's U8g2-format arrays into
 src/display/core/theme/fonts/lcars_efont.c — so every pixel
 and every metric (the 23-byte header is kept, only glyph count and section
@@ -13,7 +13,7 @@ offsets change) is identical to the original fonts.
 Usage (from the repo root, after `pio run` has fetched LovyanGFX):
     python tools/subset_efont.py
 
-Change CODEPOINTS together with lcars_theme's kFontExtraCodepoints; the
+Change CODEPOINTS together with font_set's kFontExtraCodepoints; the
 native test fonts_test.cpp (test_display) checks that every character isFontSafeText() accepts
 has a glyph in every subset font.
 """

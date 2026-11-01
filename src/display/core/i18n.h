@@ -15,7 +15,8 @@
 //
 // Text is real Polish in UTF-8 ("ZBLIŻA SIĘ"): the display fonts are efont
 // (lcars_theme), which have the Polish letters. Every string must still be
-// isFontSafeText() (ASCII + ąćęłńóśźż) — the native tests enforce it.
+// isFontSafeText() (display/core/text/font_set: ASCII + ąćęłńóśźż) — the
+// native tests enforce it.
 //
 // Pure — no Arduino dependency — tested under `pio test -e native`.
 #pragma once

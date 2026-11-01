@@ -1,16 +1,16 @@
 // lcars_theme — shared LCARS-inspired color palette and role colours, the
 // phase-icon pixel art, direction arrow, pill and bottom-nav drawing
-// helpers, text fitting, and font choices. See docs/screens.md "Design language".
+// helpers and font choices. See docs/screens.md "Design language".
 // This is the only place in the project that defines colors/shapes/fonts —
 // every view module calls into this rather than picking its own.
 #pragma once
 
 #include <cstdint>
-#include <functional>
 #include <string>
 
 #include "airspace/core/flight_phase.h"  // Phase — for phaseColor() / phaseIconKind()
 #include "display/core/i18n.h"          // Language, tr() — bottom-nav labels
+#include "display/core/text/fit_to_width.h"  // TextMeasure — gfxTextMeasure()
 #include "display/core/touch_input.h"   // Rect — shared tappable-region type
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
@@ -154,43 +154,6 @@ uint16_t tableRowTextColor(int rowIndex);
 // drawn in the muted lavender (they sort below the airborne ones and would
 // otherwise look like a sorting mistake); airborne rows alternate as above.
 uint16_t tableRowColor(int rowIndex, bool onGround);
-
-// Rendered pixel width of a string in whatever font is current. On the
-// device this wraps gfx.textWidth(); tests pass a fixed-pitch fake.
-using TextMeasure = std::function<int(const std::string &)>;
-
-// `text` cut down so that measure(result) <= maxPx — the one truncation
-// helper for every place a string must not spill out of its cell/panel
-// (docs/screens.md "Screen 1": table cells, the identity line, Screen 3's
-// airline row):
-//   - already fits                -> returned unchanged.
-//   - otherwise                   -> longest head + "..." that fits, with
-//     trailing spaces trimmed off the head ("LOT..." not "LOT ...").
-//     ASCII "...", not "…" — bitmap fonts only cover 0x20-0x7E.
-//   - not even "X..." fits        -> longest plain head that fits.
-//   - maxPx <= 0 / nothing fits   -> "".
-std::string fitToWidth(const std::string &text, int maxPx, const TextMeasure &measure);
-// (Cuts only on UTF-8 character boundaries — a multi-byte Polish letter is
-// never split, see isFontSafeText().)
-
-// Number of characters (UTF-8 code points) in `utf8`, not bytes — for
-// layout maths with the efont fonts (fixed advance per ASCII character).
-size_t utf8Length(const std::string &utf8);
-
-// True if every character of `text` is printable ASCII, one of the 18
-// Polish letters (ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ) or one of ° ± × · – — … →, as
-// well-formed UTF-8 — the set the display fonts carry (fonts/lcars_efont.c
-// next to this file holds nothing else). On-screen strings (i18n table,
-// city names) are tested against it.
-bool isFontSafeText(const std::string &text);
-
-// The same set, per Unicode code point.
-bool isFontCodepoint(uint32_t cp);
-
-// True if the U8g2-format `font` has a glyph for `cp`, found the way
-// LovyanGFX's U8g2font::getGlyph() looks it up. Pure — test_fonts uses it
-// to check theme/fonts/lcars_efont.c against isFontCodepoint().
-bool fontHasGlyph(const uint8_t *font, uint16_t cp);
 
 // Metrics of LCARS_FONT_SMALL (efont 10 px) and LCARS_FONT_BODY
 // (efont 16 px): glyph height, and the fixed advance of an ASCII /

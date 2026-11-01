@@ -4,7 +4,7 @@
 #include <cstring>
 #include <string>
 
-#include "display/core/theme/lcars_theme.h"  // isFontSafeText()
+#include "display/core/text/font_set.h"  // isFontSafeText()
 #include "enrichment/core/place_names.h"
 
 namespace {

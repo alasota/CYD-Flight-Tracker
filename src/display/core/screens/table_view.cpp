@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 
+#include "display/core/text/fit_to_width.h"
 #include "shared/geo.h"
 
 std::vector<AircraftRow> buildEnrichedRecords(
