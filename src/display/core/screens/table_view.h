@@ -94,7 +94,7 @@ std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int 
 // signature needs the LGFX device type.
 #ifdef ARDUINO
 
-#include "LGFX_CYD.hpp"
+#include "display/adapters/lgfx/LGFX_CYD.hpp"
 
 // Draws Screen 1's content area (LCARS_CONTENT_TOP..BOTTOM) across a
 // `screenWidth`-px display, at the fixed coordinates docs/screens.md "Screen 1"

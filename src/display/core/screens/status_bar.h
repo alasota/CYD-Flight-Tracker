@@ -91,7 +91,7 @@ HeaderZones statusBarZones(int screenWidth, const std::string &appName,
 // LGFX device type.
 #ifdef ARDUINO
 
-#include "LGFX_CYD.hpp"
+#include "display/adapters/lgfx/LGFX_CYD.hpp"
 
 // Draws the full header bar into y:0..LCARS_HEADER_HEIGHT across
 // `screenWidth` px, laid out by statusBarZones(): app name, health dot

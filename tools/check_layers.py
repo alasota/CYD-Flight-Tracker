@@ -35,14 +35,6 @@ SOURCE_SUFFIXES = {".h", ".hpp", ".c", ".cpp"}
 CONTEXTS = ("airspace", "enrichment", "opensky", "display", "admin")
 LAYERS = ("core", "services", "adapters", "assets")
 
-# Headers in include/ (PlatformIO's include path) until stage 4 moves them into src/:
-# the LGFX_Device subclass is the display adapter, the calibration is plain constants the pure
-# touch mapping reads.
-INCLUDE_DIR_LAYERS = {
-    "include/LGFX_CYD.hpp": "display/adapters",
-    "include/touch_calibration.h": "display/core",
-}
-
 SDK = "sdk"
 
 # Angle includes that are the ESP32 / Arduino SDK or the display library; everything else in
@@ -107,10 +99,9 @@ def format_finding(f):
 def classify(path):
     """Layer of a repo-relative path ('shared', 'platform', 'main', '<ctx>/<layer>', 'test') or
     None when it sits outside any context and layer. Subfolders collapse into their layer
-    (`display/core/screens/x.h` -> `display/core`)."""
+    (`display/core/screens/x.h` -> `display/core`). A header in include/ belongs to no layer:
+    the board config lives in display/ since stage 4, so anything left there is reported."""
     path = path.replace("\\", "/")
-    if path in INCLUDE_DIR_LAYERS:
-        return INCLUDE_DIR_LAYERS[path]
     parts = path.split("/")
     if parts[0] == "test" and len(parts) > 1:
         return "test"

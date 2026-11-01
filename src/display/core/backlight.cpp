@@ -240,7 +240,7 @@ std::string lightStatusJson(const BacklightStatus &s) {
 
 #include <ctime>
 
-#include "LGFX_CYD.hpp"
+#include "display/adapters/lgfx/LGFX_CYD.hpp"
 #include "admin/core/config_store.h"
 #include "platform/core_link.h"  // Guarded<T>
 #include "platform/time_sync.h"

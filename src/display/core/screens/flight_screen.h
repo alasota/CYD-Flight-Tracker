@@ -83,7 +83,7 @@ CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang
 // aircraft_summary. Not covered by Unity (see CLAUDE.md "Testing").
 #ifdef ARDUINO
 
-#include "LGFX_CYD.hpp"
+#include "display/adapters/lgfx/LGFX_CYD.hpp"
 
 // Draws all three zones for a `screenWidth`-px display. `hasNearest` ==
 // false (no aircraft in range) leaves the identity panel empty and forces
