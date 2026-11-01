@@ -46,7 +46,7 @@ Linia MISO wyświetlacza (pin 12) jest podłączona, bo z niej czyta zrzut ekran
 
 ## 2. Kod
 
-- **Czysta logika** (`src/display/domain/board_variant.{h,cpp}`, warstwy wg spec 12):
+- **Czysta logika** (`src/display/core/board_variant.{h,cpp}`, warstwy wg spec 12; przed jego etapem 2: `display/domain/`):
   - `enum class BoardVariant { ClassicR, R2Usb }`;
   - `BoardVariant boardFromPanelId(uint32_t rddid)`: decyzja z p. 1.3;
   - `const char *boardVariantName(BoardVariant)`: `"cyd-r"` / `"cyd-2usb"`, do logu i panelu;
@@ -57,7 +57,7 @@ Linia MISO wyświetlacza (pin 12) jest podłączona, bo z niej czyta zrzut ekran
   XPT2046 bez zmian i wspólne dla obu paneli. Dla ST7789 `invert` i `rgb_order` ustawione na
   płytce; oczekiwane `invert = true`. Kryterium: kolory motywu LCARS takie jak na R
   (porównać z `docs/screenshots/`). Konfiguracja zostaje w `include/` (spec 12 przenosi ją
-  w etapie 3).
+  w etapie 4).
 - `main.cpp` (`setup()`) woła `tft.beginDetected()` zamiast `tft.init()`. Wynik trafia do
   `core_link` **przed** startem `net_task`, bo zapis przed utworzeniem zadania jest widoczny dla
   rdzenia 0 bez blokady.
