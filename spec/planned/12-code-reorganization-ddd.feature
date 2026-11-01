@@ -2,7 +2,7 @@ Feature: Reorganizacja kodu według DDD — etap 1 „Szkielet”: katalogi kont
   Pliki z płaskiego src/ trafiają (git mv, bez dzielenia) do katalogów kontekstów i warstw z §4;
   każdy #include "…" podaje ścieżkę od src/ (flaga -I src), środowisko native nie kompiluje
   korzeni kompozycji ani adapterów, a tools/check_layers.py raportuje naruszenia tabeli z §5
-  (tylko raport, CI nie blokuje do etapu 7). Zachowanie urządzenia się nie zmienia: testy
+  (tylko raport, CI nie blokuje do etapu 8). Zachowanie urządzenia się nie zmienia: testy
   zielone, liczba RUN_TEST nie maleje, firmware ma ten sam rozmiar ± 1 KB.
   Etapy 2–7 (§8) dostaną swoje scenariusze w tym pliku, gdy przyjdzie ich kolej.
 
@@ -19,7 +19,7 @@ Feature: Reorganizacja kodu według DDD — etap 1 „Szkielet”: katalogi kont
   Scenario Outline: Plik z czystą i sprzętową połową trafia tam, gdzie będzie jego czysta część
     Given plik <plik> ma dziś część czystą i część pod #ifdef ARDUINO
     When tabela przeniesień etapu 1 wskazuje jego nowe miejsce
-    Then plik leży w <katalog>, a podział na adapter czeka na etap 3
+    Then plik leży w <katalog>, a podział na adapter czeka na etap 4
 
     Examples:
       | plik               | katalog                       |
