@@ -25,7 +25,7 @@
 
 #include "enrichment/core/aircraft_lookup.h"
 #include "platform/core_link.h"  // DataSnapshot
-#include "opensky/core/opensky_client.h"
+#include "airspace/core/aircraft_state.h"  // Aircraft
 #include "enrichment/core/route_lookup.h"
 
 struct LookupPorts {

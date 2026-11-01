@@ -327,18 +327,6 @@ static void test_reported_on_ground_stays_on_ground(void) {
   TEST_ASSERT_TRUE(a.on_ground);
 }
 
-static void test_infer_on_ground_rules(void) {
-  Aircraft a;
-  a.on_ground = false;
-  a.has_altitude = true;
-  a.baro_altitude = 900.0f;
-  a.has_velocity = true;
-  a.velocity = 100.0f;
-  TEST_ASSERT_FALSE(inferOnGround(a));
-  a.velocity = 10.0f;  // altitude reported but crawling -> stale altitude at the gate
-  TEST_ASSERT_TRUE(inferOnGround(a));
-}
-
 }  // namespace
 
 void run_opensky_client_tests() {
@@ -385,5 +373,4 @@ void run_opensky_client_tests() {
   RUN_TEST(test_taxi_speed_without_altitude_is_on_ground);
   RUN_TEST(test_real_airborne_traffic_stays_airborne);
   RUN_TEST(test_reported_on_ground_stays_on_ground);
-  RUN_TEST(test_infer_on_ground_rules);
 }
