@@ -191,3 +191,25 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   `admin/services/` would have filed `WebServer` code under a pure layer. Side effect: the
   layer report went 55 → 51, not "the same 55 under new names" as the spec first said
   (docs/architecture.md "Source layout (spec 12)").
+- **Misplaced types moved to their contexts** (spec 12, stage 3, owner 2026-11-01). The
+  wrong-way includes the 2026 review started from are gone: `core_link.h` includes
+  `airspace/core/tracked_flight.h` / `feed_health.h` instead of `table_view.h` / `status_bar.h`,
+  the credit cost left `config_portal` for `opensky/core/scan_area`, UTF-8 / `fitToWidth()` / the
+  font set left `lcars_theme` for `display/core/text/`, distance and compass point went to
+  `shared/geo`. `Aircraft` moved together with `inferOnGround()` into `airspace/core/aircraft_state`:
+  the function takes an `Aircraft`, and leaving the struct in `opensky/core` would have made the
+  sky model include OpenSky (§5 forbids it). Two findings are new and accepted:
+  `tracked_flight.h -> enrichment/core`, because `AircraftRow` carries hexdb.io's value structs;
+  the real fix (own fields) is a model change, not a refactor, so it is decided before stage 8.
+  The `config_portal.cpp` `native` exception stayed: its three remaining pure functions belong to
+  stage 4's split, and moving them early would have mixed a split into a move stage.
+- **`AircraftRow`'s copies are out of line on purpose** (stage 3). Moving
+  `buildEnrichedRecords()` / `splitFeaturedAndRest()` into their own translation units made GCC
+  inline `AircraftRow`'s implicit copy constructor / assignment (a large struct of
+  `std::string`s) at every copy site: `firmware.bin` grew 1 477 200 → 1 478 400 B (+1 200, over
+  the stage's ± 1 KB), with no new code (nm: inlined copies +409 / +240, `uninitialized_copy`
+  instances +692; ~164 B per new `.cpp` of exception tables). Declaring the copy / move
+  constructors, assignments and destructor in `tracked_flight.h` and defining them `= default`
+  in `tracked_flight.cpp` (same semantics, moves still `noexcept`) brought it to 1 477 568 B
+  (+368). Without the out-of-line destructor it was 32 B bigger. Turning them back into implicit
+  members "for simplicity" costs ~830 B of flash.

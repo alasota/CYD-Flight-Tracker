@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **etap 2 z 8 zrobiony (v1.11.1)**, etap 1 wydany w v1.11.0, etap 3 **w trakcie**, etapy 4–8 do zrobienia. Jedna specyfikacja dla całej
+Status: **etap 3 z 8 zrobiony (vNEXT)**, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etapy 4–8 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -276,6 +276,14 @@ a ekran czyta z niego tylko swoje obiekty.
    `status_bar.h`, `computeDistanceBearing`, `compassPoint`, `openSkyCreditCost`, UTF-8 /
    `fitToWidth`, `inferOnGround`, `pickNowAircraft`, `sortRowsForDisplay` do kontekstów z §4.
    Testy idą za kodem (np. testy odległości z `table_view_test.cpp` do `shared/geo_test.cpp`).
+   Decyzje (plan etapu 3, właściciel 2026-11-01): z typami idą ich towarzysze (`buildEnrichedRecords`,
+   `annotateDistances`, `classifyPhases`, `sortRowsByDistance`, `FeaturedSplit`, `NowPick`,
+   `DistanceBearing`, `TextMeasure`, `kTaxiSpeedMps`, `kOverheadRadiusKm`), bo woła je
+   `poll_pipeline`; `Aircraft` idzie z `inferOnGround` do `airspace/core/aircraft_state`; zbiór
+   znaków fontów (`isFontSafeText` i in.) też do `display/core/text/font_set`, a `DataSnapshot` i
+   `Language` zostają; 2 nowe naruszenia `tracked_flight.h -> enrichment/core` przyjęte, decyzja
+   przed etapem 8; wyjątek `config_portal.cpp` w filtrze `native` zostaje do etapu 4; kryterium
+   `check_layers.py`: **47** (51 − 6 + 2), limit w teście narzędzi obniżony do 47.
 4. **Podział czyste / sprzętowe.** Każdy plik z `#ifdef ARDUINO` → `core|services/x.cpp` +
    `adapters/x_esp32.cpp` (albo `adapters/lgfx/x_draw.cpp`). Po tym etapie `grep -rl "ifdef
    ARDUINO" src --include=*.cpp` zwraca tylko `platform/` i `adapters/`.
@@ -352,6 +360,66 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   w filtrze `native` do etapu 4 (zamiast dzielenia go teraz albo zostawienia w `services/`);
   kryterium 55 → 51 (wyżej); tabela przeniesień etapu 1 zostaje obok tabeli etapu 2.
 - **`@manual` (płytka, 2026-11-01):** wgrane przez USB (`2b29f48`): bez paniki i restartów w logu szeregowym przez 3 min; trzy ekrany z lotem na żywo (`/screenshot.bmp?screen=0..2`); stopka panelu `v1.11.0-6-g2b29f48-dirty`; `/perf.json` po 3,5 min: przerwa pętli UI maks. 93 ms, 0 wolnych przejść, sterta 147 KB (największy blok 59 KB). Po etapie 1 było: 74 ms, 0, 146 / 59 KB; dłuższa przerwa (93 ms) mieści się poniżej progu wolnego przejścia, wolnych przejść dalej 0. OTA przez WiFi (`POST /update`, trasa z przeniesionego `config_portal`): 1,48 MB w 16 s, HTTP 200, nowy obraz `c9b49d5` oznaczony jako ważny po 30 s. `pio run -e cyd-ota -t upload` przy panelu bez hasła kończy się 400 — `curl --digest` wysyła pierwsze żądanie bez treści; błąd sprzed etapu 2, osobna poprawka. Dotyk — do sprawdzenia przez właściciela.
+
+### Wynik etapu 3 (2026-11-01, wydany w vNEXT)
+
+- **Co przeszło gdzie** (symbole, nie pliki — nowe pliki pisane ręcznie, bez `git mv` i bez
+  tabeli w `rewrite_includes.py`; każdy symbol znikał ze starego nagłówka w tym samym commicie):
+  - `airspace/core/aircraft_state` — `Aircraft`, `kTaxiSpeedMps`, `inferOnGround()` (z
+    `opensky_client`, który go dołącza i tłumaczy na niego tablicę OpenSky; komentarze pól nie
+    cytują już indeksów OpenSky);
+  - `airspace/core/feed_health.h` — `OpenSkyHealth` (ze `status_bar.h`);
+  - `airspace/core/tracked_flight` — `AircraftRow`, `buildEnrichedRecords()`,
+    `annotateDistances()`, `classifyPhases()` (z `table_view`);
+  - `airspace/core/flight_ordering` — `sortRowsForDisplay()`, `sortRowsByDistance()`,
+    `FeaturedSplit`, `splitFeaturedAndRest()` (z `table_view`);
+  - `airspace/core/now_pick` — `kOverheadRadiusKm`, `NowPick`, `pickNowAircraft()` (z `flight_screen`);
+  - `shared/geo` — `DistanceBearing`, `computeDistanceBearing()` (z `table_view`), `compassPoint()`
+    (z `lcars_theme`);
+  - `opensky/core/scan_area` — `bboxAreaSqDeg()`, `openSkyCreditCost()` (z `config_portal`);
+  - `display/core/text/` — `utf8` (`utf8Length()`, `utf8IsCharBoundary()`, wcześniej anonimowy
+    pomocnik), `fit_to_width` (`TextMeasure`, `fitToWidth()`), `font_set` (`isFontSafeText()`,
+    `isFontCodepoint()`, `fontHasGlyph()`) — z `lcars_theme`.
+
+  `core_link.h` dołącza `tracked_flight.h` i `feed_health.h`, żadnego nagłówka z
+  `display/core/screens/`; `poll_pipeline` nie dołącza już ekranów ani `opensky_client.h`.
+- **Testy:** 49 przeniesionych do grupy kontekstu nowego miejsca kodu (nazwy bez zmian), 1 nowy
+  (`test_char_boundary_on_ascii_and_continuation_bytes` — `utf8IsCharBoundary()` stała się
+  publiczna). Wszystkie 6 grup zielone: admin 258 (3 pominięte) / airspace 71 / display 312 /
+  enrichment 80 / opensky 73 / platform 83 = **877** (przed etapem 876); `RUN_TEST(` = 877.
+  Nowe testy narzędzi w `LayoutTest` (symbole w nowym miejscu, testy za kodem, 6 usuniętych
+  naruszeń, `core_link.h` bez ekranów); `check_bdd.py` 0 problemów.
+- **`tools/check_layers.py`: 47 naruszeń** (51 − 6 + 2, dokładnie jak w planie): znika
+  `poll_pipeline.cpp -> display/core` × 2, `poll_pipeline.h -> opensky/core`, `table_view.h ->
+  opensky/core`, `config_page.cpp` i `device_alerts.cpp -> admin/adapters`; dochodzi
+  `tracked_flight.h -> enrichment/core` × 2 (`AircraftRow` niesie `AircraftInfo`, `RouteInfo`,
+  `AirportInfo` — §4.1 i §5 są tu sprzeczne). Limit w
+  `LayoutTest.test_layer_findings_do_not_exceed_the_stage_limit` (nowa nazwa) = 47.
+  `rewrite_includes.py --check` = 0, `check_comments.py --strict` czysto.
+- **Firmware:** `firmware.bin` 1 477 200 → 1 477 568 B (**+368 B**), Flash used +364 B, RAM bez
+  zmian (62 044 B). Po samych przeniesieniach było +1 200 B (ponad ± 1 KB): `buildEnrichedRecords`
+  i `splitFeaturedAndRest` w osobnych jednostkach kompilacji sprawiły, że GCC wstawiał inline
+  kopie `AircraftRow` (dużo `std::string`), a każdy nowy `.cpp` dokłada ok. 160 B tablic wyjątków.
+  Odzyskane (decyzja właściciela) przez zadeklarowanie konstruktorów kopiujących / przenoszących,
+  przypisań i destruktora `AircraftRow` w `tracked_flight.h` i `= default` w `tracked_flight.cpp`
+  — ta sama semantyka (docs/history.md „Tooling and docs”).
+- **Decyzje właściciela (2026-11-01):** Q1 — 2 naruszenia `tracked_flight.h -> enrichment/core`
+  przyjęte, rozstrzygnięcie przed etapem 8; Q2 — z §4 poza listą etapu przeniesiony tylko
+  `font_set`, `DataSnapshot` i `Language` zostają; Q3 — wyjątek `config_portal.cpp` w filtrze
+  `native` do etapu 4 (zostały w nim `parseOpenSkyCredentialsJson()` i dwa walidatory, 11
+  przypadków w `config_portal_test.cpp`); Q4 — limit w teście narzędzi 51 → 47 (scenariusz
+  etapu 2 o limicie dostosowany); Q5 — `sortRowsByDistance()` (bez wywołania w produkcji)
+  przeniesiona bez zmian, usunięcie osobnym PR.
+- **Odstępstwa od §8 pkt 3:** przeniesione też funkcje towarzyszące (wyżej) i `Aircraft`;
+  `font_set` z §4.4 dodany do etapu (Q2).
+- **`@manual` (płytka, 2026-11-01):** po każdym kroku wgrane przez USB (COM3), log szeregowy
+  2–3 min, `/perf.json`, trzy zrzuty ekranów. Obraz końcowy `666b69b`: bez paniki, jedyny restart
+  to start; ekrany 0–2 poprawne (tabela, TERAZ z odliczaniem, RADAR); panel nadal pokazuje
+  koszt w kredytach; przerwa pętli UI maks. 95 ms, 0 wolnych przejść; sterta 142 KB, największy
+  blok 59 KB (po etapie 2: 147 / 59 KB; w kolejnych krokach etapu sterta wahała się 142–146 KB,
+  największy blok 53–70 KB między uruchomieniami). Po drodze sprawdzone też: kropka zdrowia w
+  nagłówku, ikony lądowania / startu i linie lotnicze / trasy w wierszach, kolejność tabeli,
+  wybór TERAZ (zbliżający się LOT348). Dotyk — do sprawdzenia przez właściciela.
 
 ## 9. Testy
 

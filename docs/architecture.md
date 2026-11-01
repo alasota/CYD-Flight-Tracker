@@ -10,8 +10,9 @@ are done. Stage 8 rewrites this file around the contexts.)
 
 Spec: `spec/planned/12-code-reorganization-ddd.md` (§2 layer names, §4 contexts, §5 dependency
 table, §8 stages). Stage 1 moved the files with `git mv`, **unsplit and unrenamed**; stage 2
-renamed the layer folders. Stages 3–8 move misplaced types, split pure / hardware halves, add the
-`services/` logic, settings per context, rename to the glossary and make the layer check block CI.
+renamed the layer folders; stage 3 moved misplaced types into their contexts. Stages 4–8 split
+pure / hardware halves, add the `services/` logic, settings per context, rename to the glossary
+and make the layer check block CI.
 
 - **Folders:** `src/<context>/<layer>/` — contexts `airspace` (flight phase, CPA, the poll
   pipeline), `enrichment` (hexdb.io lookups, caches, names), `opensky` (client, login, credits),
@@ -20,33 +21,54 @@ renamed the layer folders. Stages 3–8 move misplaced types, split pure / hardw
   `core/` (pure logic of the context: types, rules, maths, screen layouts, texts — native, tested),
   `services/` (state machines, pipelines, use cases that combine `core` parts and ports — native,
   tested), `adapters/` (SDK calls: ESP32, LovyanGFX, HTTP, NVS, `WebServer` — not native). Plus
-  `shared/` (`sun_times`), `platform/` (`core_link`, `time_sync`, `wifi_manager`, `perf_stats`,
-  `net_config`) and `src/main/` (`main.cpp`, `net_task` — composition roots, one per core).
-  Subfolders: `display/core/screens/`, `display/core/theme/` (+ `fonts/`).
-- **Placement rule (stages 1–3):** a file sits where its pure half will live, named as before;
+  `shared/` (`sun_times`, `geo`), `platform/` (`core_link`, `time_sync`, `wifi_manager`,
+  `perf_stats`, `net_config`) and `src/main/` (`main.cpp`, `net_task` — composition roots, one
+  per core). Subfolders: `display/core/screens/`, `display/core/theme/` (+ `fonts/`),
+  `display/core/text/` (`utf8`, `fit_to_width`, `font_set`).
+- **Placement rule (until stage 4):** a file sits where its pure half will live, named as before;
   its `#ifdef ARDUINO` half stays inside until stage 4 moves it to `adapters/`. Only files that
   are entirely hardware are in `adapters/` / `main/` already (`enrichment/adapters/hexdb_http`,
   `admin/adapters/github_ca.h`, `main/net_task`, `main/main.cpp`).
   `admin/adapters/config_portal` is the exception: mostly `WebServer` routes, but it still holds
-  five pure functions with native tests, so the `native` filter adds it back (below) until
-  stages 3–4 take them out. `include/LGFX_CYD.hpp` and `include/touch_calibration.h` stay in `include/`
+  three pure functions with native tests, so the `native` filter adds it back (below) until
+  stage 4 takes them out. `include/LGFX_CYD.hpp` and `include/touch_calibration.h` stay in `include/`
   until stage 4.
 - **Stage 2** (`git mv` of 80 files, include lines only): `<ctx>/domain/` → `<ctx>/core/`,
   `<ctx>/app/` → `<ctx>/services/`, `src/app/` → `src/main/`; `admin/app/` split —
   `config_page`, `web_i18n` (pure) → `admin/core/`, `config_portal` (the `WebServer` routes) →
   `admin/adapters/`. Today only `airspace/services/` (`poll_pipeline`) and `display/services/`
   (`screenshot`) exist.
+- **Stage 3** (symbols, not files — written by hand, no move table): each misplaced type left its
+  old header in the same commit it appeared in the new one, and its tests moved with it into the
+  suite of the new context (49 tests, names unchanged). `airspace/core/`: `aircraft_state`
+  (`Aircraft`, `kTaxiSpeedMps`, `inferOnGround()` — from `opensky_client`, which now includes
+  it and translates OpenSky's array into it), `feed_health.h` (`OpenSkyHealth`, from
+  `status_bar.h`), `tracked_flight` (`AircraftRow`, `buildEnrichedRecords()`,
+  `annotateDistances()`, `classifyPhases()` — from `table_view`), `flight_ordering`
+  (`sortRowsForDisplay()`, `sortRowsByDistance()`, `splitFeaturedAndRest()` — from
+  `table_view`), `now_pick` (`pickNowAircraft()`, `kOverheadRadiusKm` — from `flight_screen`).
+  `shared/geo`: `computeDistanceBearing()` (from `table_view`), `compassPoint()` (from
+  `lcars_theme`). `opensky/core/scan_area`: `bboxAreaSqDeg()`, `openSkyCreditCost()` (from
+  `config_portal`). `display/core/text/`: `utf8` (`utf8Length()`, `utf8IsCharBoundary()` — was an
+  anonymous helper), `fit_to_width` (`TextMeasure`, `fitToWidth()`), `font_set`
+  (`isFontSafeText()`, `isFontCodepoint()`, `fontHasGlyph()` — from `lcars_theme`, which still
+  includes `fit_to_width.h` for its `#ifdef ARDUINO` `gfxTextMeasure()`). Companions moved with
+  their partners (`DistanceBearing`, `FeaturedSplit`, `NowPick`) so `poll_pipeline` includes no
+  screen header. `core_link.h` now includes `tracked_flight.h` and `feed_health.h`, no
+  `display/core/screens/` header (`LayoutTest.test_core_link_includes_no_screen_headers`).
+  `AircraftRow`'s copy / move constructors, assignments and destructor are declared in
+  `tracked_flight.h` and `= default` in `tracked_flight.cpp` — out of line on purpose, for
+  firmware size (docs/history.md "Tooling and docs").
 - **Includes** are full paths from `src/` (`#include "display/core/i18n.h"`), in `src/` and
   `test/` alike; `-I src` is in `env:cyd` and `env:native` (`cyd-ota`, `native-asan` inherit).
   `test/support/` headers and test-local headers (`github_fixtures.h`) stay short.
 - **`native` filter:** `+<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp>
   +<admin/adapters/config_portal.cpp>` (patterns apply in order, so the last one re-adds one
-  file). `config_portal.cpp` has pure functions above its `#ifdef ARDUINO` — `bboxAreaSqDeg`,
-  `openSkyCreditCost`, `parseOpenSkyCredentialsJson`, `isValidFloatString`,
-  `isValidUnsignedIntString` — used by `config_page` / `device_alerts` and tested by
-  `test_admin/config_portal_test.cpp`; without it every suite fails to link. The exception goes
-  when stage 3 (`openSkyCreditCost`, `bboxAreaSqDeg` → `opensky/core`) and stage 4 (the rest)
-  take them out.
+  file). `config_portal.cpp` has three pure functions above its `#ifdef ARDUINO` —
+  `parseOpenSkyCredentialsJson`, `isValidFloatString`, `isValidUnsignedIntString` — used by its
+  own routes and tested by `test_admin/config_portal_test.cpp` (11 cases), which is now the only
+  reason for the exception. It goes when stage 4 splits the file (stage 3 moved
+  `openSkyCreditCost` / `bboxAreaSqDeg` out to `opensky/core/scan_area`, owner 2026-11-01).
 - **`tools/check_layers.py`** classifies each file (`classify()`, `LAYERS = ("core", "services",
   "adapters", "assets")`, root `main`) and checks every `#include` against the §5 table
   (`ALLOWED`): `core` sees `shared/` and other cores as the table allows, `*/services` and
@@ -66,9 +88,19 @@ renamed the layer folders. Stages 3–8 move misplaced types, split pure / hardw
   `opensky_client.h` — an adapter sees only its own context). The rest: SDK includes inside
   `#ifdef` in `core/` files, `core -> adapters` (`hexdb_http.h`, `github_ca.h`, `config_portal.h`,
   `LGFX_CYD.hpp`), `core` / `services` → `platform` (`time_sync.h`, `core_link.h`,
-  `net_config.h`). `tools/test_check_layers.py`'s
-  `LayoutTest.test_layer_findings_do_not_exceed_the_stage_2_limit` fails above
-  `LAYER_FINDINGS_LIMIT = 51` (a limit, not a pin — later stages lower it without a test change).
+  `net_config.h`). **47 after stage 3** (51 − 6 + 2): gone are `poll_pipeline.cpp -> display/core`
+  (×2: `flight_screen.h`, `table_view.h`), `poll_pipeline.h -> opensky/core` and
+  `table_view.h -> opensky/core` (`opensky_client.h`, now `aircraft_state.h`), and
+  `config_page.cpp` / `device_alerts.cpp -> admin/adapters` (`config_portal.h`, now
+  `scan_area.h`); new are 2 × `airspace/core -> enrichment/core` — `tracked_flight.h` includes
+  `aircraft_lookup.h` and `route_lookup.h` because `AircraftRow` carries `AircraftInfo`,
+  `RouteInfo`, `AirportInfo` by value (§4.1 puts it in `airspace/core`, §5 lets that layer see
+  only `shared/`; owner 2026-11-01: accepted for now, decided before stage 8).
+  `admin/core -> admin/adapters` keeps 2 (`release_check` → `github_ca.h`, `config_portal.h` for
+  `OtaObserver`, stage 4). `tools/test_check_layers.py`'s
+  `LayoutTest.test_layer_findings_do_not_exceed_the_stage_limit` fails above
+  `LAYER_FINDINGS_LIMIT = 47`; each stage that lowers the count lowers the limit with it (stage 3
+  did, 51 → 47), so progress can't slip back unnoticed.
   A short include (resolving only from the file's own folder) and a file outside any context are
   findings too; `LayoutTest` keeps the tree free of them, of old `domain/` / `app/` paths in code,
   build files and tools, and keeps the `RUN_TEST(` count ≥ 874.
@@ -78,7 +110,8 @@ renamed the layer folders. Stages 3–8 move misplaced types, split pure / hardw
   ones, removes emptied folders); `final_path()` follows a stage-0 path through all stages. The
   default run rewrites any quoted include that doesn't resolve from `src/` to its full path in
   place, `--check` exits 1 if anything would change. A later stage that moves files adds its
-  table to `STAGES`; the tool stays until stage 8.
+  table to `STAGES`; stage 3 moved symbols, not files, so it has none (its new includes were
+  written as full paths by hand, `--check` = 0). The tool stays until stage 8.
 
 ## Concurrency — two cores (core_link, net_task)
 
