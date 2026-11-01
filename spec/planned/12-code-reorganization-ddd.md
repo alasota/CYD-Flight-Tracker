@@ -419,7 +419,12 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   blok 59 KB (po etapie 2: 147 / 59 KB; w kolejnych krokach etapu sterta wahała się 142–146 KB,
   największy blok 53–70 KB między uruchomieniami). Po drodze sprawdzone też: kropka zdrowia w
   nagłówku, ikony lądowania / startu i linie lotnicze / trasy w wierszach, kolejność tabeli,
-  wybór TERAZ (zbliżający się LOT348). Dotyk — do sprawdzenia przez właściciela.
+  wybór TERAZ (zbliżający się LOT348). Odczyt po 14 min pracy na `666b69b`: sterta 140 440 B,
+  największy blok 59 380 B, cache hexdb.io 15 / 15 / 11 wpisów (przy odczycie po 3 min 5 / 5 / 6) —
+  wolna sterta idzie za zapełnianiem ograniczonych cache'y w RAM, statyczny RAM bez zmian
+  (62 044 B), więc to nie regresja. Po przeglądzie `baa5ae4` poprawił include'y (`table_view.h`
+  bierze `OpenSkyHealth` z `feed_health.h`, `radar_view.cpp` dołącza `status_bar.h`) — bez
+  zmiany zachowania i rozmiaru. Dotyk — do sprawdzenia przez właściciela.
 
 ## 9. Testy
 

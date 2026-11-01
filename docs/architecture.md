@@ -3,8 +3,9 @@
 The current architecture in detail: the source layout, the two cores, the settings page,
 updates, brightness, the "!" alerts, CI and the agent harness. The rules a session must follow
 are in CLAUDE.md; this file is the reference behind them. (Spec 12 reorganises the code into
-contexts in eight stages; stages 1–2 — folders, full-path includes, layer report, layer names —
-are done. Stage 8 rewrites this file around the contexts.)
+contexts in eight stages; stages 1–3 — folders, full-path includes, layer report, layer names,
+misplaced types moved to their contexts — are done. Stage 8 rewrites this file around the
+contexts.)
 
 ## Source layout (spec 12)
 
@@ -14,8 +15,9 @@ renamed the layer folders; stage 3 moved misplaced types into their contexts. St
 pure / hardware halves, add the `services/` logic, settings per context, rename to the glossary
 and make the layer check block CI.
 
-- **Folders:** `src/<context>/<layer>/` — contexts `airspace` (flight phase, CPA, the poll
-  pipeline), `enrichment` (hexdb.io lookups, caches, names), `opensky` (client, login, credits),
+- **Folders:** `src/<context>/<layer>/` — contexts `airspace` (the sky model: aircraft state,
+  tracked flights, their order, the NOW pick, feed health, flight phase, CPA; the poll pipeline),
+  `enrichment` (hexdb.io lookups, caches, names), `opensky` (client, login, credits),
   `display` (screens, theme, fonts, i18n, touch, backlight, redraw), `admin` (settings, page,
   backup, password, alerts; `admin/core/firmware/` = OTA, release check, version). Layers:
   `core/` (pure logic of the context: types, rules, maths, screen layouts, texts — native, tested),
