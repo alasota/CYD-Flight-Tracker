@@ -30,3 +30,4 @@ dostaje ją od agenta (`NN` = kolejny wolny numer, „Źródło: issue #N”).
 | 11 | [Porządki: martwy kod, komentarze, dokumentacja](done/11-cleanup-dead-code-docs.md) | done | v1.10.0 |
 | 12 | [Reorganizacja kodu (DDD)](planned/12-code-reorganization-ddd.md) | planned | etap 1/7: v1.11.0 |
 | 13 | [Strona projektu: historia zmian, zrzuty panelu, opis funkcji](done/13-project-page-layout.md) | done | v1.7.0 |
+| 14 | [Jeden firmware dla R i R „2USB” (wykrywanie wyświetlacza)](planned/14-board-variants.md) | planned | — |
