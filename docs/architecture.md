@@ -26,8 +26,10 @@ renamed the layer folders. Stages 3–8 move misplaced types, split pure / hardw
 - **Placement rule (stages 1–3):** a file sits where its pure half will live, named as before;
   its `#ifdef ARDUINO` half stays inside until stage 4 moves it to `adapters/`. Only files that
   are entirely hardware are in `adapters/` / `main/` already (`enrichment/adapters/hexdb_http`,
-  `admin/adapters/github_ca.h`, `admin/adapters/config_portal`, `main/net_task`,
-  `main/main.cpp`). `include/LGFX_CYD.hpp` and `include/touch_calibration.h` stay in `include/`
+  `admin/adapters/github_ca.h`, `main/net_task`, `main/main.cpp`).
+  `admin/adapters/config_portal` is the exception: mostly `WebServer` routes, but it still holds
+  five pure functions with native tests, so the `native` filter adds it back (below) until
+  stages 3–4 take them out. `include/LGFX_CYD.hpp` and `include/touch_calibration.h` stay in `include/`
   until stage 4.
 - **Stage 2** (`git mv` of 80 files, include lines only): `<ctx>/domain/` → `<ctx>/core/`,
   `<ctx>/app/` → `<ctx>/services/`, `src/app/` → `src/main/`; `admin/app/` split —
