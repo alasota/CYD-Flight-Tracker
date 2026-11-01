@@ -2,7 +2,7 @@
 
 The rule tests feed the pure functions {relpath: text} dicts (the included targets are in the
 dict too, so they resolve); LayoutTest / BuildConfigTest / WorkflowTest read this repository
-and pin the state spec 12 stage 2 leaves behind.
+and pin the state spec 12 stages 2 and 3 leave behind.
 """
 
 import configparser
@@ -23,10 +23,116 @@ SOURCE_SUFFIXES = {".h", ".hpp", ".c", ".cpp"}
 # `grep -ro "RUN_TEST(" test --include=*.cpp | wc -l` on main before stage 1 (plan step 0).
 RUN_TEST_BASELINE = 874
 
-# Layer findings (check_files + full_path_findings) on this repository after stage 2: 55 from
-# stage 1, -9 +5 with the new layer names (spec 12 plan, "Layer report"). A limit, not a pin:
-# stages 3-8 lower the count without touching this test; a new finding above it fails.
-LAYER_FINDINGS_LIMIT = 51
+# Layer findings (check_files + full_path_findings) on this repository after the last finished
+# stage: 51 after stage 2, 47 after stage 3 (-6 includes only the moved types needed, +2
+# tracked_flight.h -> enrichment/core). A limit, not a pin: a stage that lowers the count lowers
+# this number with it, so a new finding can't hide under the old limit.
+LAYER_FINDINGS_LIMIT = 47
+
+# Stage 3 (spec 12 section 8 item 3): symbol -> (new header, old header), both from src/.
+STAGE_3_HOMES = {
+    "AircraftRow": ("airspace/core/tracked_flight.h", "display/core/screens/table_view.h"),
+    "buildEnrichedRecords": ("airspace/core/tracked_flight.h",
+                             "display/core/screens/table_view.h"),
+    "annotateDistances": ("airspace/core/tracked_flight.h", "display/core/screens/table_view.h"),
+    "classifyPhases": ("airspace/core/tracked_flight.h", "display/core/screens/table_view.h"),
+    "sortRowsForDisplay": ("airspace/core/flight_ordering.h",
+                           "display/core/screens/table_view.h"),
+    "sortRowsByDistance": ("airspace/core/flight_ordering.h",
+                           "display/core/screens/table_view.h"),
+    "splitFeaturedAndRest": ("airspace/core/flight_ordering.h",
+                             "display/core/screens/table_view.h"),
+    "pickNowAircraft": ("airspace/core/now_pick.h", "display/core/screens/flight_screen.h"),
+    "OpenSkyHealth": ("airspace/core/feed_health.h", "display/core/screens/status_bar.h"),
+    "Aircraft": ("airspace/core/aircraft_state.h", "opensky/core/opensky_client.h"),
+    "inferOnGround": ("airspace/core/aircraft_state.h", "opensky/core/opensky_client.h"),
+    "computeDistanceBearing": ("shared/geo.h", "display/core/screens/table_view.h"),
+    "compassPoint": ("shared/geo.h", "display/core/theme/lcars_theme.h"),
+    "openSkyCreditCost": ("opensky/core/scan_area.h", "admin/adapters/config_portal.h"),
+    "bboxAreaSqDeg": ("opensky/core/scan_area.h", "admin/adapters/config_portal.h"),
+    "utf8Length": ("display/core/text/utf8.h", "display/core/theme/lcars_theme.h"),
+    "fitToWidth": ("display/core/text/fit_to_width.h", "display/core/theme/lcars_theme.h"),
+    "isFontSafeText": ("display/core/text/font_set.h", "display/core/theme/lcars_theme.h"),
+}
+
+# Stage 3: the 49 tests that follow their code, test -> (new file, old file), both from test/.
+_TV = "test_display/table_view_test.cpp"
+_LT = "test_display/lcars_theme_test.cpp"
+_FS = "test_display/flight_screen_test.cpp"
+_GEO = "test_platform/geo_test.cpp"
+_SCAN = "test_opensky/scan_area_test.cpp"
+_TRACKED = "test_airspace/tracked_flight_test.cpp"
+_ORDER = "test_airspace/flight_ordering_test.cpp"
+_NOW = "test_airspace/now_pick_test.cpp"
+_FIT = "test_display/fit_to_width_test.cpp"
+STAGE_3_MOVED_TESTS = {
+    **{name: (_GEO, _TV) for name in (
+        "test_distance_zero_when_home_equals_aircraft",
+        "test_distance_one_degree_north_at_equator",
+        "test_distance_one_degree_east_at_equator",
+        "test_distance_london_to_paris_sanity_check")},
+    "test_compass_points": (_GEO, _LT),
+    **{name: (_SCAN, "test_admin/config_portal_test.cpp") for name in (
+        "test_bbox_area_matches_radius",
+        "test_credit_cost_boundary_exactly_25_sq_deg",
+        "test_credit_cost_boundary_exactly_100_sq_deg",
+        "test_credit_cost_boundary_exactly_400_sq_deg",
+        "test_credit_cost_just_below_and_above_each_boundary",
+        "test_credit_cost_far_over_400_sq_deg",
+        "test_credit_cost_at_zero_radius")},
+    "test_infer_on_ground_rules": ("test_airspace/aircraft_state_test.cpp",
+                                   "test_opensky/opensky_client_test.cpp"),
+    **{name: (_TRACKED, _TV) for name in (
+        "test_build_enriched_records_found_true",
+        "test_build_enriched_records_found_false_when_lookup_missing",
+        "test_build_enriched_records_missing_route_renders_as_dash",
+        "test_build_enriched_records_found_false_from_cached_miss",
+        "test_build_enriched_records_empty_aircraft_list",
+        "test_annotate_fills_distance_for_positioned_aircraft",
+        "test_annotate_leaves_no_position_aircraft_unset",
+        "test_classify_phases_fills_phase_from_distance_and_vertical_rate",
+        "test_classify_phases_no_distance_forces_none")},
+    **{name: (_ORDER, _TV) for name in (
+        "test_sort_orders_ascending_by_distance",
+        "test_sort_is_stable_for_equal_distances",
+        "test_sort_puts_rows_without_distance_last",
+        "test_sort_empty_array_does_not_crash",
+        "test_display_order_puts_airborne_before_ground_traffic",
+        "test_display_order_puts_positionless_last",
+        "test_display_order_all_on_ground_still_nearest_first",
+        "test_split_featured_and_rest_multiple_rows",
+        "test_split_featured_and_rest_single_row",
+        "test_split_featured_and_rest_empty")},
+    **{name: (_NOW, _FS) for name in (
+        "test_pick_prefers_soonest_overhead_not_nearest",
+        "test_pick_skips_ground_traffic_and_long_gone",
+        "test_pick_just_passed_still_counts",
+        "test_pick_without_overhead_candidate_shows_nearest_airborne",
+        "test_pick_empty")},
+    **{name: (_FIT, _LT) for name in (
+        "test_fit_short_string_unchanged",
+        "test_fit_exact_width_unchanged",
+        "test_fit_long_string_gets_ellipsis",
+        "test_fit_trims_trailing_space_before_ellipsis",
+        "test_fit_result_never_exceeds_width",
+        "test_fit_too_tight_for_ellipsis_hard_cuts",
+        "test_fit_nonpositive_width_is_empty",
+        "test_fit_uses_pixel_width_not_char_count",
+        "test_fit_ascii_ellipsis_only",
+        "test_fit_never_splits_a_utf8_character")},
+    "test_utf8_length_counts_characters_not_bytes": ("test_display/utf8_test.cpp", _LT),
+    "test_font_safe_accepts_ascii_and_polish_only": ("test_display/font_set_test.cpp", _LT),
+}
+
+# Stage 3: includes of these files that only the moved types needed; afterwards no finding from
+# src/<file> may point at the layer.
+STAGE_3_GONE_FINDINGS = [
+    ("airspace/services/poll_pipeline.cpp", "display/core"),
+    ("airspace/services/poll_pipeline.h", "opensky/core"),
+    ("display/core/screens/table_view.h", "opensky/core"),
+    ("admin/core/config_page.cpp", "admin/adapters"),
+    ("admin/core/device_alerts.cpp", "admin/adapters"),
+]
 
 # Old layer folder names in a path: <ctx>/domain, <ctx>/app, src/app/, the -<app/> filter.
 OLD_LAYER_PATH_RE = re.compile(r"\b(airspace|enrichment|opensky|display|admin)/(domain|app)\b"
@@ -567,8 +673,8 @@ class LayoutTest(unittest.TestCase):
             with self.subTest(file=name):
                 self.assertTrue((src / "main" / name).is_file(), f"src/main/{name}")
 
-    # Scenario: Liczba naruszeń w raporcie warstw nie rośnie ponad 51 z etapu 2
-    def test_layer_findings_do_not_exceed_the_stage_2_limit(self):
+    # Scenario: Liczba naruszeń w raporcie warstw nie rośnie ponad stan po ostatnim etapie
+    def test_layer_findings_do_not_exceed_the_stage_limit(self):
         files = check_layers.load_tree(ROOT)
         findings = check_layers.check_files(files) + check_layers.full_path_findings(files)
         self.assertLessEqual(len(findings), LAYER_FINDINGS_LIMIT,
@@ -594,6 +700,176 @@ class LayoutTest(unittest.TestCase):
                 if m:
                     hits.append(f"{p.relative_to(ROOT).as_posix()}:{n}: {m.group(0)}")
         self.assertEqual([], hits, f"{len(hits)} old layer path(s):\n" + "\n".join(hits[:60]))
+
+    # Scenario Outline: Przeniesiony typ lub funkcja ma jedną deklarację, w pliku swojego kontekstu
+    def test_moved_symbols_are_declared_in_their_new_home(self):
+        headers = {p: t for p, t in repo_sources("src").items() if p.endswith((".h", ".hpp"))}
+        self.assertGreater(len(headers), 30)
+        for symbol, (new, old) in STAGE_3_HOMES.items():
+            with self.subTest(symbol=symbol):
+                hits = [f"{p}:{n}" for p, t in headers.items()
+                        for n in declaration_lines(t, symbol)]
+                self.assertFalse([h for h in hits if h.startswith(f"src/{old}:")],
+                                 f"{symbol} still declared in src/{old}: {hits}")
+                self.assertEqual([f"src/{new}"], [h.rsplit(":", 1)[0] for h in hits],
+                                 f"declarations of {symbol}: {hits or 'none'}")
+
+    # Scenario Outline: Testy przeniesionego kodu leżą w grupie jego kontekstu, bez kopii w
+    # starym pliku
+    def test_moved_tests_follow_their_code(self):
+        self.assertEqual(49, len(STAGE_3_MOVED_TESTS))
+        sources = {p[len("test/"):]: t for p, t in repo_sources("test").items()}
+        for name, (new, old) in STAGE_3_MOVED_TESTS.items():
+            with self.subTest(test=name):
+                defs = [f"{p}:{n}" for p, t in sources.items() for n in defined_test_lines(t, name)]
+                old_text = sources.get(old, "")
+                self.assertEqual(([], 0), (defined_test_lines(old_text, name),
+                                           run_test_calls(old_text, name)),
+                                 f"{name} still defined / run in test/{old}")
+                self.assertEqual([new], [d.rsplit(":", 1)[0] for d in defs],
+                                 f"definitions of {name}: {defs or 'none'}")
+                self.assertEqual(1, run_test_calls(sources[new], name),
+                                 f"RUN_TEST({name}) in test/{new}")
+
+    # Scenario Outline: Raport warstw nie zgłasza już include'ów, które były potrzebne tylko dla
+    # przeniesionych typów
+    def test_stage_3_removes_the_misplaced_type_findings(self):
+        findings = check_layers.check_files(check_layers.load_tree(ROOT))
+        self.assertGreater(len(findings), 0, "check_layers found nothing at all")
+        for path, layer in STAGE_3_GONE_FINDINGS:
+            with self.subTest(path=path, layer=layer):
+                self.assertTrue((ROOT / "src" / path).is_file(), f"src/{path}")
+                hits = [f for f in findings if f.path == f"src/{path}"
+                        and re.search(r"-> " + re.escape(layer) + r"(\s|$)", f.message)]
+                self.assertEqual([], hits, show(hits))
+
+    # Scenario: core_link nie dołącza już widoków dla typów, które przenosi między rdzeniami
+    def test_core_link_includes_no_screen_headers(self):
+        text = (ROOT / "src" / "platform" / "core_link.h").read_text(encoding="utf-8",
+                                                                      errors="replace")
+        quoted = [i.name for i in check_layers.find_includes(text) if not i.angle]
+        self.assertGreater(len(quoted), 3, "find_includes found too few includes in core_link.h")
+        screens = [n for n in quoted if n.startswith("display/core/screens/")]
+        self.assertEqual([], screens, "core_link.h includes screen headers")
+        for header in ("airspace/core/tracked_flight.h", "airspace/core/feed_health.h"):
+            with self.subTest(header=header):
+                self.assertIn(header, quoted)
+
+
+def strip_comments(text):
+    """`text` with // and /* */ comments blanked (newlines kept, so line numbers stay); string
+    and char literals are kept as they are, so a "//" inside one doesn't start a comment."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        c, nxt = text[i], text[i + 1:i + 2]
+        if c == "/" and nxt == "/":
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        elif c == "/" and nxt == "*":
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            out.append("".join(ch if ch == "\n" else " " for ch in text[i:j]))
+            i = j
+        elif c in "\"'":
+            j = i + 1
+            while j < n and text[j] != c and text[j] != "\n":
+                j += 2 if text[j] == "\\" else 1
+            out.append(text[i:j + 1])
+            i = j + 1
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+_NOT_A_TYPE = {"return", "else", "case", "throw", "delete", "new", "goto", "sizeof", "co_return"}
+
+
+def declaration_lines(text, symbol):
+    """Line numbers where `text` (a header) declares `symbol`: a type (`struct|class|enum
+    [class] <symbol>` followed by `{` or `:` -- a forward declaration `struct X;` doesn't count)
+    or a function (`<return type> <symbol>(...)` followed by `;` or a body). Comments are
+    ignored; the name must match as a whole word (`Aircraft` isn't `AircraftRow`)."""
+    code = strip_comments(text)
+    name = re.escape(symbol)
+    lines = set()
+    type_re = re.compile(r"\b(?:struct|class|enum(?:\s+(?:class|struct))?)\s+" + name
+                         + r"\b\s*(?:final\s*)?[{:](?!:)")
+    for m in type_re.finditer(code):
+        lines.add(code.count("\n", 0, m.start()) + 1)
+    func_re = re.compile(r"(?m)^[ \t]*((?:[A-Za-z_][\w:]*(?:<[^;(){}]*>)?[\s*&]+)+)"
+                         + name + r"\s*\(")
+    for m in func_re.finditer(code):
+        words = re.findall(r"[A-Za-z_]\w*", m.group(1))
+        if not words or words[0] in _NOT_A_TYPE:
+            continue
+        depth, j = 0, m.end() - 1
+        while j < len(code):
+            depth += {"(": 1, ")": -1}.get(code[j], 0)
+            j += 1
+            if depth == 0:
+                break
+        if re.match(r"(?:\s|const\b|noexcept\b|override\b)*[;{]", code[j:]):
+            lines.add(code.count("\n", 0, m.start(1)) + 1)
+    return sorted(lines)
+
+
+def defined_test_lines(text, name):
+    """Line numbers of `static void <name>(` in `text` (comments ignored)."""
+    code = strip_comments(text)
+    return [code.count("\n", 0, m.start()) + 1 for m in
+            re.finditer(r"(?m)^[ \t]*static\s+void\s+" + re.escape(name) + r"\s*\(", code)]
+
+
+def run_test_calls(text, name):
+    """How many times `text` calls RUN_TEST(<name>) (comments ignored)."""
+    return len(re.findall(r"\bRUN_TEST\(\s*" + re.escape(name) + r"\s*\)",
+                          strip_comments(text)))
+
+
+class DeclarationMatchTest(unittest.TestCase):
+    def test_forward_declaration_and_longer_names_do_not_count(self):
+        self.assertEqual([], declaration_lines("struct AircraftRow;\n", "AircraftRow"))
+        self.assertEqual([], declaration_lines("struct AircraftRow {\n  int x;\n};\n",
+                                               "Aircraft"))
+        self.assertEqual([1], declaration_lines("struct Aircraft {\n  int x;\n};\n", "Aircraft"))
+
+    def test_types_with_a_base_or_an_underlying_type_count(self):
+        self.assertEqual([2], declaration_lines("// enum class OpenSkyHealth {\n"
+                                                "enum class OpenSkyHealth : uint8_t {\n  Ok\n};\n",
+                                                "OpenSkyHealth"))
+        self.assertEqual([1], declaration_lines("struct A : B {};\n", "A"))
+        self.assertEqual([], declaration_lines("x = A::B;\n", "A"))
+
+    def test_function_prototypes_and_definitions_count_but_calls_do_not(self):
+        text = ("const char *compassPoint(float bearingDeg);\n"
+                "std::vector<AircraftRow> buildEnrichedRecords(\n"
+                "    const std::vector<Aircraft> &aircraft,\n"
+                "    int n);\n"
+                "inline size_t utf8Length(const std::string &s) { return s.size(); }\n"
+                "inline int f() { return utf8Length(\"x\"); }\n"
+                "  int n = utf8Length(s);\n"
+                "  utf8Length(s);\n"
+                "  return utf8Length(s);\n"
+                "// size_t utf8Length(const std::string &s);\n"
+                "/* size_t utf8Length(const std::string &s); */\n")
+        self.assertEqual([1], declaration_lines(text, "compassPoint"))
+        self.assertEqual([2], declaration_lines(text, "buildEnrichedRecords"))
+        self.assertEqual([5], declaration_lines(text, "utf8Length"))
+
+    def test_comment_marker_inside_a_string_does_not_hide_code(self):
+        text = 'const char *k = "http://x";\nbool isFontSafeText(const std::string &t);\n'
+        self.assertEqual([2], declaration_lines(text, "isFontSafeText"))
+
+    def test_test_definitions_and_run_test_calls(self):
+        text = ("static void test_a(void) {}\n"
+                "static void test_ab(void) {}\n"
+                "// static void test_a(void) {}\n"
+                "void run_x_tests() {\n  RUN_TEST(test_a);\n  RUN_TEST(test_ab);\n"
+                "  // RUN_TEST(test_a);\n}\n")
+        self.assertEqual([1], defined_test_lines(text, "test_a"))
+        self.assertEqual(1, run_test_calls(text, "test_a"))
+        self.assertEqual([], defined_test_lines(text, "test_b"))
 
 
 def platformio_ini():
