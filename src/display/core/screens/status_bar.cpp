@@ -2,6 +2,7 @@
 
 #include "display/core/theme/lcars_theme.h"  // palette (pure section) + drawing helpers
 #include "display/core/screen_nav.h"  // kScreenFlights / kScreenFlight / kScreenRadar
+#include "display/core/text/utf8.h"  // utf8Length()
 #include "platform/time_sync.h"
 
 const char *statusBarScreenName(int screenIndex, Language lang) {

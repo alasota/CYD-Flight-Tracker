@@ -3,6 +3,7 @@
 
 #include "display/core/screens/aircraft_summary.h"
 #include "display/core/screens/table_view.h"  // AircraftRow
+#include "display/core/text/fit_to_width.h"  // TextMeasure
 #include "test_support.h"
 
 namespace {

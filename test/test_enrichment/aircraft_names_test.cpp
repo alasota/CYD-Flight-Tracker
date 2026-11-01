@@ -5,7 +5,8 @@
 #include <string>
 
 #include "enrichment/core/aircraft_names.h"
-#include "display/core/theme/lcars_theme.h"  // isFontSafeText()
+#include "display/core/text/font_set.h"  // isFontSafeText()
+#include "display/core/text/utf8.h"      // utf8Length()
 
 namespace {
 

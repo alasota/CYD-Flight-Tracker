@@ -17,7 +17,8 @@
 
 #include <string>
 
-#include "display/core/theme/lcars_theme.h"   // TextMeasure, fitToWidth()
+#include "display/core/i18n.h"               // Language
+#include "display/core/text/fit_to_width.h"  // TextMeasure, fitToWidth()
 #include "enrichment/core/route_lookup.h"  // RouteInfo, AirportInfo
 
 // Forward-declared rather than #include "table_view.h" (which pulls in a

@@ -8,7 +8,7 @@
 #include <initializer_list>
 
 #include "display/core/theme/fonts/lcars_efont.h"
-#include "display/core/theme/lcars_theme.h"
+#include "display/core/text/font_set.h"
 
 namespace {
 

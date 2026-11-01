@@ -57,6 +57,7 @@ std::string radarSummaryStats(const AircraftRow &row, Language lang) {
 #include <cstdio>
 
 #include "display/core/screens/aircraft_summary.h"
+#include "display/core/text/fit_to_width.h"
 #include "display/core/theme/lcars_theme.h"
 
 namespace {
