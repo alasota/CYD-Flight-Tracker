@@ -30,10 +30,14 @@ Rarer now than with 41 executables, but it still happens.
 The six suites follow the contexts of [spec 12](../spec/planned/12-code-reorganization-ddd.md),
 so they stayed put when `src/` moved into `src/<context>/<layer>/` (stage 1). Each suite is one
 executable. Test files include `src/` headers by **full path** (`#include
-"enrichment/core/lookup_cache.h"`, `-I src`) and never an `adapters/`, root `app/` or SDK
-header — `tools/check_layers.py` reports it, `tools/test_check_layers.py`'s `LayoutTest`
-fails on a short include. `native` links everything in `src/` except root `app/`,
-`*/adapters/` and `platform/*_esp32.cpp` (docs/architecture.md "Source layout").
+"enrichment/core/lookup_cache.h"`, `-I src`) and never an `adapters/`, `main/` (the roots) or
+SDK header — `tools/check_layers.py` reports it, `tools/test_check_layers.py`'s `LayoutTest`
+fails on a short include. `native` links everything in `src/` except `main/`, `*/adapters/`
+and `platform/*_esp32.cpp`, with one exception: `admin/adapters/config_portal.cpp` is added
+back (its pure validators and `openSkyCreditCost()` are tested by `config_portal_test.cpp` and
+used by `config_page` / `device_alerts`) until spec 12 stages 3–4 move them out — so
+`config_portal_test.cpp` is the one test that includes an adapter (reported by
+`check_layers.py`, docs/architecture.md "Source layout").
 
 | Suite | What | Modules (`<module>_test.cpp`) |
 |---|---|---|
