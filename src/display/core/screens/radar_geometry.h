@@ -31,7 +31,7 @@ struct ScreenPoint {
 // circular radar plot centered at (center_x, center_y) with radius
 // radius_px. Compass convention: bearing_deg 0 = north/up, increasing
 // clockwise (standard compass azimuth) — matches
-// table_view::computeDistanceBearing()'s bearing_deg output, so its result
+// shared/geo's computeDistanceBearing()'s bearing_deg output, so its result
 // can be fed straight in.
 //
 // distance_km is scaled linearly against max_distance_km: distance_km ==

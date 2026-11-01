@@ -247,21 +247,6 @@ static void test_arrow_stays_inside_its_box(void) {
   }
 }
 
-static void test_compass_points(void) {
-  TEST_ASSERT_EQUAL_STRING("N", compassPoint(0.0f));
-  TEST_ASSERT_EQUAL_STRING("N", compassPoint(22.0f));
-  TEST_ASSERT_EQUAL_STRING("NE", compassPoint(23.0f));
-  TEST_ASSERT_EQUAL_STRING("E", compassPoint(90.0f));
-  TEST_ASSERT_EQUAL_STRING("SE", compassPoint(135.0f));
-  TEST_ASSERT_EQUAL_STRING("S", compassPoint(180.0f));
-  TEST_ASSERT_EQUAL_STRING("SW", compassPoint(225.0f));
-  TEST_ASSERT_EQUAL_STRING("W", compassPoint(270.0f));
-  TEST_ASSERT_EQUAL_STRING("NW", compassPoint(315.0f));
-  TEST_ASSERT_EQUAL_STRING("N", compassPoint(350.0f));
-  TEST_ASSERT_EQUAL_STRING("N", compassPoint(360.0f));
-  TEST_ASSERT_EQUAL_STRING("W", compassPoint(-90.0f));
-}
-
 // ---- fitToWidth -------------------------------------------------------------
 //
 // Measured with fake fixed-pitch fonts so expectations are hand-checkable:
@@ -402,7 +387,6 @@ void run_lcars_theme_tests() {
   RUN_TEST(test_arrow_points_along_the_bearing);
   RUN_TEST(test_arrow_stays_inside_its_box);
   RUN_TEST(test_arrow_has_a_stem_so_it_is_not_a_phase_triangle);
-  RUN_TEST(test_compass_points);
 
   RUN_TEST(test_variant_a_palette_values);
   RUN_TEST(test_chrome_and_content_use_different_colour_families);

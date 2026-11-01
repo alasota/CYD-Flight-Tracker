@@ -3,6 +3,7 @@
 #include <cstdio>
 
 #include "display/core/screens/table_view.h"  // full AircraftRow definition
+#include "shared/geo.h"                        // compassPoint()
 
 namespace {
 constexpr int16_t kPanelTop = LCARS_CONTENT_TOP;  // 18

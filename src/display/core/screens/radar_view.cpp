@@ -4,7 +4,7 @@
 #include <cmath>
 
 namespace {
-// Same km-per-degree approximation table_view's computeDistanceBearing()
+// Same km-per-degree approximation shared/geo's computeDistanceBearing()
 // (haversine) is built on, for short distances.
 constexpr float kKmPerDegree = 111.2f;
 }  // namespace

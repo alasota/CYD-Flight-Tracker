@@ -146,13 +146,6 @@ struct ArrowShape {
 };
 ArrowShape directionArrow(float bearingDeg, int16_t cx, int16_t cy, int16_t size);
 
-// 8-point compass abbreviation for a bearing: "N", "NE", "E", "SE", "S",
-// "SW", "W", "NW" (each covers 45 degrees centred on its direction; any
-// angle, normalised to 0..360). International letters as on a compass rose
-// — Polish abbreviations ("PN-WSCH") don't fit the distance chip. Pure.
-const char *compassPoint(float bearingDeg);
-
-
 // Text colour for table row `rowIndex` (0-based within the page): white /
 // sky alternating, so a row is easy to follow across the columns. Pure.
 uint16_t tableRowTextColor(int rowIndex);

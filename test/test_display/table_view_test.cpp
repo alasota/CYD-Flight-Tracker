@@ -7,35 +7,6 @@
 
 namespace {
 
-// ---- computeDistanceBearing -----------------------------------------------
-
-static void test_distance_zero_when_home_equals_aircraft(void) {
-  DistanceBearing db = computeDistanceBearing(51.5074f, -0.1278f, 51.5074f, -0.1278f);
-  TEST_ASSERT_EQUAL_FLOAT(0.0f, db.distance_km);
-  TEST_ASSERT_EQUAL_FLOAT(0.0f, db.bearing_deg);
-}
-
-static void test_distance_one_degree_north_at_equator(void) {
-  // 1 deg of latitude is ~111.19 km anywhere on a sphere of radius 6371km.
-  DistanceBearing db = computeDistanceBearing(0.0f, 0.0f, 1.0f, 0.0f);
-  TEST_ASSERT_FLOAT_WITHIN(0.5f, 111.19f, db.distance_km);
-  TEST_ASSERT_FLOAT_WITHIN(0.5f, 0.0f, db.bearing_deg);  // due north
-}
-
-static void test_distance_one_degree_east_at_equator(void) {
-  // At the equator, 1 deg of longitude is also ~111.19 km.
-  DistanceBearing db = computeDistanceBearing(0.0f, 0.0f, 0.0f, 1.0f);
-  TEST_ASSERT_FLOAT_WITHIN(0.5f, 111.19f, db.distance_km);
-  TEST_ASSERT_FLOAT_WITHIN(0.5f, 90.0f, db.bearing_deg);  // due east
-}
-
-static void test_distance_london_to_paris_sanity_check(void) {
-  // Well-known great-circle distance, commonly cited as ~344 km.
-  DistanceBearing db = computeDistanceBearing(51.5074f, -0.1278f, 48.8566f, 2.3522f);
-  TEST_ASSERT_FLOAT_WITHIN(5.0f, 344.0f, db.distance_km);
-  TEST_ASSERT_TRUE(db.bearing_deg > 90.0f && db.bearing_deg < 180.0f);  // south-east
-}
-
 // ---- buildEnrichedRecords ---------------------------------------------------
 
 static void test_build_enriched_records_found_true(void) {
@@ -557,10 +528,6 @@ void run_table_view_tests() {
   UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
 
   RUN_TEST(test_phase_icon_fits_the_phase_column_and_row);
-  RUN_TEST(test_distance_zero_when_home_equals_aircraft);
-  RUN_TEST(test_distance_one_degree_north_at_equator);
-  RUN_TEST(test_distance_one_degree_east_at_equator);
-  RUN_TEST(test_distance_london_to_paris_sanity_check);
 
   RUN_TEST(test_build_enriched_records_found_true);
   RUN_TEST(test_build_enriched_records_found_false_when_lookup_missing);
