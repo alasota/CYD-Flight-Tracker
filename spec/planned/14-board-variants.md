@@ -106,7 +106,7 @@ Linia MISO wyświetlacza (pin 12) jest podłączona, bo z niej czyta zrzut ekran
   `/perf.json`).
 - `docs/history.md`: dlaczego wykrywanie, a nie osobne buildy.
 - README i strona projektu.
-- ROADMAP: pozycja → Done in vNEXT.
+- ROADMAP: pozycja przechodzi do „Done” z wersją wydania (placeholder wersji jak zwykle).
 
 ## Poza zakresem
 
