@@ -32,7 +32,7 @@
 #include "admin/core/device_alerts.h"  // AlertSet, AlertDetails
 #include "display/core/redraw_policy.h"  // RedrawEvents
 #include "admin/core/firmware/release_check.h"  // UpdateStatus
-#include "display/core/screens/status_bar.h"     // OpenSkyHealth
+#include "airspace/core/feed_health.h"  // OpenSkyHealth
 #include "display/core/screens/table_view.h"     // AircraftRow
 #include "platform/wifi_manager.h"   // WifiStatus
 
