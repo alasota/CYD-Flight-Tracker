@@ -1,10 +1,11 @@
 """Tests for tools/rewrite_includes.py:  python tools/test_rewrite_includes.py
 
 RewriteTest feeds the pure functions strings and runs the CLI on temporary trees (never on this
-repository); MoveTableTest pins the stage-1 move table (spec 12 plan) against src/.
+repository); MoveTableTest pins the stage-1 and stage-2 move tables (spec 12 plan) against src/.
 """
 
 import posixpath
+import re
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,10 @@ TOOL = Path(__file__).resolve().parent / "rewrite_includes.py"
 
 # Files in the flat src/ (+ src/fonts/) before stage 1.
 STAGE_0_FILE_COUNT = 94
+# Stage-1 paths whose layer folder stage 2 renames (all but shared/, platform/, */adapters/).
+STAGE_2_FILE_COUNT = 80
+# A stage-1 path in a layer folder stage 2 renames: <ctx>/domain/, <ctx>/app/ or the root app/.
+_OLD_LAYER_RE = re.compile(r"^(?:(airspace|enrichment|opensky|display|admin)/(domain|app)/|app/)")
 
 
 def run_cli(root, *args):
@@ -42,8 +47,8 @@ def read_tree(root):
 
 
 SHORT_TREE = {
-    "src/display/domain/screens/table_view.h": '#pragma once\n#include "core_link.h"\n',
-    "src/display/domain/screens/table_view.cpp": '#include "table_view.h"\n#include <vector>\n',
+    "src/display/core/screens/table_view.h": '#pragma once\n#include "core_link.h"\n',
+    "src/display/core/screens/table_view.cpp": '#include "table_view.h"\n#include <vector>\n',
     "src/platform/core_link.h": "#pragma once\n",
     "test/support/test_support.h": "#pragma once\n",
     "test/test_display/table_view_test.cpp": '#include "table_view.h"\n'
@@ -65,15 +70,20 @@ class MoveTableTest(unittest.TestCase):
         ]
         for name, folder in rows:
             with self.subTest(file=name):
-                self.assertEqual(folder + name, ri.MOVES.get(name))
+                self.assertEqual(folder + name, ri.MOVES_STAGE_1.get(name))
 
-    # Scenario: Tabela przeniesień zgadza się z drzewem po przeniesieniu
+    # Scenario: Tabele przeniesień etapów 1 i 2 zgadzają się z drzewem
     def test_move_table_matches_the_tree(self):
-        self.assertEqual(STAGE_0_FILE_COUNT, len(ri.MOVES))
-        missing = [new for new in ri.MOVES.values() if not (ROOT / "src" / new).is_file()]
-        left = [old for old in ri.MOVES if (ROOT / "src" / old).exists()]
-        self.assertEqual([], missing, "destinations that don't exist")
-        self.assertEqual([], left, "old flat paths still present")
+        self.assertEqual(STAGE_0_FILE_COUNT, len(ri.MOVES_STAGE_1))
+        finals = {old: ri.final_path(old) for old in ri.MOVES_STAGE_1}
+        missing = [f"{old} -> {new}" for old, new in finals.items()
+                   if not (ROOT / "src" / new).is_file()]
+        self.assertEqual([], missing, "final paths that don't exist")
+        left_stage_0 = [old for old in ri.MOVES_STAGE_1 if (ROOT / "src" / old).exists()]
+        self.assertEqual([], left_stage_0, "stage-0 flat paths still present")
+        left_stage_1 = [mid for old, mid in ri.MOVES_STAGE_1.items()
+                        if mid != finals[old] and (ROOT / "src" / mid).exists()]
+        self.assertEqual([], left_stage_1, "stage-1 paths still present")
 
     def test_whole_hardware_files_and_owner_decisions(self):
         expected = {
@@ -94,18 +104,90 @@ class MoveTableTest(unittest.TestCase):
         }
         for old, new in expected.items():
             with self.subTest(file=old):
-                self.assertEqual(new, ri.MOVES.get(old))
+                self.assertEqual(new, ri.MOVES_STAGE_1.get(old))
 
     def test_every_destination_is_a_context_layer_path(self):
-        self.assertEqual(STAGE_0_FILE_COUNT, len(ri.MOVES))
-        bad = [new for new in ri.MOVES.values()
-               if check_layers.classify("src/" + new) in (None, "test")]
+        # Final paths: stage-1 destinations in domain/ / app/ no longer classify after stage 2.
+        self.assertEqual(STAGE_0_FILE_COUNT, len(ri.MOVES_STAGE_1))
+        finals = [ri.final_path(old) for old in ri.MOVES_STAGE_1]
+        bad = [p for p in finals if check_layers.classify("src/" + p) in (None, "test")]
         self.assertEqual([], bad)
 
     def test_no_two_files_share_a_destination_and_none_is_renamed(self):
-        self.assertEqual(STAGE_0_FILE_COUNT, len(ri.MOVES))
-        self.assertEqual(len(ri.MOVES), len(set(ri.MOVES.values())))
-        renamed = [(o, n) for o, n in ri.MOVES.items()
+        self.assertEqual(STAGE_0_FILE_COUNT, len(ri.MOVES_STAGE_1))
+        self.assertEqual(2, len(ri.STAGES))
+        self.assertIs(ri.MOVES_STAGE_1, ri.STAGES[0])
+        self.assertIs(ri.MOVES_STAGE_2, ri.STAGES[1])
+        for stage, table in enumerate(ri.STAGES, 1):
+            with self.subTest(stage=stage):
+                self.assertEqual(len(table), len(set(table.values())))
+                renamed = [(o, n) for o, n in table.items()
+                           if posixpath.basename(o) != posixpath.basename(n)]
+                self.assertEqual([], renamed)
+        finals = [ri.final_path(old) for old in ri.MOVES_STAGE_1]
+        self.assertEqual(len(finals), len(set(finals)), "two files share a final path")
+
+    def test_moves_is_the_last_stage(self):
+        # --move applies MOVES: the table of the newest stage.
+        self.assertIs(ri.STAGES[-1], ri.MOVES)
+
+    def test_final_path_follows_both_stages(self):
+        cases = {
+            "fonts/lcars_efont.c": "display/core/theme/fonts/lcars_efont.c",
+            "main.cpp": "main/main.cpp",
+            "config_portal.h": "admin/adapters/config_portal.h",
+            "web_i18n.cpp": "admin/core/web_i18n.cpp",
+            "screenshot.cpp": "display/services/screenshot.cpp",
+            "sun_times.h": "shared/sun_times.h",
+            "core_link.cpp": "platform/core_link.cpp",
+            "hexdb_http.h": "enrichment/adapters/hexdb_http.h",
+        }
+        for old, new in cases.items():
+            with self.subTest(file=old):
+                self.assertEqual(new, ri.final_path(old))
+
+    # Scenario Outline: Etap 2 zmienia tylko nazwę katalogu warstwy, nie plik
+    def test_stage_2_renames_the_layer_folder(self):
+        rows = [
+            ("display/domain/screens/table_view.cpp", "display/core/screens/table_view.cpp"),
+            ("display/domain/theme/fonts/lcars_efont.c", "display/core/theme/fonts/lcars_efont.c"),
+            ("enrichment/domain/lookup_cache.h", "enrichment/core/lookup_cache.h"),
+            ("admin/domain/firmware/version.cpp", "admin/core/firmware/version.cpp"),
+            ("airspace/app/poll_pipeline.cpp", "airspace/services/poll_pipeline.cpp"),
+            ("display/app/screenshot.cpp", "display/services/screenshot.cpp"),
+            ("app/main.cpp", "main/main.cpp"),
+            ("app/net_task.h", "main/net_task.h"),
+        ]
+        for old, new in rows:
+            with self.subTest(file=old):
+                self.assertEqual(new, ri.MOVES_STAGE_2.get(old))
+
+    # Scenario Outline: admin/app/ rozdziela się: czyste moduły do admin/core/, trasy WebServer
+    # do admin/adapters/
+    def test_admin_app_splits_into_core_and_adapters(self):
+        rows = [
+            ("config_page.cpp", "admin/core/"),
+            ("config_page.h", "admin/core/"),
+            ("web_i18n.cpp", "admin/core/"),
+            ("web_i18n.h", "admin/core/"),
+            ("config_portal.cpp", "admin/adapters/"),
+            ("config_portal.h", "admin/adapters/"),
+        ]
+        for name, folder in rows:
+            with self.subTest(file=name):
+                self.assertEqual(folder + name, ri.MOVES_STAGE_2.get("admin/app/" + name))
+
+    # Scenario: Etap 2 nie rusza shared/, platform/ ani plików, które już leżą w adapters/
+    def test_stage_2_leaves_shared_platform_and_adapters_alone(self):
+        table = ri.MOVES_STAGE_2
+        self.assertEqual(STAGE_2_FILE_COUNT, len(table))
+        expected_keys = {p for p in ri.MOVES_STAGE_1.values() if _OLD_LAYER_RE.match(p)}
+        self.assertEqual(STAGE_2_FILE_COUNT, len(expected_keys))
+        self.assertEqual(sorted(expected_keys), sorted(table))
+        untouchable = [k for k in table
+                       if k.startswith(("shared/", "platform/")) or "/adapters/" in k]
+        self.assertEqual([], untouchable)
+        renamed = [(o, n) for o, n in table.items()
                    if posixpath.basename(o) != posixpath.basename(n)]
         self.assertEqual([], renamed)
 
@@ -113,44 +195,47 @@ class MoveTableTest(unittest.TestCase):
 class MoveCliTest(unittest.TestCase):
     def test_move_runs_git_mv_drops_empty_folders_and_skips_done_ones(self):
         with tempfile.TemporaryDirectory() as tmp:
-            write_tree(tmp, {"src/table_view.h": "#pragma once\n",
-                             "src/fonts/lcars_efont.h": "#pragma once\n"})
+            # Stage-1 paths: --move applies the stage-2 table.
+            write_tree(tmp, {"src/display/domain/screens/table_view.h": "#pragma once\n",
+                             "src/app/main.cpp": "int main() { return 0; }\n"})
             subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
             subprocess.run(["git", "add", "src"], cwd=tmp, check=True)
             code, out = run_cli(tmp, "--move")
             self.assertEqual(0, code, out)
             self.assertIn("moved 2 file(s)", out)
-            self.assertTrue((Path(tmp) / "src/display/domain/screens/table_view.h").is_file())
-            self.assertTrue((Path(tmp) / "src/display/domain/theme/fonts/lcars_efont.h").is_file())
-            self.assertFalse((Path(tmp) / "src/fonts").exists())
+            self.assertTrue((Path(tmp) / "src/display/core/screens/table_view.h").is_file())
+            self.assertTrue((Path(tmp) / "src/main/main.cpp").is_file())
+            self.assertFalse((Path(tmp) / "src/display/domain").exists())
+            self.assertFalse((Path(tmp) / "src/app").exists())
             staged = subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=tmp,
                                     capture_output=True, text=True, check=True).stdout
-            self.assertIn("src/display/domain/screens/table_view.h", staged)
+            self.assertIn("src/display/core/screens/table_view.h", staged)
+            self.assertIn("src/main/main.cpp", staged)
             code, out = run_cli(tmp, "--move")
             self.assertEqual(0, code, out)
             self.assertIn("moved 0 file(s)", out)
 
 
 class RewriteTest(unittest.TestCase):
-    INDEX_PATHS = ["display/domain/screens/table_view.h", "platform/core_link.h",
-                   "display/domain/theme/fonts/lcars_efont.h"]
+    INDEX_PATHS = ["display/core/screens/table_view.h", "platform/core_link.h",
+                   "display/core/theme/fonts/lcars_efont.h"]
 
     def index(self):
         return ri.build_index(self.INDEX_PATHS)
 
     def test_index_maps_basenames_to_src_relative_paths(self):
-        self.assertEqual({"table_view.h": "display/domain/screens/table_view.h",
+        self.assertEqual({"table_view.h": "display/core/screens/table_view.h",
                           "core_link.h": "platform/core_link.h",
-                          "lcars_efont.h": "display/domain/theme/fonts/lcars_efont.h"},
+                          "lcars_efont.h": "display/core/theme/fonts/lcars_efont.h"},
                          self.index())
 
     # Scenario: Krótki include przeniesionego nagłówka dostaje pełną ścieżkę
     def test_short_include_becomes_full_path(self):
-        self.assertEqual('#include "display/domain/screens/table_view.h"\n',
+        self.assertEqual('#include "display/core/screens/table_view.h"\n',
                          ri.rewrite_text('#include "table_view.h"\n', self.index()))
 
     def test_include_with_an_old_subdirectory_becomes_full_path(self):
-        self.assertEqual('#include "display/domain/theme/fonts/lcars_efont.h"  // efont\n',
+        self.assertEqual('#include "display/core/theme/fonts/lcars_efont.h"  // efont\n',
                          ri.rewrite_text('#include "fonts/lcars_efont.h"  // efont\n',
                                          self.index()))
 
@@ -163,10 +248,10 @@ class RewriteTest(unittest.TestCase):
         out = ri.rewrite_text(text, self.index()).splitlines()
         self.assertEqual(kept, out[:5])
         # The control line in the same file is rewritten, so the tool did run on it.
-        self.assertEqual('#include "display/domain/screens/table_view.h"', out[5])
+        self.assertEqual('#include "display/core/screens/table_view.h"', out[5])
 
     def test_full_path_include_is_not_touched(self):
-        text = '#include "display/domain/screens/table_view.h"\n#include "platform/core_link.h"\n'
+        text = '#include "display/core/screens/table_view.h"\n#include "platform/core_link.h"\n'
         self.assertEqual(text, ri.rewrite_text(text, self.index()))
 
     # Scenario: Drugie uruchomienie niczego nie zmienia
@@ -176,10 +261,10 @@ class RewriteTest(unittest.TestCase):
             code, out = run_cli(tmp)
             self.assertEqual(0, code, out)
             first = read_tree(tmp)
-            self.assertIn(b'#include "display/domain/screens/table_view.h"',
+            self.assertIn(b'#include "display/core/screens/table_view.h"',
                           first["test/test_display/table_view_test.cpp"])
             self.assertIn(b'#include "platform/core_link.h"',
-                          first["src/display/domain/screens/table_view.h"])
+                          first["src/display/core/screens/table_view.h"])
             code, out = run_cli(tmp)
             self.assertEqual(0, code, out)
             self.assertEqual(first, read_tree(tmp))
@@ -197,17 +282,17 @@ class RewriteTest(unittest.TestCase):
     # Scenario: Dwa nagłówki o tej samej nazwie w src/ to błąd, a nie zgadywanie
     def test_duplicate_header_name_is_an_error(self):
         with self.assertRaises(ValueError) as ctx:
-            ri.build_index(["a/domain/x.h", "b/domain/x.h"])
-        self.assertIn("a/domain/x.h", str(ctx.exception))
-        self.assertIn("b/domain/x.h", str(ctx.exception))
+            ri.build_index(["a/core/x.h", "b/core/x.h"])
+        self.assertIn("a/core/x.h", str(ctx.exception))
+        self.assertIn("b/core/x.h", str(ctx.exception))
         with tempfile.TemporaryDirectory() as tmp:
-            write_tree(tmp, {"src/a/domain/x.h": "", "src/b/domain/x.h": "",
-                             "src/a/domain/y.cpp": '#include "x.h"\n'})
+            write_tree(tmp, {"src/a/core/x.h": "", "src/b/core/x.h": "",
+                             "src/a/core/y.cpp": '#include "x.h"\n'})
             before = read_tree(tmp)
             code, out = run_cli(tmp)
             self.assertNotEqual(0, code, out)
-            self.assertIn("a/domain/x.h", out)
-            self.assertIn("b/domain/x.h", out)
+            self.assertIn("a/core/x.h", out)
+            self.assertIn("b/core/x.h", out)
             self.assertEqual(before, read_tree(tmp))
 
     # Scenario: Komentarz za include'em i końce linii CRLF zostają
@@ -217,12 +302,34 @@ class RewriteTest(unittest.TestCase):
                          ri.rewrite_text(text, self.index()))
         with tempfile.TemporaryDirectory() as tmp:
             write_tree(tmp, {"src/platform/core_link.h": b"#pragma once\r\n",
-                             "src/app/x.cpp": text.encode("utf-8")})
+                             "src/main/x.cpp": text.encode("utf-8")})
             code, out = run_cli(tmp)
             self.assertEqual(0, code, out)
-            data = (Path(tmp) / "src/app/x.cpp").read_bytes()
+            data = (Path(tmp) / "src/main/x.cpp").read_bytes()
         self.assertIn(b'#include "platform/core_link.h"  // Guarded<T>\r\n', data)
         self.assertEqual(data.count(b"\n"), data.count(b"\r\n"))
+
+    # Scenario: Include ze starą nazwą warstwy dostaje nową pełną ścieżkę
+    def test_old_layer_path_becomes_the_new_full_path(self):
+        user = ('#include "display/domain/i18n.h"  // Language\n'
+                '#include "app/net_task.h"\n'
+                '#include <vector>\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            write_tree(tmp, {"src/display/core/i18n.h": "#pragma once\n",
+                             "src/main/net_task.h": "#pragma once\n",
+                             "src/display/core/screens/x.cpp": user})
+            before = read_tree(tmp)
+            code, out = run_cli(tmp, "--check")
+            self.assertEqual(1, code, out)
+            self.assertEqual(before, read_tree(tmp))
+            code, out = run_cli(tmp)
+            self.assertEqual(0, code, out)
+            lines = (Path(tmp) / "src/display/core/screens/x.cpp").read_text(
+                encoding="utf-8").splitlines()
+            self.assertEqual(['#include "display/core/i18n.h"  // Language',
+                              '#include "main/net_task.h"', '#include <vector>'], lines)
+            code, out = run_cli(tmp, "--check")
+            self.assertEqual(0, code, out)
 
 
 if __name__ == "__main__":

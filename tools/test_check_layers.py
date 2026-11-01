@@ -2,7 +2,7 @@
 
 The rule tests feed the pure functions {relpath: text} dicts (the included targets are in the
 dict too, so they resolve); LayoutTest / BuildConfigTest / WorkflowTest read this repository
-and pin the state spec 12 stage 1 leaves behind.
+and pin the state spec 12 stage 2 leaves behind.
 """
 
 import configparser
@@ -22,6 +22,15 @@ SOURCE_SUFFIXES = {".h", ".hpp", ".c", ".cpp"}
 
 # `grep -ro "RUN_TEST(" test --include=*.cpp | wc -l` on main before stage 1 (plan step 0).
 RUN_TEST_BASELINE = 874
+
+# Layer findings (check_files + full_path_findings) on this repository after stage 2: 55 from
+# stage 1, -9 +5 with the new layer names (spec 12 plan, "Layer report"). A limit, not a pin:
+# stages 3-8 lower the count without touching this test; a new finding above it fails.
+LAYER_FINDINGS_LIMIT = 51
+
+# Old layer folder names in a path: <ctx>/domain, <ctx>/app, src/app/, the -<app/> filter.
+OLD_LAYER_PATH_RE = re.compile(r"\b(airspace|enrichment|opensky|display|admin)/(domain|app)\b"
+                               r"|\bsrc/app/|<app/>")
 
 
 def show(findings, limit=30):
@@ -62,20 +71,21 @@ class ClassifyTest(unittest.TestCase):
         cases = {
             "src/shared/sun_times.h": "shared",
             "src/platform/core_link.cpp": "platform",
-            "src/app/main.cpp": "app",
-            "src/app/net_task.h": "app",
-            "src/airspace/domain/flight_phase.h": "airspace/domain",
-            "src/airspace/app/poll_pipeline.cpp": "airspace/app",
+            "src/main/main.cpp": "main",
+            "src/main/net_task.h": "main",
+            "src/airspace/core/flight_phase.h": "airspace/core",
+            "src/airspace/services/poll_pipeline.cpp": "airspace/services",
             "src/enrichment/adapters/hexdb_http.h": "enrichment/adapters",
-            "src/opensky/domain/opensky_client.cpp": "opensky/domain",
-            "src/display/domain/screens/table_view.h": "display/domain",
-            "src/display/domain/theme/fonts/lcars_efont.c": "display/domain",
-            "src/display/app/screenshot.cpp": "display/app",
-            "src/admin/domain/firmware/version.cpp": "admin/domain",
-            "src/admin/app/config_portal.cpp": "admin/app",
+            "src/opensky/core/opensky_client.cpp": "opensky/core",
+            "src/display/core/screens/table_view.h": "display/core",
+            "src/display/core/theme/fonts/lcars_efont.c": "display/core",
+            "src/display/services/screenshot.cpp": "display/services",
+            "src/admin/core/firmware/version.cpp": "admin/core",
+            "src/admin/core/config_page.h": "admin/core",
+            "src/admin/adapters/config_portal.cpp": "admin/adapters",
             "src/admin/adapters/github_ca.h": "admin/adapters",
             "include/LGFX_CYD.hpp": "display/adapters",
-            "include/touch_calibration.h": "display/domain",
+            "include/touch_calibration.h": "display/core",
             "test/support/fixtures.h": "test",
             "test/test_admin/github_fixtures.h": "test",
             "test/test_display/table_view_test.cpp": "test",
@@ -85,8 +95,8 @@ class ClassifyTest(unittest.TestCase):
                 self.assertEqual(layer, check_layers.classify(path))
 
     def test_unknown_context_or_missing_layer_is_outside(self):
-        for path in ("src/stray.cpp", "src/display/stray.cpp", "src/weather/domain/x.h",
-                     "src/display/views/x.h", "lib/x.h"):
+        for path in ("src/stray.cpp", "src/display/stray.cpp", "src/weather/core/x.h",
+                     "src/display/views/x.h", "src/display/domain/x.h", "lib/x.h"):
             with self.subTest(path=path):
                 self.assertIsNone(check_layers.classify(path))
 
@@ -95,32 +105,37 @@ class ClassifyTest(unittest.TestCase):
 
 class RuleTableTest(unittest.TestCase):
     ALLOWED = [
-        ("src/airspace/domain/", "shared/sun_times.h"),
-        ("src/opensky/domain/", "airspace/domain/flight_phase.h"),
-        ("src/display/domain/", "enrichment/domain/aircraft_names.h"),
-        ("src/display/domain/", "admin/domain/device_alerts.h"),
-        ("src/admin/domain/", "display/domain/backlight.h"),
-        ("src/airspace/app/", "enrichment/domain/aircraft_lookup.h"),
-        ("src/display/app/", "platform/core_link.h"),
-        ("src/platform/", "display/domain/screens/table_view.h"),
-        ("src/enrichment/adapters/", "enrichment/domain/lookup_store.h"),
-        ("src/app/", "enrichment/adapters/hexdb_http.h"),
-        ("test/test_display/", "display/domain/theme/lcars_theme.h"),
+        ("src/airspace/core/", "shared/sun_times.h"),
+        ("src/opensky/core/", "airspace/core/flight_phase.h"),
+        ("src/display/core/", "enrichment/core/aircraft_names.h"),
+        ("src/display/core/", "admin/core/device_alerts.h"),
+        ("src/admin/core/", "display/core/backlight.h"),
+        ("src/admin/core/", "admin/core/web_i18n.h"),
+        ("src/airspace/services/", "enrichment/core/aircraft_lookup.h"),
+        ("src/display/services/", "platform/core_link.h"),
+        ("src/platform/", "display/core/screens/table_view.h"),
+        ("src/enrichment/adapters/", "enrichment/core/lookup_store.h"),
+        ("src/admin/adapters/", "admin/core/config_page.h"),
+        ("src/main/", "enrichment/adapters/hexdb_http.h"),
+        ("test/test_display/", "display/core/theme/lcars_theme.h"),
     ]
 
     FORBIDDEN = [
-        ("src/display/domain/", "opensky/domain/opensky_quota.h",
-         "display/domain -> opensky/domain"),
-        ("src/enrichment/domain/", "opensky/domain/opensky_auth.h",
-         "enrichment/domain -> opensky/domain"),
-        ("src/airspace/domain/", "display/domain/screens/table_view.h",
-         "airspace/domain -> display/domain"),
-        ("src/opensky/domain/", "enrichment/adapters/hexdb_http.h",
-         "opensky/domain -> enrichment/adapters"),
-        ("src/admin/domain/", "admin/app/config_page.h", "admin/domain -> admin/app"),
-        ("src/airspace/app/", "enrichment/app/x.h", "airspace/app -> enrichment/app"),
-        ("src/display/domain/", "app/net_task.h", "display/domain -> app"),
-        ("src/display/domain/", "LGFX_CYD.hpp", "display/domain -> display/adapters"),
+        ("src/display/core/", "opensky/core/opensky_quota.h", "display/core -> opensky/core"),
+        ("src/enrichment/core/", "opensky/core/opensky_auth.h",
+         "enrichment/core -> opensky/core"),
+        ("src/airspace/core/", "display/core/screens/table_view.h",
+         "airspace/core -> display/core"),
+        ("src/opensky/core/", "enrichment/adapters/hexdb_http.h",
+         "opensky/core -> enrichment/adapters"),
+        ("src/admin/core/", "admin/adapters/config_portal.h", "admin/core -> admin/adapters"),
+        ("src/admin/core/", "admin/services/x.h", "admin/core -> admin/services"),
+        ("src/airspace/services/", "enrichment/services/x.h",
+         "airspace/services -> enrichment/services"),
+        ("src/admin/adapters/", "display/services/screenshot.h",
+         "admin/adapters -> display/services"),
+        ("src/display/core/", "main/net_task.h", "display/core -> main"),
+        ("src/display/core/", "LGFX_CYD.hpp", "display/core -> display/adapters"),
         ("src/shared/", "platform/core_link.h", "shared -> platform"),
     ]
 
@@ -153,16 +168,16 @@ class RuleTableTest(unittest.TestCase):
     def test_test_files_may_not_include_adapters_or_roots(self):
         files = {
             "test/test_enrichment/x_test.cpp": '#include "enrichment/adapters/hexdb_http.h"\n'
-                                               '#include "app/net_task.h"\n',
+                                               '#include "main/net_task.h"\n',
             "src/enrichment/adapters/hexdb_http.h": "",
-            "src/app/net_task.h": "",
+            "src/main/net_task.h": "",
         }
         found = check_layers.check_files(files)
         texts = [check_layers.format_finding(f) for f in found]
         self.assertEqual(2, len(found), show(found))
         self.assertTrue(texts[0].startswith("test/test_enrichment/x_test.cpp:1: "
                                             "test -> enrichment/adapters "), texts[0])
-        self.assertTrue(texts[1].startswith("test/test_enrichment/x_test.cpp:2: test -> app "),
+        self.assertTrue(texts[1].startswith("test/test_enrichment/x_test.cpp:2: test -> main "),
                         texts[1])
 
     # Scenario: Plik poza katalogami kontekstów jest zgłaszany
@@ -175,9 +190,30 @@ class RuleTableTest(unittest.TestCase):
                 self.assertEqual(path, found[0].path)
                 self.assertIn("outside", found[0].message)
 
+    # Scenario: Plik w katalogu o starej nazwie warstwy jest zgłaszany jako leżący poza warstwą
+    def test_old_layer_names_are_outside_any_layer(self):
+        for path in ("src/display/domain/x.h", "src/admin/app/x.cpp", "src/app/main.cpp"):
+            with self.subTest(path=path):
+                self.assertIsNone(check_layers.classify(path))
+                found = check_layers.check_files({path: "int x;\n"})
+                self.assertEqual(1, len(found), show(found))
+                self.assertEqual(path, found[0].path)
+                self.assertIn("outside", found[0].message)
+        new = {"src/display/core/x.h": "display/core",
+               "src/admin/services/x.cpp": "admin/services",
+               "src/main/main.cpp": "main"}
+        for path, layer in new.items():
+            with self.subTest(path=path):
+                self.assertEqual(layer, check_layers.classify(path))
+                found = check_layers.check_files({path: "int x;\n"})
+                self.assertEqual([], found, show(found))
+
+    def test_main_root_may_include_anything(self):
+        self.assertIsNone(check_layers.allowed_targets("main"))
+
     def test_unresolved_quoted_include_is_reported(self):
         found = check_layers.check_files(
-            {"src/display/domain/x.cpp": '#include "shared/nowhere.h"\n'})
+            {"src/display/core/x.cpp": '#include "shared/nowhere.h"\n'})
         self.assertEqual(1, len(found), show(found))
         self.assertEqual(1, found[0].line)
         self.assertIn("shared/nowhere.h", check_layers.format_finding(found[0]))
@@ -185,59 +221,75 @@ class RuleTableTest(unittest.TestCase):
     def test_adapters_see_their_own_context_and_platform_only(self):
         source = "src/enrichment/adapters/x.cpp"
         files = {
-            source: '#include "enrichment/app/enrichment_service.h"\n'
-                    '#include "enrichment/domain/lookup_store.h"\n'
+            source: '#include "enrichment/services/enrichment_service.h"\n'
+                    '#include "enrichment/core/lookup_store.h"\n'
                     '#include "platform/core_link.h"\n'
                     '#include "shared/sun_times.h"\n'
                     '#include <HTTPClient.h>\n'
-                    '#include "opensky/domain/opensky_auth.h"\n'
+                    '#include "opensky/core/opensky_auth.h"\n'
                     '#include "display/adapters/y.h"\n',
-            "src/enrichment/app/enrichment_service.h": "",
-            "src/enrichment/domain/lookup_store.h": "",
+            "src/enrichment/services/enrichment_service.h": "",
+            "src/enrichment/core/lookup_store.h": "",
             "src/platform/core_link.h": "",
             "src/shared/sun_times.h": "",
-            "src/opensky/domain/opensky_auth.h": "",
+            "src/opensky/core/opensky_auth.h": "",
             "src/display/adapters/y.h": "",
         }
         found = check_layers.check_files(files)
         self.assertEqual([6, 7], [f.line for f in found], show(found))
-        self.assertIn("enrichment/adapters -> opensky/domain", found[0].message)
+        self.assertIn("enrichment/adapters -> opensky/core", found[0].message)
         self.assertIn("enrichment/adapters -> display/adapters", found[1].message)
 
-    def test_app_layer_sees_its_own_app_but_not_another_contexts(self):
+    def test_adapter_sees_its_own_core_and_services_but_not_another_contexts_core(self):
         files = {
-            "src/display/app/x.cpp": '#include "display/app/y.h"\n#include "admin/app/z.h"\n',
-            "src/display/app/y.h": "",
-            "src/admin/app/z.h": "",
+            "src/display/adapters/x.cpp": '#include "display/core/i18n.h"\n'
+                                          '#include "display/services/screenshot.h"\n'
+                                          '#include "admin/core/config_store.h"\n',
+            "src/display/core/i18n.h": "",
+            "src/display/services/screenshot.h": "",
+            "src/admin/core/config_store.h": "",
+        }
+        self.assertEqual({"shared", "platform", "sdk", "display/core", "display/services",
+                          "display/adapters"}, check_layers.allowed_targets("display/adapters"))
+        found = check_layers.check_files(files)
+        self.assertEqual([3], [f.line for f in found], show(found))
+        self.assertIn("display/adapters -> admin/core", found[0].message)
+
+    def test_services_layer_sees_its_own_services_but_not_another_contexts(self):
+        files = {
+            "src/display/services/x.cpp": '#include "display/services/y.h"\n'
+                                          '#include "admin/services/z.h"\n',
+            "src/display/services/y.h": "",
+            "src/admin/services/z.h": "",
         }
         found = check_layers.check_files(files)
         self.assertEqual([2], [f.line for f in found], show(found))
-        self.assertIn("display/app -> admin/app", found[0].message)
+        self.assertIn("display/services -> admin/services", found[0].message)
 
-    def test_enrichment_app_may_implement_the_airspace_port(self):
+    def test_enrichment_services_may_implement_the_airspace_port(self):
         files = {
-            "src/enrichment/app/x.cpp": '#include "airspace/app/poll_pipeline.h"\n'
-                                        '#include "airspace/domain/flight_phase.h"\n'
-                                        '#include "enrichment/domain/lookup_cache.h"\n'
-                                        '#include "opensky/domain/opensky_auth.h"\n',
-            "src/airspace/app/poll_pipeline.h": "",
-            "src/airspace/domain/flight_phase.h": "",
-            "src/enrichment/domain/lookup_cache.h": "",
-            "src/opensky/domain/opensky_auth.h": "",
+            "src/enrichment/services/x.cpp": '#include "airspace/services/poll_pipeline.h"\n'
+                                             '#include "airspace/core/flight_phase.h"\n'
+                                             '#include "enrichment/core/lookup_cache.h"\n'
+                                             '#include "opensky/core/opensky_auth.h"\n',
+            "src/airspace/services/poll_pipeline.h": "",
+            "src/airspace/core/flight_phase.h": "",
+            "src/enrichment/core/lookup_cache.h": "",
+            "src/opensky/core/opensky_auth.h": "",
         }
         found = check_layers.check_files(files)
         self.assertEqual([4], [f.line for f in found], show(found))
-        self.assertIn("enrichment/app -> opensky/domain", found[0].message)
+        self.assertIn("enrichment/services -> opensky/core", found[0].message)
 
     def test_test_files_may_include_support_and_their_own_headers(self):
         files = {
             "test/test_admin/x_test.cpp": '#include "test_support.h"\n'
                                           '#include "github_fixtures.h"\n'
-                                          '#include "admin/app/config_page.h"\n'
+                                          '#include "admin/core/config_page.h"\n'
                                           '#include "platform/core_link.h"\n',
             "test/support/test_support.h": "",
             "test/test_admin/github_fixtures.h": "",
-            "src/admin/app/config_page.h": "",
+            "src/admin/core/config_page.h": "",
             "src/platform/core_link.h": "",
         }
         self.assertEqual("test", check_layers.classify("test/test_admin/x_test.cpp"))
@@ -261,14 +313,14 @@ class SdkIncludeTest(unittest.TestCase):
         self.assertTrue(check_layers.format_finding(found[0])
                         .startswith("src/platform/x.cpp:5: platform -> sdk "), show(found))
 
-    # Scenario Outline: domain/ i app/ nie dołączają SDK, także pod #ifdef ARDUINO
+    # Scenario Outline: core/ i services/ nie dołączają SDK, także pod #ifdef ARDUINO
     def test_sdk_include_in_domain_is_reported_even_inside_ifdef(self):
         rows = [
-            ("src/display/domain/", "Arduino.h", "display/domain"),
-            ("src/opensky/domain/", "HTTPClient.h", "opensky/domain"),
-            ("src/enrichment/domain/", "Preferences.h", "enrichment/domain"),
-            ("src/admin/app/", "WebServer.h", "admin/app"),
-            ("src/display/domain/", "LovyanGFX.hpp", "display/domain"),
+            ("src/display/core/", "Arduino.h", "display/core"),
+            ("src/opensky/core/", "HTTPClient.h", "opensky/core"),
+            ("src/enrichment/core/", "Preferences.h", "enrichment/core"),
+            ("src/admin/services/", "WebServer.h", "admin/services"),
+            ("src/display/core/", "LovyanGFX.hpp", "display/core"),
         ]
         for who, sdk, layer in rows:
             with self.subTest(who=who, sdk=sdk):
@@ -283,7 +335,7 @@ class SdkIncludeTest(unittest.TestCase):
     def test_standard_and_arduinojson_headers_allowed_everywhere(self):
         text = ("#include <vector>\n#include <cstdint>\n#include <atomic>\n"
                 "#include <ArduinoJson.h>\n#include <unity.h>\n")
-        for source in ("src/shared/x.cpp", "src/airspace/domain/x.cpp",
+        for source in ("src/shared/x.cpp", "src/airspace/core/x.cpp",
                        "test/test_airspace/x_test.cpp"):
             with self.subTest(source=source):
                 self.assertIsNotNone(check_layers.classify(source), source)
@@ -298,7 +350,7 @@ class SdkIncludeTest(unittest.TestCase):
         self.assertEqual([], found, show(found))
 
     def test_adapters_and_roots_may_include_the_sdk(self):
-        for source in ("src/display/adapters/x.cpp", "src/app/main.cpp"):
+        for source in ("src/display/adapters/x.cpp", "src/main/main.cpp"):
             with self.subTest(source=source):
                 self.assertIsNotNone(check_layers.classify(source))
                 found = check_layers.check_files(
@@ -347,9 +399,9 @@ class FindIncludesTest(unittest.TestCase):
                 '#include "shared/sun_times.h"\n')
         self.assertEqual([(5, "shared/sun_times.h", False, False)], self.names(text))
 
-    def test_opensky_app_sees_its_own_context_only(self):
-        self.assertEqual({"shared", "opensky/domain", "opensky/app"},
-                         check_layers.allowed_targets("opensky/app"))
+    def test_opensky_services_sees_its_own_context_only(self):
+        self.assertEqual({"shared", "opensky/core", "opensky/services"},
+                         check_layers.allowed_targets("opensky/services"))
 
     def test_ifdef_arduino_else_endif(self):
         text = ("#ifdef ARDUINO\n#include <A.h>\n#else\n#include <B.h>\n#endif\n"
@@ -381,13 +433,13 @@ class FindIncludesTest(unittest.TestCase):
 
 class ResolveTest(unittest.TestCase):
     KNOWN = {"src/platform/core_link.h", "include/LGFX_CYD.hpp", "test/support/fixtures.h",
-             "test/test_admin/github_fixtures.h", "src/display/domain/screens/table_view.h"}
+             "test/test_admin/github_fixtures.h", "src/display/core/screens/table_view.h"}
 
     def test_full_path_from_src_include_and_test_support(self):
         r = check_layers.resolve_include
         self.assertEqual("src/platform/core_link.h",
-                         r("src/app/main.cpp", "platform/core_link.h", self.KNOWN))
-        self.assertEqual("include/LGFX_CYD.hpp", r("src/app/main.cpp", "LGFX_CYD.hpp", self.KNOWN))
+                         r("src/main/main.cpp", "platform/core_link.h", self.KNOWN))
+        self.assertEqual("include/LGFX_CYD.hpp", r("src/main/main.cpp", "LGFX_CYD.hpp", self.KNOWN))
         self.assertEqual("test/support/fixtures.h",
                          r("test/test_admin/x_test.cpp", "fixtures.h", self.KNOWN))
 
@@ -396,24 +448,24 @@ class ResolveTest(unittest.TestCase):
         self.assertEqual("test/test_admin/github_fixtures.h",
                          r("test/test_admin/x_test.cpp", "github_fixtures.h", self.KNOWN))
         self.assertIsNone(r("test/test_display/x_test.cpp", "github_fixtures.h", self.KNOWN))
-        self.assertIsNone(r("src/display/domain/screens/x.cpp", "table_view.h", self.KNOWN))
+        self.assertIsNone(r("src/display/core/screens/x.cpp", "table_view.h", self.KNOWN))
 
     def test_short_include_in_src_is_a_full_path_finding(self):
-        files = {"src/display/domain/screens/x.cpp": '#include "table_view.h"\n'
-                                                     '#include "display/domain/screens/table_view.h"\n',
-                 "src/display/domain/screens/table_view.h": ""}
+        files = {"src/display/core/screens/x.cpp": '#include "table_view.h"\n'
+                                                   '#include "display/core/screens/table_view.h"\n',
+                 "src/display/core/screens/table_view.h": ""}
         found = check_layers.full_path_findings(files)
         self.assertEqual([1], [f.line for f in found], show(found))
-        self.assertEqual("src/display/domain/screens/x.cpp", found[0].path)
+        self.assertEqual("src/display/core/screens/x.cpp", found[0].path)
 
 
 # ---- CLI ------------------------------------------------------------------------------------
 
 TWO_VIOLATIONS = {
-    "src/display/domain/a.cpp": '#include "opensky/domain/q.h"\n',
+    "src/display/core/a.cpp": '#include "opensky/core/q.h"\n',
     "src/shared/b.cpp": '#include "shared/b.h"\n#include "platform/core_link.h"\n',
     "src/shared/b.h": "",
-    "src/opensky/domain/q.h": "",
+    "src/opensky/core/q.h": "",
     "src/platform/core_link.h": "",
 }
 
@@ -425,7 +477,7 @@ class CliTest(unittest.TestCase):
             write_tree(tmp, TWO_VIOLATIONS)
             code, out, _ = run_cli(tmp)
         out = out.replace("\\", "/")
-        self.assertIn("src/display/domain/a.cpp:1: display/domain -> opensky/domain", out)
+        self.assertIn("src/display/core/a.cpp:1: display/core -> opensky/core", out)
         self.assertIn("src/shared/b.cpp:2: shared -> platform", out)
         summary = [ln for ln in out.splitlines() if "total" in ln.lower()]
         self.assertEqual(1, len(summary), out)
@@ -447,13 +499,13 @@ class CliTest(unittest.TestCase):
 
     def test_summary_counts_per_pair_and_output_is_ascii(self):
         files = dict(TWO_VIOLATIONS)
-        files["src/display/domain/c.cpp"] = '#include "opensky/domain/q.h"\n'
+        files["src/display/core/c.cpp"] = '#include "opensky/core/q.h"\n'
         with tempfile.TemporaryDirectory() as tmp:
             write_tree(tmp, files)
             code, out, raw = run_cli(tmp)
-        raw.decode("ascii")  # UnicodeDecodeError = non-ASCII output (Windows console code page)
+        self.assertTrue(raw.isascii(), out)  # non-ASCII output breaks the Windows console
         pair_lines = [ln for ln in out.splitlines()
-                      if "display/domain -> opensky/domain" in ln and not ln.startswith("src")]
+                      if "display/core -> opensky/core" in ln and not ln.startswith("src")]
         self.assertEqual(1, len(pair_lines), out)
         self.assertRegex(pair_lines[0], r"\b2\b")
         self.assertEqual(0, code)
@@ -503,6 +555,46 @@ class LayoutTest(unittest.TestCase):
                     if p.endswith(".cpp"))
         self.assertGreaterEqual(count, RUN_TEST_BASELINE)
 
+    # Scenario: W src/ nie ma już katalogów warstw o starych nazwach
+    def test_old_layer_folders_are_gone(self):
+        src = ROOT / "src"
+        old = [f"src/{c}/{layer}/" for c in check_layers.CONTEXTS for layer in ("domain", "app")
+               if (src / c / layer).exists()]
+        if (src / "app").exists():
+            old.append("src/app/")
+        self.assertEqual([], old, "old layer folders still in src/")
+        for name in ("main.cpp", "net_task.h", "net_task.cpp"):
+            with self.subTest(file=name):
+                self.assertTrue((src / "main" / name).is_file(), f"src/main/{name}")
+
+    # Scenario: Liczba naruszeń w raporcie warstw nie rośnie ponad 51 z etapu 2
+    def test_layer_findings_do_not_exceed_the_stage_2_limit(self):
+        files = check_layers.load_tree(ROOT)
+        findings = check_layers.check_files(files) + check_layers.full_path_findings(files)
+        self.assertLessEqual(len(findings), LAYER_FINDINGS_LIMIT,
+                             f"{len(findings)} layer findings, limit {LAYER_FINDINGS_LIMIT}:"
+                             + show(findings, limit=len(findings)))
+
+    # Scenario: W kodzie, testach, skryptach i plikach budowania nie zostały ścieżki ze starymi
+    # nazwami warstw
+    def test_no_old_layer_paths_left_in_code_and_build_files(self):
+        paths = [p for d in ("src", "test", "include") for p in sorted((ROOT / d).rglob("*"))
+                 if p.is_file()]
+        paths.append(ROOT / "platformio.ini")
+        paths += sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+        # The stage-1 move table and the tool tests name the old paths on purpose.
+        paths += [p for p in sorted((ROOT / "tools").glob("*.py"))
+                  if p.name != "rewrite_includes.py" and not p.name.startswith("test_")]
+        self.assertGreater(len(paths), 100)
+        hits = []
+        for p in paths:
+            text = p.read_text(encoding="utf-8", errors="replace")
+            for n, line in enumerate(text.splitlines(), 1):
+                m = OLD_LAYER_PATH_RE.search(line)
+                if m:
+                    hits.append(f"{p.relative_to(ROOT).as_posix()}:{n}: {m.group(0)}")
+        self.assertEqual([], hits, f"{len(hits)} old layer path(s):\n" + "\n".join(hits[:60]))
+
 
 def platformio_ini():
     cp = configparser.ConfigParser(interpolation=None)
@@ -512,11 +604,15 @@ def platformio_ini():
 
 class BuildConfigTest(unittest.TestCase):
     # Scenario: Środowisko native nie kompiluje korzeni kompozycji, adapterów ani adapterowej
-    # części platform/
+    # części platform/ — poza config_portal do etapu 4
     def test_native_filter_excludes_roots_and_adapters(self):
         native = platformio_ini()["env:native"]
-        self.assertEqual(["+<*>", "-<app/>", "-<*/adapters/>", "-<platform/*_esp32.cpp>"],
-                         native.get("build_src_filter", "").split())
+        tokens = native.get("build_src_filter", "").split()
+        self.assertEqual(["+<*>", "-<main/>", "-<*/adapters/>", "-<platform/*_esp32.cpp>",
+                          "+<admin/adapters/config_portal.cpp>"], tokens)
+        readded = [t for t in tokens[1:] if t.startswith("+<")]
+        self.assertEqual(["+<admin/adapters/config_portal.cpp>"], readded)
+        self.assertTrue((ROOT / "src" / "admin" / "adapters" / "config_portal.cpp").is_file())
 
     # Scenario: src/ jest na ścieżce include'ów firmware'u i testów
     def test_src_is_on_the_include_path_of_every_env(self):

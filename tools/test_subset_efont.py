@@ -14,18 +14,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import subset_efont  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-FONTS_DIR = ROOT / "src" / "display" / "domain" / "theme" / "fonts"
+FONTS_DIR = ROOT / "src" / "display" / "core" / "theme" / "fonts"
 
 
 class OutputTest(unittest.TestCase):
-    # Scenario: Generator fontów pisze do nowego katalogu i dołącza nagłówek pełną ścieżką
+    # Scenario: Generator fontów pisze do katalogu fontów w display/core/ i dołącza nagłówek pełną
+    # ścieżką
     def test_writes_fonts_into_their_new_directory_with_full_path_include(self):
         out_c = Path(os.path.normpath(subset_efont.OUT_C))
         self.assertEqual(FONTS_DIR / "lcars_efont.c", out_c)
         self.assertTrue(out_c.is_file(), out_c)
 
         include = getattr(subset_efont, "INCLUDE_LINE", None)
-        self.assertEqual('#include "display/domain/theme/fonts/lcars_efont.h"', include)
+        self.assertEqual('#include "display/core/theme/fonts/lcars_efont.h"', include)
         committed = out_c.read_text(encoding="utf-8").splitlines()
         self.assertIn(include, committed)
         # main() writes that constant, not a literal of its own.
