@@ -86,10 +86,10 @@ class RemovedSymbolsTest(unittest.TestCase):
 class MainCppCommentsTest(unittest.TestCase):
     # Scenario: Komentarz „main.cpp reloads” w module sieciowym jest zgłaszany
     def test_main_cpp_in_net_module_comment_is_reported(self):
-        files = {"src/config_portal.cpp": "// main.cpp reloads the config\n"}
+        files = {"src/web_server.cpp": "// main.cpp reloads the config\n"}
         found = check_comments.find_main_cpp_comments(files)
         self.assertEqual(1, len(found), show(found))
-        self.assertIn("src/config_portal.cpp:1", check_comments.format_finding(found[0]))
+        self.assertIn("src/web_server.cpp:1", check_comments.format_finding(found[0]))
 
     # Scenario: Komentarz o 8 KB stosu loopTask w module sieciowym jest zgłaszany
     def test_looptask_in_net_module_comment_is_reported(self):
@@ -133,12 +133,20 @@ class MainCppCommentsTest(unittest.TestCase):
         found = check_comments.find_main_cpp_comments({"src/net_task.cpp": text})
         self.assertEqual([], found, show(found))
 
+    # Scenario: Nowe adaptery rdzenia 0 są sprawdzane jak moduły, z których wyszły
     def test_net_modules_include_the_core0_modules(self):
-        for stem in ("config_portal", "opensky_client", "aircraft_lookup", "route_lookup",
-                     "lookup_budget", "poll_pipeline", "release_check", "net_task"):
+        for stem in ("opensky_client", "aircraft_lookup", "route_lookup", "lookup_budget",
+                     "poll_pipeline", "release_check", "net_task"):
             self.assertIn(stem, check_comments.NET_MODULES)
-        for stem in ("main", "redraw_policy", "status_bar", "table_view"):
-            self.assertNotIn(stem, check_comments.NET_MODULES)
+        # Spec 12 stage 4: the core-0 adapters split off those modules, and config_portal's
+        # new name.
+        for stem in ("web_server", "opensky_http", "hexdb_sources", "lookup_store_nvs",
+                     "settings_nvs", "github_http", "ota_flash", "alert_sources"):
+            with self.subTest(stem=stem):
+                self.assertIn(stem, check_comments.NET_MODULES)
+        for stem in ("config_portal", "main", "redraw_policy", "status_bar", "table_view"):
+            with self.subTest(stem=stem):
+                self.assertNotIn(stem, check_comments.NET_MODULES)
 
 
 # ---- CLI --------------------------------------------------------------------------------------
@@ -152,7 +160,7 @@ def write_tree(root, files):
 
 ONE_FINDING_TREE = {
     "CLAUDE.md": "# CLAUDE.md\n\n## Testing\n",
-    "src/config_portal.cpp": "// main.cpp reloads the config\nint x;\n",
+    "src/web_server.cpp": "// main.cpp reloads the config\nint x;\n",
 }
 
 CLEAN_TREE = {
@@ -174,7 +182,7 @@ class CliTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             write_tree(d, ONE_FINDING_TREE)
             code, out = run_cli(["--root", d])
-        self.assertIn("src/config_portal.cpp:1", out)
+        self.assertIn("src/web_server.cpp:1", out)
         self.assertEqual(0, code)
 
     # Scenario: Z --strict zgłoszenie kończy skrypt błędem
@@ -214,10 +222,10 @@ class DocRefsTest(unittest.TestCase):
     # Scenario: Stare odwołanie „CLAUDE.md review notes” jest zgłaszane
     def test_old_review_notes_reference_is_reported(self):
         docs = {"CLAUDE.md": "# CLAUDE.md\n"}
-        files = {"src/config_portal.cpp": "// see CLAUDE.md review notes 1.5\n"}
+        files = {"src/web_server.cpp": "// see CLAUDE.md review notes 1.5\n"}
         found = check_comments.find_bad_doc_refs(files, docs)
         self.assertEqual(1, len(found), show(found))
-        self.assertIn("src/config_portal.cpp:1", check_comments.format_finding(found[0]))
+        self.assertIn("src/web_server.cpp:1", check_comments.format_finding(found[0]))
         self.assertIn("docs/review-notes-2026.md", found[0].message)
 
     def test_reference_to_missing_file_is_reported(self):
