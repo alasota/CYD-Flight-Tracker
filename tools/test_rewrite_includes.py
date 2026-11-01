@@ -1,7 +1,8 @@
 """Tests for tools/rewrite_includes.py:  python tools/test_rewrite_includes.py
 
 RewriteTest feeds the pure functions strings and runs the CLI on temporary trees (never on this
-repository); MoveTableTest pins the stage-1 and stage-2 move tables (spec 12 plan) against src/.
+repository); MoveTableTest pins the stage-1, stage-2 and stage-4 move tables (spec 12 plan)
+against src/.
 """
 
 import posixpath
@@ -11,6 +12,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import check_layers  # noqa: E402
@@ -23,6 +25,11 @@ TOOL = Path(__file__).resolve().parent / "rewrite_includes.py"
 STAGE_0_FILE_COUNT = 94
 # Stage-1 paths whose layer folder stage 2 renames (all but shared/, platform/, */adapters/).
 STAGE_2_FILE_COUNT = 80
+# Stage 4 renames one module (spec 12 section 4.5): the WebServer routes become web_server.
+STAGE_4_RENAMES = {
+    "admin/adapters/config_portal.h": "admin/adapters/web_server.h",
+    "admin/adapters/config_portal.cpp": "admin/adapters/web_server.cpp",
+}
 # A stage-1 path in a layer folder stage 2 renames: <ctx>/domain/, <ctx>/app/ or the root app/.
 _OLD_LAYER_RE = re.compile(r"^(?:(airspace|enrichment|opensky|display|admin)/(domain|app)/|app/)")
 
@@ -72,7 +79,7 @@ class MoveTableTest(unittest.TestCase):
             with self.subTest(file=name):
                 self.assertEqual(folder + name, ri.MOVES_STAGE_1.get(name))
 
-    # Scenario: Tabele przeniesień etapów 1 i 2 zgadzają się z drzewem
+    # Scenario: Tabele przeniesień etapów 1, 2 i 4 zgadzają się z drzewem
     def test_move_table_matches_the_tree(self):
         self.assertEqual(STAGE_0_FILE_COUNT, len(ri.MOVES_STAGE_1))
         finals = {old: ri.final_path(old) for old in ri.MOVES_STAGE_1}
@@ -81,9 +88,15 @@ class MoveTableTest(unittest.TestCase):
         self.assertEqual([], missing, "final paths that don't exist")
         left_stage_0 = [old for old in ri.MOVES_STAGE_1 if (ROOT / "src" / old).exists()]
         self.assertEqual([], left_stage_0, "stage-0 flat paths still present")
-        left_stage_1 = [mid for old, mid in ri.MOVES_STAGE_1.items()
-                        if mid != finals[old] and (ROOT / "src" / mid).exists()]
-        self.assertEqual([], left_stage_1, "stage-1 paths still present")
+        # Every path a file had between two tables (before the last table that changes it).
+        left = []
+        for old in ri.MOVES_STAGE_1:
+            path = old
+            for stage, table in enumerate(ri.STAGES, 1):
+                path = table.get(path, path)
+                if path != finals[old] and (ROOT / "src" / path).exists():
+                    left.append(f"{path} (after table {stage})")
+        self.assertEqual([], left, "intermediate paths still present")
 
     def test_whole_hardware_files_and_owner_decisions(self):
         expected = {
@@ -114,16 +127,19 @@ class MoveTableTest(unittest.TestCase):
         self.assertEqual([], bad)
 
     def test_no_two_files_share_a_destination_and_none_is_renamed(self):
+        # Stages 1 and 2 only move files; stage 4 renames exactly config_portal -> web_server.
         self.assertEqual(STAGE_0_FILE_COUNT, len(ri.MOVES_STAGE_1))
-        self.assertEqual(2, len(ri.STAGES))
+        self.assertEqual(3, len(ri.STAGES), "STAGES = the stage 1, 2 and 4 tables")
         self.assertIs(ri.MOVES_STAGE_1, ri.STAGES[0])
         self.assertIs(ri.MOVES_STAGE_2, ri.STAGES[1])
+        self.assertIs(getattr(ri, "MOVES_STAGE_4", None), ri.STAGES[2])
+        expected_renames = {1: {}, 2: {}, 3: STAGE_4_RENAMES}
         for stage, table in enumerate(ri.STAGES, 1):
-            with self.subTest(stage=stage):
+            with self.subTest(table=stage):
                 self.assertEqual(len(table), len(set(table.values())))
-                renamed = [(o, n) for o, n in table.items()
-                           if posixpath.basename(o) != posixpath.basename(n)]
-                self.assertEqual([], renamed)
+                renamed = {o: n for o, n in table.items()
+                           if posixpath.basename(o) != posixpath.basename(n)}
+                self.assertEqual(expected_renames[stage], renamed)
         finals = [ri.final_path(old) for old in ri.MOVES_STAGE_1]
         self.assertEqual(len(finals), len(set(finals)), "two files share a final path")
 
@@ -131,11 +147,12 @@ class MoveTableTest(unittest.TestCase):
         # --move applies MOVES: the table of the newest stage.
         self.assertIs(ri.STAGES[-1], ri.MOVES)
 
-    def test_final_path_follows_both_stages(self):
+    def test_final_path_follows_all_stages(self):
         cases = {
             "fonts/lcars_efont.c": "display/core/theme/fonts/lcars_efont.c",
             "main.cpp": "main/main.cpp",
-            "config_portal.h": "admin/adapters/config_portal.h",
+            "config_portal.h": "admin/adapters/web_server.h",
+            "config_portal.cpp": "admin/adapters/web_server.cpp",
             "web_i18n.cpp": "admin/core/web_i18n.cpp",
             "screenshot.cpp": "display/services/screenshot.cpp",
             "sun_times.h": "shared/sun_times.h",
@@ -145,6 +162,25 @@ class MoveTableTest(unittest.TestCase):
         for old, new in cases.items():
             with self.subTest(file=old):
                 self.assertEqual(new, ri.final_path(old))
+
+    # Scenario Outline: Tabela etapu 4 zmienia nazwę config_portal na web_server (§4.5) i nic
+    # więcej
+    def test_stage_4_renames_config_portal_to_web_server(self):
+        table = getattr(ri, "MOVES_STAGE_4", None)
+        self.assertIsNotNone(table, "rewrite_includes.py has no MOVES_STAGE_4")
+        self.assertIs(table, ri.STAGES[-1], "MOVES_STAGE_4 is the last table in STAGES")
+        self.assertIs(table, ri.MOVES)
+        self.assertEqual(STAGE_4_RENAMES, table)
+        rows = [("config_portal.h", "admin/adapters/web_server.h"),
+                ("config_portal.cpp", "admin/adapters/web_server.cpp")]
+        for old, new in rows:
+            with self.subTest(file=old):
+                self.assertEqual(new, ri.final_path(old))
+                self.assertTrue((ROOT / "src" / new).is_file(), f"src/{new}")
+                self.assertFalse((ROOT / "src/admin/adapters" / old).exists(),
+                                 f"src/admin/adapters/{old}")
+        # hexdb_http keeps its name: section 4.2 calls it hexdb_http too.
+        self.assertEqual("enrichment/adapters/hexdb_http.h", ri.final_path("hexdb_http.h"))
 
     # Scenario Outline: Etap 2 zmienia tylko nazwę katalogu warstwy, nie plik
     def test_stage_2_renames_the_layer_folder(self):
@@ -192,25 +228,53 @@ class MoveTableTest(unittest.TestCase):
         self.assertEqual([], renamed)
 
 
+def git_tree(tmp, files):
+    write_tree(tmp, files)
+    subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+    subprocess.run(["git", "add", "src"], cwd=tmp, check=True)
+
+
+def staged_names(tmp):
+    return subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=tmp,
+                          capture_output=True, text=True, check=True).stdout
+
+
 class MoveCliTest(unittest.TestCase):
     def test_move_runs_git_mv_drops_empty_folders_and_skips_done_ones(self):
         with tempfile.TemporaryDirectory() as tmp:
-            # Stage-1 paths: --move applies the stage-2 table.
-            write_tree(tmp, {"src/display/domain/screens/table_view.h": "#pragma once\n",
-                             "src/app/main.cpp": "int main() { return 0; }\n"})
-            subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
-            subprocess.run(["git", "add", "src"], cwd=tmp, check=True)
-            code, out = run_cli(tmp, "--move")
-            self.assertEqual(0, code, out)
-            self.assertIn("moved 2 file(s)", out)
+            # Stage-1 paths and the stage-2 table, in-process: --move itself applies the newest
+            # table (stage 4), which empties no folder.
+            git_tree(tmp, {"src/display/domain/screens/table_view.h": "#pragma once\n",
+                           "src/app/main.cpp": "int main() { return 0; }\n"})
+            with mock.patch.object(ri, "MOVES", ri.MOVES_STAGE_2):
+                self.assertEqual(2, ri.move_files(Path(tmp)))
             self.assertTrue((Path(tmp) / "src/display/core/screens/table_view.h").is_file())
             self.assertTrue((Path(tmp) / "src/main/main.cpp").is_file())
             self.assertFalse((Path(tmp) / "src/display/domain").exists())
             self.assertFalse((Path(tmp) / "src/app").exists())
-            staged = subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=tmp,
-                                    capture_output=True, text=True, check=True).stdout
+            staged = staged_names(tmp)
             self.assertIn("src/display/core/screens/table_view.h", staged)
             self.assertIn("src/main/main.cpp", staged)
+            with mock.patch.object(ri, "MOVES", ri.MOVES_STAGE_2):
+                self.assertEqual(0, ri.move_files(Path(tmp)))
+
+    def test_move_applies_the_stage_4_rename(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            git_tree(tmp, {"src/admin/adapters/config_portal.h": "#pragma once\n",
+                           "src/admin/adapters/config_portal.cpp":
+                               '#include "admin/adapters/config_portal.h"\n',
+                           "src/admin/adapters/github_ca.h": "#pragma once\n"})
+            code, out = run_cli(tmp, "--move")
+            self.assertEqual(0, code, out)
+            self.assertIn("moved 2 file(s)", out)
+            adapters = Path(tmp) / "src/admin/adapters"
+            self.assertTrue((adapters / "web_server.h").is_file())
+            self.assertTrue((adapters / "web_server.cpp").is_file())
+            self.assertFalse((adapters / "config_portal.h").exists())
+            self.assertTrue((adapters / "github_ca.h").is_file())
+            staged = staged_names(tmp)
+            self.assertIn("src/admin/adapters/web_server.h", staged)
+            self.assertIn("src/admin/adapters/web_server.cpp", staged)
             code, out = run_cli(tmp, "--move")
             self.assertEqual(0, code, out)
             self.assertIn("moved 0 file(s)", out)
@@ -330,6 +394,41 @@ class RewriteTest(unittest.TestCase):
                               '#include "main/net_task.h"', '#include <vector>'], lines)
             code, out = run_cli(tmp, "--check")
             self.assertEqual(0, code, out)
+
+    # Scenario: Include pliku o zmienionej nazwie dostaje nową pełną ścieżkę
+    def test_renamed_header_include_becomes_the_new_full_path(self):
+        full = b'#include "admin/adapters/config_portal.h"  // configPortalBegin()\r\n'
+        short = b'#include "config_portal.h"\r\n#include <vector>\r\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            write_tree(tmp, {"src/admin/adapters/web_server.h": b"#pragma once\r\n",
+                             "src/main/main.cpp": full,
+                             "test/test_admin/x_test.cpp": short})
+            before = read_tree(tmp)
+            code, out = run_cli(tmp, "--check")
+            self.assertEqual(1, code, out)
+            self.assertEqual(before, read_tree(tmp))
+            code, out = run_cli(tmp)
+            self.assertEqual(0, code, out)
+            after = read_tree(tmp)
+            self.assertEqual(b'#include "admin/adapters/web_server.h"  // configPortalBegin()\r\n',
+                             after["src/main/main.cpp"])
+            self.assertEqual(b'#include "admin/adapters/web_server.h"\r\n#include <vector>\r\n',
+                             after["test/test_admin/x_test.cpp"])
+            code, out = run_cli(tmp, "--check")
+            self.assertEqual(0, code, out)
+
+    def test_renamed_basename_next_to_a_live_header_of_that_name_is_an_error(self):
+        # The old name of a renamed file must not belong to another header: the short form
+        # would be ambiguous, like two headers of one name.
+        with tempfile.TemporaryDirectory() as tmp:
+            write_tree(tmp, {"src/admin/adapters/web_server.h": "",
+                             "src/display/core/config_portal.h": "",
+                             "src/main/x.cpp": '#include "config_portal.h"\n'})
+            before = read_tree(tmp)
+            code, out = run_cli(tmp)
+            self.assertNotEqual(0, code, out)
+            self.assertIn("display/core/config_portal.h", out)
+            self.assertEqual(before, read_tree(tmp))
 
 
 if __name__ == "__main__":

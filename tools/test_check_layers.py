@@ -2,7 +2,7 @@
 
 The rule tests feed the pure functions {relpath: text} dicts (the included targets are in the
 dict too, so they resolve); LayoutTest / BuildConfigTest / WorkflowTest read this repository
-and pin the state spec 12 stages 2 and 3 leave behind.
+and pin the state spec 12 stages 2–4 leave behind.
 """
 
 import configparser
@@ -25,9 +25,11 @@ RUN_TEST_BASELINE = 874
 
 # Layer findings (check_files + full_path_findings) on this repository after the last finished
 # stage: 51 after stage 2, 47 after stage 3 (-6 includes only the moved types needed, +2
-# tracked_flight.h -> enrichment/core). A limit, not a pin: a stage that lowers the count lowers
-# this number with it, so a new finding can't hide under the old limit.
-LAYER_FINDINGS_LIMIT = 47
+# tracked_flight.h -> enrichment/core), 14 after stage 4 (-38 SDK / adapter / platform includes
+# that left core/ with the hardware halves, +5 adapters reaching another context's core). A
+# limit, not a pin: a stage that lowers the count lowers this number with it, so a new finding
+# can't hide under the old limit.
+LAYER_FINDINGS_LIMIT = 14
 
 # Stage 3 (spec 12 section 8 item 3): symbol -> (new header, old header), both from src/.
 STAGE_3_HOMES = {
@@ -134,6 +136,111 @@ STAGE_3_GONE_FINDINGS = [
     ("admin/core/device_alerts.cpp", "admin/adapters"),
 ]
 
+# Stage 4 (spec 12 section 8 item 4): function -> (adapter .cpp that defines it, core .cpp that
+# keeps the pure half), both from src/.
+STAGE_4_ADAPTERS = {
+    "drawStatusBar": ("display/adapters/lgfx/status_bar_draw.cpp",
+                      "display/core/screens/status_bar.cpp"),
+    "drawOtaScreen": ("display/adapters/lgfx/service_screen_draw.cpp",
+                      "display/core/screens/service_screen.cpp"),
+    "drawRadarView": ("display/adapters/lgfx/radar_view_draw.cpp",
+                      "display/core/screens/radar_view.cpp"),
+    "flightScreenReserveSprite": ("display/adapters/lgfx/flight_screen_draw.cpp",
+                                  "display/core/screens/flight_screen.cpp"),
+    "drawTablePage": ("display/adapters/lgfx/table_view_draw.cpp",
+                      "display/core/screens/table_view.cpp"),
+    "drawFeaturedPanel": ("display/adapters/lgfx/featured_panel_draw.cpp",
+                          "display/core/screens/featured_panel.cpp"),
+    "drawAircraftSummary": ("display/adapters/lgfx/aircraft_summary_draw.cpp",
+                            "display/core/screens/aircraft_summary.cpp"),
+    "drawBottomNav": ("display/adapters/lgfx/lcars_theme_draw.cpp",
+                      "display/core/theme/lcars_theme.cpp"),
+    "touchInputRead": ("display/adapters/touch_xpt2046.cpp", "display/core/touch_input.cpp"),
+    "backlightLoop": ("display/adapters/backlight_ldr.cpp", "display/core/backlight.cpp"),
+    "storeLoadAircraft": ("enrichment/adapters/lookup_store_nvs.cpp",
+                          "enrichment/core/lookup_store.cpp"),
+    "lookupAircraft": ("enrichment/adapters/hexdb_sources.cpp",
+                       "enrichment/core/aircraft_lookup.cpp"),
+    "lookupRoute": ("enrichment/adapters/hexdb_sources.cpp", "enrichment/core/route_lookup.cpp"),
+    "fetchAircraftStates": ("opensky/adapters/opensky_http.cpp",
+                            "opensky/core/opensky_client.cpp"),
+    "otaFlashSession": ("admin/adapters/ota_flash.cpp", "admin/core/firmware/ota_update.cpp"),
+    "releaseCheckLoop": ("admin/adapters/github_http.cpp",
+                         "admin/core/firmware/release_check.cpp"),
+    "loadConfig": ("admin/adapters/settings_nvs.cpp", "admin/core/config_store.cpp"),
+    "deviceAlertInputs": ("admin/adapters/alert_sources.cpp", "admin/core/device_alerts.cpp"),
+}
+
+# Stage 4: symbol -> (new header, old header), both from src/. The old home of the first five is
+# config_portal.h under its stage-4 name (web_server.h); a missing old header reads as empty.
+_WEB = "admin/adapters/web_server.h"
+STAGE_4_HOMES = {
+    "parseOpenSkyCredentialsJson": ("admin/core/settings_form.h", _WEB),
+    "OpenSkyCredentials": ("admin/core/settings_form.h", _WEB),
+    "isValidFloatString": ("admin/core/settings_form.h", _WEB),
+    "isValidUnsignedIntString": ("admin/core/settings_form.h", _WEB),
+    "OtaObserver": ("admin/core/firmware/ota_update.h", _WEB),
+    "TouchPoint": ("display/adapters/touch_xpt2046.h", "display/core/touch_input.h"),
+    "touchInputRead": ("display/adapters/touch_xpt2046.h", "display/core/touch_input.h"),
+    "gfxTextMeasure": ("display/adapters/lgfx/lcars_theme_draw.h",
+                       "display/core/theme/lcars_theme.h"),
+    "drawPhaseIcon": ("display/adapters/lgfx/lcars_theme_draw.h",
+                      "display/core/theme/lcars_theme.h"),
+    "drawTablePage": ("display/adapters/lgfx/table_view_draw.h",
+                      "display/core/screens/table_view.h"),
+    "drawStatusBar": ("display/adapters/lgfx/status_bar_draw.h",
+                      "display/core/screens/status_bar.h"),
+    "backlightBegin": ("display/adapters/backlight_ldr.h", "display/core/backlight.h"),
+    "formatDate": ("shared/clock.h", "platform/time_sync.h"),
+    "minuteOf": ("shared/clock.h", "platform/time_sync.h"),
+}
+
+# Stage 4: the 21 tests that follow the pure functions out of config_portal and time_sync,
+# test -> (new file, old file), both from test/. The old files are git-mv'ed away.
+_SETTINGS_FORM = "test_admin/settings_form_test.cpp"
+_CLOCK = "test_platform/clock_test.cpp"
+STAGE_4_MOVED_TESTS = {
+    **{name: (_SETTINGS_FORM, "test_admin/config_portal_test.cpp") for name in (
+        "test_parse_credentials_json_valid",
+        "test_parse_credentials_json_ignores_extra_fields_and_whitespace",
+        "test_parse_credentials_json_rejects_malformed_json",
+        "test_parse_credentials_json_rejects_missing_field",
+        "test_parse_credentials_json_rejects_empty_values",
+        "test_parse_credentials_json_rejects_empty_string",
+        "test_parse_credentials_json_rejects_oversized_body",
+        "test_valid_float_string_accepts_typical_values",
+        "test_valid_float_string_rejects_garbage",
+        "test_valid_unsigned_int_string_accepts_digits",
+        "test_valid_unsigned_int_string_rejects_non_digits")},
+    **{name: (_CLOCK, "test_platform/time_sync_test.cpp") for name in (
+        "test_format_date_epoch_zero",
+        "test_format_date_known_values",
+        "test_format_date_pads_day_and_month",
+        "test_format_date_leap_year_after_feb29",
+        "test_format_date_negative_epoch_clamps",
+        "test_format_time_epoch_zero",
+        "test_format_time_known_values",
+        "test_format_time_pads_single_digits",
+        "test_minute_of_same_within_a_minute",
+        "test_minute_of_changes_at_minute_boundary")},
+}
+
+# Stage 4: (from layer, to layer) pairs no finding may have once the hardware halves left core/.
+STAGE_4_GONE_PAIRS = [
+    ("display/core", "display/adapters"),
+    ("display/core", "sdk"),
+    ("display/core", "platform"),
+    ("admin/core", "sdk"),
+    ("admin/core", "admin/adapters"),
+    ("admin/core", "platform"),
+    ("enrichment/core", "sdk"),
+    ("enrichment/core", "enrichment/adapters"),
+    ("opensky/core", "sdk"),
+    ("opensky/core", "platform"),
+    ("opensky/core", "admin/core"),
+    ("test", "admin/adapters"),
+]
+
 # Old layer folder names in a path: <ctx>/domain, <ctx>/app, src/app/, the -<app/> filter.
 OLD_LAYER_PATH_RE = re.compile(r"\b(airspace|enrichment|opensky|display|admin)/(domain|app)\b"
                                r"|\bsrc/app/|<app/>")
@@ -154,7 +261,7 @@ def with_target(source, include, target_path, line=1):
 
 def target_of(include):
     """Where a full-path include lives in the dict trees below."""
-    return include if include.startswith("include/") else "src/" + include
+    return "src/" + include
 
 
 def run_cli(root, *args):
@@ -190,8 +297,7 @@ class ClassifyTest(unittest.TestCase):
             "src/admin/core/config_page.h": "admin/core",
             "src/admin/adapters/config_portal.cpp": "admin/adapters",
             "src/admin/adapters/github_ca.h": "admin/adapters",
-            "include/LGFX_CYD.hpp": "display/adapters",
-            "include/touch_calibration.h": "display/core",
+            "src/display/adapters/lgfx/status_bar_draw.cpp": "display/adapters",
             "test/support/fixtures.h": "test",
             "test/test_admin/github_fixtures.h": "test",
             "test/test_display/table_view_test.cpp": "test",
@@ -205,6 +311,17 @@ class ClassifyTest(unittest.TestCase):
                      "src/display/views/x.h", "src/display/domain/x.h", "lib/x.h"):
             with self.subTest(path=path):
                 self.assertIsNone(check_layers.classify(path))
+
+    # Scenario: Nagłówek w include/ nie należy już do żadnej warstwy
+    def test_include_dir_headers_are_outside_any_layer(self):
+        for path in ("include/LGFX_CYD.hpp", "include/x.h"):
+            with self.subTest(path=path):
+                self.assertIsNone(check_layers.classify(path))
+        cases = {"src/display/adapters/lgfx/LGFX_CYD.hpp": "display/adapters",
+                 "src/display/core/touch_calibration.h": "display/core"}
+        for path, layer in cases.items():
+            with self.subTest(path=path):
+                self.assertEqual(layer, check_layers.classify(path))
 
 
 # ---- §5 table -------------------------------------------------------------------------------
@@ -234,14 +351,15 @@ class RuleTableTest(unittest.TestCase):
          "airspace/core -> display/core"),
         ("src/opensky/core/", "enrichment/adapters/hexdb_http.h",
          "opensky/core -> enrichment/adapters"),
-        ("src/admin/core/", "admin/adapters/config_portal.h", "admin/core -> admin/adapters"),
+        ("src/admin/core/", "admin/adapters/web_server.h", "admin/core -> admin/adapters"),
         ("src/admin/core/", "admin/services/x.h", "admin/core -> admin/services"),
         ("src/airspace/services/", "enrichment/services/x.h",
          "airspace/services -> enrichment/services"),
         ("src/admin/adapters/", "display/services/screenshot.h",
          "admin/adapters -> display/services"),
         ("src/display/core/", "main/net_task.h", "display/core -> main"),
-        ("src/display/core/", "LGFX_CYD.hpp", "display/core -> display/adapters"),
+        ("src/display/core/", "display/adapters/lgfx/LGFX_CYD.hpp",
+         "display/core -> display/adapters"),
         ("src/shared/", "platform/core_link.h", "shared -> platform"),
     ]
 
@@ -261,8 +379,8 @@ class RuleTableTest(unittest.TestCase):
         for who, target, pair in self.FORBIDDEN:
             with self.subTest(who=who, target=target):
                 source = who + "x.cpp"
-                path = ("include/" + target) if target.endswith(".hpp") else "src/" + target
-                found = check_layers.check_files(with_target(source, target, path, line=3))
+                found = check_layers.check_files(with_target(source, target, target_of(target),
+                                                             line=3))
                 self.assertEqual(1, len(found), show(found))
                 self.assertEqual(source, found[0].path)
                 self.assertEqual(3, found[0].line)
@@ -755,6 +873,124 @@ class LayoutTest(unittest.TestCase):
             with self.subTest(header=header):
                 self.assertIn(header, quoted)
 
+    # Scenario: #ifdef ARDUINO zostaje tylko w platform/ i adapters/
+    def test_arduino_ifdef_only_in_platform_and_adapters(self):
+        files = repo_sources("src")
+        allowed, misplaced = [], []
+        for path, text in files.items():
+            hits = arduino_condition_lines(text)
+            if not hits:
+                continue
+            layer = check_layers.classify(path) or ""
+            ok = layer == "platform" or layer.endswith("/adapters")
+            (allowed if ok else misplaced).extend(f"{path}:{n}" for n in hits)
+        # Guard against a vacuous pass: platform/ keeps its NTP / FreeRTOS halves.
+        self.assertTrue([h for h in allowed if h.startswith("src/platform/")],
+                        "found no ARDUINO conditional at all, not even in src/platform/")
+        self.assertEqual([], misplaced, f"{len(misplaced)} ARDUINO conditional(s) outside "
+                         "platform/ and */adapters/:\n" + "\n".join(misplaced))
+
+    # Scenario: Typy LovyanGFX i funkcje rysujące są tylko w display/adapters/
+    def test_core_and_services_never_name_lovyangfx(self):
+        files = repo_sources("src")
+        pure = {p: t for p, t in files.items()
+                if (check_layers.classify(p) or "").endswith(("/core", "/services"))
+                or check_layers.classify(p) == "shared"}
+        self.assertGreater(len(pure), 50)
+        named = [f"{p}:{n}: {m}" for p, t in pure.items() for n, m in lovyangfx_names(t)]
+        self.assertEqual([], named, f"{len(named)} LovyanGFX name(s) in pure code:\n"
+                         + "\n".join(named[:60]))
+        headers = {p: t for p, t in files.items() if p.endswith((".h", ".hpp"))}
+        takers = sorted({p for p, t in headers.items() if LGFX_PARAM_RE.search(strip_comments(t))})
+        self.assertTrue(takers, "no header declares a function taking LGFX &")
+        outside = [p for p in takers if not p.startswith("src/display/adapters/")]
+        self.assertEqual([], outside, "headers outside src/display/adapters/ with an LGFX & "
+                                      "parameter")
+
+    # Scenario Outline: Sprzętowa połowa modułu jest zdefiniowana w adapterze, a czysta zostaje
+    # w core/
+    def test_hardware_functions_are_defined_in_adapters(self):
+        self.assertEqual(18, len(STAGE_4_ADAPTERS))
+        sources = {p: t for p, t in repo_sources("src").items() if p.endswith(".cpp")}
+        for function, (adapter, core) in STAGE_4_ADAPTERS.items():
+            with self.subTest(function=function):
+                defs = [f"{p}:{n}" for p, t in sources.items()
+                        for n in declaration_lines(t, function, bodies_only=True)]
+                self.assertEqual([f"src/{adapter}"], [d.rsplit(":", 1)[0] for d in defs],
+                                 f"definitions of {function}: {defs or 'none'}")
+                self.assertIn(f"src/{core}", sources, f"src/{core} is gone")
+                core_text = sources[f"src/{core}"]
+                self.assertEqual([], arduino_condition_lines(core_text),
+                                 f"src/{core} still has an ARDUINO conditional")
+
+    # Scenario Outline: Typ lub funkcja wyniesiona przy podziale ma jedną deklarację, w swoim
+    # nowym nagłówku
+    def test_stage_4_symbols_are_declared_in_their_new_home(self):
+        self.assertEqual(14, len(STAGE_4_HOMES))
+        headers = {p: t for p, t in repo_sources("src").items() if p.endswith((".h", ".hpp"))}
+        self.assertGreater(len(headers), 30)
+        for symbol, (new, old) in STAGE_4_HOMES.items():
+            with self.subTest(symbol=symbol):
+                hits = [f"{p}:{n}" for p, t in headers.items()
+                        for n in declaration_lines(t, symbol)]
+                self.assertFalse([h for h in hits if h.startswith(f"src/{old}:")],
+                                 f"{symbol} still declared in src/{old}: {hits}")
+                self.assertEqual([f"src/{new}"], [h.rsplit(":", 1)[0] for h in hits],
+                                 f"declarations of {symbol}: {hits or 'none'}")
+
+    # Scenario Outline: Testy czystych funkcji idą za nimi do pliku testów nowego modułu
+    def test_stage_4_moved_tests_follow_their_code(self):
+        self.assertEqual(21, len(STAGE_4_MOVED_TESTS))
+        sources = {p[len("test/"):]: t for p, t in repo_sources("test").items()}
+        for name, (new, old) in STAGE_4_MOVED_TESTS.items():
+            with self.subTest(test=name):
+                self.assertFalse((ROOT / "test" / old).exists(), f"test/{old} still exists")
+                defs = [f"{p}:{n}" for p, t in sources.items() for n in defined_test_lines(t, name)]
+                self.assertEqual([new], [d.rsplit(":", 1)[0] for d in defs],
+                                 f"definitions of {name}: {defs or 'none'}")
+                self.assertEqual(1, run_test_calls(sources[new], name),
+                                 f"RUN_TEST({name}) in test/{new}")
+        # Each new file is registered in its suite's main.cpp, so its RUN_TESTs run.
+        for new in sorted({new for new, _ in STAGE_4_MOVED_TESTS.values()}):
+            module = Path(new).stem[:-len("_test")]
+            suite = Path(new).parent.as_posix()
+            with self.subTest(suite_main=suite):
+                main = strip_comments(sources.get(f"{suite}/main.cpp", ""))
+                self.assertRegex(main, r"\bRUN_MODULE\(\s*" + module + r"\s*\)\s*\)\s*run_"
+                                 + module + r"_tests\(\)", f"test/{suite}/main.cpp")
+
+    # Scenario: Konfiguracja LovyanGFX i kalibracja dotyku leżą w kontekście display, nie
+    # w include/
+    def test_board_config_headers_live_in_the_display_context(self):
+        include_dir = ROOT / "include"
+        left = sorted(p.relative_to(ROOT).as_posix() for p in include_dir.rglob("*")
+                      if p.is_file() and p.suffix in (".h", ".hpp")) if include_dir.is_dir() else []
+        self.assertEqual([], left, "headers still in include/")
+        lgfx = ROOT / "src/display/adapters/lgfx/LGFX_CYD.hpp"
+        calibration = ROOT / "src/display/core/touch_calibration.h"
+        self.assertTrue(lgfx.is_file(), "src/display/adapters/lgfx/LGFX_CYD.hpp")
+        self.assertTrue(calibration.is_file(), "src/display/core/touch_calibration.h")
+        lgfx_text = lgfx.read_text(encoding="utf-8", errors="replace")
+        self.assertRegex(strip_comments(lgfx_text), r"\bclass\s+LGFX\s*:\s*public\s+lgfx::",
+                         "class LGFX in LGFX_CYD.hpp")
+        wanted = "display/core/touch_calibration.h"
+        quoted = [i.name for i in check_layers.find_includes(lgfx_text) if not i.angle]
+        self.assertIn(wanted, quoted, "LGFX_CYD.hpp includes")
+        touch = repo_sources("src/display/core")
+        readers = [p for p, t in touch.items() if "mapRawTouch" in strip_comments(t)
+                   and wanted in [i.name for i in check_layers.find_includes(t) if not i.angle]]
+        self.assertTrue(readers, f"no display/core file with mapRawTouch() includes {wanted}")
+
+    # Scenario Outline: Raport warstw nie zgłasza już SDK, adapterów ani platform/ dołączanych
+    # z core/ i z testów
+    def test_stage_4_removes_sdk_and_adapter_findings_from_core(self):
+        findings = check_layers.check_files(check_layers.load_tree(ROOT))
+        self.assertGreater(len(findings), 0, "check_layers found nothing at all")
+        for source, target in STAGE_4_GONE_PAIRS:
+            with self.subTest(source=source, target=target):
+                hits = [f for f in findings if f.message.startswith(f"{source} -> {target} ")]
+                self.assertEqual([], hits, show(hits, limit=len(hits)))
+
 
 def strip_comments(text):
     """`text` with // and /* */ comments blanked (newlines kept, so line numbers stay); string
@@ -785,11 +1021,12 @@ def strip_comments(text):
 _NOT_A_TYPE = {"return", "else", "case", "throw", "delete", "new", "goto", "sizeof", "co_return"}
 
 
-def declaration_lines(text, symbol):
+def declaration_lines(text, symbol, bodies_only=False):
     """Line numbers where `text` (a header) declares `symbol`: a type (`struct|class|enum
     [class] <symbol>` followed by `{` or `:` -- a forward declaration `struct X;` doesn't count)
-    or a function (`<return type> <symbol>(...)` followed by `;` or a body). Comments are
-    ignored; the name must match as a whole word (`Aircraft` isn't `AircraftRow`)."""
+    or a function (`<return type> <symbol>(...)` followed by `;` or a body; with bodies_only
+    only a function with a body -- a definition -- counts). Comments are ignored; the name must
+    match as a whole word (`Aircraft` isn't `AircraftRow`)."""
     code = strip_comments(text)
     name = re.escape(symbol)
     lines = set()
@@ -809,9 +1046,38 @@ def declaration_lines(text, symbol):
             j += 1
             if depth == 0:
                 break
-        if re.match(r"(?:\s|const\b|noexcept\b|override\b)*[;{]", code[j:]):
+        end = "{" if bodies_only else "[;{]"
+        if re.match(r"(?:\s|const\b|noexcept\b|override\b)*" + end, code[j:]):
             lines.add(code.count("\n", 0, m.start(1)) + 1)
     return sorted(lines)
+
+
+_CONDITIONAL_RE = re.compile(r"^\s*#\s*(if|ifdef|ifndef|elif)\b(.*)$")
+
+
+def arduino_condition_lines(text):
+    """Line numbers of the #if / #ifdef / #ifndef / #elif lines in `text` that test ARDUINO
+    (`#ifdef ARDUINO`, `#ifndef ARDUINO`, `#if [!]defined(ARDUINO)`), comments ignored."""
+    out = []
+    for n, line in enumerate(strip_comments(text).splitlines(), 1):
+        m = _CONDITIONAL_RE.match(line)
+        if m and check_layers._condition_kind(m.group(1), m.group(2)) in ("ard", "not"):
+            out.append(n)
+    return out
+
+
+_LOVYANGFX_RE = re.compile(r"\bLGFX\b|\bLGFX_Sprite\b|\blgfx::")
+
+# A parameter of a LovyanGFX device / sprite type taken by reference.
+LGFX_PARAM_RE = re.compile(r"\b(?:LGFX|LGFX_Sprite|lgfx::\w+)\s*&")
+
+
+def lovyangfx_names(text):
+    """[(line, match)] of LGFX, LGFX_Sprite and lgfx:: in the code of `text` (comments ignored;
+    `LGFX_CYD.hpp` in an include line isn't `LGFX`)."""
+    code = strip_comments(text)
+    return [(code.count("\n", 0, m.start()) + 1, m.group(0))
+            for m in _LOVYANGFX_RE.finditer(code)]
 
 
 def defined_test_lines(text, name):
@@ -871,6 +1137,34 @@ class DeclarationMatchTest(unittest.TestCase):
         self.assertEqual(1, run_test_calls(text, "test_a"))
         self.assertEqual([], defined_test_lines(text, "test_b"))
 
+    def test_bodies_only_counts_definitions_not_prototypes(self):
+        text = ("void loadConfig(Config &out);\n"
+                "void loadConfig(Config &out) {\n  out = {};\n}\n"
+                "static void helper() { loadConfig(c); }\n")
+        self.assertEqual([1, 2], declaration_lines(text, "loadConfig"))
+        self.assertEqual([2], declaration_lines(text, "loadConfig", bodies_only=True))
+
+    def test_arduino_conditions_of_every_spelling_but_not_others(self):
+        text = ("#ifdef ARDUINO\n#endif\n"
+                "#ifndef ARDUINO\n#endif\n"
+                "#if defined(ARDUINO)\n#elif !defined(ARDUINO)\n#endif\n"
+                "#ifdef UNIT_TEST\n#endif\n"
+                "// #ifdef ARDUINO\n"
+                "#ifndef ARDUINO_GUARD_H\n#endif\n")
+        self.assertEqual([1, 3, 5, 6], arduino_condition_lines(text))
+
+    def test_lovyangfx_names_in_code_but_not_comments_or_include_names(self):
+        text = ('#include "display/adapters/lgfx/LGFX_CYD.hpp"\n'
+                "// draws on an LGFX & with lgfx::fonts\n"
+                "class LGFX;\n"
+                "void f(lgfx::LovyanGFX &gfx);\n"
+                "LGFX_Sprite s;\n"
+                "int LGFXish = 0;\n")
+        self.assertEqual([(3, "LGFX"), (4, "lgfx::"), (5, "LGFX_Sprite")], lovyangfx_names(text))
+        self.assertIsNotNone(LGFX_PARAM_RE.search("void drawX(LGFX &gfx);"))
+        self.assertIsNotNone(LGFX_PARAM_RE.search("TextMeasure m(lgfx::LovyanGFX& gfx);"))
+        self.assertIsNone(LGFX_PARAM_RE.search("void hitTest(int x, int y);"))
+
 
 def platformio_ini():
     cp = configparser.ConfigParser(interpolation=None)
@@ -880,15 +1174,14 @@ def platformio_ini():
 
 class BuildConfigTest(unittest.TestCase):
     # Scenario: Środowisko native nie kompiluje korzeni kompozycji, adapterów ani adapterowej
-    # części platform/ — poza config_portal do etapu 4
+    # części platform/
     def test_native_filter_excludes_roots_and_adapters(self):
         native = platformio_ini()["env:native"]
         tokens = native.get("build_src_filter", "").split()
-        self.assertEqual(["+<*>", "-<main/>", "-<*/adapters/>", "-<platform/*_esp32.cpp>",
-                          "+<admin/adapters/config_portal.cpp>"], tokens)
+        self.assertEqual(["+<*>", "-<main/>", "-<*/adapters/>", "-<platform/*_esp32.cpp>"],
+                         tokens)
         readded = [t for t in tokens[1:] if t.startswith("+<")]
-        self.assertEqual(["+<admin/adapters/config_portal.cpp>"], readded)
-        self.assertTrue((ROOT / "src" / "admin" / "adapters" / "config_portal.cpp").is_file())
+        self.assertEqual([], readded, "the native filter adds files back")
 
     # Scenario: src/ jest na ścieżce include'ów firmware'u i testów
     def test_src_is_on_the_include_path_of_every_env(self):
