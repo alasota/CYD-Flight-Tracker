@@ -82,6 +82,7 @@
 #include "display/core/screens/service_screen.h"
 #include "display/core/screens/status_bar.h"
 #include "display/core/screens/table_view.h"
+#include "airspace/core/flight_ordering.h"  // splitFeaturedAndRest()
 #include "platform/time_sync.h"
 #include "display/core/touch_input.h"
 #include "admin/core/firmware/version.h"

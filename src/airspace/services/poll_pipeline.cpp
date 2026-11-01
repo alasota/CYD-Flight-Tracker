@@ -6,7 +6,7 @@
 #include "display/core/screens/flight_screen.h"  // pickNowAircraft(), kOverheadRadiusKm
 #include "enrichment/core/lookup_budget.h"
 #include "airspace/core/tracked_flight.h"
-#include "display/core/screens/table_view.h"  // sortRowsForDisplay()
+#include "airspace/core/flight_ordering.h"  // sortRowsForDisplay()
 
 bool serveBetweenFetches(bool &busy, const std::function<void()> &serve,
                          const std::function<bool()> &updateStarted) {

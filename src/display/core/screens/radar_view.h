@@ -93,7 +93,7 @@ std::string radarSummaryStats(const AircraftRow &row, Language lang);
 //     five rows for the nearest aircraft (rows.front()): callsign, airline,
 //     origin city, "-> destination" city, compass + distance + altitude.
 // `rows` must already be annotated (annotateDistances()) and sorted
-// (sortRowsByDistance()).
+// (sortRowsByDistance(), flight_ordering).
 // Empty-range state (`rows` empty): the radar still draws its empty rings
 // and home marker; the summary panel shows a centered "BRAK LOTU" — or, when
 // the feed failed, why (emptyStateText(health, short form)).
