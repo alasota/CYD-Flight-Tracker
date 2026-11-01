@@ -101,7 +101,7 @@ std::string alertCloseLabel(uint32_t secondsLeft, Language lang);
 
 #ifdef ARDUINO
 
-#include "LGFX_CYD.hpp"
+#include "display/adapters/lgfx/LGFX_CYD.hpp"
 
 // Clears the screen and draws the static part of the update screen; the
 // title says "downloading from GitHub" for release_check's installs.

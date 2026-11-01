@@ -1,1 +1,2 @@
-Board config: `LGFX_CYD.hpp` (display + touch), `touch_calibration.h`.
+Empty: the board config lives in src/ - `display/adapters/lgfx/LGFX_CYD.hpp` (display +
+touch), `display/core/touch_calibration.h`.

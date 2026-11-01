@@ -6,7 +6,7 @@
 // This file is loop() on core 1: the display, touch and everything drawn.
 // It never waits for the network, and the network never draws.
 //
-// setup(): initializes LovyanGFX (configured via include/LGFX_CYD.hpp) and
+// setup(): initializes LovyanGFX (configured via display/adapters/lgfx/LGFX_CYD.hpp) and
 // its built-in XPT2046 touch driver (read via touch_input), the backlight,
 // loads the persisted config (config_store) — restoring which of the three
 // screens was last active (last_screen 0/1/2) into screen_nav — offers the
@@ -61,7 +61,7 @@
 #include <string>
 #include <vector>
 
-#include "LGFX_CYD.hpp"
+#include "display/adapters/lgfx/LGFX_CYD.hpp"
 #include "display/core/backlight.h"
 #include "admin/adapters/config_portal.h"
 #include "admin/core/config_store.h"
@@ -830,7 +830,7 @@ void loop() {
   TouchPoint touch = touchInputRead(tft);
   if (touch.pressed && !wasTouchPressed) {
     // One line per tap: raw XPT2046 values + where they mapped to — what
-    // touch calibration is tuned from (include/touch_calibration.h).
+    // touch calibration is tuned from (display/core/touch_calibration.h).
     Serial.printf("[touch] raw=(%d,%d) -> screen=(%d,%d) nav=%d\n", touch.raw_x, touch.raw_y,
                   touch.x, touch.y,
                   static_cast<int>(navHitTest(touch.x, touch.y, static_cast<int16_t>(tft.width()),

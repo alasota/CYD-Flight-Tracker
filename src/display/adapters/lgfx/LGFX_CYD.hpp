@@ -9,14 +9,14 @@
 // own SPI wiring (CLK 25, MOSI 32, MISO 39, CS 33, IRQ 36), so it gets its
 // own SPI host: the display uses HSPI, touch uses VSPI, and the two never
 // share a peripheral (bus_shared = false). Calibration lives in
-// touch_calibration.h. Read it with tft.getTouch() / tft.getTouchRaw();
+// display/core/touch_calibration.h. Read it with tft.getTouch() / tft.getTouchRaw();
 // coordinates already follow tft.setRotation().
 #pragma once
 
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
 
-#include "touch_calibration.h"
+#include "display/core/touch_calibration.h"
 
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ILI9341 _panel_instance;

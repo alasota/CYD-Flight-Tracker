@@ -17,7 +17,8 @@ Two src/ headers with the same file name make the short form ambiguous: the scri
 both paths and writes nothing. One move table per stage (MOVES_STAGE_1: flat src/ into
 <context>/<layer>/; MOVES_STAGE_2: layers renamed to core / services, roots into main/), kept
 side by side so final_path() can follow a file from stage 0 to today. A later stage that moves
-files adds its table to STAGES.
+files adds its table to STAGES. Stage 4 moved two headers from include/ by hand (git mv); the
+default rewrite fixed their includes.
 """
 
 import argparse

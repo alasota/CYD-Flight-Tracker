@@ -101,7 +101,7 @@ std::string formatRowRouteCities(const AircraftRow &row, Language lang, int maxP
 // too since the signature needs the LGFX device type.
 #ifdef ARDUINO
 
-#include "LGFX_CYD.hpp"
+#include "display/adapters/lgfx/LGFX_CYD.hpp"
 
 // Draws the two-line identity block (identity line + route line) into
 // [x, y, w, h], for Screen 1's featured panel and Screen 2. Uses

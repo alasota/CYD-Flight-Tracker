@@ -179,7 +179,7 @@ constexpr uint16_t LCARS_RUNWAY_GREY = rgb565(0x80, 0x80, 0x80);
 // free of any ESP32/LovyanGFX dependency for `pio test -e native`.
 #ifdef ARDUINO
 
-#include "LGFX_CYD.hpp"
+#include "display/adapters/lgfx/LGFX_CYD.hpp"
 
 // Fonts used across the project, chosen once here rather than per-view —
 // table_view/radar_view reference these instead of picking their own.

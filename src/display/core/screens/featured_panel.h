@@ -45,7 +45,7 @@ std::vector<std::string> featuredPillTexts(const AircraftRow &row, Language lang
 // device type.
 #ifdef ARDUINO
 
-#include "LGFX_CYD.hpp"
+#include "display/adapters/lgfx/LGFX_CYD.hpp"
 
 // Draws the featured panel for `row` across a `screenWidth`-px display, at
 // the fixed y:18..95 bounds (no frame): the identity line + "WAW (PL) ->

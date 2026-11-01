@@ -75,7 +75,7 @@ std::string radarSummaryStats(const AircraftRow &row, Language lang);
 // LGFX device type.
 #ifdef ARDUINO
 
-#include "LGFX_CYD.hpp"
+#include "display/adapters/lgfx/LGFX_CYD.hpp"
 
 // Draws Screen 3's content area (LCARS_CONTENT_TOP..BOTTOM) across a
 // `screenWidth`-px display, at the fixed docs/screens.md "Screen 3" layout (the

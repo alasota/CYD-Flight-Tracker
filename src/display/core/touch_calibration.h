@@ -1,5 +1,5 @@
 // touch_calibration — this board's XPT2046 touch calibration, in
-// LovyanGFX's terms. Shared by include/LGFX_CYD.hpp (which hands it to
+// LovyanGFX's terms. Shared by display/adapters/lgfx/LGFX_CYD.hpp (which hands it to
 // lgfx::Touch_XPT2046) and touch_input's pure mapRawTouch() model (which
 // the native tests check against raw taps logged on the real board), so the
 // two can't drift apart. Pure constants — no Arduino/LovyanGFX dependency.

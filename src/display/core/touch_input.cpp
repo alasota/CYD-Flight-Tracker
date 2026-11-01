@@ -1,6 +1,6 @@
 #include "display/core/touch_input.h"
 
-#include "touch_calibration.h"
+#include "display/core/touch_calibration.h"
 
 bool hitTest(int16_t touchX, int16_t touchY, const Rect &bounds) {
   return touchX >= bounds.x && touchX <= bounds.x + bounds.w && touchY >= bounds.y &&

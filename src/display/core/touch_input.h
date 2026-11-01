@@ -1,5 +1,5 @@
 // touch_input — touch reading (via LovyanGFX's built-in XPT2046 driver,
-// configured in include/LGFX_CYD.hpp) plus a generic point-in-rectangle hit
+// configured in display/adapters/lgfx/LGFX_CYD.hpp) plus a generic point-in-rectangle hit
 // test shared by screen_nav's bottom-nav buttons and table_view's page tap
 // zones. See CLAUDE.md "Hardware" and "Code conventions".
 #pragma once
@@ -47,7 +47,7 @@ TouchXY mapRawTouch(int32_t rawX, int32_t rawY);
 // by Unity (see CLAUDE.md "Testing").
 #ifdef ARDUINO
 
-#include "LGFX_CYD.hpp"
+#include "display/adapters/lgfx/LGFX_CYD.hpp"
 
 // One touch sample, already in screen coordinates (0,0 = top-left, matching
 // the rotation set with tft.setRotation()).
