@@ -2,6 +2,12 @@
 
 #include "shared/geo.h"  // computeDistanceBearing()
 
+AircraftRow::AircraftRow(const AircraftRow &other) = default;
+AircraftRow::AircraftRow(AircraftRow &&other) noexcept = default;
+AircraftRow &AircraftRow::operator=(const AircraftRow &other) = default;
+AircraftRow &AircraftRow::operator=(AircraftRow &&other) noexcept = default;
+AircraftRow::~AircraftRow() = default;
+
 std::vector<AircraftRow> buildEnrichedRecords(
     const std::vector<Aircraft> &aircraft, const std::map<std::string, AircraftInfo> &infoByIcao24,
     const std::map<std::string, RouteInfo> &routeByCallsign) {
