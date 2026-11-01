@@ -9,7 +9,7 @@
 #include "admin/core/config_store.h"
 #include "airspace/core/aircraft_state.h"
 #include "airspace/services/poll_pipeline.h"
-#include "display/core/screens/table_view.h"
+#include "airspace/core/tracked_flight.h"
 
 // ---- Aircraft / AircraftRow --------------------------------------------------
 

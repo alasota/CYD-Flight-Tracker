@@ -33,7 +33,7 @@
 #include "display/core/redraw_policy.h"  // RedrawEvents
 #include "admin/core/firmware/release_check.h"  // UpdateStatus
 #include "airspace/core/feed_health.h"  // OpenSkyHealth
-#include "display/core/screens/table_view.h"     // AircraftRow
+#include "airspace/core/tracked_flight.h"  // AircraftRow
 #include "platform/wifi_manager.h"   // WifiStatus
 
 #ifdef ARDUINO

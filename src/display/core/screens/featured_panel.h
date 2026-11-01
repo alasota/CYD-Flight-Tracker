@@ -5,7 +5,7 @@
 // "no aircraft in range" placeholder. See docs/screens.md "Screen 1 — Flights".
 //
 // Zero networking code — draws from an already-enriched AircraftRow
-// (table_view's type) plus the two AirportInfo results for its route's
+// (airspace/core/tracked_flight) plus the two AirportInfo results for its route's
 // endpoints, looked up separately for only the one featured row.
 #pragma once
 
@@ -18,9 +18,9 @@
 #include "enrichment/core/route_lookup.h"  // AirportInfo
 #include "display/core/screens/status_bar.h"    // OpenSkyHealth, emptyStateText()
 
-// Forward-declared rather than #include "table_view.h" (which includes
-// this header — cycle). featured_panel.cpp includes table_view.h for the
-// full definition. Same pattern as aircraft_summary.h.
+// Forward-declared — only references are needed here. featured_panel.cpp
+// includes airspace/core/tracked_flight.h for the full definition. Same
+// pattern as aircraft_summary.h.
 struct AircraftRow;
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under

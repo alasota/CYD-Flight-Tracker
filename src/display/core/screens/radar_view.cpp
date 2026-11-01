@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "display/core/screens/featured_panel.h"  // featuredPillTexts()
+
 namespace {
 // Same km-per-degree approximation shared/geo's computeDistanceBearing()
 // (haversine) is built on, for short distances.
