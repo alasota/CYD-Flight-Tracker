@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <string>
 
+#include "airspace/core/feed_health.h"  // OpenSkyHealth
 #include "admin/core/device_alerts.h"  // AlertSeverity
 #include "display/core/i18n.h"           // Language
 
@@ -36,18 +37,6 @@ std::string statusBarDate(std::time_t localEpoch, bool timeSynced);
 // "HH:MM" from time_sync::formatTime(), or "--:--" until the first NTP
 // sync completes.
 std::string statusBarClock(std::time_t localEpoch, bool timeSynced);
-
-// Health of the OpenSky data feed, surfaced as a short header tag so a
-// silent failure (persistent 401, exhausted rate-limit credits, a dead
-// network) isn't invisible — the aircraft list on screen may be stale
-// (net_task keeps the last good DataSnapshot rather than blanking it). See
-// docs/review-notes-2026.md 1.2/1.3/1.4.
-enum class OpenSkyHealth {
-  Ok,            // last poll succeeded
-  RateLimited,   // 429 — credits exhausted, backing off
-  AuthError,     // 401 persisted after a token refresh — check credentials
-  NetworkError,  // transport / other HTTP failure
-};
 
 // Header block text: "<n> <flights>" in `lang` with the right plural form
 // (PL "1 LOT" / "3 LOTY" / "7 LOTOW", EN "1 FLIGHT" / "7 FLIGHTS"); counts
