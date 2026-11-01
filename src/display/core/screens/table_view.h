@@ -11,12 +11,12 @@
 #include <string>
 #include <vector>
 
+#include "airspace/core/feed_health.h"      // OpenSkyHealth
 #include "airspace/core/tracked_flight.h"  // AircraftRow
 #include "airspace/core/flight_ordering.h"  // splitFeaturedAndRest() — drawTablePage()
 #include "display/core/screens/featured_panel.h"
 #include "display/core/i18n.h"
 #include "display/core/theme/lcars_theme.h"
-#include "display/core/screens/status_bar.h"  // OpenSkyHealth
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
