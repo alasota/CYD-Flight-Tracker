@@ -103,13 +103,6 @@ std::vector<Aircraft> extractAircraftFromStates(JsonArrayConst states) {
 }
 }  // namespace
 
-bool inferOnGround(const Aircraft &ac) {
-  if (ac.on_ground) return true;
-  if (ac.has_velocity && ac.velocity < kTaxiSpeedMps) return true;  // taxiing / parked
-  if (!ac.has_altitude && !ac.has_velocity) return true;            // apron, no data
-  return false;
-}
-
 std::vector<Aircraft> parseStatesResponse(const std::string &json) {
   if (json.size() > kMaxStatesResponseBytes) {
     return {};  // refuse to even attempt parsing an unexpectedly huge body

@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "airspace/core/aircraft_state.h"  // Aircraft — what parseStatesResponse() returns
 #include "opensky/core/opensky_auth.h"   // OpenSkyAuthState — openSkyAuthStatus()
 #include "opensky/core/opensky_quota.h"  // OpenSkyQuota — openSkyQuota()
 
@@ -70,21 +71,6 @@ uint32_t msUntilNextPoll(uint32_t now_ms, uint32_t last_poll_ms, bool ever_polle
 // mode described in docs/data-sources.md "Authentication".
 bool shouldUseOAuth(const std::string &client_id, const std::string &client_secret);
 
-struct Aircraft {
-  std::string icao24;
-  std::string callsign;
-  float lat = 0.0f;
-  float lon = 0.0f;
-  bool has_position = false;  // false if lat/lon were null in the response
-  float baro_altitude = 0.0f;
-  bool has_altitude = false;  // false if baro_altitude was null (often on the apron)
-  float velocity = 0.0f;
-  bool has_velocity = false;  // false if velocity was null
-  float true_track = 0.0f;
-  bool on_ground = false;        // index 8, *or inferred* — see inferOnGround()
-  float vertical_rate = 0.0f;    // state vector index 11, m/s, positive = climbing
-};
-
 // Hard ceiling on how large a /states/all response body parseStatesResponse()
 // will attempt to parse. A well-formed response for even a maxed-out (400
 // sq deg, per config_store's radius clamp) bounding box over a busy
@@ -98,23 +84,11 @@ constexpr size_t kMaxStatesResponseBytes = 65536;  // 64 KB
 // of a missing/null "states" array (-> empty result), of state vectors
 // shorter than expected (-> skipped), and of null individual fields within
 // a state vector (left at the struct's defaults). Callsigns are
-// right-trimmed (OpenSky space-pads them to 8 chars). A body larger than
-// kMaxStatesResponseBytes is rejected outright (-> empty result) without
-// being parsed. Pure — uses ArduinoJson but no HTTP dependency.
+// right-trimmed (OpenSky space-pads them to 8 chars). on_ground is the
+// state vector's index 8 folded through inferOnGround(); vertical_rate is
+// index 11. A body larger than kMaxStatesResponseBytes is rejected outright
+// (-> empty result) without being parsed. Pure — uses ArduinoJson but no HTTP dependency.
 std::vector<Aircraft> parseStatesResponse(const std::string &json);
-
-// Speed below which an aircraft is taxiing / parked rather than flying
-// (15 m/s = 54 km/h — airliners never fly that slowly; taxi speeds stay
-// under ~15 m/s).
-constexpr float kTaxiSpeedMps = 15.0f;
-
-// Whether `ac` is effectively on the ground. OpenSky's on_ground flag is
-// trusted when set, but aircraft on the apron are also often reported with
-// on_ground=false and no altitude / no or crawling speed — so: flagged, or
-// moving slower than kTaxiSpeedMps, or with neither altitude nor speed.
-// parseStatesResponse() folds this into Aircraft::on_ground, so every
-// screen (featured slot, phase, Screen 2 pick) agrees. Pure — native-tested.
-bool inferOnGround(const Aircraft &ac);
 
 // Backoff duration after a 429, per docs/data-sources.md "Rate limits": the
 // X-Rate-Limit-Retry-After-Seconds header value if present and a valid
