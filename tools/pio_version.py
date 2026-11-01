@@ -7,7 +7,7 @@
 #   no tag yet / local changes    -> 1a2b3c4 / 1a2b3c4-dirty
 # else "0.0.0-unknown" (no git at all).
 #
-# - Passed as the FW_VERSION macro to src/admin/domain/firmware/version.cpp
+# - Passed as the FW_VERSION macro to src/admin/core/firmware/version.cpp
 #   only (build middleware), so a new version recompiles one file, not the
 #   whole project.
 # - After the build, copies firmware.bin to cyd-sky-tracker-<version>.bin in

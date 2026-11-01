@@ -6,10 +6,10 @@
 #include <string>
 #include <vector>
 
-#include "admin/domain/config_store.h"
-#include "opensky/domain/opensky_client.h"
-#include "airspace/app/poll_pipeline.h"
-#include "display/domain/screens/table_view.h"
+#include "admin/core/config_store.h"
+#include "opensky/core/opensky_client.h"
+#include "airspace/services/poll_pipeline.h"
+#include "display/core/screens/table_view.h"
 
 // ---- Aircraft / AircraftRow --------------------------------------------------
 

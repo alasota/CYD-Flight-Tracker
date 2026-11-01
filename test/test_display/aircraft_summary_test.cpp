@@ -1,8 +1,8 @@
 // aircraft_summary: shared identity / route lines. docs/screens.md "Screen 1 — Flights" (identity line).
 #include <unity.h>
 
-#include "display/domain/screens/aircraft_summary.h"
-#include "display/domain/screens/table_view.h"  // AircraftRow
+#include "display/core/screens/aircraft_summary.h"
+#include "display/core/screens/table_view.h"  // AircraftRow
 #include "test_support.h"
 
 namespace {

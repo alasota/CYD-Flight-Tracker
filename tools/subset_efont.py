@@ -6,7 +6,7 @@ take ~1.05 MB of flash together. The display only ever draws printable ASCII,
 the 18 Polish letters and a few symbols (see isFontSafeText() in
 lcars_theme). This script copies exactly those glyphs, byte for byte, out of
 LovyanGFX's U8g2-format arrays into
-src/display/domain/theme/fonts/lcars_efont.c — so every pixel
+src/display/core/theme/fonts/lcars_efont.c — so every pixel
 and every metric (the 23-byte header is kept, only glyph count and section
 offsets change) is identical to the original fonts.
 
@@ -26,9 +26,9 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE = os.path.join(REPO, ".pio", "libdeps", "cyd", "LovyanGFX", "src", "lgfx", "Fonts",
                       "efont", "lgfx_efont_ja.c")
 COPYRIGHT = os.path.join(os.path.dirname(SOURCE), "COPYRIGHT.txt")
-OUT_C = os.path.join(REPO, "src", "display", "domain", "theme", "fonts", "lcars_efont.c")
+OUT_C = os.path.join(REPO, "src", "display", "core", "theme", "fonts", "lcars_efont.c")
 # The generated .c includes its header by the full path from src/ (spec 12, -I src).
-INCLUDE_LINE = '#include "display/domain/theme/fonts/lcars_efont.h"'
+INCLUDE_LINE = '#include "display/core/theme/fonts/lcars_efont.h"'
 
 # (array in LovyanGFX, array written here, role)
 FONTS = [

@@ -4,16 +4,16 @@
   python tools/check_layers.py [--strict] [--root DIR]
 
 Reads every #include "…" and #include <…> in src/, test/ and include/, classifies the including
-file and the included one (shared, platform, the root app/, <context>/<layer>, test, sdk) and
+file and the included one (shared, platform, the root main/, <context>/<layer>, test, sdk) and
 reports what the §5 table doesn't allow:
-  * an include of a layer the table has no tick for (`display/domain -> opensky/domain`),
+  * an include of a layer the table has no tick for (`display/core -> opensky/core`),
   * an SDK header (Arduino, LovyanGFX, WiFi, HTTPClient, Preferences, FreeRTOS, …) outside
     adapters / roots — in platform/ only inside #ifdef ARDUINO,
   * a quoted include that resolves from neither src/, include/, test/support/ nor (tests only)
     the test's own directory,
   * a source file outside any context and layer.
 Prints `path:line: <from> -> <to> ("<include>")`, a count per pair and a total; warns only
-(exit 0) unless --strict (stage 7 makes CI use it). tools/test_check_layers.py pins the rules
+(exit 0) unless --strict (stage 8 makes CI use it). tools/test_check_layers.py pins the rules
 and the repository's layout.
 """
 
@@ -33,14 +33,14 @@ Include = namedtuple("Include", "line name angle arduino")
 SOURCE_SUFFIXES = {".h", ".hpp", ".c", ".cpp"}
 
 CONTEXTS = ("airspace", "enrichment", "opensky", "display", "admin")
-LAYERS = ("domain", "app", "adapters", "assets")
+LAYERS = ("core", "services", "adapters", "assets")
 
-# Headers in include/ (PlatformIO's include path) until stage 3 moves them into src/:
+# Headers in include/ (PlatformIO's include path) until stage 4 moves them into src/:
 # the LGFX_Device subclass is the display adapter, the calibration is plain constants the pure
 # touch mapping reads.
 INCLUDE_DIR_LAYERS = {
     "include/LGFX_CYD.hpp": "display/adapters",
-    "include/touch_calibration.h": "display/domain",
+    "include/touch_calibration.h": "display/core",
 }
 
 SDK = "sdk"
@@ -59,44 +59,43 @@ def is_sdk_header(name):
     return name.startswith("WiFi") and name.endswith(".h")
 
 
-_DOMAINS = {f"{c}/domain" for c in CONTEXTS}
-_APPS = {f"{c}/app" for c in CONTEXTS}
+_CORES = {f"{c}/core" for c in CONTEXTS}
+_SERVICES = {f"{c}/services" for c in CONTEXTS}
 
-# The §5 table: {row: layers that row may include}. "Own" entries of the */app and */adapters
-# rows are added by allowed_targets(). Footnotes ¹ ² (only certain types) can't be told apart
-# from an include line, so they count as allowed. Rows §5 doesn't have: enrichment/app
-# implements airspace's EnrichmentPort (§4.2), opensky/app sees its own context, tests see
-# everything pure (not adapters, the roots or the SDK).
+# The §5 table: {row: layers that row may include}. "Own" entries of the */services and
+# */adapters rows are added by allowed_targets(). Footnotes ¹ ² (only certain types) can't be
+# told apart from an include line, so they count as allowed. Rows §5 doesn't have:
+# enrichment/services implements airspace's EnrichmentPort (§4.2), opensky/services sees its own
+# context, tests see everything pure (not adapters, the roots or the SDK).
 ALLOWED = {
     "shared": {"shared"},
-    "airspace/domain": {"shared", "airspace/domain"},
-    "enrichment/domain": {"shared", "enrichment/domain"},
-    "opensky/domain": {"shared", "airspace/domain", "opensky/domain"},
-    "display/domain": {"shared", "airspace/domain", "enrichment/domain", "display/domain",
-                       "admin/domain"},
-    "admin/domain": {"shared", "airspace/domain", "opensky/domain", "display/domain",
-                     "admin/domain"},
-    "airspace/app": {"shared", "airspace/domain", "enrichment/domain"},
-    "enrichment/app": {"shared", "enrichment/domain", "airspace/domain", "airspace/app"},
-    "opensky/app": {"shared", "opensky/domain"},
-    "display/app": {"shared", "airspace/domain", "enrichment/domain", "display/domain",
-                    "admin/domain", "platform"},
-    "admin/app": {"shared", "airspace/domain", "opensky/domain", "display/domain",
-                  "admin/domain"},
-    "platform": {"shared", "platform"} | _DOMAINS,
-    "test": {"shared", "platform", "test"} | _DOMAINS | _APPS,
+    "airspace/core": {"shared", "airspace/core"},
+    "enrichment/core": {"shared", "enrichment/core"},
+    "opensky/core": {"shared", "airspace/core", "opensky/core"},
+    "display/core": {"shared", "airspace/core", "enrichment/core", "display/core",
+                     "admin/core"},
+    "admin/core": {"shared", "airspace/core", "opensky/core", "display/core", "admin/core"},
+    "airspace/services": {"shared", "airspace/core", "enrichment/core"},
+    "enrichment/services": {"shared", "enrichment/core", "airspace/core", "airspace/services"},
+    "opensky/services": {"shared", "opensky/core"},
+    "display/services": {"shared", "airspace/core", "enrichment/core", "display/core",
+                         "admin/core", "platform"},
+    "admin/services": {"shared", "airspace/core", "opensky/core", "display/core",
+                       "admin/core"},
+    "platform": {"shared", "platform"} | _CORES,
+    "test": {"shared", "platform", "test"} | _CORES | _SERVICES,
 }
 
 
 def allowed_targets(layer):
     """Layers `layer` may include (sdk included where the table allows it unconditionally)."""
-    if layer == "app":
+    if layer == "main":
         return None  # the composition roots may include anything
     ctx, _, kind = layer.partition("/")
     if kind == "adapters":
-        return {"shared", "platform", SDK, f"{ctx}/domain", f"{ctx}/app", f"{ctx}/adapters"}
+        return {"shared", "platform", SDK, f"{ctx}/core", f"{ctx}/services", f"{ctx}/adapters"}
     allowed = set(ALLOWED.get(layer, set()))
-    if kind == "app":
+    if kind == "services":
         allowed.add(layer)
     return allowed
 
@@ -106,9 +105,9 @@ def format_finding(f):
 
 
 def classify(path):
-    """Layer of a repo-relative path ('shared', 'platform', 'app', '<ctx>/<layer>', 'test') or
+    """Layer of a repo-relative path ('shared', 'platform', 'main', '<ctx>/<layer>', 'test') or
     None when it sits outside any context and layer. Subfolders collapse into their layer
-    (`display/domain/screens/x.h` -> `display/domain`)."""
+    (`display/core/screens/x.h` -> `display/core`)."""
     path = path.replace("\\", "/")
     if path in INCLUDE_DIR_LAYERS:
         return INCLUDE_DIR_LAYERS[path]
@@ -117,7 +116,7 @@ def classify(path):
         return "test"
     if parts[0] != "src" or len(parts) < 3:
         return None
-    if parts[1] in ("shared", "platform", "app"):
+    if parts[1] in ("shared", "platform", "main"):
         return parts[1]
     if parts[1] in CONTEXTS and len(parts) >= 4 and parts[2] in LAYERS:
         return f"{parts[1]}/{parts[2]}"
@@ -249,7 +248,7 @@ def resolve_include(path, name, known):
 def _check_one(path, text, known):
     layer = classify(path)
     if layer is None:
-        return [Finding(path, 1, "outside any context and layer (spec 12 §4)")]
+        return [Finding(path, 1, "outside any context and layer (spec 12 section 4)")]
     allowed = allowed_targets(layer)
     found = []
     for inc in find_includes(text):

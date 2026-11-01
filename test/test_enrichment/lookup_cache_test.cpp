@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "enrichment/domain/lookup_cache.h"
+#include "enrichment/core/lookup_cache.h"
 #include "test_support.h"
 
 namespace {

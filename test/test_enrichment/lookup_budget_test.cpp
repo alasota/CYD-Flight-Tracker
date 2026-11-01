@@ -3,7 +3,7 @@
 
 #include <set>
 
-#include "enrichment/domain/lookup_budget.h"
+#include "enrichment/core/lookup_budget.h"
 #include "test_support.h"
 
 namespace {

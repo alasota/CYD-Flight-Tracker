@@ -30,7 +30,7 @@ Rarer now than with 41 executables, but it still happens.
 The six suites follow the contexts of [spec 12](../spec/planned/12-code-reorganization-ddd.md),
 so they stayed put when `src/` moved into `src/<context>/<layer>/` (stage 1). Each suite is one
 executable. Test files include `src/` headers by **full path** (`#include
-"enrichment/domain/lookup_cache.h"`, `-I src`) and never an `adapters/`, root `app/` or SDK
+"enrichment/core/lookup_cache.h"`, `-I src`) and never an `adapters/`, root `app/` or SDK
 header — `tools/check_layers.py` reports it, `tools/test_check_layers.py`'s `LayoutTest`
 fails on a short include. `native` links everything in `src/` except root `app/`,
 `*/adapters/` and `platform/*_esp32.cpp` (docs/architecture.md "Source layout").
@@ -44,7 +44,7 @@ fails on a short include. `native` links everything in `src/` except root `app/`
 | `test_admin` | settings, web panel, backups, password, updates | config_page, config_portal, config_backup, config_store, web_auth, web_i18n, ota_update, release_check, version, screenshot¹, device_alerts |
 | `test_platform` | concurrency, perf, WiFi, time | core_link, perf_stats, wifi_manager, time_sync, sun_times |
 
-¹ `screenshot` lives in `src/display/app/` but its test stays in `test_admin` for now (the
+¹ `screenshot` lives in `src/display/services/` but its test stays in `test_admin` for now (the
 settings page serves the screenshot; spec 12 stage 1 moved no test files).
 
 `support/` (on the include path via `-I test/support`, header-only):

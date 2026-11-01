@@ -3,7 +3,7 @@
 
 #include <cmath>
 
-#include "display/domain/screens/radar_geometry.h"
+#include "display/core/screens/radar_geometry.h"
 
 namespace {
 

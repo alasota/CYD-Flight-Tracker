@@ -3,9 +3,9 @@
 
 #include <cstring>
 
-#include "display/domain/screen_nav.h"  // kScreen* indices
-#include "display/domain/screens/status_bar.h"
-#include "display/domain/theme/lcars_theme.h"  // palette constants
+#include "display/core/screen_nav.h"  // kScreen* indices
+#include "display/core/screens/status_bar.h"
+#include "display/core/theme/lcars_theme.h"  // palette constants
 #include "test_support.h"
 #include "platform/time_sync.h"
 

@@ -9,8 +9,8 @@
 #include <vector>
 
 #include "fixtures.h"
-#include "enrichment/domain/lookup_cache.h"
-#include "airspace/app/poll_pipeline.h"
+#include "enrichment/core/lookup_cache.h"
+#include "airspace/services/poll_pipeline.h"
 #include "test_support.h"
 
 namespace {

@@ -1,7 +1,7 @@
 // backlight: auto brightness, night window, touch wake. docs/architecture.md "Brightness & night mode", spec/03.
 #include <unity.h>
 
-#include "display/domain/backlight.h"
+#include "display/core/backlight.h"
 #include "test_support.h"
 
 namespace {

@@ -4,8 +4,8 @@
 #include <cstring>
 #include <string>
 
-#include "display/domain/theme/lcars_theme.h"  // isFontSafeText()
-#include "enrichment/domain/place_names.h"
+#include "display/core/theme/lcars_theme.h"  // isFontSafeText()
+#include "enrichment/core/place_names.h"
 
 namespace {
 

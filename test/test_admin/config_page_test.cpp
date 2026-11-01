@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "admin/app/config_page.h"
+#include "admin/core/config_page.h"
 #include "test_support.h"
 
 namespace {
