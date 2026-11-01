@@ -44,6 +44,16 @@ struct AircraftRow {
   AirportInfo dest_airport;
   bool origin_airport_pending = false;
   bool dest_airport_pending = false;
+
+  // Copy, move and destructor are defined (= default) in tracked_flight.cpp,
+  // not inline: a row holds many strings, and inlining its copy at every
+  // call site in every translation unit costs ~1 KB of flash.
+  AircraftRow() = default;
+  AircraftRow(const AircraftRow &other);
+  AircraftRow(AircraftRow &&other) noexcept;
+  AircraftRow &operator=(const AircraftRow &other);
+  AircraftRow &operator=(AircraftRow &&other) noexcept;
+  ~AircraftRow();
 };
 
 // Joins the aircraft states with their hexdb.io aircraft lookups (by
