@@ -192,14 +192,6 @@ ArrowShape directionArrow(float bearingDeg, int16_t cx, int16_t cy, int16_t size
   return a;
 }
 
-const char *compassPoint(float bearingDeg) {
-  static const char *const kPoints[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
-  float b = std::fmod(bearingDeg, 360.0f);
-  if (b < 0.0f) b += 360.0f;
-  const int sector = static_cast<int>((b + 22.5f) / 45.0f) % 8;
-  return kPoints[sector];
-}
-
 uint16_t tableRowColor(int rowIndex, bool onGround) {
   return onGround ? THEME_CONTENT_MUTED : tableRowTextColor(rowIndex);
 }

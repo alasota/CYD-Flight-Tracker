@@ -40,7 +40,7 @@ RadarLayout computeRadarLayout(int16_t x, int16_t y, int16_t w, int16_t h, int16
 // for use as radar_geometry's max_distance_km — this is the "convert
 // degrees to km at the call site, not inside radar_geometry" step
 // radar_geometry's own header asks for. Uses the same ~111.2 km/degree
-// approximation table_view's computeDistanceBearing() is built on; a
+// approximation shared/geo's computeDistanceBearing() is built on; a
 // rough, direction-independent estimate good enough for sizing a radar
 // ring, not survey-grade.
 float radiusDegToKm(float radius_deg);

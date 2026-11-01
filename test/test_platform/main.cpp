@@ -8,6 +8,7 @@ void run_perf_stats_tests();
 void run_wifi_manager_tests();
 void run_time_sync_tests();
 void run_sun_times_tests();
+void run_geo_tests();
 
 void setUp(void) { resetAllForTesting(); }
 void tearDown(void) {}
@@ -27,5 +28,6 @@ int main(int, char **) {
   if (RUN_MODULE(wifi_manager)) run_wifi_manager_tests();
   if (RUN_MODULE(time_sync)) run_time_sync_tests();
   if (RUN_MODULE(sun_times)) run_sun_times_tests();
+  if (RUN_MODULE(geo)) run_geo_tests();
   return UNITY_END();
 }

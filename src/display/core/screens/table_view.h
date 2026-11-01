@@ -25,17 +25,6 @@
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
 
-// Great-circle distance (km) and initial bearing (degrees, 0=north,
-// clockwise) from (home_lat, home_lon) to (lat, lon), via the haversine
-// formula on a spherical Earth — good enough for a "how far/which way"
-// home tracker, not survey-grade. distance_km == 0 and bearing_deg == 0
-// when the two points coincide (bearing is undefined at zero distance).
-struct DistanceBearing {
-  float distance_km = 0.0f;
-  float bearing_deg = 0.0f;
-};
-DistanceBearing computeDistanceBearing(float home_lat, float home_lon, float lat, float lon);
-
 // One enriched table row: an OpenSky state vector joined with its hexdb.io
 // aircraft lookup (by icao24) and route lookup (by callsign) — all three
 // structs kept as-is, no duplicated fields — plus the distance/bearing
@@ -82,7 +71,7 @@ std::vector<AircraftRow> buildEnrichedRecords(
     const std::map<std::string, RouteInfo> &routeByCallsign);
 
 // Fills distance_km/bearing_deg/has_distance on every row in `rows` from
-// (home_lat, home_lon) via computeDistanceBearing(). Rows whose
+// (home_lat, home_lon) via shared/geo's computeDistanceBearing(). Rows whose
 // Aircraft::has_position is false get has_distance=false (nothing to
 // compute) and are left at distance_km=0/bearing_deg=0. Call this once
 // before classifyPhases()/sortRowsByDistance()/drawTablePage() — all read
