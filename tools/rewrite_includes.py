@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Move the flat src/ files into src/<context>/<layer>/ and give every #include a full path
-from src/ (spec 12, stage 1).
+"""Move src/ files to their spec 12 folders and give every #include a full path from src/
+(spec 12, stages 1-2).
 
   python tools/rewrite_includes.py [--move] [--check] [--root DIR]
 
-  --move    `git mv` every file in MOVES that is still at its old path (creates the folders,
-            skips the ones already moved). Nothing else.
+  --move    `git mv` every file in MOVES (the newest stage's table) that is still at its old
+            path (creates the folders, skips the ones already moved, removes emptied folders).
+            Nothing else.
   (default) rewrite, in src/ and test/, every #include "X" whose X isn't a full path from src/
             to the full path of the src/ header with X's file name. <…> includes, headers from
             test/support/ or include/ and test-local headers have no src/ header of that name
@@ -13,7 +14,10 @@ from src/ (spec 12, stage 1).
   --check   only report: exit 1 if the rewrite would change a file, write nothing.
 
 Two src/ headers with the same file name make the short form ambiguous: the script stops with
-both paths and writes nothing. Stages 2-3 move files again — give MOVES their table and rerun.
+both paths and writes nothing. One move table per stage (MOVES_STAGE_1: flat src/ into
+<context>/<layer>/; MOVES_STAGE_2: layers renamed to core / services, roots into main/), kept
+side by side so final_path() can follow a file from stage 0 to today. A later stage that moves
+files adds its table to STAGES.
 """
 
 import argparse
@@ -26,15 +30,15 @@ from pathlib import Path
 SOURCE_SUFFIXES = {".h", ".hpp", ".c", ".cpp"}
 HEADER_SUFFIXES = {".h", ".hpp"}
 
-# {path relative to src/ today: path relative to src/ after stage 1}. A file lands where its
-# pure half will live (the layer native compiles); files that are entirely hardware go to
+# {path relative to src/ at stage 0: path relative to src/ after stage 1}. A file lands where
+# its pure half will live (the layer native compiles); files that are entirely hardware go to
 # adapters/ or the root app/ (spec 12 plan, "Placement rule for stage 1").
-MOVES = {}
+MOVES_STAGE_1 = {}
 
 
 def _add(folder, *names):
     for name in names:
-        MOVES[name] = posixpath.join(folder, posixpath.basename(name))
+        MOVES_STAGE_1[name] = posixpath.join(folder, posixpath.basename(name))
 
 
 def _pair(name):
@@ -67,16 +71,48 @@ _add("admin/app", *_pair("config_page"), *_pair("web_i18n"), *_pair("config_port
 _add("admin/adapters", "github_ca.h")
 _add("app", "main.cpp", *_pair("net_task"))
 
-# TODO(spec 12): stub from test-author — the stage-2 table, STAGES and final_path() are filled
-# in by the implementer (plan "Tool design"); MOVES stays the stage-1 table until then.
-MOVES_STAGE_1 = MOVES
-MOVES_STAGE_2 = {}
+# {path after stage 1: path after stage 2} for the files whose path changes in stage 2: the
+# layer folders are renamed (<ctx>/domain/ -> <ctx>/core/, <ctx>/app/ -> <ctx>/services/, the
+# root app/ -> main/), except admin/app/, which splits: the pure page HTML and its strings go to
+# admin/core/, the WebServer routes to admin/adapters/. No file changes its name.
+_STAGE_2_SPLIT = {
+    "admin/app/config_page.h": "admin/core/config_page.h",
+    "admin/app/config_page.cpp": "admin/core/config_page.cpp",
+    "admin/app/web_i18n.h": "admin/core/web_i18n.h",
+    "admin/app/web_i18n.cpp": "admin/core/web_i18n.cpp",
+    "admin/app/config_portal.h": "admin/adapters/config_portal.h",
+    "admin/app/config_portal.cpp": "admin/adapters/config_portal.cpp",
+}
+_STAGE_2_LAYER_RE = re.compile(r"^(?:(\w+)/(domain|app)|(app))/")
+
+
+def _stage_2_path(path):
+    """path's stage-2 location, or None if stage 2 doesn't move it."""
+    if path in _STAGE_2_SPLIT:
+        return _STAGE_2_SPLIT[path]
+    m = _STAGE_2_LAYER_RE.match(path)
+    if m is None:
+        return None
+    if m.group(3):
+        return "main/" + path[m.end():]
+    layer = "core" if m.group(2) == "domain" else "services"
+    return f"{m.group(1)}/{layer}/" + path[m.end():]
+
+
+MOVES_STAGE_2 = {mid: new for mid in MOVES_STAGE_1.values()
+                 if (new := _stage_2_path(mid)) is not None}
+
 STAGES = (MOVES_STAGE_1, MOVES_STAGE_2)
+MOVES = STAGES[-1]  # what --move applies: the newest stage
 
 
 def final_path(stage0_path):
     """Path relative to src/ that the stage-0 file `stage0_path` has after the last stage."""
-    return stage0_path  # TODO(spec 12): stub from test-author
+    path = stage0_path
+    for table in STAGES:
+        path = table.get(path, path)
+    return path
+
 
 _QUOTED_INCLUDE_RE = re.compile(r'^([ \t]*#[ \t]*include[ \t]*")([^"\r\n]+)(")', re.M)
 
