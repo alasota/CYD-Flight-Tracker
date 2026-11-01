@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <vector>
 
-#include "admin/adapters/config_portal.h"  // openSkyCreditCost()
+#include "opensky/core/scan_area.h"  // openSkyCreditCost()
 #include "platform/time_sync.h"      // formatDate() / formatTime() — "checked" time
 #include "admin/core/firmware/version.h"        // firmwareVersion() — page footer
 

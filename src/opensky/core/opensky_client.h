@@ -24,8 +24,8 @@ struct BoundingBox {
 
 // Bounding box for a ±radius_deg half-width square around (lat, lon),
 // clamped to valid lat/lon ranges. Same half-width convention as
-// config_store's Config::radius_deg / config_portal's bboxAreaSqDeg() — a
-// radius_deg that crosses config_portal's 1-credit threshold (2.5°)
+// config_store's Config::radius_deg / scan_area's bboxAreaSqDeg() — a
+// radius_deg that crosses scan_area's 1-credit threshold (2.5°)
 // produces a proportionally larger box here. Does not handle antimeridian
 // wraparound (a home point near ±180° longitude just gets clipped, not
 // wrapped) — an accepted limitation for a fixed home-location tracker.

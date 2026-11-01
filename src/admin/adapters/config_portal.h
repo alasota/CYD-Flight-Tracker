@@ -9,17 +9,6 @@
 #include <cstdint>
 #include <string>
 
-// Area (in square degrees) of the lat/lon bounding box implied by a
-// ±radius_deg half-width scan radius (i.e. a 2*radius_deg x 2*radius_deg
-// box), matching config_store's Config::radius_deg. Pure — no WebServer/
-// Arduino dependency — tested under `pio test -e native`.
-float bboxAreaSqDeg(float radius_deg);
-
-// OpenSky /states/all credit cost per call for that bbox area, per
-// docs/data-sources.md "Rate limits": <=25 sq deg = 1, <=100 = 2, <=400 = 3,
-// >400 = 4. Pure — tested under `pio test -e native`.
-int openSkyCreditCost(float radius_deg);
-
 // Parsed OpenSky OAuth client credentials from the JSON file OpenSky's
 // account page generates for download: {"clientId":"...","clientSecret":
 // "..."}.
@@ -59,7 +48,7 @@ bool isValidUnsignedIntString(const std::string &s);
 // (mDNS) with a form for lat/lon/radius/poll_interval/auto_cycle_enabled/
 // auto_cycle_interval_s/OpenSky credentials,
 // read/persisted via config_store. The radius field's credit cost updates
-// live in the browser (client-side JS mirroring openSkyCreditCost() above)
+// live in the browser (client-side JS mirroring scan_area's openSkyCreditCost())
 // as the user types, no round trip needed. A second form lets the user
 // upload OpenSky's credentials JSON file directly instead of copy-pasting
 // clientId/clientSecret by hand (parsed via parseOpenSkyCredentialsJson()
