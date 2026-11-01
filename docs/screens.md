@@ -121,7 +121,7 @@ on black, left-aligned.
   summary) therefore shows the nearest aircraft you can see in the sky, never a parked jet; the
   table lists the rest in the same order, without the featured one. The lookup budget follows
   this order too.
-- **On the ground** is inferred (`opensky_client::inferOnGround()`, folded into
+- **On the ground** is inferred (`aircraft_state::inferOnGround()`, folded into
   `Aircraft::on_ground`): OpenSky's flag, OR speed below `kTaxiSpeedMps` (15 m/s), OR neither
   altitude nor speed reported. Null altitude / speed are tracked (`has_altitude` /
   `has_velocity`) and shown as `--`. Ground rows get the top-view plane in FAZA.

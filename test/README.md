@@ -34,22 +34,28 @@ executable. Test files include `src/` headers by **full path** (`#include
 SDK header — `tools/check_layers.py` reports it, `tools/test_check_layers.py`'s `LayoutTest`
 fails on a short include. `native` links everything in `src/` except `main/`, `*/adapters/`
 and `platform/*_esp32.cpp`, with one exception: `admin/adapters/config_portal.cpp` is added
-back (its pure validators and `openSkyCreditCost()` are tested by `config_portal_test.cpp` and
-used by `config_page` / `device_alerts`) until spec 12 stages 3–4 move them out — so
+back (its three pure functions — `parseOpenSkyCredentialsJson()` and the two number validators
+— are tested by `config_portal_test.cpp`) until spec 12 stage 4 splits the file — so
 `config_portal_test.cpp` is the one test that includes an adapter (reported by
-`check_layers.py`, docs/architecture.md "Source layout").
+`check_layers.py`, docs/architecture.md "Source layout"). Tests follow their code: when spec 12
+stage 3 moved a type to another context, its tests moved to that context's suite with their
+names unchanged (`git log -S test_<name>` finds them).
 
 | Suite | What | Modules (`<module>_test.cpp`) |
 |---|---|---|
-| `test_airspace` | the sky over home: phase, overhead pass, sky snapshot | flight_phase, cpa_predictor, poll_pipeline |
+| `test_airspace` | the sky over home: aircraft state, tracked flights, order, NOW pick, phase, overhead pass, sky snapshot | aircraft_state, tracked_flight, flight_ordering, now_pick, flight_phase, cpa_predictor, poll_pipeline |
 | `test_enrichment` | aircraft / route / airport data (hexdb.io, caches, NVS) | aircraft_lookup, route_lookup, lookup_cache, lookup_store, lookup_budget, aircraft_names, place_names |
-| `test_opensky` | the OpenSky data source | opensky_client, opensky_quota, opensky_auth |
-| `test_display` | screens, theme, navigation, touch, brightness, display texts | table_view, featured_panel, flight_screen, radar_view, radar_geometry, aircraft_summary, status_bar, service_screen, screen_nav, redraw_policy, touch_input, lcars_theme, fonts, backlight, i18n |
+| `test_opensky` | the OpenSky data source | opensky_client, opensky_quota, opensky_auth, scan_area |
+| `test_display` | screens, theme, navigation, touch, brightness, display texts | table_view, featured_panel, flight_screen, radar_view, radar_geometry, aircraft_summary, status_bar, service_screen, screen_nav, redraw_policy, touch_input, lcars_theme, utf8, fit_to_width, font_set, fonts, backlight, i18n |
 | `test_admin` | settings, web panel, backups, password, updates | config_page, config_portal, config_backup, config_store, web_auth, web_i18n, ota_update, release_check, version, screenshot¹, device_alerts |
-| `test_platform` | concurrency, perf, WiFi, time | core_link, perf_stats, wifi_manager, time_sync, sun_times |
+| `test_platform` | concurrency, perf, WiFi, time; the shared kernel (`src/shared/`) | core_link, perf_stats, wifi_manager, time_sync, sun_times, geo |
 
 ¹ `screenshot` lives in `src/display/services/` but its test stays in `test_admin` for now (the
 settings page serves the screenshot; spec 12 stage 1 moved no test files).
+
+Cases per suite (spec 12 stage 3): admin 258 (3 skipped), airspace 71, display 312, enrichment
+80, opensky 73, platform 83 — 877, the same as the `RUN_TEST(` count (`LayoutTest` keeps it
+≥ 874).
 
 `support/` (on the include path via `-I test/support`, header-only):
 
