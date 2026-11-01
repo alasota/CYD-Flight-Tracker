@@ -3,7 +3,7 @@
 #include <algorithm>
 
 #include "admin/core/config_page.h"    // SettingsTab, openSkyDailyRequests()
-#include "admin/adapters/config_portal.h"  // openSkyCreditCost()
+#include "opensky/core/scan_area.h"  // openSkyCreditCost()
 #include "display/core/theme/lcars_theme.h"    // THEME_ALERT / THEME_WARNING
 
 namespace {

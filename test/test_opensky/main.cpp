@@ -6,6 +6,7 @@
 void run_opensky_client_tests();
 void run_opensky_quota_tests();
 void run_opensky_auth_tests();
+void run_scan_area_tests();
 
 void setUp(void) { resetAllForTesting(); }
 void tearDown(void) {}
@@ -23,5 +24,6 @@ int main(int, char **) {
   if (RUN_MODULE(opensky_client)) run_opensky_client_tests();
   if (RUN_MODULE(opensky_quota)) run_opensky_quota_tests();
   if (RUN_MODULE(opensky_auth)) run_opensky_auth_tests();
+  if (RUN_MODULE(scan_area)) run_scan_area_tests();
   return UNITY_END();
 }
