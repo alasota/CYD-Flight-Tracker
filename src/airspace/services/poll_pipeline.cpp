@@ -3,7 +3,7 @@
 #include <map>
 
 #include "airspace/core/cpa_predictor.h"
-#include "display/core/screens/flight_screen.h"  // pickNowAircraft(), kOverheadRadiusKm
+#include "airspace/core/now_pick.h"  // pickNowAircraft(), kOverheadRadiusKm
 #include "enrichment/core/lookup_budget.h"
 #include "airspace/core/tracked_flight.h"
 #include "airspace/core/flight_ordering.h"  // sortRowsForDisplay()
