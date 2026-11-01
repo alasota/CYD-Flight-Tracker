@@ -1,12 +1,15 @@
-Feature: Reorganizacja kodu według DDD — etapy 1–2: katalogi kontekstów i warstw (core / services / adapters, korzenie w main/), include'y z pełną ścieżką, raport zależności
+Feature: Reorganizacja kodu według DDD — etapy 1–3: katalogi kontekstów i warstw (core / services / adapters, korzenie w main/), include'y z pełną ścieżką, raport zależności, źle położone typy w swoich kontekstach
   Etap 1 przeniósł pliki z płaskiego src/ (git mv, bez dzielenia) do katalogów kontekstów i warstw
   z §4; każdy #include "…" podaje ścieżkę od src/ (flaga -I src), środowisko native nie kompiluje
   korzeni kompozycji ani adapterów, a tools/check_layers.py raportuje naruszenia tabeli z §5
   (tylko raport, CI nie blokuje do etapu 8). Etap 2 zmienia nazwy warstw: domain/ → core/,
   app/ → services/, src/app/ → src/main/; z admin/app/ czyste config_page i web_i18n idą do
-  admin/core/, a config_portal (trasy WebServer) do admin/adapters/. Zachowanie urządzenia się
+  admin/core/, a config_portal (trasy WebServer) do admin/adapters/. Etap 3 przenosi typy i
+  funkcje leżące w złym kontekście (AircraftRow, OpenSkyHealth, odległość / namiar / kierunek
+  świata, koszt w kredytach, UTF-8 / fitToWidth, „na ziemi”, wybór TERAZ, kolejność lotów) do
+  kontekstów z §4, a ich testy idą za kodem do grupy nowego kontekstu. Zachowanie urządzenia się
   nie zmienia: testy zielone, liczba RUN_TEST nie maleje, firmware ma ten sam rozmiar ± 1 KB.
-  Wyniki płytki z etapu 1 są w specyfikacji (§8 „Wynik etapu 1”); etapy 3–8 dostaną swoje
+  Wyniki płytki z etapów 1–2 są w specyfikacji (§8 „Wynik etapu N”); etapy 4–8 dostaną swoje
   scenariusze w tym pliku, gdy przyjdzie ich kolej.
 
   # ---- etap 1 (aktualne po etapie 2): układ katalogów i include'y
@@ -281,12 +284,13 @@ Feature: Reorganizacja kodu według DDD — etapy 1–2: katalogi kontekstów i 
     Then filtr to +<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp> +<admin/adapters/config_portal.cpp>
     And config_portal.cpp jest jedynym plikiem z adapters/, który filtr przywraca (jego czyste funkcje mają testy w test_admin, a część WebServer jest pod #ifdef ARDUINO)
 
-  @test=tools/test_check_layers.py:LayoutTest.test_layer_findings_do_not_exceed_the_stage_2_limit
-  Scenario: Liczba naruszeń w raporcie warstw nie rośnie ponad 51 z etapu 2
-    Given limit 51 naruszeń zapisany w teście (stan po etapie 2)
+  # (zmienione w etapie 3: limit to stan po ostatnim wydanym etapie — 51 po etapie 2, 47 po etapie 3)
+  @test=tools/test_check_layers.py:LayoutTest.test_layer_findings_do_not_exceed_the_stage_limit
+  Scenario: Liczba naruszeń w raporcie warstw nie rośnie ponad stan po ostatnim etapie
+    Given limit naruszeń zapisany w teście: 47 (stan po etapie 3; po etapie 2 było 51)
     When uruchamiam check_layers na drzewie repozytorium
-    Then łączna liczba naruszeń jest nie większa niż 51
-    And spadek w etapach 3–8 nie wymaga zmiany testu, a nowe naruszenie powyżej limitu kończy test błędem
+    Then łączna liczba naruszeń jest nie większa niż 47
+    And nowe naruszenie powyżej limitu kończy test błędem, a lista naruszeń jest w komunikacie
 
   @test=tools/test_check_layers.py:LayoutTest.test_no_old_layer_paths_left_in_code_and_build_files
   Scenario: W kodzie, testach, skryptach i plikach budowania nie zostały ścieżki ze starymi nazwami warstw
@@ -311,3 +315,205 @@ Feature: Reorganizacja kodu według DDD — etapy 1–2: katalogi kontekstów i 
     And /screenshot.bmp?screen=0, 1 i 2 pokazują ekrany LOTY, TERAZ i RADAR z nagłówkiem i paskiem zakładek jak przedtem
     And stopka panelu ustawień pokazuje wersję z gałęzi
     And /perf.json po ok. 2 minutach: przerwa pętli UI i wolne przejścia jak po etapie 1 (maks. 74 ms, 0), sterta i największy blok nie mniejsze o więcej niż kilka KB (146 KB / 59 KB), bez restartu
+
+  # ---- etap 3: źle położone typy i funkcje w kontekstach z §4 (testy idą za kodem)
+
+  @test=tools/test_check_layers.py:LayoutTest.test_moved_symbols_are_declared_in_their_new_home
+  Scenario Outline: Przeniesiony typ lub funkcja ma jedną deklarację, w pliku swojego kontekstu
+    Given drzewo src/ po etapie 3
+    When szukam w nagłówkach src/ deklaracji <symbol>
+    Then jest dokładnie jedna i leży w src/<plik>
+    And dawny plik (<dawniej>) już jej nie ma
+
+    Examples:
+      | symbol                 | plik                                   | dawniej                                   |
+      | AircraftRow            | airspace/core/tracked_flight.h         | display/core/screens/table_view.h         |
+      | buildEnrichedRecords   | airspace/core/tracked_flight.h         | display/core/screens/table_view.h         |
+      | annotateDistances      | airspace/core/tracked_flight.h         | display/core/screens/table_view.h         |
+      | classifyPhases         | airspace/core/tracked_flight.h         | display/core/screens/table_view.h         |
+      | sortRowsForDisplay     | airspace/core/flight_ordering.h        | display/core/screens/table_view.h         |
+      | sortRowsByDistance     | airspace/core/flight_ordering.h        | display/core/screens/table_view.h         |
+      | splitFeaturedAndRest   | airspace/core/flight_ordering.h        | display/core/screens/table_view.h         |
+      | pickNowAircraft        | airspace/core/now_pick.h               | display/core/screens/flight_screen.h      |
+      | OpenSkyHealth          | airspace/core/feed_health.h            | display/core/screens/status_bar.h         |
+      | Aircraft               | airspace/core/aircraft_state.h         | opensky/core/opensky_client.h             |
+      | inferOnGround          | airspace/core/aircraft_state.h         | opensky/core/opensky_client.h             |
+      | computeDistanceBearing | shared/geo.h                           | display/core/screens/table_view.h         |
+      | compassPoint           | shared/geo.h                           | display/core/theme/lcars_theme.h          |
+      | openSkyCreditCost      | opensky/core/scan_area.h               | admin/adapters/config_portal.h            |
+      | bboxAreaSqDeg          | opensky/core/scan_area.h               | admin/adapters/config_portal.h            |
+      | utf8Length             | display/core/text/utf8.h               | display/core/theme/lcars_theme.h          |
+      | fitToWidth             | display/core/text/fit_to_width.h       | display/core/theme/lcars_theme.h          |
+      | isFontSafeText         | display/core/text/font_set.h           | display/core/theme/lcars_theme.h          |
+
+  @test=tools/test_check_layers.py:LayoutTest.test_moved_tests_follow_their_code
+  Scenario Outline: Testy przeniesionego kodu leżą w grupie jego kontekstu, bez kopii w starym pliku
+    Given test/ po etapie 3 i lista 49 testów przeniesionych w etapie 3 (zapisana w teście narzędzia)
+    When szukam definicji testu <test>
+    Then jest dokładnie jedna, w test/<plik>, i ten sam plik wywołuje ją przez RUN_TEST(
+    And w <dawniej> nie ma ani definicji, ani RUN_TEST( tego testu
+
+    Examples:
+      | test                                                   | plik                                    | dawniej                                  |
+      | test_distance_one_degree_north_at_equator              | test_platform/geo_test.cpp              | test_display/table_view_test.cpp         |
+      | test_compass_points                                    | test_platform/geo_test.cpp              | test_display/lcars_theme_test.cpp        |
+      | test_credit_cost_boundary_exactly_25_sq_deg            | test_opensky/scan_area_test.cpp         | test_admin/config_portal_test.cpp        |
+      | test_bbox_area_matches_radius                          | test_opensky/scan_area_test.cpp         | test_admin/config_portal_test.cpp        |
+      | test_infer_on_ground_rules                             | test_airspace/aircraft_state_test.cpp   | test_opensky/opensky_client_test.cpp     |
+      | test_build_enriched_records_found_true                 | test_airspace/tracked_flight_test.cpp   | test_display/table_view_test.cpp         |
+      | test_annotate_fills_distance_for_positioned_aircraft   | test_airspace/tracked_flight_test.cpp   | test_display/table_view_test.cpp         |
+      | test_classify_phases_no_distance_forces_none           | test_airspace/tracked_flight_test.cpp   | test_display/table_view_test.cpp         |
+      | test_sort_puts_rows_without_distance_last              | test_airspace/flight_ordering_test.cpp  | test_display/table_view_test.cpp         |
+      | test_display_order_puts_airborne_before_ground_traffic | test_airspace/flight_ordering_test.cpp  | test_display/table_view_test.cpp         |
+      | test_split_featured_and_rest_empty                     | test_airspace/flight_ordering_test.cpp  | test_display/table_view_test.cpp         |
+      | test_pick_prefers_soonest_overhead_not_nearest         | test_airspace/now_pick_test.cpp         | test_display/flight_screen_test.cpp      |
+      | test_utf8_length_counts_characters_not_bytes           | test_display/utf8_test.cpp              | test_display/lcars_theme_test.cpp        |
+      | test_fit_never_splits_a_utf8_character                 | test_display/fit_to_width_test.cpp      | test_display/lcars_theme_test.cpp        |
+      | test_font_safe_accepts_ascii_and_polish_only           | test_display/font_set_test.cpp          | test_display/lcars_theme_test.cpp        |
+
+  @test=tools/test_check_layers.py:LayoutTest.test_stage_3_removes_the_misplaced_type_findings
+  Scenario Outline: Raport warstw nie zgłasza już include'ów, które były potrzebne tylko dla przeniesionych typów
+    Given drzewo repozytorium po etapie 3
+    When uruchamiam check_layers
+    Then żadne zgłoszenie z src/<plik> nie wskazuje warstwy <cel>
+
+    Examples:
+      | plik                                      | cel             |
+      | airspace/services/poll_pipeline.cpp       | display/core    |
+      | airspace/services/poll_pipeline.h         | opensky/core    |
+      | display/core/screens/table_view.h         | opensky/core    |
+      | admin/core/config_page.cpp                | admin/adapters  |
+      | admin/core/device_alerts.cpp              | admin/adapters  |
+
+  @test=tools/test_check_layers.py:LayoutTest.test_core_link_includes_no_screen_headers
+  Scenario: core_link nie dołącza już widoków dla typów, które przenosi między rdzeniami
+    Given src/platform/core_link.h po etapie 3
+    When czytam jego dyrektywy #include
+    Then żadna nie wskazuje pliku w display/core/screens/
+    And AircraftRow i OpenSkyHealth przychodzą z airspace/core/tracked_flight.h i airspace/core/feed_health.h
+
+  @test=test_platform/geo_test.cpp:test_distance_london_to_paris_sanity_check
+  @test=test_platform/geo_test.cpp:test_distance_zero_when_home_equals_aircraft
+  Scenario: Odległość i namiar od domu liczy wspólne jądro (shared/geo)
+    Given dom w Londynie (51.5074, -0.1278)
+    When liczę odległość i namiar do Paryża (48.8566, 2.3522), a potem do samego domu
+    Then do Paryża wychodzi ok. 344 km (± 5) w kierunku między 90° a 180°
+    And do domu wychodzi 0 km i namiar 0°
+
+  @test=test_platform/geo_test.cpp:test_compass_points
+  Scenario Outline: Kierunek świata dla namiaru liczy wspólne jądro (shared/geo)
+    Given namiar <namiar>°
+    When pytam o kierunek świata
+    Then dostaję <kierunek>
+
+    Examples:
+      | namiar | kierunek |
+      | 0      | N        |
+      | 22     | N        |
+      | 23     | NE       |
+      | 135    | SE       |
+      | 350    | N        |
+      | 360    | N        |
+      | -90    | W        |
+
+  @test=test_opensky/scan_area_test.cpp:test_credit_cost_just_below_and_above_each_boundary
+  @test=test_opensky/scan_area_test.cpp:test_credit_cost_boundary_exactly_25_sq_deg
+  Scenario Outline: Koszt zapytania OpenSky w kredytach liczy kontekst opensky (scan_area), nie panel WWW
+    Given zasięg ±<promień>° wokół domu
+    When liczę koszt jednego zapytania /states/all
+    Then wynosi <kredyty> (pole ≤ 25 / ≤ 100 / ≤ 400 / powyżej 400 stopni kwadratowych)
+
+    Examples:
+      | promień | kredyty |
+      | 2.4     | 1       |
+      | 2.5     | 1       |
+      | 2.6     | 2       |
+      | 5.1     | 3       |
+      | 9.9     | 3       |
+      | 10.1    | 4       |
+
+  @test=test_airspace/aircraft_state_test.cpp:test_infer_on_ground_rules
+  @test=test_opensky/opensky_client_test.cpp:test_flag_false_but_no_altitude_and_no_speed_is_on_ground
+  Scenario: Regułę „na ziemi” zna dziedzina (airspace), a parser OpenSky z niej korzysta
+    Given samolot bez flagi on_ground, na 900 m
+    When leci 100 m/s, a potem pełznie 10 m/s
+    Then najpierw jest w powietrzu, potem na ziemi
+    And stan z /states/all bez wysokości i prędkości, z flagą false, parser dalej oznacza jako „na ziemi”
+
+  @test=test_airspace/tracked_flight_test.cpp:test_build_enriched_records_found_false_when_lookup_missing
+  @test=test_airspace/tracked_flight_test.cpp:test_annotate_leaves_no_position_aircraft_unset
+  Scenario: Lot (AircraftRow) składa się w airspace bez znajomości ekranu
+    Given stan samolotu bez wpisu w danych hexdb.io i drugi bez pozycji
+    When buduję wiersze lotów i liczę odległości od domu
+    Then pierwszy ma linię i typ jako nieznalezione (wyświetlane „--”), a nie znika
+    And drugi nie ma odległości (has_distance = false, 0 km, 0°)
+
+  @test=test_airspace/flight_ordering_test.cpp:test_display_order_puts_airborne_before_ground_traffic
+  @test=test_airspace/flight_ordering_test.cpp:test_display_order_puts_positionless_last
+  Scenario: Kolejność lotów ustala airspace: w powietrzu, potem na ziemi, potem bez pozycji
+    Given loty w powietrzu, na ziemi i bez pozycji, w różnych odległościach
+    When układam je do wyświetlenia
+    Then najpierw są te w powietrzu od najbliższego, potem na ziemi od najbliższego, na końcu bez pozycji
+
+  @test=test_airspace/now_pick_test.cpp:test_pick_prefers_soonest_overhead_not_nearest
+  @test=test_airspace/now_pick_test.cpp:test_pick_empty
+  Scenario: Wybór na ekran TERAZ robi airspace: najbliższy przelot nad domem, nie najbliższy samolot
+    Given trzy samoloty od najbliższego: pierwszy minie dom o 12 km, drugi przeleci nad domem (1 km) za 40 s, trzeci (0,5 km) za 90 s
+    When wybieram samolot na ekran TERAZ
+    Then wybrany jest drugi, z przelotem za 40 s
+    And przy pustej liście nie ma wyboru (indeks -1)
+
+  @test=test_airspace/poll_pipeline_test.cpp:test_rows_ordered_airborne_ground_no_position
+  @test=test_airspace/poll_pipeline_test.cpp:test_now_pick_points_at_the_sorted_row
+  Scenario: Poll składa obraz nieba z airspace/core, bez nagłówków ekranów i OpenSky
+    Given odpowiedź z samolotami w powietrzu, na ziemi i bez pozycji
+    When poll_pipeline buduje obraz nieba
+    Then wiersze są w kolejności do wyświetlenia, a wybór TERAZ wskazuje właściwy wiersz po sortowaniu
+
+  @test=test_display/fit_to_width_test.cpp:test_fit_never_splits_a_utf8_character
+  @test=test_display/fit_to_width_test.cpp:test_fit_trims_trailing_space_before_ellipsis
+  Scenario: Przycinanie tekstu (display/core/text) nie rozcina polskiej litery i nie zostawia spacji przed „...”
+    Given „Łódź Łódź” i miara 1 px na bajt, oraz „LOT Airlines” w 7 px
+    When przycinam do każdej szerokości od 0 do długości tekstu
+    Then każdy wynik jest poprawnym UTF-8 z zestawu fontów
+    And „LOT Airlines” daje „LOT...”
+
+  @test=test_display/utf8_test.cpp:test_utf8_length_counts_characters_not_bytes
+  Scenario: Długość tekstu do układu (display/core/text) liczy znaki, nie bajty
+    Given „SKĄD” (5 bajtów) i „Łódź” (7 bajtów)
+    When liczę długość
+    Then obie mają 4 znaki, a pusty tekst 0
+
+  @test=test_display/font_set_test.cpp:test_font_safe_accepts_ascii_and_polish_only
+  @test=test_display/fonts_test.cpp:test_every_allowed_character_has_a_glyph_in_every_font
+  Scenario: Zestaw znaków fontów (display/core/text) to ASCII, polskie litery i kilka symboli
+    Given „ZBLIŻA SIĘ”, „Kraków”, „Zürich”, „€”, tabulator i ucięta sekwencja UTF-8
+    When sprawdzam, czy fonty je narysują
+    Then pierwsze dwa tak, pozostałe nie
+    And każdy dozwolony znak ma glif we wszystkich trzech fontach
+
+  @test=test_display/status_bar_test.cpp:test_health_dot_colour
+  @test=test_platform/core_link_test.cpp:test_diff_health_with_rows_is_header_only
+  Scenario: Stan źródła danych (OpenSkyHealth z airspace) dalej koloruje kropkę w nagłówku i odświeża tylko nagłówek
+    Given stan źródła Ok, RateLimited, AuthError, NetworkError
+    When nagłówek dobiera kolor kropki, a zmiana stanu przy widocznych lotach przechodzi przez diffNetState
+    Then kolory są jak przed etapem (zielony, żółty, czerwony, czerwony)
+    And zmiana stanu przy widocznych lotach odświeża tylko nagłówek
+
+  @manual
+  Scenario: Etap 3 nie zmienia liczby testów ani firmware'u
+    Given na main przed etapem 3 (v1.11.1): przypadki w 6 grupach pio test -e native (admin 265, airspace 46, display 340, enrichment 80, opensky 67, platform 78 = 876), liczba RUN_TEST( (876) oraz rozmiar firmware.bin, linie „Flash: used” / „RAM: used” i lista bibliotek z pio run -e cyd
+    When mierzę to samo na gałęzi etapu 3 (po usunięciu .pio/build/native i .pio/build/cyd)
+    Then wszystkie grupy są zielone, a przypadków jest razem 877: admin 258, airspace 71, display 312, enrichment 80, opensky 73, platform 83 (49 testów przeszło do grup kontekstów nowego miejsca kodu, 1 nowy: granica znaku UTF-8, teraz publiczna funkcja)
+    And RUN_TEST( jest 877, firmware.bin różni się o najwyżej 1024 bajty, a lista bibliotek jest ta sama
+    And python tools/check_layers.py zgłasza dokładnie 47 naruszeń: 51 z etapu 2 minus 6 (poll_pipeline.cpp → display/core × 2, poll_pipeline.h → opensky/core, table_view.h → opensky/core, config_page.cpp i device_alerts.cpp → admin/adapters) plus 2 (tracked_flight.h → enrichment/core × 2: AircraftRow niesie AircraftInfo, RouteInfo i AirportInfo)
+    And python tools/rewrite_includes.py --check kończy się kodem 0, python tools/check_comments.py --strict nic nie zgłasza, a filtr native wciąż przywraca config_portal.cpp (zostają w nim parseOpenSkyCredentialsJson i dwa walidatory — do etapu 4)
+
+  @manual
+  Scenario: Płytka z firmware'em etapu 3 działa jak przedtem
+    Given firmware z gałęzi wgrany przez USB (pio run -e cyd -t upload, za zgodą właściciela) i otwarty pio device monitor -b 115200
+    When płytka startuje, łączy się z WiFi i odbiera kilka pollów
+    Then log szeregowy nie pokazuje paniki ani restartu, a płytka odpowiada pod cyd-sky.local
+    And /screenshot.bmp?screen=0 pokazuje tabelę LOTY z odległościami, chipem kierunku (np. „SE 6km”) i samolotami w powietrzu przed tymi na ziemi; screen=1 ekran TERAZ z odliczaniem; screen=2 RADAR z podsumowaniem
+    And zakładka OpenSky w panelu pokazuje koszt w kredytach jak przedtem dla zapisanego promienia, a stopka wersję z gałęzi
+    And /perf.json po ok. 3 minutach: wolnych przejść pętli UI 0, sterta i największy blok nie mniejsze o więcej niż kilka KB niż po etapie 2 (147 KB / 59 KB), bez restartu
