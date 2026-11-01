@@ -21,11 +21,9 @@
 #include "display/core/text/fit_to_width.h"  // TextMeasure, fitToWidth()
 #include "enrichment/core/route_lookup.h"  // RouteInfo, AirportInfo
 
-// Forward-declared rather than #include "table_view.h" (which pulls in a
-// lot and would risk an include cycle) — only a reference to AircraftRow
-// is needed in these signatures. aircraft_summary.cpp includes
-// table_view.h itself for the full definition. Same pattern as
-// featured_panel.h.
+// Forward-declared — only a reference to AircraftRow is needed in these
+// signatures. aircraft_summary.cpp includes airspace/core/tracked_flight.h
+// for the full definition. Same pattern as featured_panel.h.
 struct AircraftRow;
 
 // How the origin -> destination line is rendered.

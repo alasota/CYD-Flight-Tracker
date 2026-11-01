@@ -11,7 +11,7 @@
 //   - status strip    — a text label matching the countdown state
 //
 // Zero networking code — draws from an already-enriched AircraftRow
-// (table_view's type), its two route-endpoint AirportInfos, and a
+// (airspace/core/tracked_flight), its two route-endpoint AirportInfos, and a
 // cpa_predictor::CpaPrediction. The between-polls "local ticking" of the
 // countdown is the UI's job (main.cpp) — this module just renders
 // whatever CpaPrediction it's handed.
@@ -28,9 +28,9 @@
 #include "enrichment/core/route_lookup.h"      // AirportInfo
 #include "display/core/screens/status_bar.h"        // OpenSkyHealth, emptyStateText()
 
-// Forward-declared rather than #include "table_view.h" (cycle risk) — same
-// pattern as featured_panel.h / aircraft_summary.h. flight_screen.cpp
-// includes table_view.h for the full definition.
+// Forward-declared — same pattern as featured_panel.h / aircraft_summary.h.
+// flight_screen.cpp includes airspace/core/tracked_flight.h for the full
+// definition.
 struct AircraftRow;
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under

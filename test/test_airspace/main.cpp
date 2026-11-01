@@ -7,6 +7,7 @@ void run_flight_phase_tests();
 void run_cpa_predictor_tests();
 void run_poll_pipeline_tests();
 void run_aircraft_state_tests();
+void run_tracked_flight_tests();
 
 void setUp(void) { resetAllForTesting(); }
 void tearDown(void) {}
@@ -25,5 +26,6 @@ int main(int, char **) {
   if (RUN_MODULE(cpa_predictor)) run_cpa_predictor_tests();
   if (RUN_MODULE(poll_pipeline)) run_poll_pipeline_tests();
   if (RUN_MODULE(aircraft_state)) run_aircraft_state_tests();
+  if (RUN_MODULE(tracked_flight)) run_tracked_flight_tests();
   return UNITY_END();
 }

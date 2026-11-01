@@ -2,91 +2,23 @@
 // "Screen 1 — Flights". Composes featured_panel (the
 // closest aircraft, spotlighted) with a paginated table of the rest. Uses
 // lcars_theme for all chrome (panels/pills/fonts/colors) — defines none of
-// its own. Zero networking code, zero calls into
-// opensky_client/aircraft_lookup/route_lookup: it takes their
-// Aircraft/AircraftInfo/RouteInfo *types* as plain data (joined by
-// icao24/callsign by whoever builds the AircraftRow list) and only draws.
+// its own. Zero networking code: it takes the AircraftRow list
+// (airspace/core/tracked_flight, built by poll_pipeline) as plain data and
+// only draws.
 #pragma once
 
 #include <cstdint>
-#include <map>
 #include <string>
 #include <vector>
 
-#include "enrichment/core/aircraft_lookup.h"
+#include "airspace/core/tracked_flight.h"  // AircraftRow
 #include "display/core/screens/featured_panel.h"
-#include "airspace/core/flight_phase.h"
 #include "display/core/i18n.h"
 #include "display/core/theme/lcars_theme.h"
-#include "opensky/core/opensky_client.h"
-#include "enrichment/core/route_lookup.h"
 #include "display/core/screens/status_bar.h"  // OpenSkyHealth
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
-
-// One enriched table row: an OpenSky state vector joined with its hexdb.io
-// aircraft lookup (by icao24) and route lookup (by callsign) — all three
-// structs kept as-is, no duplicated fields — plus the distance/bearing
-// from home (annotateDistances()) and the classified flight phase
-// (classifyPhases()) once those have run.
-struct AircraftRow {
-  Aircraft aircraft;
-  AircraftInfo info;
-  RouteInfo route;
-  Phase phase = Phase::NONE;
-  float distance_km = 0.0f;
-  float bearing_deg = 0.0f;
-  bool has_distance = false;  // false when aircraft.has_position is false
-
-  // "Still loading" vs "confirmed unknown": a lookup that the per-poll
-  // budget hasn't reached yet is *pending* (shown as "..."); a lookup that
-  // ran and found nothing is not (shown as "--"). Set by poll_pipeline.
-  bool info_pending = false;   // aircraft_lookup (airline / type)
-  bool route_pending = false;  // route_lookup (origin / destination)
-
-  // Route endpoint airports (IATA code + country) — looked up for every row
-  // with a route, so the whole UI can show IATA codes. A pending flag means
-  // that airport's lookup hasn't run yet this cycle.
-  AirportInfo origin_airport;
-  AirportInfo dest_airport;
-  bool origin_airport_pending = false;
-  bool dest_airport_pending = false;
-};
-
-// Joins OpenSky state vectors with their hexdb.io aircraft lookups (by
-// icao24) and route lookups (by callsign), producing the AircraftRow list
-// table_view actually draws — the "connect Aircraft + AircraftInfo +
-// RouteInfo" step of table_view's input contract (CLAUDE.md "Code conventions"). A key
-// with no entry in the corresponding map (lookup still pending, or
-// poll_pipeline simply never ran it for that row) produces a
-// default-constructed AircraftInfo/RouteInfo (found == false), which
-// drawTablePage()/featured_panel render as "--" rather than dropping the
-// row (docs/data-sources.md "Aircraft identification"). Distance and phase
-// are NOT computed here — call annotateDistances() then classifyPhases()
-// (then sortRowsByDistance()) on the result afterward. Pure — no HTTP call
-// happens here, just the join — tested under `pio test -e native`.
-std::vector<AircraftRow> buildEnrichedRecords(
-    const std::vector<Aircraft> &aircraft, const std::map<std::string, AircraftInfo> &infoByIcao24,
-    const std::map<std::string, RouteInfo> &routeByCallsign);
-
-// Fills distance_km/bearing_deg/has_distance on every row in `rows` from
-// (home_lat, home_lon) via shared/geo's computeDistanceBearing(). Rows whose
-// Aircraft::has_position is false get has_distance=false (nothing to
-// compute) and are left at distance_km=0/bearing_deg=0. Call this once
-// before classifyPhases()/sortRowsByDistance()/drawTablePage() — all read
-// the annotated fields rather than recomputing per call.
-void annotateDistances(std::vector<AircraftRow> &rows, float home_lat, float home_lon);
-
-// Fills row.phase on every row via flight_phase's classifyPhase(), using
-// each row's own (already annotated) distance_km as the "distance to
-// nearest airport" input — this project has no airport coordinate
-// database, only country codes (route_lookup), so distance from HOME is
-// what's actually available; see docs/screens.md "Flight phase". Rows with
-// has_distance == false get Phase::NONE (nothing meaningful to classify)
-// rather than a misleading guess. Call after annotateDistances().
-void classifyPhases(std::vector<AircraftRow> &rows, float near_airport_km,
-                     float climb_threshold_mps);
 
 // Sorts `rows` ascending by distance_km — closest aircraft first, per
 // docs/screens.md "Screen 1" (closest aircraft on top). Call

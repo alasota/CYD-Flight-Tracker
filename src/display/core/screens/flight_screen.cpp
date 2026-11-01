@@ -2,7 +2,8 @@
 
 #include <cmath>
 
-#include "display/core/screens/table_view.h"  // full AircraftRow definition
+#include "airspace/core/tracked_flight.h"  // full AircraftRow definition
+#include "display/core/screens/featured_panel.h"  // featuredPillTexts()
 
 namespace {
 constexpr int16_t kIdentityTop = LCARS_CONTENT_TOP;  // 18

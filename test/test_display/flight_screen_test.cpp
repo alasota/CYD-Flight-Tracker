@@ -3,7 +3,7 @@
 
 #include "airspace/core/cpa_predictor.h"
 #include "display/core/screens/flight_screen.h"
-#include "display/core/screens/table_view.h"  // AircraftRow
+#include "airspace/core/tracked_flight.h"  // AircraftRow
 #include "test_support.h"
 
 #include <vector>

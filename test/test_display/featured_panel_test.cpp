@@ -2,7 +2,7 @@
 #include <unity.h>
 
 #include "display/core/screens/featured_panel.h"
-#include "display/core/screens/table_view.h"  // AircraftRow
+#include "airspace/core/tracked_flight.h"  // AircraftRow
 
 namespace {
 

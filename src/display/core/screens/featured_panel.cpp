@@ -2,7 +2,7 @@
 
 #include <cstdio>
 
-#include "display/core/screens/table_view.h"  // full AircraftRow definition
+#include "airspace/core/tracked_flight.h"  // full AircraftRow definition
 #include "shared/geo.h"                        // compassPoint()
 
 namespace {

@@ -7,7 +7,7 @@
 // (which lives in radar_geometry, reused here rather than duplicated).
 // Static plot for v1 — no sweep-line animation. Zero networking code:
 // draws from an already-enriched, already-annotated AircraftRow list
-// (bearing/distance come from table_view::annotateDistances(), not
+// (bearing/distance come from tracked_flight's annotateDistances(), not
 // recomputed here) plus the nearest aircraft's route-endpoint AirportInfos.
 #pragma once
 
@@ -17,7 +17,9 @@
 
 #include "display/core/screens/radar_geometry.h"
 #include "enrichment/core/route_lookup.h"  // AirportInfo
-#include "display/core/screens/table_view.h"    // AircraftRow
+#include "airspace/core/feed_health.h"     // OpenSkyHealth
+#include "airspace/core/tracked_flight.h"  // AircraftRow
+#include "display/core/i18n.h"             // Language
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
