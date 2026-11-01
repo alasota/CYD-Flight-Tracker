@@ -174,3 +174,20 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   until stage 7 — making it block before the types move would have stopped every PR. The
   efont tables went to `display/domain/theme/fonts/`, not `adapters/` as §4.4 first said: they
   are pure data read by `fonts_test`, and `native` doesn't compile `adapters/`.
+  (Stage numbers here are from the original seven-stage plan; the eight-stage plan adds the
+  layer rename as stage 2, so the split is stage 4, renaming stage 7, blocking CI stage 8.)
+- **`domain/` / `app/` → `core/` / `services/`, `src/app/` → `src/main/`** (spec 12, stage 2,
+  owner 2026-11-01). The stage-1 names misled: `domain` means business rules in DDD, but
+  `display/domain/` held screens, the theme and fonts; and `app` meant two things — the
+  composition roots in `src/app/` and the use cases in `<ctx>/app/`. `core` only says "pure and
+  testable", which fits every context including `display`; `services` is the use-case layer;
+  the roots got their own word, `main/`. Done as its own stage (80 × `git mv` + include lines,
+  firmware +16 B) before the types move, so no later diff mixes a rename with a real change.
+  `admin/app/` didn't map to one layer: `config_page` and `web_i18n` are pure (→ `admin/core/`),
+  `config_portal` is `WebServer` routes (→ `admin/adapters/`). `config_portal.cpp` still carries
+  five pure, tested functions, so the `native` filter re-adds that one file
+  (`+<admin/adapters/config_portal.cpp>`) until stages 3–4 move them out — splitting it now
+  would have put real code changes into a rename-only stage, and leaving it in
+  `admin/services/` would have filed `WebServer` code under a pure layer. Side effect: the
+  layer report went 55 → 51, not "the same 55 under new names" as the spec first said
+  (docs/architecture.md "Source layout (spec 12)").

@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **etap 1 z 8 zrobiony (v1.11.0)**, etap 2 **w trakcie**, etapy 3–8 do zrobienia. Jedna specyfikacja dla całej
+Status: **etap 2 z 8 zrobiony (vNEXT)**, etap 1 wydany w v1.11.0, etapy 3–8 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -250,14 +250,27 @@ a ekran czyta z niego tylko swoje obiekty.
    include'ów w `src/` i `test/`). Do tego:
    - tabela warstw w `check_layers.py` i przykłady w jego testach oraz w scenariuszach
      `.feature`;
-   - `build_src_filter`: `+<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp>`;
+   - `build_src_filter`: `+<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp>
+     +<admin/adapters/config_portal.cpp>` — ostatni wzorzec dodaje z powrotem jeden plik:
+     `config_portal.cpp` ma nad `#ifdef ARDUINO` czyste, testowane funkcje (`bboxAreaSqDeg`,
+     `openSkyCreditCost`, `parseOpenSkyCredentialsJson`, `isValidFloatString`,
+     `isValidUnsignedIntString`), z których korzystają `config_page` i `device_alerts`; wyjątek
+     znika, gdy etapy 3 i 4 je wyniosą (decyzja właściciela 2026-11-01);
    - `tools/subset_efont.py` (katalog fontów), komentarze z odwołaniami do ścieżek;
    - CLAUDE.md („Code conventions”), `docs/architecture.md`, `test/README.md`, spec 14.
 
    Kryteria jak w etapie 1:
    - liczba `RUN_TEST` bez zmian;
    - firmware ± 1 KB;
-   - `check_layers.py` zgłasza te same 55 naruszeń, tylko pod nowymi nazwami;
+   - `check_layers.py` zgłasza **51** naruszeń (poprawione 2026-11-01; pierwotnie „te same 55,
+     tylko pod nowymi nazwami” — to się nie dało: przeniesienie `config_page` / `web_i18n` do
+     `admin/core/` i `config_portal` do `admin/adapters/` zmienia, co jest dozwolone).
+     55 − 9 + 5: znika 4 × `admin/domain -> admin/app` (teraz `admin/core -> admin/core`) i
+     5 include'ów SDK / `platform` w `config_portal.cpp` (adapter może); dochodzi
+     `config_page.cpp -> admin/adapters` (`config_portal.h`), `config_portal_test.cpp ->
+     admin/adapters` i 3 include'y innych kontekstów w `config_portal.cpp` (adapter widzi tylko
+     swój kontekst). W CI test narzędzi pilnuje limitu ≤ 51 (nie dokładnej listy), dokładną
+     listę sprawdza się ręcznie na koniec etapu;
    - `rewrite_includes.py --check` = 0.
 3. **Przeniesienie źle położonych typów.** `AircraftRow` z `table_view.h`, `OpenSkyHealth` ze
    `status_bar.h`, `computeDistanceBearing`, `compassPoint`, `openSkyCreditCost`, UTF-8 /
@@ -312,6 +325,34 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   przerwa pętli UI maks. 74 ms, 0 wolnych przejść, sterta 146 KB (największy blok 59 KB), bez
   restartów. Dotyk i jedna aktualizacja OTA — do sprawdzenia przez właściciela (build `-dev`).
   Rozmiar firmware zmierzony lokalnie (wyżej).
+
+### Wynik etapu 2 (2026-11-01, wydany w vNEXT)
+
+- **Katalogi:** 80 plików przeniesionych `git mv` (80 rename'ów w gicie): `<kontekst>/domain/` →
+  `core/`, `<kontekst>/app/` → `services/`, `src/app/` → `src/main/`; `admin/app/` rozdzielony
+  (`config_page`, `web_i18n` → `admin/core/`, `config_portal` → `admin/adapters/`). Bez zmian
+  w kodzie: include'y w 103 plikach `src/` / `test/` i ścieżki w komentarzach
+  (`fonts_test.cpp`, `platformio.ini`, `subset_efont.py`, `pio_version.py`).
+- **Narzędzia:** `rewrite_includes.py` ma obie tabele (`MOVES_STAGE_1`, `MOVES_STAGE_2` w
+  `STAGES`, `final_path()` prowadzi ścieżkę z etapu 0 przez wszystkie etapy);
+  `check_layers.py` zna warstwy `core` / `services` / `adapters` i korzeń `main`, stare nazwy
+  to „poza kontekstem i warstwą”; `subset_efont.py` pisze do `display/core/theme/fonts/`.
+  `rewrite_includes.py --check` = 0.
+- **`native`:** filtr `+<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp>
+  +<admin/adapters/config_portal.cpp>`; wszystkie 6 grup zielone, 876 przypadków (265 / 46 /
+  340 / 80 / 67 / 78, 3 pominięte) — tyle samo co przed etapem; `RUN_TEST(` = 876.
+- **Firmware:** `firmware.bin` 1 477 184 → 1 477 200 B (+16 B, kolejność linkowania), Flash
+  used +8 B, RAM bez zmian (62 044 B) — w granicy ± 1 KB; ten sam graf zależności.
+- **`tools/check_layers.py`:** **51 naruszeń** (55 − 9 + 5, dokładnie jak w §8 pkt 2), m.in.
+  10 × `display/core -> display/adapters` (`LGFX_CYD.hpp`), 4 × `admin/core -> admin/adapters`,
+  15 × SDK w `core/` pod `#ifdef ARDUINO`, 3 × `config_portal.cpp` → inne konteksty,
+  1 × `test -> admin/adapters` (`config_portal_test.cpp`). Test narzędzi
+  `LayoutTest.test_layer_findings_do_not_exceed_the_stage_2_limit` pilnuje limitu ≤ 51.
+- **Odstępstwa (decyzje właściciela 2026-11-01):** `config_portal` w `admin/adapters/` z wyjątkiem
+  w filtrze `native` do etapu 4 (zamiast dzielenia go teraz albo zostawienia w `services/`);
+  kryterium 55 → 51 (wyżej); tabela przeniesień etapu 1 zostaje obok tabeli etapu 2.
+- **`@manual` (płytka):** TODO — wyniki sprawdzenia na płytce (uruchomienie, trzy ekrany,
+  panel ustawień, strona OTA, `/perf.json`) do uzupełnienia przez orkiestratora.
 
 ## 9. Testy
 

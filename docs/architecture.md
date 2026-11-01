@@ -3,52 +3,80 @@
 The current architecture in detail: the source layout, the two cores, the settings page,
 updates, brightness, the "!" alerts, CI and the agent harness. The rules a session must follow
 are in CLAUDE.md; this file is the reference behind them. (Spec 12 reorganises the code into
-contexts in seven stages; stage 1 — folders, full-path includes, layer report — is done. Stage 7
-rewrites this file around the contexts.)
+contexts in eight stages; stages 1–2 — folders, full-path includes, layer report, layer names —
+are done. Stage 8 rewrites this file around the contexts.)
 
 ## Source layout (spec 12)
 
-Spec: `spec/planned/12-code-reorganization-ddd.md` (§4 contexts, §5 dependency table, §8
-stages). Stage 1 moved the files with `git mv`, **unsplit and unrenamed**; stages 2–7 move types,
-split pure / hardware halves, add the `app/` layer, rename to the glossary and make the layer
-check block CI.
+Spec: `spec/planned/12-code-reorganization-ddd.md` (§2 layer names, §4 contexts, §5 dependency
+table, §8 stages). Stage 1 moved the files with `git mv`, **unsplit and unrenamed**; stage 2
+renamed the layer folders. Stages 3–8 move misplaced types, split pure / hardware halves, add the
+`services/` logic, settings per context, rename to the glossary and make the layer check block CI.
 
 - **Folders:** `src/<context>/<layer>/` — contexts `airspace` (flight phase, CPA, the poll
   pipeline), `enrichment` (hexdb.io lookups, caches, names), `opensky` (client, login, credits),
   `display` (screens, theme, fonts, i18n, touch, backlight, redraw), `admin` (settings, page,
-  backup, password, alerts; `admin/domain/firmware/` = OTA, release check, version); layers
-  `domain/` (pure), `app/` (use cases, pure), `adapters/` (SDK / hardware only). Plus `shared/`
-  (`sun_times`), `platform/` (`core_link`, `time_sync`, `wifi_manager`, `perf_stats`,
-  `net_config`) and the root `src/app/` (`main.cpp`, `net_task` — composition roots, one per
-  core). Subfolders: `display/domain/screens/`, `display/domain/theme/` (+ `fonts/`).
-- **Placement rule in stage 1:** a file sits where its pure half will live, named as before; its
-  `#ifdef ARDUINO` half stays inside until stage 3 moves it to `adapters/`. Only files that are
-  entirely hardware are in `adapters/` / root `app/` already (`enrichment/adapters/hexdb_http`,
-  `admin/adapters/github_ca.h`, `app/net_task`, `app/main.cpp`). `include/LGFX_CYD.hpp` and
-  `include/touch_calibration.h` stay in `include/` until stage 3.
-- **Includes** are full paths from `src/` (`#include "display/domain/i18n.h"`), in `src/` and
+  backup, password, alerts; `admin/core/firmware/` = OTA, release check, version). Layers:
+  `core/` (pure logic of the context: types, rules, maths, screen layouts, texts — native, tested),
+  `services/` (state machines, pipelines, use cases that combine `core` parts and ports — native,
+  tested), `adapters/` (SDK calls: ESP32, LovyanGFX, HTTP, NVS, `WebServer` — not native). Plus
+  `shared/` (`sun_times`), `platform/` (`core_link`, `time_sync`, `wifi_manager`, `perf_stats`,
+  `net_config`) and `src/main/` (`main.cpp`, `net_task` — composition roots, one per core).
+  Subfolders: `display/core/screens/`, `display/core/theme/` (+ `fonts/`).
+- **Placement rule (stages 1–3):** a file sits where its pure half will live, named as before;
+  its `#ifdef ARDUINO` half stays inside until stage 4 moves it to `adapters/`. Only files that
+  are entirely hardware are in `adapters/` / `main/` already (`enrichment/adapters/hexdb_http`,
+  `admin/adapters/github_ca.h`, `admin/adapters/config_portal`, `main/net_task`,
+  `main/main.cpp`). `include/LGFX_CYD.hpp` and `include/touch_calibration.h` stay in `include/`
+  until stage 4.
+- **Stage 2** (`git mv` of 80 files, include lines only): `<ctx>/domain/` → `<ctx>/core/`,
+  `<ctx>/app/` → `<ctx>/services/`, `src/app/` → `src/main/`; `admin/app/` split —
+  `config_page`, `web_i18n` (pure) → `admin/core/`, `config_portal` (the `WebServer` routes) →
+  `admin/adapters/`. Today only `airspace/services/` (`poll_pipeline`) and `display/services/`
+  (`screenshot`) exist.
+- **Includes** are full paths from `src/` (`#include "display/core/i18n.h"`), in `src/` and
   `test/` alike; `-I src` is in `env:cyd` and `env:native` (`cyd-ota`, `native-asan` inherit).
   `test/support/` headers and test-local headers (`github_fixtures.h`) stay short.
-- **`native` filter:** `+<*> -<app/> -<*/adapters/> -<platform/*_esp32.cpp>` — `-<app/>` matches
-  only the root `src/app/`, not `admin/app/`.
-- **`tools/check_layers.py`** classifies each file (`classify()`) and checks every `#include`
-  against the §5 table (`ALLOWED`): domain sees `shared/` and other domains as the table allows,
-  `*/app` and `*/adapters` their own context, tests anything but `adapters/`, root `app/` and SDK
-  headers; SDK headers (`Arduino.h`, `WiFi*.h`, `LovyanGFX.hpp`, `esp_*`, `freertos/…` …) only in
-  `adapters/`, root `app/` and inside `#ifdef ARDUINO` in `platform/`. Stage-1 decisions: the §5
-  footnotes count as allowed; the table's missing rows were filled in (`enrichment/app` may see
-  `airspace` domain / app — it implements its port; `opensky/app` only its own context).
-  Output `path:line: from -> to ("include")`, a count per pair and a total; exit 0, `--strict`
-  exits 1 (stage 7 turns that on in CI). Stage 1 ends with **55 findings** — SDK includes inside
-  `#ifdef` in domain files, `admin/domain -> admin/app` (`device_alerts`), domain → adapters
-  (`hexdb_http.h`, `github_ca.h`, `LGFX_CYD.hpp`), domain / app → platform (`time_sync.h`,
-  `core_link.h`, `net_config.h`); each later stage should lower it. A short include (resolving
-  only from the file's own folder) and a file outside any context are findings too;
-  `tools/test_check_layers.py`'s `LayoutTest` keeps the tree free of them and the `RUN_TEST(`
-  count ≥ 874.
-- **`tools/rewrite_includes.py`** — the move table (`MOVES`) and the include rewriter: `--move`
-  (`git mv` per entry, skips done ones), default rewrites short includes in place, `--check` exits
-  1 if anything would change. Kept until stage 7: stages 2 / 3 move files again with a new `MOVES`.
+- **`native` filter:** `+<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp>
+  +<admin/adapters/config_portal.cpp>` (patterns apply in order, so the last one re-adds one
+  file). `config_portal.cpp` has pure functions above its `#ifdef ARDUINO` — `bboxAreaSqDeg`,
+  `openSkyCreditCost`, `parseOpenSkyCredentialsJson`, `isValidFloatString`,
+  `isValidUnsignedIntString` — used by `config_page` / `device_alerts` and tested by
+  `test_admin/config_portal_test.cpp`; without it every suite fails to link. The exception goes
+  when stage 3 (`openSkyCreditCost`, `bboxAreaSqDeg` → `opensky/core`) and stage 4 (the rest)
+  take them out.
+- **`tools/check_layers.py`** classifies each file (`classify()`, `LAYERS = ("core", "services",
+  "adapters", "assets")`, root `main`) and checks every `#include` against the §5 table
+  (`ALLOWED`): `core` sees `shared/` and other cores as the table allows, `*/services` and
+  `*/adapters` their own context (`{ctx}/core`, `{ctx}/services`), tests anything but
+  `adapters/`, `main/` and SDK headers; SDK headers (`Arduino.h`, `WiFi*.h`, `LovyanGFX.hpp`,
+  `esp_*`, `freertos/…` …) only in `adapters/`, `main/` and inside `#ifdef ARDUINO` in
+  `platform/`. A file in an old `domain/` / `app/` folder is "outside any context and layer".
+  Stage-1 decisions: the §5 footnotes count as allowed; the table's missing rows were filled in
+  (`enrichment/services` may see `airspace` core / services — it implements its port;
+  `opensky/services` only its own context). Output `path:line: from -> to ("include")`, a count
+  per pair and a total; exit 0, `--strict` exits 1 (stage 8 turns that on in CI).
+- **Findings:** 55 after stage 1, **51 after stage 2** (55 − 9 + 5): `config_page` / `web_i18n`
+  in `admin/core/` make 4 × `admin/domain -> admin/app` legal, and `config_portal` as an adapter
+  may include the SDK and `platform/` (−5); new are `config_page.cpp -> admin/adapters`
+  (`config_portal.h`, for `openSkyCreditCost`), `config_portal_test.cpp -> admin/adapters` and
+  three of `config_portal.cpp`'s includes of other contexts (`backlight.h`, `service_screen.h`,
+  `opensky_client.h` — an adapter sees only its own context). The rest: SDK includes inside
+  `#ifdef` in `core/` files, `core -> adapters` (`hexdb_http.h`, `github_ca.h`, `config_portal.h`,
+  `LGFX_CYD.hpp`), `core` / `services` → `platform` (`time_sync.h`, `core_link.h`,
+  `net_config.h`). `tools/test_check_layers.py`'s
+  `LayoutTest.test_layer_findings_do_not_exceed_the_stage_2_limit` fails above
+  `LAYER_FINDINGS_LIMIT = 51` (a limit, not a pin — later stages lower it without a test change).
+  A short include (resolving only from the file's own folder) and a file outside any context are
+  findings too; `LayoutTest` keeps the tree free of them, of old `domain/` / `app/` paths in code,
+  build files and tools, and keeps the `RUN_TEST(` count ≥ 874.
+- **`tools/rewrite_includes.py`** — the move tables and the include rewriter. `MOVES_STAGE_1`
+  (94 files, stage 0 → stage 1) and `MOVES_STAGE_2` (80 files, stage 1 → stage 2) sit side by
+  side in `STAGES`; `MOVES = STAGES[-1]` is what `--move` applies (`git mv` per entry, skips done
+  ones, removes emptied folders); `final_path()` follows a stage-0 path through all stages. The
+  default run rewrites any quoted include that doesn't resolve from `src/` to its full path in
+  place, `--check` exits 1 if anything would change. A later stage that moves files adds its
+  table to `STAGES`; the tool stays until stage 8.
 
 ## Concurrency — two cores (core_link, net_task)
 
@@ -361,7 +389,7 @@ green dot, red "!").
 
 - **Version = git tag.** `tools/pio_version.py` (PlatformIO `extra_scripts = pre:`) runs
   `git describe --tags --always --dirty` (or takes `$FW_VERSION`) and passes it as the
-  `FW_VERSION` macro to `src/admin/domain/firmware/version.cpp` only (build middleware on the
+  `FW_VERSION` macro to `src/admin/core/firmware/version.cpp` only (build middleware on the
   pattern `*version.cpp`, which must match one file; a new version recompiles only it).
   `firmwareVersion()` returns it, `"dev"` when not injected (native tests). Shown only in
   the settings page footer, not on the display. The script also writes
@@ -483,7 +511,7 @@ The summary is in CLAUDE.md "Spec → PR harness"; shared agent rules in
   branch name. The status line `Status: **etap N z M …` with N < M keeps the spec in
   `planned/` even though its branch was merged (`release_plan.py`'s `STAGE_STATUS`); a
   `**zrobione` status still moves it. Each stage gets a "Wynik etapu N" in the spec and its
-  version in `spec/README.md`'s "Stan" (`etap 1/7: vX.Y.Z`).
+  version in `spec/README.md`'s "Stan" (`etap 1/8: v1.11.0, etap 2/8: vX.Y.Z`).
 - **The `vNEXT` placeholder:** branches don't know their version, so docs write a bare
   placeholder (ROADMAP's "Done in" rows, spec status, `spec/README.md`, `docs/*.md`);
   `/release` fills it in (`release_plan.py --fill vX.Y.Z`), the project page shows it as "the

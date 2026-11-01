@@ -46,7 +46,7 @@ Linia MISO wyświetlacza (pin 12) jest podłączona, bo z niej czyta zrzut ekran
 
 ## 2. Kod
 
-- **Czysta logika** (`src/display/core/board_variant.{h,cpp}`, warstwy wg spec 12; przed jego etapem 2: `display/domain/`):
+- **Czysta logika** (`src/display/core/board_variant.{h,cpp}`, warstwy wg spec 12):
   - `enum class BoardVariant { ClassicR, R2Usb }`;
   - `BoardVariant boardFromPanelId(uint32_t rddid)`: decyzja z p. 1.3;
   - `const char *boardVariantName(BoardVariant)`: `"cyd-r"` / `"cyd-2usb"`, do logu i panelu;
