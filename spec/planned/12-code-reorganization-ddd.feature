@@ -1,4 +1,4 @@
-Feature: Reorganizacja kodu według DDD — etapy 1–3: katalogi kontekstów i warstw (core / services / adapters, korzenie w main/), include'y z pełną ścieżką, raport zależności, źle położone typy w swoich kontekstach
+Feature: Reorganizacja kodu według DDD — etapy 1–4: katalogi kontekstów i warstw (core / services / adapters, korzenie w main/), include'y z pełną ścieżką, raport zależności, źle położone typy w swoich kontekstach, podział czyste / sprzętowe
   Etap 1 przeniósł pliki z płaskiego src/ (git mv, bez dzielenia) do katalogów kontekstów i warstw
   z §4; każdy #include "…" podaje ścieżkę od src/ (flaga -I src), środowisko native nie kompiluje
   korzeni kompozycji ani adapterów, a tools/check_layers.py raportuje naruszenia tabeli z §5
@@ -7,10 +7,13 @@ Feature: Reorganizacja kodu według DDD — etapy 1–3: katalogi kontekstów i 
   admin/core/, a config_portal (trasy WebServer) do admin/adapters/. Etap 3 przenosi typy i
   funkcje leżące w złym kontekście (AircraftRow, OpenSkyHealth, odległość / namiar / kierunek
   świata, koszt w kredytach, UTF-8 / fitToWidth, „na ziemi”, wybór TERAZ, kolejność lotów) do
-  kontekstów z §4, a ich testy idą za kodem do grupy nowego kontekstu. Zachowanie urządzenia się
-  nie zmienia: testy zielone, liczba RUN_TEST nie maleje, firmware ma ten sam rozmiar ± 1 KB.
-  Wyniki płytki z etapów 1–2 są w specyfikacji (§8 „Wynik etapu N”); etapy 4–8 dostaną swoje
-  scenariusze w tym pliku, gdy przyjdzie ich kolej.
+  kontekstów z §4, a ich testy idą za kodem do grupy nowego kontekstu. Etap 4 dzieli każdy plik
+  z #ifdef ARDUINO na czystą połowę w core/ i sprzętową w adapters/ (nazwy z §4: opensky_http, settings_nvs,
+  touch_xpt2046…; rysowanie w display/adapters/lgfx/x_draw.cpp), przenosi LGFX_CYD.hpp i touch_calibration.h z include/ do
+  kontekstu display, a ostatnie czyste funkcje config_portal do admin/core/settings_form — wyjątek
+  w filtrze native znika; config_portal (już tylko trasy WebServer) dostaje nazwę z §4.5: web_server. Zachowanie urządzenia się nie zmienia: testy zielone, liczba RUN_TEST
+  nie maleje, firmware ma ten sam rozmiar ± 1 KB. Wyniki płytki z etapów 1–3 są w specyfikacji
+  (§8 „Wynik etapu N”); etapy 5–8 dostaną swoje scenariusze w tym pliku, gdy przyjdzie ich kolej.
 
   # ---- etap 1 (aktualne po etapie 2): układ katalogów i include'y
 
@@ -37,12 +40,13 @@ Feature: Reorganizacja kodu według DDD — etapy 1–3: katalogi kontekstów i 
       | release_check.cpp  | admin/domain/firmware/        |
       | time_sync.cpp      | platform/                     |
 
+  # (zmienione w etapie 4: doszła tabela etapu 4)
   @test=tools/test_rewrite_includes.py:MoveTableTest.test_move_table_matches_the_tree
-  Scenario: Tabele przeniesień etapów 1 i 2 zgadzają się z drzewem
-    Given tabele przeniesień etapów 1 i 2 w tools/rewrite_includes.py
-    When dla każdego z 94 plików sprzed etapu 1 składam jego ścieżkę: etap 1, potem etap 2
+  Scenario: Tabele przeniesień etapów 1, 2 i 4 zgadzają się z drzewem
+    Given tabele przeniesień etapów 1, 2 i 4 w tools/rewrite_includes.py
+    When dla każdego z 94 plików sprzed etapu 1 składam jego ścieżkę przez wszystkie tabele po kolei
     Then każda ścieżka końcowa istnieje w src/
-    And żadna ścieżka sprzed etapu 1 ani pośrednia (po etapie 1, przed etapem 2) już nie istnieje
+    And żadna ścieżka sprzed etapu 1 ani pośrednia (sprzed ostatniej tabeli, która ją zmienia) już nie istnieje
 
   @test=tools/test_check_layers.py:LayoutTest.test_includes_in_src_and_test_use_full_paths
   Scenario: Include'y w src/ i test/ podają pełną ścieżkę od src/
@@ -138,12 +142,12 @@ Feature: Reorganizacja kodu według DDD — etapy 1–3: katalogi kontekstów i 
       | src/enrichment/core/       | opensky/core/opensky_auth.h          | enrichment/core -> opensky/core           |
       | src/airspace/core/         | display/core/screens/table_view.h    | airspace/core -> display/core             |
       | src/opensky/core/          | enrichment/adapters/hexdb_http.h     | opensky/core -> enrichment/adapters       |
-      | src/admin/core/            | admin/adapters/config_portal.h       | admin/core -> admin/adapters              |
+      | src/admin/core/            | admin/adapters/web_server.h          | admin/core -> admin/adapters              |
       | src/admin/core/            | admin/services/x.h                   | admin/core -> admin/services              |
       | src/airspace/services/     | enrichment/services/x.h              | airspace/services -> enrichment/services  |
       | src/admin/adapters/        | display/services/screenshot.h        | admin/adapters -> display/services        |
       | src/display/core/          | main/net_task.h                      | display/core -> main                      |
-      | src/display/core/          | LGFX_CYD.hpp                         | display/core -> display/adapters          |
+      | src/display/core/          | display/adapters/lgfx/LGFX_CYD.hpp   | display/core -> display/adapters          |
       | src/shared/                | platform/core_link.h                 | shared -> platform                        |
 
   @test=tools/test_check_layers.py:RuleTableTest.test_test_files_may_not_include_adapters_or_roots
@@ -277,19 +281,20 @@ Feature: Reorganizacja kodu według DDD — etapy 1–3: katalogi kontekstów i 
     Then każdy jest zgłoszony jako leżący poza kontekstem i warstwą
     But src/display/core/x.h, src/admin/services/x.cpp i src/main/main.cpp należą do display/core, admin/services i main
 
+  # (zmienione w etapie 4: wyjątek +<admin/adapters/config_portal.cpp> zniknął razem z czystymi funkcjami config_portal, a plik nazywa się teraz web_server.cpp)
   @test=tools/test_check_layers.py:BuildConfigTest.test_native_filter_excludes_roots_and_adapters
-  Scenario: Środowisko native nie kompiluje korzeni kompozycji, adapterów ani adapterowej części platform/ — poza config_portal do etapu 4
+  Scenario: Środowisko native nie kompiluje korzeni kompozycji, adapterów ani adapterowej części platform/
     Given platformio.ini
     When czytam build_src_filter środowiska native
-    Then filtr to +<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp> +<admin/adapters/config_portal.cpp>
-    And config_portal.cpp jest jedynym plikiem z adapters/, który filtr przywraca (jego czyste funkcje mają testy w test_admin, a część WebServer jest pod #ifdef ARDUINO)
+    Then filtr to +<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp>
+    And filtr nie przywraca żadnego pliku z adapters/ (od etapu 4 trasy WebServer są w admin/adapters/web_server.cpp bez czystych funkcji, a testy tych funkcji w admin/core/settings_form)
 
-  # (zmienione w etapie 3: limit to stan po ostatnim wydanym etapie — 51 po etapie 2, 47 po etapie 3)
+  # (zmienione w etapie 3: limit to stan po ostatnim wydanym etapie — 51 po etapie 2, 47 po etapie 3; w etapie 4: 14)
   @test=tools/test_check_layers.py:LayoutTest.test_layer_findings_do_not_exceed_the_stage_limit
   Scenario: Liczba naruszeń w raporcie warstw nie rośnie ponad stan po ostatnim etapie
-    Given limit naruszeń zapisany w teście: 47 (stan po etapie 3; po etapie 2 było 51)
+    Given limit naruszeń zapisany w teście: 14 (stan po etapie 4; po etapie 2 było 51, po etapie 3 47)
     When uruchamiam check_layers na drzewie repozytorium
-    Then łączna liczba naruszeń jest nie większa niż 47
+    Then łączna liczba naruszeń jest nie większa niż 14
     And nowe naruszenie powyżej limitu kończy test błędem, a lista naruszeń jest w komunikacie
 
   @test=tools/test_check_layers.py:LayoutTest.test_no_old_layer_paths_left_in_code_and_build_files
@@ -517,3 +522,194 @@ Feature: Reorganizacja kodu według DDD — etapy 1–3: katalogi kontekstów i 
     And /screenshot.bmp?screen=0 pokazuje tabelę LOTY z odległościami, chipem kierunku (np. „SE 6km”) i samolotami w powietrzu przed tymi na ziemi; screen=1 ekran TERAZ z odliczaniem; screen=2 RADAR z podsumowaniem
     And zakładka OpenSky w panelu pokazuje koszt w kredytach jak przedtem dla zapisanego promienia, a stopka wersję z gałęzi
     And /perf.json po ok. 3 minutach: wolnych przejść pętli UI 0, sterta i największy blok nie mniejsze o więcej niż kilka KB niż po etapie 2 (147 KB / 59 KB), bez restartu
+
+  # ---- etap 4: podział czyste / sprzętowe (core/x + adapter o nazwie z §4, rysowanie w display/adapters/lgfx/x_draw)
+
+  @test=tools/test_check_layers.py:LayoutTest.test_arduino_ifdef_only_in_platform_and_adapters
+  Scenario: #ifdef ARDUINO zostaje tylko w platform/ i adapters/
+    Given pliki .h, .hpp, .c i .cpp w src/ po etapie 4
+    When szukam warunków #ifdef ARDUINO, #ifndef ARDUINO i #if defined(ARDUINO)
+    Then każdy plik z takim warunkiem leży w src/platform/ albo w src/<kontekst>/adapters/
+    And żaden plik w core/, services/, shared/ ani w korzeniach main/ go nie ma (także nagłówki, §10 pkt 2)
+
+  @test=tools/test_check_layers.py:LayoutTest.test_core_and_services_never_name_lovyangfx
+  Scenario: Typy LovyanGFX i funkcje rysujące są tylko w display/adapters/
+    Given kod (bez komentarzy) plików w src/*/core/, src/*/services/ i src/shared/
+    When szukam LGFX, LGFX_Sprite i lgfx::
+    Then nie ma żadnego trafienia
+    And każda deklaracja funkcji z parametrem LGFX & leży w nagłówku w src/display/adapters/
+
+  @test=tools/test_check_layers.py:LayoutTest.test_hardware_functions_are_defined_in_adapters
+  Scenario Outline: Sprzętowa połowa modułu jest zdefiniowana w adapterze, a czysta zostaje w core/
+    Given drzewo src/ po etapie 4
+    When szukam definicji funkcji <funkcja> w plikach .cpp
+    Then jest dokładnie jedna, w src/<adapter>
+    And src/<rdzeń> nadal istnieje, nie definiuje jej i nie ma w sobie #ifdef ARDUINO
+
+    Examples:
+      | funkcja                   | adapter                                         | rdzeń                                     |
+      | drawStatusBar             | display/adapters/lgfx/status_bar_draw.cpp       | display/core/screens/status_bar.cpp       |
+      | drawOtaScreen             | display/adapters/lgfx/service_screen_draw.cpp   | display/core/screens/service_screen.cpp   |
+      | drawRadarView             | display/adapters/lgfx/radar_view_draw.cpp       | display/core/screens/radar_view.cpp       |
+      | flightScreenReserveSprite | display/adapters/lgfx/flight_screen_draw.cpp    | display/core/screens/flight_screen.cpp    |
+      | drawTablePage             | display/adapters/lgfx/table_view_draw.cpp       | display/core/screens/table_view.cpp       |
+      | drawFeaturedPanel         | display/adapters/lgfx/featured_panel_draw.cpp   | display/core/screens/featured_panel.cpp   |
+      | drawAircraftSummary       | display/adapters/lgfx/aircraft_summary_draw.cpp | display/core/screens/aircraft_summary.cpp |
+      | drawBottomNav             | display/adapters/lgfx/lcars_theme_draw.cpp      | display/core/theme/lcars_theme.cpp        |
+      | touchInputRead            | display/adapters/touch_xpt2046.cpp              | display/core/touch_input.cpp              |
+      | backlightLoop             | display/adapters/backlight_ldr.cpp              | display/core/backlight.cpp                |
+      | storeLoadAircraft         | enrichment/adapters/lookup_store_nvs.cpp        | enrichment/core/lookup_store.cpp          |
+      | lookupAircraft            | enrichment/adapters/hexdb_sources.cpp           | enrichment/core/aircraft_lookup.cpp       |
+      | lookupRoute               | enrichment/adapters/hexdb_sources.cpp           | enrichment/core/route_lookup.cpp          |
+      | fetchAircraftStates       | opensky/adapters/opensky_http.cpp               | opensky/core/opensky_client.cpp           |
+      | otaFlashSession           | admin/adapters/ota_flash.cpp                    | admin/core/firmware/ota_update.cpp        |
+      | releaseCheckLoop          | admin/adapters/github_http.cpp                  | admin/core/firmware/release_check.cpp     |
+      | loadConfig                | admin/adapters/settings_nvs.cpp                 | admin/core/config_store.cpp               |
+      | deviceAlertInputs         | admin/adapters/alert_sources.cpp                | admin/core/device_alerts.cpp              |
+
+  @test=tools/test_check_layers.py:LayoutTest.test_stage_4_symbols_are_declared_in_their_new_home
+  Scenario Outline: Typ lub funkcja wyniesiona przy podziale ma jedną deklarację, w swoim nowym nagłówku
+    Given nagłówki w src/ po etapie 4
+    When szukam deklaracji <symbol> (typu albo funkcji; deklaracja zapowiadająca się nie liczy)
+    Then jest dokładnie jedna, w src/<nowy_nagłówek>
+    And src/<stary_nagłówek> jej nie ma
+
+    Examples:
+      | symbol                      | nowy_nagłówek                            | stary_nagłówek                    |
+      | parseOpenSkyCredentialsJson | admin/core/settings_form.h               | admin/adapters/web_server.h       |
+      | OpenSkyCredentials          | admin/core/settings_form.h               | admin/adapters/web_server.h       |
+      | isValidFloatString          | admin/core/settings_form.h               | admin/adapters/web_server.h       |
+      | isValidUnsignedIntString    | admin/core/settings_form.h               | admin/adapters/web_server.h       |
+      | OtaObserver                 | admin/core/firmware/ota_update.h         | admin/adapters/web_server.h       |
+      | TouchPoint                  | display/adapters/touch_xpt2046.h         | display/core/touch_input.h        |
+      | touchInputRead              | display/adapters/touch_xpt2046.h         | display/core/touch_input.h        |
+      | gfxTextMeasure              | display/adapters/lgfx/lcars_theme_draw.h | display/core/theme/lcars_theme.h  |
+      | drawPhaseIcon               | display/adapters/lgfx/lcars_theme_draw.h | display/core/theme/lcars_theme.h  |
+      | drawTablePage               | display/adapters/lgfx/table_view_draw.h  | display/core/screens/table_view.h |
+      | drawStatusBar               | display/adapters/lgfx/status_bar_draw.h  | display/core/screens/status_bar.h |
+      | backlightBegin              | display/adapters/backlight_ldr.h         | display/core/backlight.h          |
+      | formatDate                  | shared/clock.h                           | platform/time_sync.h              |
+      | minuteOf                    | shared/clock.h                           | platform/time_sync.h              |
+
+  @test=tools/test_check_layers.py:LayoutTest.test_stage_4_moved_tests_follow_their_code
+  Scenario Outline: Testy czystych funkcji idą za nimi do pliku testów nowego modułu
+    Given katalog test/ po etapie 4
+    When szukam definicji i wywołania RUN_TEST testu <test>
+    Then oba są w test/<nowy_plik>, a test/<stary_plik> już nie istnieje
+
+    Examples:
+      | test                                               | nowy_plik                         | stary_plik                        |
+      | test_parse_credentials_json_valid                  | test_admin/settings_form_test.cpp | test_admin/config_portal_test.cpp |
+      | test_parse_credentials_json_rejects_oversized_body | test_admin/settings_form_test.cpp | test_admin/config_portal_test.cpp |
+      | test_valid_float_string_rejects_garbage            | test_admin/settings_form_test.cpp | test_admin/config_portal_test.cpp |
+      | test_valid_unsigned_int_string_rejects_non_digits  | test_admin/settings_form_test.cpp | test_admin/config_portal_test.cpp |
+      | test_format_date_leap_year_after_feb29             | test_platform/clock_test.cpp      | test_platform/time_sync_test.cpp  |
+      | test_format_time_pads_single_digits                | test_platform/clock_test.cpp      | test_platform/time_sync_test.cpp  |
+      | test_minute_of_changes_at_minute_boundary          | test_platform/clock_test.cpp      | test_platform/time_sync_test.cpp  |
+
+  @test=tools/test_rewrite_includes.py:MoveTableTest.test_stage_4_renames_config_portal_to_web_server
+  Scenario Outline: Tabela etapu 4 zmienia nazwę config_portal na web_server (§4.5) i nic więcej
+    Given MOVES_STAGE_4 w tools/rewrite_includes.py, ostatnia tabela w STAGES
+    When składam ścieżkę pliku <plik_sprzed_etapu_1> przez wszystkie tabele
+    Then final_path() daje <ścieżka_końcowa>, plik istnieje w src/, a admin/adapters/<stara_nazwa> nie istnieje
+    And tabela etapu 4 ma dokładnie te dwa wpisy; hexdb_http zostaje, bo §4.2 nazywa go tak samo
+
+    Examples:
+      | plik_sprzed_etapu_1 | stara_nazwa       | ścieżka_końcowa                |
+      | config_portal.h     | config_portal.h   | admin/adapters/web_server.h    |
+      | config_portal.cpp   | config_portal.cpp | admin/adapters/web_server.cpp  |
+
+  @test=tools/test_rewrite_includes.py:RewriteTest.test_renamed_header_include_becomes_the_new_full_path
+  Scenario: Include pliku o zmienionej nazwie dostaje nową pełną ścieżkę
+    Given plik z #include "admin/adapters/config_portal.h" i drugi z #include "config_portal.h", a w src/ jest już tylko admin/adapters/web_server.h
+    When uruchamiam python tools/rewrite_includes.py --check, potem bez --check, potem znów --check
+    Then pierwsze --check kończy się kodem 1 i niczego nie zapisuje
+    And oba include'y wskazują "admin/adapters/web_server.h", a komentarz za include'em i końce linii zostają
+    And drugie --check kończy się kodem 0
+
+  @test=tools/test_check_comments.py:MainCppCommentsTest.test_net_modules_include_the_core0_modules
+  Scenario: Nowe adaptery rdzenia 0 są sprawdzane jak moduły, z których wyszły
+    Given lista modułów rdzenia 0 w tools/check_comments.py (NET_MODULES)
+    When czytam ją po etapie 4
+    Then zawiera web_server, opensky_http, hexdb_sources, lookup_store_nvs, settings_nvs, github_http, ota_flash i alert_sources
+    And nie zawiera już config_portal (pliku o tej nazwie nie ma)
+
+  @test=tools/test_check_layers.py:LayoutTest.test_board_config_headers_live_in_the_display_context
+  Scenario: Konfiguracja LovyanGFX i kalibracja dotyku leżą w kontekście display, nie w include/
+    Given drzewo repozytorium po etapie 4
+    When szukam nagłówków projektu poza src/ i test/
+    Then include/ nie ma żadnego pliku .h ani .hpp
+    And klasa LGFX jest w src/display/adapters/lgfx/LGFX_CYD.hpp, a stałe kalibracji dotyku w src/display/core/touch_calibration.h
+    And LGFX_CYD.hpp dołącza "display/core/touch_calibration.h" — ten sam plik, który czyta czyste mapRawTouch()
+
+  @test=tools/test_check_layers.py:ClassifyTest.test_include_dir_headers_are_outside_any_layer
+  Scenario: Nagłówek w include/ nie należy już do żadnej warstwy
+    Given ścieżki include/LGFX_CYD.hpp i include/x.h
+    When skrypt klasyfikuje pliki
+    Then żadna nie należy do kontekstu ani warstwy (check_layers nie ma już wyjątków dla include/)
+    But src/display/adapters/lgfx/LGFX_CYD.hpp należy do display/adapters, a src/display/core/touch_calibration.h do display/core
+
+  @test=tools/test_check_layers.py:LayoutTest.test_stage_4_removes_sdk_and_adapter_findings_from_core
+  Scenario Outline: Raport warstw nie zgłasza już SDK, adapterów ani platform/ dołączanych z core/ i z testów
+    Given drzewo repozytorium po etapie 4
+    When uruchamiam check_layers
+    Then żadne zgłoszenie z warstwy <z> nie wskazuje warstwy <cel>
+
+    Examples:
+      | z               | cel                 |
+      | display/core    | display/adapters    |
+      | display/core    | sdk                 |
+      | display/core    | platform            |
+      | admin/core      | sdk                 |
+      | admin/core      | admin/adapters      |
+      | admin/core      | platform            |
+      | enrichment/core | sdk                 |
+      | enrichment/core | enrichment/adapters |
+      | opensky/core    | sdk                 |
+      | opensky/core    | platform            |
+      | opensky/core    | admin/core          |
+      | test            | admin/adapters      |
+
+  @test=test_admin/settings_form_test.cpp:test_valid_float_string_rejects_garbage
+  @test=test_admin/settings_form_test.cpp:test_parse_credentials_json_rejects_oversized_body
+  Scenario: Walidacja liczb z formularza i plik poświadczeń OpenSky są czystą logiką admin/core, testowaną bez adaptera
+    Given admin/core/settings_form z isValidFloatString, isValidUnsignedIntString i parseOpenSkyCredentialsJson
+    When test_admin sprawdza je, dołączając tylko admin/core/settings_form.h
+    Then "", "abc", "12.3.4", "12abc", "12 34" i " " nie są poprawną liczbą
+    And plik poświadczeń dłuższy niż 4096 bajtów jest odrzucony bez parsowania (ok = false)
+
+  @test=test_opensky/opensky_client_test.cpp:test_extract_aircraft_from_states_matches_parse_states_response
+  @test=test_opensky/opensky_client_test.cpp:test_parse_states_response_valid
+  Scenario: Odczyt /states/all na płytce i w testach mapuje pola tą samą funkcją
+    Given tablica "states" z dwoma wektorami stanu, w tym callsign ze spacjami na końcu
+    When adapter OpenSky (strumień HTTP) zamienia ją na samoloty przez extractAircraftFromStates(), a test przez parseStatesResponse()
+    Then obie drogi dają te same rekordy: icao24, callsign bez spacji, pozycja, wysokość, „na ziemi”, prędkość, kurs i prędkość pionowa
+
+  @test=test_platform/clock_test.cpp:test_format_date_leap_year_after_feb29
+  @test=test_platform/clock_test.cpp:test_minute_of_changes_at_minute_boundary
+  Scenario: Datę i godzinę formatuje wspólne jądro (shared/clock), a synchronizacja NTP zostaje w platform/
+    Given epoka już przesunięta do czasu lokalnego (na płytce: timeSyncNowLocal() z platform/time_sync)
+    When nagłówek i panel ustawień formatują ją funkcjami formatDate(), formatTime() i minuteOf() z shared/clock
+    Then 1583020800 to „01.03.2020”, a minuteOf() zmienia się dokładnie na granicy minuty
+
+  @manual
+  Scenario: Etap 4 nie zmienia liczby testów ani firmware'u
+    Given na gałęzi przed etapem 4 (koniec etapu 3, 4c58782): przypadki w 6 grupach pio test -e native (admin 258, airspace 71, display 312, enrichment 80, opensky 73, platform 83 = 877), RUN_TEST( 877, firmware.bin 1 477 568 B, „Flash: used” / „RAM: used” (62 044 B) i lista bibliotek z pio run -e cyd
+    When mierzę to samo po każdym kroku i na końcu etapu (po usunięciu .pio/build/native i .pio/build/cyd)
+    Then wszystkie grupy są zielone, a przypadków jest razem 878: admin 258, airspace 71, display 312, enrichment 80, opensky 74, platform 83 (testy config_portal i time_sync przeszły do settings_form i clock w tych samych grupach, 1 nowy: wspólna funkcja mapująca stany OpenSky)
+    And RUN_TEST( jest 878, firmware.bin na końcu różni się od 1 477 568 B o najwyżej 1024 bajty, RAM bez zmian, lista bibliotek ta sama
+    And grep -rl "ifdef ARDUINO" src --include=*.cpp zwraca tylko pliki w src/platform/ i src/*/adapters/
+    And python tools/check_layers.py zgłasza dokładnie 14 naruszeń: 47 z etapu 3 minus 38 (SDK, adaptery i platform/ dołączane z core/, LGFX_CYD.hpp w nagłówkach ekranów, config_portal_test → admin/adapters, release_check.h → config_portal.h) plus 5 (service_screen_draw.cpp, backlight_ldr.cpp i opensky_http.cpp → admin/core, alert_sources.cpp → display/core i opensky/core)
+    And python tools/rewrite_includes.py --check kończy się kodem 0, python tools/check_comments.py --strict nic nie zgłasza, python tools/check_bdd.py 0 problemów
+
+  @manual
+  Scenario: Płytka po każdym kroku etapu 4 działa jak przedtem, z aktualizacją OTA i zapisem ustawień
+    Given firmware z każdego kroku wgrany przez USB (COM3, pio run -e cyd -t upload, za zgodą właściciela) i pio device monitor -b 115200 przez 2–3 minuty
+    When płytka startuje, łączy się z WiFi i odbiera kilka pollów
+    Then log szeregowy nie pokazuje paniki ani restartu poza startem, a płytka odpowiada pod cyd-sky.local
+    And /screenshot.bmp?screen=0, 1 i 2 pokazują LOTY, TERAZ z odliczaniem i RADAR jak po etapie 3: polskie litery, ikony faz, strzałka kierunku, zakładki, nagłówek z datą, zegarem i kropką zdrowia
+    And /perf.json: wolnych przejść pętli UI 0, sterta i największy blok w zakresie z etapu 3 (140–146 KB / 53–70 KB), bez restartu
+    And krok, który rusza dotyk albo jasność, sprawdza je na płytce: zakładki przełączają ekrany, strona tabeli się zmienia, /light.json podaje odczyt czujnika i jasność
+    And na końcu etapu aktualizacja OTA przez WiFi (POST /update z firmware.bin gałęzi) pokazuje ekran aktualizacji na wyświetlaczu, kończy się HTTP 200, a nowy obraz zostaje oznaczony jako ważny
+    And zapis ustawień w panelu (zmiana np. interwału auto-cycle i z powrotem) przetrwa restart, szerokość „abc” jest odrzucona z komunikatem, a plik poświadczeń z błędnym JSON-em nie zmienia zapisanych poświadczeń
+    And „Sprawdź teraz” na karcie Firmware łączy się z GitHubem (zweryfikowany TLS) bez błędu pamięci
