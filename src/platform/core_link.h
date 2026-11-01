@@ -27,13 +27,13 @@
 #include <utility>
 #include <vector>
 
-#include "admin/domain/config_store.h"   // Config
-#include "airspace/domain/cpa_predictor.h"  // CpaPrediction
-#include "admin/domain/device_alerts.h"  // AlertSet, AlertDetails
-#include "display/domain/redraw_policy.h"  // RedrawEvents
-#include "admin/domain/firmware/release_check.h"  // UpdateStatus
-#include "display/domain/screens/status_bar.h"     // OpenSkyHealth
-#include "display/domain/screens/table_view.h"     // AircraftRow
+#include "admin/core/config_store.h"   // Config
+#include "airspace/core/cpa_predictor.h"  // CpaPrediction
+#include "admin/core/device_alerts.h"  // AlertSet, AlertDetails
+#include "display/core/redraw_policy.h"  // RedrawEvents
+#include "admin/core/firmware/release_check.h"  // UpdateStatus
+#include "display/core/screens/status_bar.h"     // OpenSkyHealth
+#include "display/core/screens/table_view.h"     // AircraftRow
 #include "platform/wifi_manager.h"   // WifiStatus
 
 #ifdef ARDUINO

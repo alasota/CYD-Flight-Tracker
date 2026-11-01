@@ -3,9 +3,9 @@
 
 #include <string>
 
-#include "enrichment/domain/aircraft_lookup.h"
-#include "enrichment/domain/lookup_store.h"
-#include "enrichment/domain/route_lookup.h"
+#include "enrichment/core/aircraft_lookup.h"
+#include "enrichment/core/lookup_store.h"
+#include "enrichment/core/route_lookup.h"
 
 namespace {
 

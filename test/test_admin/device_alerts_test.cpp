@@ -4,9 +4,9 @@
 #include <set>
 #include <string>
 
-#include "admin/app/config_page.h"  // SettingsTab, openSkyDailyCredits()
-#include "admin/domain/device_alerts.h"
-#include "display/domain/theme/lcars_theme.h"  // THEME_ALERT / THEME_WARNING, isFontSafeText()
+#include "admin/core/config_page.h"  // SettingsTab, openSkyDailyCredits()
+#include "admin/core/device_alerts.h"
+#include "display/core/theme/lcars_theme.h"  // THEME_ALERT / THEME_WARNING, isFontSafeText()
 #include "test_support.h"
 
 namespace {

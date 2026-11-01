@@ -1,7 +1,7 @@
 // lcars_theme: palette, fitToWidth, phase icons, font set. docs/screens.md "Design language".
 #include <unity.h>
 
-#include "display/domain/theme/lcars_theme.h"
+#include "display/core/theme/lcars_theme.h"
 #include "test_support.h"
 
 namespace {

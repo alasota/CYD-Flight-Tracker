@@ -1,8 +1,8 @@
 // featured_panel: Screen 1 featured panel geometry + stat chips. docs/screens.md "Screen 1 — Flights".
 #include <unity.h>
 
-#include "display/domain/screens/featured_panel.h"
-#include "display/domain/screens/table_view.h"  // AircraftRow
+#include "display/core/screens/featured_panel.h"
+#include "display/core/screens/table_view.h"  // AircraftRow
 
 namespace {
 

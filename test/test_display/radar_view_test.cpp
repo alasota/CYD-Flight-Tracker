@@ -1,7 +1,7 @@
 // radar_view: Screen 3 layout + summary panel. docs/screens.md "Screen 3 — Radar".
 #include <unity.h>
 
-#include "display/domain/screens/radar_view.h"
+#include "display/core/screens/radar_view.h"
 
 namespace {
 

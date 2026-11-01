@@ -11,10 +11,10 @@
 #include <type_traits>
 #include <vector>
 
-#include "enrichment/domain/aircraft_lookup.h"
+#include "enrichment/core/aircraft_lookup.h"
 #include "fixtures.h"
-#include "display/domain/i18n.h"
-#include "enrichment/domain/route_lookup.h"
+#include "display/core/i18n.h"
+#include "enrichment/core/route_lookup.h"
 
 // Clears all global state the modules (and fixtures.h's stubs) keep between
 // tests. Called from every suite's setUp().
