@@ -8,7 +8,7 @@
 #include "display/core/text/utf8.h"  // utf8Length()
 #include "display/core/theme/lcars_theme.h"  // palette constants
 #include "test_support.h"
-#include "platform/time_sync.h"
+#include "shared/clock.h"
 
 namespace {
 

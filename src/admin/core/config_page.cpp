@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "opensky/core/scan_area.h"  // openSkyCreditCost()
-#include "platform/time_sync.h"      // formatDate() / formatTime() — "checked" time
+#include "shared/clock.h"            // formatDate() / formatTime() — "checked" time
 #include "admin/core/firmware/version.h"        // firmwareVersion() — page footer
 
 const char *settingsTabId(SettingsTab tab) {

@@ -29,13 +29,13 @@
 // Also the bottom-nav button labels.
 const char *statusBarScreenName(int screenIndex, Language lang);
 
-// "DD.MM.YYYY" from time_sync::formatDate(), or a same-width
+// "DD.MM.YYYY" from clock's formatDate(), or a same-width
 // "--.--.----" placeholder when the clock hasn't synced yet
 // (time_sync::isTimeSynced() == false) — never the epoch-zero garbage the
 // ESP32 boots with.
 std::string statusBarDate(std::time_t localEpoch, bool timeSynced);
 
-// "HH:MM" from time_sync::formatTime(), or "--:--" until the first NTP
+// "HH:MM" from clock's formatTime(), or "--:--" until the first NTP
 // sync completes.
 std::string statusBarClock(std::time_t localEpoch, bool timeSynced);
 
