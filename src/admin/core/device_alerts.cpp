@@ -208,24 +208,3 @@ AlertDemo alertDemoState() {
   demo.details = collectAlertDetails(in);
   return demo;
 }
-
-#ifdef ARDUINO
-
-#include "display/core/backlight.h"       // backlightStatus() — tonight's window
-#include "admin/core/config_store.h"    // Config
-#include "opensky/core/opensky_client.h"  // openSkyQuota(), openSkyAuthStatus()
-
-AlertInputs deviceAlertInputs(const Config &cfg) {
-  AlertInputs in;
-  in.auth = openSkyAuthStatus(cfg);
-  in.quota = openSkyQuota();
-  in.radiusDeg = cfg.radius_deg;
-  in.pollIntervalS = cfg.poll_interval_s;
-  in.pausedMinutesPerDay = pausedMinutesPerDay(cfg, backlightStatus(cfg));
-  in.dailyLimit = openSkyDailyLimit(in.auth);
-  in.estimatedDailyCredits =
-      openSkyDailyCredits(in.radiusDeg, in.pollIntervalS, in.pausedMinutesPerDay);
-  return in;
-}
-
-#endif  // ARDUINO

@@ -1,0 +1,23 @@
+// alert_sources — where the device-alert inputs come from on the board: the
+// OpenSky login and credits (opensky_client), tonight's night window
+// (backlight) and the settings. Adapter, not covered by Unity (CLAUDE.md
+// "Testing"); collectAlerts() and the rest of device_alerts are pure.
+#include "admin/core/device_alerts.h"
+
+#include "admin/core/config_page.h"       // openSkyDailyCredits(), pausedMinutesPerDay()
+#include "admin/core/config_store.h"      // Config
+#include "display/core/backlight.h"       // backlightStatus() — tonight's window
+#include "opensky/core/opensky_client.h"  // openSkyQuota(), openSkyAuthStatus()
+
+AlertInputs deviceAlertInputs(const Config &cfg) {
+  AlertInputs in;
+  in.auth = openSkyAuthStatus(cfg);
+  in.quota = openSkyQuota();
+  in.radiusDeg = cfg.radius_deg;
+  in.pollIntervalS = cfg.poll_interval_s;
+  in.pausedMinutesPerDay = pausedMinutesPerDay(cfg, backlightStatus(cfg));
+  in.dailyLimit = openSkyDailyLimit(in.auth);
+  in.estimatedDailyCredits =
+      openSkyDailyCredits(in.radiusDeg, in.pollIntervalS, in.pausedMinutesPerDay);
+  return in;
+}

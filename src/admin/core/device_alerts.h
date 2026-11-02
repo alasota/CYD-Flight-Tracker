@@ -129,9 +129,8 @@ struct AlertDemo {
 };
 AlertDemo alertDemoState();
 
-#ifdef ARDUINO
 struct Config;
 // The inputs as of now, from opensky_client (auth, quota), the backlight's
-// night window and `cfg`. Core 0 (net_task, config_portal).
+// night window and `cfg`. Core 0 (net_task, config_portal); defined in
+// admin/adapters/alert_sources.cpp.
 AlertInputs deviceAlertInputs(const Config &cfg);
-#endif
