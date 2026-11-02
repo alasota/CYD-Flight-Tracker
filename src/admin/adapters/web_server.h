@@ -1,4 +1,4 @@
-// config_portal — local web config page for lat/lon/radius/poll_interval/
+// web_server — local web config page for lat/lon/radius/poll_interval/
 // OpenSky client_id/client_secret/auto-cycle settings, reachable via mDNS
 // at cyd-sky.local (see
 // CLAUDE.md "Code conventions"). Submissions are persisted through

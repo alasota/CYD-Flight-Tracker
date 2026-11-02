@@ -1,11 +1,11 @@
-// config_page — the HTML of the config web page (served by config_portal),
+// config_page — the HTML of the config web page (served by web_server),
 // rendered as a stream of chunks so the ESP32 never builds the whole page in
 // RAM. Five tabs (Location / OpenSky client / General / Backup / Firmware), PL or EN text from
 // web_i18n (Config::web_language), dark theme with the display's peach as
 // the single accent colour.
 //
 // Pure — no WebServer / Arduino dependency: the caller supplies the sink
-// (config_portal sends each chunk over HTTP, the native tests collect them
+// (web_server sends each chunk over HTTP, the native tests collect them
 // into a string). Tested under `pio test -e native`.
 #pragma once
 

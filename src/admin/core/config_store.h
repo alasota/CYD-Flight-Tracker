@@ -45,7 +45,7 @@ struct Config {
   // when enabled, the active screen advances every auto_cycle_interval_s
   // seconds (the Screen 2 "imminent overhead" deferral lives in
   // screen_nav::shouldDeferAutoSwitch()). Both are user-configurable via
-  // config_portal.
+  // web_server.
   bool auto_cycle_enabled = false;
   uint32_t auto_cycle_interval_s = 15;
   // flight_phase thresholds (docs/screens.md "Flight phase"). near_airport_km
@@ -95,7 +95,7 @@ struct Config {
   uint16_t night_wake_s = 60;
   bool night_pause_polling = false;
   // True once the user has saved the settings form at least once via
-  // config_portal. (0, 0) is a real place (Gulf of Guinea) — without this
+  // web_server. (0, 0) is a real place (Gulf of Guinea) — without this
   // flag there's no way to tell "user hasn't configured their home
   // location yet" apart from "user's home really is at 0,0", so the
   // firmware would happily poll/display aircraft around Null Island with
@@ -119,7 +119,7 @@ uint32_t clampPollIntervalS(uint32_t poll_interval_s);
 // flight_phase threshold clamps — both must stay strictly positive (a
 // zero/negative "near airport" radius or climb cutoff would make
 // classifyPhase() nonsensical), with a generous ceiling so a fat-fingered
-// value in config_portal can't break the classifier. Pure — native-tested.
+// value in web_server can't break the classifier. Pure — native-tested.
 float clampNearAirportKm(float near_airport_km);
 float clampClimbRateThresholdMps(float climb_rate_threshold_mps);
 
