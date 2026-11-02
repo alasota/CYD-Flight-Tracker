@@ -92,6 +92,7 @@
 #include "display/core/screens/table_view.h"
 #include "airspace/core/flight_ordering.h"  // splitFeaturedAndRest()
 #include "platform/time_sync.h"
+#include "shared/clock.h"  // minuteOf()
 #include "display/core/touch_input.h"
 #include "admin/core/firmware/version.h"
 #include "admin/core/web_auth.h"

@@ -1,7 +1,7 @@
-// time_sync: date / time formatting from an injected time_t. docs/screens.md "Time".
+// clock: date / time formatting from an injected time_t. docs/screens.md "Time".
 #include <unity.h>
 
-#include "platform/time_sync.h"
+#include "shared/clock.h"
 
 namespace {
 
@@ -66,7 +66,7 @@ static void test_minute_of_changes_at_minute_boundary(void) {
 
 }  // namespace
 
-void run_time_sync_tests() {
+void run_clock_tests() {
   UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
 
   RUN_TEST(test_format_date_epoch_zero);

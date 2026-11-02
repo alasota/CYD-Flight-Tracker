@@ -6,7 +6,7 @@
 void run_core_link_tests();
 void run_perf_stats_tests();
 void run_wifi_manager_tests();
-void run_time_sync_tests();
+void run_clock_tests();
 void run_sun_times_tests();
 void run_geo_tests();
 
@@ -26,7 +26,7 @@ int main(int, char **) {
   if (RUN_MODULE(core_link)) run_core_link_tests();
   if (RUN_MODULE(perf_stats)) run_perf_stats_tests();
   if (RUN_MODULE(wifi_manager)) run_wifi_manager_tests();
-  if (RUN_MODULE(time_sync)) run_time_sync_tests();
+  if (RUN_MODULE(clock)) run_clock_tests();
   if (RUN_MODULE(sun_times)) run_sun_times_tests();
   if (RUN_MODULE(geo)) run_geo_tests();
   return UNITY_END();
