@@ -3,8 +3,8 @@
 // See docs/screens.md "Screen 2 — Flight" and "Flight ETA".
 //
 // Three fixed zones in the content area (LCARS_CONTENT_TOP..BOTTOM, between
-// the header and the bottom nav; exact y values are the k* constants in
-// flight_screen.cpp):
+// the header and the bottom nav; exact y values are the kFlight* constants
+// below):
 //   - identity panel  — text only, no frame (as featured_panel): identity,
 //                       route and stats lines via aircraft_summary
 //   - countdown zone  — giant digits, colour-coded by urgency
@@ -14,13 +14,16 @@
 // (airspace/core/tracked_flight), its two route-endpoint AirportInfos, and a
 // cpa_predictor::CpaPrediction. The between-polls "local ticking" of the
 // countdown is the UI's job (main.cpp) — this module just renders
-// whatever CpaPrediction it's handed.
+// whatever CpaPrediction it's handed. Layout and texts are pure; the
+// LovyanGFX drawing (and the countdown sprite) is
+// display/adapters/lgfx/flight_screen_draw.
 #pragma once
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
+#include "airspace/core/tracked_flight.h"  // AircraftRow
 #include "display/core/screens/aircraft_summary.h"  // RouteFormat + the identity/route formatters
 #include "airspace/core/cpa_predictor.h"     // CpaPrediction
 #include "display/core/i18n.h"              // Language, tr()
@@ -28,16 +31,18 @@
 #include "enrichment/core/route_lookup.h"      // AirportInfo
 #include "display/core/screens/status_bar.h"        // OpenSkyHealth, emptyStateText()
 
-// Forward-declared — same pattern as featured_panel.h / aircraft_summary.h.
-// flight_screen.cpp includes airspace/core/tracked_flight.h for the full
-// definition.
-struct AircraftRow;
-
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
 
 // Fixed zone geometry from docs/screens.md "Screen 2" — absolute y on the
-// 320x240 frame.
+// 320x240 frame; the constants for the drawing, the functions for the tests.
+constexpr int16_t kFlightIdentityTop = LCARS_CONTENT_TOP;  // 18
+constexpr int16_t kFlightIdentityHeight = 70;  // y:18..88 — identity, route, stats lines
+constexpr int16_t kFlightCountdownTop = kFlightIdentityTop + kFlightIdentityHeight + 4;  // 92
+constexpr int16_t kFlightStatusTop = LCARS_CONTENT_BOTTOM - 25;  // 190
+constexpr int16_t kFlightStatusHeight = 25;  // y:190..215 (bottom nav: 215..240)
+constexpr int16_t kFlightCountdownHeight =
+    kFlightStatusTop - 4 - kFlightCountdownTop;  // 94 (y:92..186)
 int16_t flightIdentityTopPx();      // 18
 int16_t flightIdentityHeightPx();   // 70  (18..88): identity, route, stats lines
 int16_t flightCountdownTopPx();     // 92
@@ -78,30 +83,3 @@ struct CountdownDisplay {
 CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang,
                                          bool anyAircraft,
                                          OpenSkyHealth health = OpenSkyHealth::Ok);
-
-// ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme +
-// aircraft_summary. Not covered by Unity (see CLAUDE.md "Testing").
-#ifdef ARDUINO
-
-#include "display/adapters/lgfx/LGFX_CYD.hpp"
-
-// Draws all three zones for a `screenWidth`-px display. `hasNearest` ==
-// false (no aircraft in range) leaves the identity panel empty and forces
-// the countdown/status into their empty state regardless of `cpa`.
-void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
-                      const CpaPrediction &cpa, int16_t screenWidth, OpenSkyHealth health);
-
-// Repaints only the countdown zone + status strip — the 1 Hz
-// tick path (CLAUDE.md "Redraw policy"), leaving the identity panel,
-// header and bottom nav untouched. Renders into an off-screen 8-bit
-// LGFX_Sprite and pushes it in one go so the digits don't flicker; if the
-// sprite can't be allocated (low heap) it falls back to drawing straight
-// to `gfx`. drawFlightScreen() calls this for its lower two zones.
-void drawFlightCountdown(LGFX &gfx, bool hasNearest, const CpaPrediction &cpa,
-                         int16_t screenWidth, OpenSkyHealth health);
-
-// Allocates the countdown sprite now (setup(), before WiFi / net_task) so it
-// doesn't later split the largest free heap block. Safe to call again.
-void flightScreenReserveSprite(int16_t screenWidth);
-
-#endif  // ARDUINO
