@@ -61,14 +61,15 @@
 #include <string>
 #include <vector>
 
+#include "display/adapters/backlight_ldr.h"
 #include "display/adapters/lgfx/LGFX_CYD.hpp"
-#include "display/adapters/touch_xpt2046.h"
-#include "display/adapters/lgfx/lcars_theme_draw.h"
-#include "display/adapters/lgfx/table_view_draw.h"
 #include "display/adapters/lgfx/flight_screen_draw.h"
+#include "display/adapters/lgfx/lcars_theme_draw.h"
 #include "display/adapters/lgfx/radar_view_draw.h"
 #include "display/adapters/lgfx/service_screen_draw.h"
 #include "display/adapters/lgfx/status_bar_draw.h"
+#include "display/adapters/lgfx/table_view_draw.h"
+#include "display/adapters/touch_xpt2046.h"
 #include "display/core/backlight.h"
 #include "admin/adapters/config_portal.h"
 #include "admin/core/config_store.h"
