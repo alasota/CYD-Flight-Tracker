@@ -2,6 +2,8 @@
 
 #include <Arduino.h>  // Serial, ESP.getFreeHeap()
 
+#include "display/adapters/lgfx/aircraft_summary_draw.h"  // drawAircraftSummary()
+
 namespace {
 constexpr int16_t kSideMargin = 10;   // identity panel x:10..(w-10)
 constexpr int16_t kTextInset = 6;     // = aircraft_summary's text margin, so lines align

@@ -12,19 +12,16 @@
 //
 // Zero networking code — draws from an already-enriched AircraftRow plus
 // the two AirportInfo results for its route endpoints (looked up
-// elsewhere, exactly as featured_panel already receives them).
+// elsewhere, exactly as featured_panel already receives them). The texts are
+// pure; the LovyanGFX drawing is display/adapters/lgfx/aircraft_summary_draw.
 #pragma once
 
 #include <string>
 
+#include "airspace/core/tracked_flight.h"   // AircraftRow
 #include "display/core/i18n.h"               // Language
 #include "display/core/text/fit_to_width.h"  // TextMeasure, fitToWidth()
 #include "enrichment/core/route_lookup.h"  // RouteInfo, AirportInfo
-
-// Forward-declared — only a reference to AircraftRow is needed in these
-// signatures. aircraft_summary.cpp includes airspace/core/tracked_flight.h
-// for the full definition. Same pattern as featured_panel.h.
-struct AircraftRow;
 
 // How the origin -> destination line is rendered.
 enum class RouteFormat {
@@ -95,26 +92,3 @@ std::string rowPlaceName(const AircraftRow &row, bool origin, Language lang);
 // "..." / "--" for a loading / missing route, "..." for a loading endpoint.
 std::string formatRowRouteCities(const AircraftRow &row, Language lang, int maxPx,
                                  const TextMeasure &measure);
-
-// ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme. Not
-// covered by Unity (see CLAUDE.md "Testing"). Guarded here in the header
-// too since the signature needs the LGFX device type.
-#ifdef ARDUINO
-
-#include "display/adapters/lgfx/LGFX_CYD.hpp"
-
-// Draws the two-line identity block (identity line + route line) into
-// [x, y, w, h], for Screen 1's featured panel and Screen 2. Uses
-// lcars_theme fonts/colors, no chrome of its own — the caller draws any
-// surrounding panel/frame. The route line uses city names
-// (formatRowRouteCities(), "Warszawa (PL) -> Rzym (IT)").
-void drawAircraftSummary(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, int16_t w,
-                         int16_t h);
-
-// The identity line alone, top-left at (x, y): fitSummaryIdentity() text
-// on the left, the phase icon right-aligned so its right edge sits at
-// `rightX`. Nothing is drawn past `rightX`. Shared by drawAircraftSummary()
-// and featured_panel so both obey the same overflow rule.
-void drawIdentityLine(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, int16_t rightX);
-
-#endif  // ARDUINO
