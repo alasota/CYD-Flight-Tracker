@@ -1,7 +1,9 @@
-// touch_input — touch reading (via LovyanGFX's built-in XPT2046 driver,
-// configured in display/adapters/lgfx/LGFX_CYD.hpp) plus a generic point-in-rectangle hit
+// touch_input — the pure side of touch: a generic point-in-rectangle hit
 // test shared by screen_nav's bottom-nav buttons and table_view's page tap
-// zones. See CLAUDE.md "Hardware" and "Code conventions".
+// zones, and the raw -> screen mapping model the calibration is tested with.
+// Reading the panel (LovyanGFX's built-in XPT2046 driver, configured in
+// display/adapters/lgfx/LGFX_CYD.hpp) is display/adapters/touch_xpt2046.
+// See CLAUDE.md "Hardware" and "Code conventions".
 #pragma once
 
 #include <cstdint>
@@ -42,27 +44,3 @@ struct TouchXY {
 // conversion; this pure copy exists so the native tests can check the
 // calibration constants against raw taps logged on the real board.
 TouchXY mapRawTouch(int32_t rawX, int32_t rawY);
-
-// ---- Hardware adapter: reads touch through the LGFX device. Not covered
-// by Unity (see CLAUDE.md "Testing").
-#ifdef ARDUINO
-
-#include "display/adapters/lgfx/LGFX_CYD.hpp"
-
-// One touch sample, already in screen coordinates (0,0 = top-left, matching
-// the rotation set with tft.setRotation()).
-struct TouchPoint {
-  int16_t x = 0;
-  int16_t y = 0;
-  bool pressed = false;
-  int16_t raw_x = 0;  // LovyanGFX raw readings — for calibration logging
-  int16_t raw_y = 0;
-};
-
-// Polls the touch controller through `gfx` (LovyanGFX getTouch()).
-// Non-blocking — safe to call every loop() iteration. `pressed` is false
-// (x/y meaningless) when nothing is touching the panel. No separate init:
-// tft.init() brings up the touch controller too.
-TouchPoint touchInputRead(LGFX &gfx);
-
-#endif  // ARDUINO
