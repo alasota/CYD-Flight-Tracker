@@ -3,6 +3,7 @@
 #include <Arduino.h>  // Serial, ESP.getFreeHeap()
 
 #include "display/adapters/lgfx/aircraft_summary_draw.h"  // drawAircraftSummary()
+#include "display/adapters/lgfx/lcars_theme_draw.h"
 
 namespace {
 constexpr int16_t kSideMargin = 10;   // identity panel x:10..(w-10)

@@ -1,8 +1,10 @@
 // lcars_theme — shared LCARS-inspired color palette and role colours, the
-// phase-icon pixel art, direction arrow, pill and bottom-nav drawing
-// helpers and font choices. See docs/screens.md "Design language".
-// This is the only place in the project that defines colors/shapes/fonts —
-// every view module calls into this rather than picking its own.
+// phase-icon pixel art, the direction-arrow geometry and the font metrics.
+// See docs/screens.md "Design language". This is the only place in the
+// project that defines colors/shapes/fonts — every view module calls into
+// this rather than picking its own. The fonts themselves and the drawing of
+// icons, arrows, pills and the bottom nav are the LovyanGFX adapter
+// display/adapters/lgfx/lcars_theme_draw.
 #pragma once
 
 #include <cstdint>
@@ -10,7 +12,6 @@
 
 #include "airspace/core/flight_phase.h"  // Phase — for phaseColor() / phaseIconKind()
 #include "display/core/i18n.h"          // Language, tr() — bottom-nav labels
-#include "display/core/text/fit_to_width.h"  // TextMeasure — gfxTextMeasure()
 #include "display/core/touch_input.h"   // Rect — shared tappable-region type
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
@@ -170,54 +171,3 @@ constexpr int16_t LCARS_FONT_TABLE_CHAR_PX = 7;
 
 // Runway strip under the takeoff / landing icons.
 constexpr uint16_t LCARS_RUNWAY_GREY = rgb565(0x80, 0x80, 0x80);
-
-// ---- Hardware adapter: actual drawing, via LovyanGFX. Not covered by
-// Unity (see CLAUDE.md "Testing") — this module is almost entirely draw
-// calls, which is expected for a theme/chrome module. Requires the LGFX
-// device type, so this whole section (unlike other modules' adapters) is
-// guarded in the header too, keeping the palette and pure helpers above
-// free of any ESP32/LovyanGFX dependency for `pio test -e native`.
-#ifdef ARDUINO
-
-#include "display/adapters/lgfx/LGFX_CYD.hpp"
-
-// Fonts used across the project, chosen once here rather than per-view —
-// table_view/radar_view reference these instead of picking their own.
-extern const lgfx::IFont *const LCARS_FONT_HEADING;  // panel/header titles
-extern const lgfx::IFont *const LCARS_FONT_BODY;     // table rows, labels
-extern const lgfx::IFont *const LCARS_FONT_SMALL;    // 10px labels for thin strips (header, column header)
-extern const lgfx::IFont *const LCARS_FONT_TABLE;    // table rows: efont 14px (Polish letters)
-extern const lgfx::IFont *const LCARS_FONT_CLOCK;    // header clock: DejaVu12 (13px line, ASCII digits only)
-
-// Adapter: a TextMeasure that measures with `gfx`'s *current* font/size.
-TextMeasure gfxTextMeasure(lgfx::LovyanGFX &gfx);
-
-// Draws phaseIconRows(kind) centred on (cx, cy), one fastHLine per run of
-// same-coloured pixels. Draws nothing for PhaseIconKind::NONE.
-void drawPhaseIcon(LGFX &gfx, PhaseIconKind kind, int16_t cx, int16_t cy);
-
-// Fills directionArrow(bearingDeg, cx, cy, size) in `color` — the "where to
-// look" arrow next to distances (featured panel, Screen 2).
-void drawDirectionArrow(LGFX &gfx, float bearingDeg, int16_t cx, int16_t cy, int16_t size,
-                        uint16_t color);
-
-// Pill-shaped button/label: a fully rounded rectangle (corner radius =
-// h/2) with text centered inside. Used for the stat pills.
-void drawPillButton(LGFX &gfx, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t fillColor,
-                     uint16_t textColor, const char *text);
-
-// The persistent bottom navigation bar (present on all three screens -
-// docs/screens.md "Screen navigation"): `kScreenCount` equal-width segments, the
-// active one highlighted. Segment geometry comes straight from
-// screen_nav's bottomNavSegment(), so the drawn indicators line up exactly
-// with navHitTest()'s JumpTo hit zones. Drawn as folder tabs hanging from a
-// peach rule along the bar's top edge (geometry: screen_nav's navTabRule() /
-// navTabRect()): the active tab is peach, full height, merged into the rule,
-// black label; inactive tabs are recessed (dark fill, lavender outline and
-// label, a few px lower). Square top corners, rounded bottom ones. Labels
-// from `labelFor(index, i18nLanguage())` in LCARS_FONT_BODY. Repaints its
-// own strip first, so it's safe to call every frame.
-void drawBottomNav(LGFX &gfx, int activeIndex, int16_t screenWidth, int16_t screenHeight,
-                   const char *(*labelFor)(int screenIndex, Language lang));
-
-#endif  // ARDUINO

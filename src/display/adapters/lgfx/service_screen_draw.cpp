@@ -5,7 +5,7 @@
 #include "admin/core/firmware/release_check.h"  // kUpdatePromptTimeoutMs
 #include "display/core/i18n.h"
 #include "display/core/text/fit_to_width.h"
-#include "display/core/theme/lcars_theme.h"
+#include "display/adapters/lgfx/lcars_theme_draw.h"
 
 namespace {
 

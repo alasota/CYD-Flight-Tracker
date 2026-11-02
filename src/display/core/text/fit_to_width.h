@@ -10,7 +10,7 @@
 #include <string>
 
 // Rendered pixel width of a string in whatever font is current. On the
-// device this wraps gfx.textWidth() (lcars_theme's gfxTextMeasure()); tests
+// device this wraps gfx.textWidth() (lcars_theme_draw's gfxTextMeasure()); tests
 // pass a fixed-pitch fake.
 using TextMeasure = std::function<int(const std::string &)>;
 

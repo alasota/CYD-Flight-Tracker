@@ -1,6 +1,6 @@
 #include "display/adapters/lgfx/status_bar_draw.h"
 
-#include "display/core/theme/lcars_theme.h"  // palette, fonts
+#include "display/adapters/lgfx/lcars_theme_draw.h"  // palette, fonts
 
 void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, OpenSkyHealth health,
                    AlertSeverity badge, std::time_t localEpoch, bool timeSynced,

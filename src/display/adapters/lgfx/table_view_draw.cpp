@@ -3,6 +3,7 @@
 #include <string>
 
 #include "display/adapters/lgfx/featured_panel_draw.h"  // drawFeaturedPanel()
+#include "display/adapters/lgfx/lcars_theme_draw.h"
 #include "display/core/text/fit_to_width.h"
 
 namespace {
