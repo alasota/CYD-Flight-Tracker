@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <string>
 
+#include "admin/core/firmware/ota_update.h"  // OtaObserver
+
 // Parsed OpenSky OAuth client credentials from the JSON file OpenSky's
 // account page generates for download: {"clientId":"...","clientSecret":
 // "..."}.
@@ -100,16 +102,9 @@ struct ScreenshotSource {
 };
 void configPortalSetScreenshotSource(const ScreenshotSource &source);
 
-// POST /update (firmware over WiFi, ota_update) reports what it's doing so
-// the display can show it — this module draws nothing. All callbacks run
-// inside configPortalLoop() on the network core (the upload is handled there
-// in one go); net_task turns them into OtaProgress for the UI. `newVersion`
-// is "" until the firmware marker has been seen.
-struct OtaObserver {
-  void (*onStart)(size_t totalOrZero) = nullptr;
-  void (*onProgress)(size_t written, size_t totalOrZero, const char *newVersion) = nullptr;
-  void (*onEnd)(bool ok) = nullptr;  // ok: the board restarts ~1.5 s later
-};
+// POST /update (firmware over WiFi, ota_update) reports through this
+// OtaObserver; its callbacks run inside configPortalLoop() (the upload is
+// handled there in one go).
 void configPortalSetOtaObserver(const OtaObserver &observer);
 
 // True between a successful update and the restart it triggers — net_task

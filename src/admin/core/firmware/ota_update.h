@@ -175,11 +175,22 @@ bool shouldMarkAppValid(bool pendingVerify, uint32_t uptimeMs, bool reachable, b
 // after kOtaValidAfterMs (the UI gets a fair start) and never once valid.
 bool shouldRestartForRollback(bool pendingVerify, uint32_t uptimeMs, bool uiAlive);
 
-#ifdef ARDUINO
+// Both updaters (the config page's POST /update, release_check's download)
+// report what they're doing so the display can show it — neither draws
+// anything. The callbacks run on the network core; net_task turns them into
+// OtaProgress for the UI. `newVersion` is "" until the firmware marker has
+// been seen.
+struct OtaObserver {
+  void (*onStart)(size_t totalOrZero) = nullptr;
+  void (*onProgress)(size_t written, size_t totalOrZero, const char *newVersion) = nullptr;
+  void (*onEnd)(bool ok) = nullptr;  // ok: the board restarts ~1.5 s later
+};
+
+// ---- Device side (defined in admin/adapters/ota_flash.cpp) -----------------
+
 // The one session that writes to the spare app slot (arduino-esp32 Update +
 // mbedTLS SHA-256), shared by the config page's POST /update and
 // release_check's download — so two updates can never run at once.
 OtaSession &otaFlashSession();
 // Update.errorString() of the last failed write / verify.
 const char *otaFlashError();
-#endif

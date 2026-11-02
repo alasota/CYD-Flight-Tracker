@@ -11,8 +11,8 @@
 //
 // The logic (versions, picking the file, parsing GitHub's answers, allowed
 // hosts, schedule, when to ask) is pure and tested under `pio test -e
-// native`; the HTTPS check + download below the ARDUINO guard is the thin
-// adapter (WiFiClientSecure with the CA roots of github_ca.h).
+// native`; the HTTPS check + download is the thin adapter
+// admin/adapters/github_http (WiFiClientSecure with the CA roots of github_ca.h).
 #pragma once
 
 #include <ArduinoJson.h>
@@ -21,7 +21,7 @@
 #include <ctime>
 #include <string>
 
-#include "admin/core/firmware/ota_update.h"  // OtaResult
+#include "admin/core/firmware/ota_update.h"  // OtaResult, OtaObserver
 #include "admin/core/web_i18n.h"    // WebStr
 
 // The repository updates come from — fixed in the firmware (a fork sets
@@ -228,10 +228,9 @@ bool acceptPromptTap(bool releasedSinceShown, uint32_t msSinceShown);
 // v1.4.0-rc.1 in the development channel.
 UpdateState updateDemoState(bool withPrerelease);
 
-#ifdef ARDUINO
+// ---- Device side (defined in admin/adapters/github_http.cpp) ---------------
 
-#include "admin/adapters/config_portal.h"  // OtaObserver
-#include "admin/core/config_store.h"   // Config
+struct Config;  // config_store.h
 
 // Takes the settings (call again after they change).
 void releaseCheckBegin(const Config &cfg);
@@ -251,5 +250,3 @@ bool releaseInstallRequest(const std::string &tag);
 bool releaseInstallPending();
 const UpdateState &releaseUpdateState();
 void releaseSetOtaObserver(const OtaObserver &observer);
-
-#endif  // ARDUINO
