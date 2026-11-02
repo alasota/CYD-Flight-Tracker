@@ -6,22 +6,19 @@
 //
 // Zero networking code — draws from an already-enriched AircraftRow
 // (airspace/core/tracked_flight) plus the two AirportInfo results for its route's
-// endpoints, looked up separately for only the one featured row.
+// endpoints, looked up separately for only the one featured row. The pill
+// texts are pure; the LovyanGFX drawing is display/adapters/lgfx/featured_panel_draw.
 #pragma once
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
+#include "airspace/core/tracked_flight.h"  // AircraftRow
 #include "display/core/screens/aircraft_summary.h"  // RouteFormat, the identity/route formatters
 #include "display/core/theme/lcars_theme.h"
 #include "enrichment/core/route_lookup.h"  // AirportInfo
 #include "display/core/screens/status_bar.h"    // OpenSkyHealth, emptyStateText()
-
-// Forward-declared — only references are needed here. featured_panel.cpp
-// includes airspace/core/tracked_flight.h for the full definition. Same
-// pattern as aircraft_summary.h.
-struct AircraftRow;
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
@@ -29,6 +26,8 @@ struct AircraftRow;
 // Fixed vertical bounds of the featured panel on the 320x240 frame, per
 // docs/screens.md "Screen 1" (featured flight section, y:18..95).
 // table_view starts its table section immediately below.
+constexpr int16_t kFeaturedPanelTop = LCARS_CONTENT_TOP;  // 18
+constexpr int16_t kFeaturedPanelHeight = 77;  // y:18..95 per docs/screens.md "Screen 1"
 int16_t featuredPanelTopPx();     // 18
 int16_t featuredPanelHeightPx();  // 77 (18..95)
 
@@ -38,23 +37,3 @@ int16_t featuredPanelHeightPx();  // 77 (18..95)
 // and "0m" / "1m/s" read like a bug — the first pill is drawn double-width).
 // A missing value is "--", never a fake 0. Pure — native-tested.
 std::vector<std::string> featuredPillTexts(const AircraftRow &row, Language lang);
-
-// ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme +
-// aircraft_summary. Not covered by Unity (see CLAUDE.md "Testing").
-// Guarded here in the header too since these signatures need the LGFX
-// device type.
-#ifdef ARDUINO
-
-#include "display/adapters/lgfx/LGFX_CYD.hpp"
-
-// Draws the featured panel for `row` across a `screenWidth`-px display, at
-// the fixed y:18..95 bounds (no frame): the identity line + "WAW (PL) ->
-// FCO (IT)" route line (RouteFormat::WithCountry, airports from the row),
-// and the stat pills from featuredPillTexts().
-void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, int16_t screenWidth);
-
-// Draws the empty placeholder in the same bounds: "no aircraft in range",
-// or why there is no data (emptyStateText(health)).
-void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth, OpenSkyHealth health);
-
-#endif  // ARDUINO

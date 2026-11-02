@@ -4,7 +4,8 @@
 // lcars_theme for all chrome (panels/pills/fonts/colors) — defines none of
 // its own. Zero networking code: it takes the AircraftRow list
 // (airspace/core/tracked_flight, built by poll_pipeline) as plain data and
-// only draws.
+// only draws. Layout and cell texts are pure; the LovyanGFX drawing is
+// display/adapters/lgfx/table_view_draw.
 #pragma once
 
 #include <cstdint>
@@ -31,7 +32,7 @@ constexpr int kTableRowsPerPage = 5;
 // in sync with these instead of hardcoding their own copies — see
 // docs/review-notes-2026.md 5.5.
 int tableRowsPerPage();   // kTableRowsPerPage (5)
-int16_t tableRowHeightPx();  // the row step (kRowStep in table_view.cpp)
+int16_t tableRowHeightPx();  // the row step (kTableRowStep)
 int16_t tableFirstRowY();    // 116 — y of the first data row
 
 // One table column — the single source of truth shared by the lilac
@@ -59,8 +60,22 @@ constexpr int16_t kTableHeaderLabelPadPx = 4;
 // (LCARS_FONT_TABLE_HEIGHT_PX).
 constexpr int16_t kTableHeaderHeightPx = 15;
 
+// Fixed layout from docs/screens.md "Screen 1", below the featured panel
+// (y:18..95). The cyan LOTY/FLIGHTS sub-header strip was removed on request;
+// the space went to roomier rows.
+constexpr int16_t kTableColHeaderY = 98;  // lilac column-header bar, y:98..113
+constexpr int16_t kTableFirstRowY = 116;  // rows at 116,133,150,167,184 (last ends y:201)
+constexpr int16_t kTableRowStep = 17;     // LCARS_FONT_TABLE (14px) + gap; must end by 215
+static_assert(kTableFirstRowY + kTableRowsPerPage * kTableRowStep <= LCARS_CONTENT_BOTTOM,
+              "table rows must end above the bottom nav");
+
 // The 6 columns, in order: LOT/FLIGHT, ODL./DIST, SKĄD/FROM, DOKĄD/TO,
-// TYP/TYPE, FAZA/PHASE.
+// TYP/TYPE, FAZA/PHASE — defined once in table_view.cpp (one copy in flash for
+// the header row and the data rows), indexed by TableColumnIndex.
+extern const TableColumn kTableColumns[kTableColumnCount];
+enum TableColumnIndex {
+  kTableColFlight, kTableColDistance, kTableColOrigin, kTableColDest, kTableColType, kTableColPhase
+};
 const TableColumn *tableColumns();
 
 // Pixel width available to a cell's text — what fitToWidth() cuts it to.
@@ -87,33 +102,3 @@ int getPageCount(int totalRows, int rowsPerPage);
 // nothing back. Pure — no TFT dependency.
 std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int page,
                                        int rowsPerPage);
-
-// ---- Hardware adapter: actual drawing, via LovyanGFX + lcars_theme +
-// featured_panel. Not covered by Unity (see CLAUDE.md "Testing"). Guarded
-// here in the header too (like lcars_theme/featured_panel) since its
-// signature needs the LGFX device type.
-#ifdef ARDUINO
-
-#include "display/adapters/lgfx/LGFX_CYD.hpp"
-
-// Draws Screen 1's content area (LCARS_CONTENT_TOP..BOTTOM) across a
-// `screenWidth`-px display, at the fixed coordinates docs/screens.md "Screen 1"
-// specifies (kColHeaderY / kFirstRowY / kRowStep in table_view.cpp):
-//   - featured_panel for the first aircraft in `rows` (or its "no aircraft
-//     in range" placeholder if `rows` is empty);
-//   - a lilac (THEME_TABLE_HEADER) column-header row, labels aligned to
-//     the columns (tableColumns());
-//   - exactly kTableRowsPerPage (5) data rows — flight, distance, origin
-//     IATA, destination IATA, aircraft type, phase icon — for everyone
-//     *except* the featured aircraft.
-// `rows` must already be annotated (annotateDistances()), classified
-// (classifyPhases()), and sorted (sortRowsByDistance()).
-// `page` is
-// 0-based over the *rest* of the list (the featured row is never repeated
-// in the table); an out-of-range page draws no data rows. Which page is
-// current, and reacting to touch, is main.cpp's job — this only lays out
-// whichever page it's told to draw.
-void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t screenWidth,
-                   int page, OpenSkyHealth health);
-
-#endif  // ARDUINO
