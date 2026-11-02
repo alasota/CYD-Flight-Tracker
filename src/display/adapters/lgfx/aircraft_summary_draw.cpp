@@ -1,6 +1,6 @@
 #include "display/adapters/lgfx/aircraft_summary_draw.h"
 
-#include "display/core/theme/lcars_theme.h"
+#include "display/adapters/lgfx/lcars_theme_draw.h"
 
 namespace {
 constexpr int16_t kTextMargin = 6;

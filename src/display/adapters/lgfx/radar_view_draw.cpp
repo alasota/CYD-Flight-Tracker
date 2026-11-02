@@ -6,7 +6,7 @@
 #include "display/core/screens/aircraft_summary.h"
 #include "display/core/screens/status_bar.h"  // emptyStateText()
 #include "display/core/text/fit_to_width.h"
-#include "display/core/theme/lcars_theme.h"
+#include "display/adapters/lgfx/lcars_theme_draw.h"
 
 namespace {
 

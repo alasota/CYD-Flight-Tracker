@@ -62,6 +62,7 @@
 #include <vector>
 
 #include "display/adapters/lgfx/LGFX_CYD.hpp"
+#include "display/adapters/lgfx/lcars_theme_draw.h"
 #include "display/adapters/lgfx/table_view_draw.h"
 #include "display/adapters/lgfx/flight_screen_draw.h"
 #include "display/adapters/lgfx/radar_view_draw.h"

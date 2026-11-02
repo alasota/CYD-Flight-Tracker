@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "display/adapters/lgfx/aircraft_summary_draw.h"  // drawIdentityLine()
+#include "display/adapters/lgfx/lcars_theme_draw.h"
 
 namespace {
 constexpr int16_t kSideMargin = 4;     // panel inset from the screen edges
