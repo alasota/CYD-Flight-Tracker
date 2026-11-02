@@ -5,7 +5,9 @@
 // Split per CLAUDE.md "Testing": the sensor filter, the light -> brightness
 // curve, the night decision, touch wake-up and "may we poll OpenSky" are
 // pure and run under `pio test -e native`; backlightBegin() / backlightLoop()
-// (ADC + tft.setBrightness) are the thin device adapter.
+// (ADC + tft.setBrightness) are the thin device adapter
+// display/adapters/backlight_ldr, which also implements the three
+// state accessors declared at the end of this header.
 #pragma once
 
 #include <cstdint>
@@ -149,22 +151,13 @@ struct BacklightStatus {
 // ("sunrise"/"sunset" "" when unknown or polar; "sun":"normal"/"polar_day"/"polar_night"/"").
 std::string lightStatusJson(const BacklightStatus &s);
 
-#ifdef ARDUINO
+// ---- Device state (defined in display/adapters/backlight_ldr.cpp) ---------
 
-class LGFX;
 struct Config;
 
-// After tft.init(): ADC attenuation, backlight to full.
-void backlightBegin(LGFX &tft);
-// Every loop(): samples the sensor, decides, ramps the PWM.
-void backlightLoop(LGFX &tft, const Config &cfg, bool serviceScreen);
-// A service screen (OTA progress...) is about to be drawn from outside
-// loop(): full brightness now.
-void backlightFullNow(LGFX &tft);
+// The last backlightLoop() decision (UI core).
 const BacklightDecision &backlightDecision();
 // A new touch: true = swallowed (it only woke a dark screen).
 bool backlightHandleTouch(const Config &cfg);
 // Safe from either core: a copy taken at the end of the last backlightLoop().
 BacklightStatus backlightStatus(const Config &cfg);
-
-#endif  // ARDUINO
