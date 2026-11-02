@@ -119,8 +119,9 @@ void routeLookupClearCacheForTesting();
 void airportLookupClearCacheForTesting();
 
 // --- Hardware adapters: the real hexdb.io GET requests, i.e. the
-// lookup*WithFetcher() functions above wired to actual HTTP fetches. Thin
-// wrappers around WiFiClientSecure/HTTPClient — not covered by Unity (see
-// CLAUDE.md "Testing"). These are what production callers use.
+// lookup*WithFetcher() functions above wired to actual HTTP fetches
+// (hexdb_http). Defined in enrichment/adapters/hexdb_sources.cpp — not
+// covered by Unity (see CLAUDE.md "Testing"). These are what production
+// callers use.
 RouteInfo lookupRoute(const std::string &callsign);
 AirportInfo lookupAirportCountry(const std::string &icao_code);

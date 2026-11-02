@@ -16,6 +16,10 @@ struct AircraftInfo {
   std::string aircraft_type;  // hexdb.io "Type", e.g. "A319 111" / "737MAX 8"
   std::string icao_type;      // hexdb.io "ICAOTypeCode", e.g. "A319" / "B38M"
   std::string registration;   // hexdb.io "Registration"
+
+  // Defined (= default) in aircraft_lookup.cpp, not inline: four strings to
+  // construct, and inlining that into every function that makes one costs flash.
+  AircraftInfo();
 };
 
 // Hard ceiling on how large a hexdb.io response body
@@ -95,7 +99,7 @@ size_t aircraftLookupCacheSize();
 void aircraftLookupClearCacheForTesting();
 
 // --- Hardware adapter: the real hexdb.io GET request, i.e.
-// lookupAircraftWithFetcher() wired to an actual HTTP fetch. Thin wrapper
-// around WiFiClientSecure/HTTPClient — not covered by Unity (see CLAUDE.md
-// "Testing"). This is what production callers use.
+// lookupAircraftWithFetcher() wired to an actual HTTP fetch (hexdb_http).
+// Defined in enrichment/adapters/hexdb_sources.cpp — not covered by Unity
+// (see CLAUDE.md "Testing"). This is what production callers use.
 AircraftInfo lookupAircraft(const std::string &icao24);
