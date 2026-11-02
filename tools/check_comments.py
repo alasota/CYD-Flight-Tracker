@@ -45,7 +45,7 @@ NET_MODULES = {
     "net_task", "wifi_manager", "config_portal", "config_store", "opensky_client",
     "opensky_auth", "opensky_quota", "aircraft_lookup", "route_lookup", "lookup_store",
     "lookup_budget", "lookup_cache", "hexdb_http", "poll_pipeline", "release_check",
-    "ota_update",
+    "ota_update", "hexdb_sources", "lookup_store_nvs", "opensky_http",
 }
 
 SOURCE_SUFFIXES = {".h", ".hpp", ".c", ".cpp"}

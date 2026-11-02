@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include <ArduinoJson.h>
+
 #include "airspace/core/aircraft_state.h"  // Aircraft — what parseStatesResponse() returns
 #include "opensky/core/opensky_auth.h"   // OpenSkyAuthState — openSkyAuthStatus()
 #include "opensky/core/opensky_quota.h"  // OpenSkyQuota — openSkyQuota()
@@ -90,6 +92,12 @@ constexpr size_t kMaxStatesResponseBytes = 65536;  // 64 KB
 // (-> empty result) without being parsed. Pure — uses ArduinoJson but no HTTP dependency.
 std::vector<Aircraft> parseStatesResponse(const std::string &json);
 
+// The field mapping behind parseStatesResponse(): OpenSky's "states" array (an
+// array of state vectors) -> Aircraft records, same rules as above. The device
+// parses /states/all from the HTTP stream and calls this on doc["states"], so
+// the mapping lives in exactly one place. Pure.
+std::vector<Aircraft> extractAircraftFromStates(JsonArrayConst states);
+
 // Backoff duration after a 429, per docs/data-sources.md "Rate limits": the
 // X-Rate-Limit-Retry-After-Seconds header value if present and a valid
 // non-negative integer, otherwise `default_backoff_s`. The result is
@@ -123,8 +131,9 @@ struct OpenSkyPollResult {
 };
 
 // --- Hardware adapter: OAuth token fetch, /states/all HTTP call, 401 retry
-// and 429 backoff. Thin wrapper around WiFiClientSecure/HTTPClient — not
-// covered by Unity (see CLAUDE.md "Testing"). No TFT/drawing code.
+// and 429 backoff, defined in opensky/adapters/opensky_http.cpp. Thin wrapper
+// around WiFiClientSecure/HTTPClient — not covered by Unity (see CLAUDE.md
+// "Testing"). No TFT/drawing code.
 struct Config;  // config_store.h — full type only needed by the .cpp
 
 // Fetches aircraft currently in the bounding box around the configured

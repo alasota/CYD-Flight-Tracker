@@ -1,7 +1,10 @@
 // opensky_client: bbox, credits, token timing, /states/all parsing. docs/data-sources.md "OpenSky".
 #include <unity.h>
 
+#include <ArduinoJson.h>
+
 #include "opensky/core/opensky_client.h"
+#include "test_support.h"
 
 namespace {
 
@@ -164,6 +167,53 @@ static void test_parse_states_response_valid(void) {
   TEST_ASSERT_EQUAL_FLOAT(19.9449f, a2.lon);
   TEST_ASSERT_FALSE(a2.on_ground);
   TEST_ASSERT_EQUAL_FLOAT(-1.2f, a2.vertical_rate);
+}
+
+// The device parses /states/all from the HTTP stream into a JsonDocument and
+// hands doc["states"] to extractAircraftFromStates(); the tests go through
+// parseStatesResponse(). Both must map the fields identically.
+static void test_extract_aircraft_from_states_matches_parse_states_response(void) {
+  const char *body =
+      "{\"time\":1700000000,\"states\":["
+      "[\"4b1814\",\"SWR12   \",\"Switzerland\",1700000000,1700000000,8.5491,47.4582,"
+      "11277.6,false,236.1,271.3,-3.25,null,11300.0,\"1000\",false,0],"
+      "[\"48ae21\",\"LOT3TU  \",\"Poland\",1700000000,1700000000,20.9671,52.1657,"
+      "null,true,4.2,183.0,null,null,null,null,false,0]"
+      "]}";
+
+  JsonDocument doc;
+  TEST_ASSERT_TRUE(deserializeJson(doc, body) == DeserializationError::Ok);
+  const std::vector<Aircraft> streamed =
+      extractAircraftFromStates(doc["states"].as<JsonArrayConst>());
+  const std::vector<Aircraft> parsed = parseStatesResponse(body);
+
+  TEST_ASSERT_EQUAL_size_t(2, streamed.size());
+  TEST_ASSERT_EQUAL_size_t(parsed.size(), streamed.size());
+  ASSERT_STR_EQ("SWR12", streamed[0].callsign);  // trailing spaces trimmed
+  ASSERT_STR_EQ("LOT3TU", streamed[1].callsign);
+  for (size_t i = 0; i < streamed.size(); ++i) {
+    const Aircraft &s = streamed[i];
+    const Aircraft &p = parsed[i];
+    ASSERT_STR_EQ(p.icao24, s.icao24);
+    ASSERT_STR_EQ(p.callsign, s.callsign);
+    TEST_ASSERT_EQUAL(p.has_position, s.has_position);
+    TEST_ASSERT_EQUAL_FLOAT(p.lat, s.lat);
+    TEST_ASSERT_EQUAL_FLOAT(p.lon, s.lon);
+    TEST_ASSERT_EQUAL(p.has_altitude, s.has_altitude);
+    TEST_ASSERT_EQUAL_FLOAT(p.baro_altitude, s.baro_altitude);
+    TEST_ASSERT_EQUAL(p.on_ground, s.on_ground);
+    TEST_ASSERT_EQUAL(p.has_velocity, s.has_velocity);
+    TEST_ASSERT_EQUAL_FLOAT(p.velocity, s.velocity);
+    TEST_ASSERT_EQUAL_FLOAT(p.true_track, s.true_track);
+    TEST_ASSERT_EQUAL_FLOAT(p.vertical_rate, s.vertical_rate);
+  }
+  // The values themselves, so "both wrong the same way" can't pass.
+  TEST_ASSERT_EQUAL_FLOAT(47.4582f, streamed[0].lat);
+  TEST_ASSERT_EQUAL_FLOAT(11277.6f, streamed[0].baro_altitude);
+  TEST_ASSERT_EQUAL_FLOAT(-3.25f, streamed[0].vertical_rate);
+  TEST_ASSERT_FALSE(streamed[0].on_ground);
+  TEST_ASSERT_TRUE(streamed[1].on_ground);
+  TEST_ASSERT_FALSE(streamed[1].has_altitude);
 }
 
 static void test_parse_states_response_skips_vectors_missing_vertical_rate(void) {
@@ -349,6 +399,7 @@ void run_opensky_client_tests() {
   RUN_TEST(test_is_before_deadline_survives_millis_rollover);
 
   RUN_TEST(test_parse_states_response_valid);
+  RUN_TEST(test_extract_aircraft_from_states_matches_parse_states_response);
   RUN_TEST(test_parse_states_response_missing_states_key);
   RUN_TEST(test_parse_states_response_null_states);
   RUN_TEST(test_parse_states_response_empty_states);
