@@ -11,41 +11,6 @@
 
 #include "admin/core/firmware/ota_update.h"  // OtaObserver
 
-// Parsed OpenSky OAuth client credentials from the JSON file OpenSky's
-// account page generates for download: {"clientId":"...","clientSecret":
-// "..."}.
-struct OpenSkyCredentials {
-  bool ok = false;  // true only if both fields were present and non-empty
-  std::string client_id;
-  std::string client_secret;
-};
-
-// Hard ceiling on how large a credentials JSON body
-// parseOpenSkyCredentialsJson() will attempt to parse — matches the config
-// page's own upload size cap, but enforced here too so the function is
-// self-defending regardless of caller (see docs/review-notes-2026.md 4.3).
-constexpr size_t kMaxCredentialsJsonBytes = 4096;
-
-// Parses that JSON file's contents (uploaded via the config page — see
-// below). A body over kMaxCredentialsJsonBytes is rejected outright
-// without being parsed. Pure — uses ArduinoJson but no WebServer/hardware
-// dependency — tested under `pio test -e native`.
-OpenSkyCredentials parseOpenSkyCredentialsJson(const std::string &json);
-
-// True if `s` parses entirely as a valid (base-10) floating point number —
-// no trailing garbage, not empty (leading whitespace is tolerated, same as
-// strtof()). Used by the config form to reject malformed lat/lon/radius
-// input instead of silently treating it as 0, which sanitizeConfig would
-// then just clamp up to a "valid-looking" value with no feedback to the
-// user — see docs/review-notes-2026.md 1.6. Pure — tested under
-// `pio test -e native`.
-bool isValidFloatString(const std::string &s);
-
-// True if `s` is a valid non-negative base-10 integer (digits only, at
-// least one digit) — same idea as isValidFloatString(), for the
-// poll-interval field.
-bool isValidUnsignedIntString(const std::string &s);
-
 // --- Hardware adapter: serves the local config web page at cyd-sky.local
 // (mDNS) with a form for lat/lon/radius/poll_interval/auto_cycle_enabled/
 // auto_cycle_interval_s/OpenSky credentials,
@@ -53,8 +18,8 @@ bool isValidUnsignedIntString(const std::string &s);
 // live in the browser (client-side JS mirroring scan_area's openSkyCreditCost())
 // as the user types, no round trip needed. A second form lets the user
 // upload OpenSky's credentials JSON file directly instead of copy-pasting
-// clientId/clientSecret by hand (parsed via parseOpenSkyCredentialsJson()
-// above). Thin wrapper around WebServer/ESPmDNS — not covered by Unity (see
+// clientId/clientSecret by hand (parsed by settings_form's
+// parseOpenSkyCredentialsJson()). Thin wrapper around WebServer/ESPmDNS — not covered by Unity (see
 // CLAUDE.md "Testing").
 
 // Starts the mDNS responder ("cyd-sky.local") and the config web server.
