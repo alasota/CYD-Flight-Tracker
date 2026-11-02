@@ -46,7 +46,7 @@ NET_MODULES = {
     "opensky_auth", "opensky_quota", "aircraft_lookup", "route_lookup", "lookup_store",
     "lookup_budget", "lookup_cache", "hexdb_http", "poll_pipeline", "release_check",
     "ota_update", "hexdb_sources", "lookup_store_nvs", "opensky_http", "github_http",
-    "ota_flash",
+    "ota_flash", "settings_nvs", "alert_sources",
 }
 
 SOURCE_SUFFIXES = {".h", ".hpp", ".c", ".cpp"}

@@ -4,8 +4,8 @@
 //
 // Split in two per CLAUDE.md "Testing": the struct + pure validation/default
 // helpers below have no hardware dependency and run under `pio test -e
-// native`; loadConfig()/saveConfig() are the thin Preferences adapter and
-// are only compiled for the ARDUINO (device) build.
+// native`; loadConfig()/saveConfig() are the thin Preferences adapter
+// admin/adapters/settings_nvs, compiled only for the device.
 #pragma once
 
 #include <cstdint>
