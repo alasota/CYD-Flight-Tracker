@@ -10,7 +10,7 @@
 //     wrong and what to do, CLOSE with a 15 s countdown (spec 08 §3.5).
 //
 // Geometry and text are pure (tested under `pio test -e native`); the draw
-// calls below the ARDUINO guard are the thin LovyanGFX adapter.
+// calls are the thin LovyanGFX adapter display/adapters/lgfx/service_screen_draw.
 #pragma once
 
 #include <cstddef>
@@ -98,34 +98,3 @@ AlertScreenStepResult alertScreenStep(const AlertScreen &s, const AlertScreenInp
 
 // "ZAMKNIJ  15 s" / "CLOSE  15 s".
 std::string alertCloseLabel(uint32_t secondsLeft, Language lang);
-
-#ifdef ARDUINO
-
-#include "display/adapters/lgfx/LGFX_CYD.hpp"
-
-// Clears the screen and draws the static part of the update screen; the
-// title says "downloading from GitHub" for release_check's installs.
-void drawOtaScreen(LGFX &gfx, const std::string &fromVersion, bool fromGithub = false);
-// Repaints only the version line, bar and percent.
-void drawOtaProgress(LGFX &gfx, const std::string &fromVersion, const std::string &toVersion,
-                     size_t written, size_t total);
-// "DONE · RESTARTING…" or "UPDATE FAILED" in place of the progress text.
-void drawOtaResult(LGFX &gfx, bool ok);
-
-void drawResetHoldScreen(LGFX &gfx);
-void drawResetHoldProgress(LGFX &gfx, uint32_t heldMs);
-void drawResetConfirmScreen(LGFX &gfx);
-void drawResetDoneScreen(LGFX &gfx);
-
-// The update question, and the strip under the buttons that runs out as
-// `remainingMs` of kUpdatePromptTimeoutMs pass.
-void drawUpdatePromptScreen(LGFX &gfx, const std::string &fromVersion, const std::string &toVersion);
-void drawUpdatePromptTimer(LGFX &gfx, uint32_t remainingMs);
-
-// The alert message screen (full screen), and only its CLOSE button with the
-// countdown (the 1 Hz repaint). `nowMs` dates the quota's renewal time.
-void drawAlertScreen(LGFX &gfx, AlertSet alerts, const AlertDetails &details, uint32_t nowMs,
-                     uint32_t secondsLeft);
-void drawAlertCloseButton(LGFX &gfx, int count, uint32_t secondsLeft);
-
-#endif  // ARDUINO
