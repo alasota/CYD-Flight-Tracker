@@ -42,7 +42,7 @@ REMOVED_SYMBOLS = [
 # Modules (file stems in src/) whose code runs in net_task on core 0. A comment in one of them
 # that says main.cpp / loopTask does the work is describing the pre-spec-04 single loop().
 NET_MODULES = {
-    "net_task", "wifi_manager", "config_portal", "config_store", "opensky_client",
+    "net_task", "wifi_manager", "web_server", "config_store", "opensky_client",
     "opensky_auth", "opensky_quota", "aircraft_lookup", "route_lookup", "lookup_store",
     "lookup_budget", "lookup_cache", "hexdb_http", "poll_pipeline", "release_check",
     "ota_update", "hexdb_sources", "lookup_store_nvs", "opensky_http", "github_http",

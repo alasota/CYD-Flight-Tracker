@@ -1,4 +1,4 @@
-// config_page: config page HTML, tabs, credits readouts, OpenSky login state (spec 06). CLAUDE.md "Code conventions" (config_portal / config_page).
+// config_page: config page HTML, tabs, credits readouts, OpenSky login state (spec 06). CLAUDE.md "Code conventions" (web_server / config_page).
 #include <unity.h>
 
 #include <cstdio>

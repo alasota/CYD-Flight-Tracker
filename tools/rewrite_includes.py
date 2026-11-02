@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Move src/ files to their spec 12 folders and give every #include a full path from src/
-(spec 12, stages 1-2).
+(spec 12, stages 1, 2 and 4).
 
   python tools/rewrite_includes.py [--move] [--check] [--root DIR]
 
@@ -8,17 +8,19 @@
             path (creates the folders, skips the ones already moved, removes emptied folders).
             Nothing else.
   (default) rewrite, in src/ and test/, every #include "X" whose X isn't a full path from src/
-            to the full path of the src/ header with X's file name. <…> includes, headers from
-            test/support/ or include/ and test-local headers have no src/ header of that name
-            and stay as they are. Line endings and trailing comments are kept.
+            to the full path of the src/ header with X's file name - or, for a header a stage
+            renamed, with its old file name. <…> includes, headers from test/support/ or
+            include/ and test-local headers have no src/ header of that name and stay as they
+            are. Line endings and trailing comments are kept.
   --check   only report: exit 1 if the rewrite would change a file, write nothing.
 
 Two src/ headers with the same file name make the short form ambiguous: the script stops with
-both paths and writes nothing. One move table per stage (MOVES_STAGE_1: flat src/ into
-<context>/<layer>/; MOVES_STAGE_2: layers renamed to core / services, roots into main/), kept
-side by side so final_path() can follow a file from stage 0 to today. A later stage that moves
-files adds its table to STAGES. Stage 4 moved two headers from include/ by hand (git mv); the
-default rewrite fixed their includes.
+both paths and writes nothing; so does a renamed header's old file name that another live header
+still has. One move table per stage (MOVES_STAGE_1: flat src/ into <context>/<layer>/;
+MOVES_STAGE_2: layers renamed to core / services, roots into main/; MOVES_STAGE_4: config_portal
+renamed web_server), kept side by side so final_path() can follow a file from stage 0 to today.
+A later stage that moves files adds its table to STAGES. Stage 4 also moved two headers from
+include/ by hand (git mv); the default rewrite fixed their includes.
 """
 
 import argparse
@@ -103,7 +105,14 @@ def _stage_2_path(path):
 MOVES_STAGE_2 = {mid: new for mid in MOVES_STAGE_1.values()
                  if (new := _stage_2_path(mid)) is not None}
 
-STAGES = (MOVES_STAGE_1, MOVES_STAGE_2)
+# Stage 4 moves no file between folders (its splits write new files by hand); it renames the
+# settings page's web server adapter after what it is (spec 12 section 4.5).
+MOVES_STAGE_4 = {
+    "admin/adapters/config_portal.h": "admin/adapters/web_server.h",
+    "admin/adapters/config_portal.cpp": "admin/adapters/web_server.cpp",
+}
+
+STAGES = (MOVES_STAGE_1, MOVES_STAGE_2, MOVES_STAGE_4)
 MOVES = STAGES[-1]  # what --move applies: the newest stage
 
 
@@ -118,9 +127,25 @@ def final_path(stage0_path):
 _QUOTED_INCLUDE_RE = re.compile(r'^([ \t]*#[ \t]*include[ \t]*")([^"\r\n]+)(")', re.M)
 
 
+def _renamed_headers():
+    """{old basename: path after the last stage} for every header a stage table renamed."""
+    renamed = {}
+    for i, table in enumerate(STAGES):
+        for old, new in table.items():
+            if Path(new).suffix not in HEADER_SUFFIXES:
+                continue
+            if posixpath.basename(old) == posixpath.basename(new):
+                continue
+            for later in STAGES[i + 1:]:
+                new = later.get(new, new)
+            renamed[posixpath.basename(old)] = new
+    return renamed
+
+
 def build_index(src_paths):
-    """{basename: src-relative path} of the headers in src_paths; ValueError naming both paths
-    on a duplicate basename."""
+    """{basename: src-relative path} of the headers in src_paths, plus the old basename of
+    every renamed header that exists (pointing at its new path); ValueError naming both paths
+    on a duplicate basename, or on an old basename another live header still has."""
     index = {}
     for path in sorted(p.replace("\\", "/") for p in src_paths):
         if Path(path).suffix not in HEADER_SUFFIXES:
@@ -130,12 +155,21 @@ def build_index(src_paths):
             raise ValueError(f'two headers named "{name}" in src/: {index[name]} and {path} '
                              "- a short include can't tell them apart")
         index[name] = path
+    live = set(index.values())
+    for old_name, new_path in _renamed_headers().items():
+        if new_path not in live:
+            continue
+        if old_name in index:
+            raise ValueError(f'"{old_name}" was renamed to {new_path}, but {index[old_name]} '
+                             "still has that name - a short include can't tell them apart")
+        index[old_name] = new_path
     return index
 
 
 def rewrite_text(text, index):
     """text with every #include "X" that doesn't resolve from src/ rewritten to index's full
-    path. Includes with no src/ header of that file name are left alone."""
+    path (an old name of a renamed header -> its new path). Includes with no src/ header of
+    that file name are left alone."""
     full_paths = set(index.values())
 
     def fix(m):

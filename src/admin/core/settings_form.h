@@ -1,7 +1,7 @@
 // settings_form — what the settings page's forms send, checked before it
 // reaches config_store: the number fields (no "abc" silently read as 0) and
 // the OpenSky credentials file. Pure, tested under `pio test -e native`; the
-// WebServer routes that use it are config_portal.
+// WebServer routes that use it are web_server.
 #pragma once
 
 #include <cstddef>
@@ -23,7 +23,7 @@ struct OpenSkyCredentials {
 constexpr size_t kMaxCredentialsJsonBytes = 4096;
 
 // Parses that JSON file's contents (uploaded on the config page's OpenSky
-// tab, config_portal). A body over kMaxCredentialsJsonBytes is rejected outright
+// tab, web_server). A body over kMaxCredentialsJsonBytes is rejected outright
 // without being parsed. Pure — uses ArduinoJson but no WebServer/hardware
 // dependency — tested under `pio test -e native`.
 OpenSkyCredentials parseOpenSkyCredentialsJson(const std::string &json);

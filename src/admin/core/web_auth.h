@@ -3,7 +3,7 @@
 // whether a request is let through, a lockout after repeated wrong
 // passwords, and the "reset the password from the touchscreen" gesture.
 //
-// config_portal does the HTTP Digest part (WebServer::authenticate /
+// web_server does the HTTP Digest part (WebServer::authenticate /
 // requestAuthentication) and asks this module what to do with the answer.
 //
 // Pure — no WebServer / Arduino dependency — tested under `pio test -e native`.

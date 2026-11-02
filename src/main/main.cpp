@@ -71,7 +71,7 @@
 #include "display/adapters/lgfx/table_view_draw.h"
 #include "display/adapters/touch_xpt2046.h"
 #include "display/core/backlight.h"
-#include "admin/adapters/config_portal.h"
+#include "admin/adapters/web_server.h"
 #include "admin/core/config_store.h"
 #include "platform/core_link.h"
 #include "airspace/core/cpa_predictor.h"
@@ -587,7 +587,7 @@ ScreenshotBridge<SpinLock> bridge(ScreenshotBridge<SpinLock>::Hooks{
     [] { return static_cast<uint32_t>(millis()); }, [] { core_link::wakeUi(); },
     [] { vTaskDelay(1); }});
 
-// ---- called on core 0 (config_portal's handler) — ScreenshotSource wants
+// ---- called on core 0 (web_server's handler) — ScreenshotSource wants
 // plain function pointers.
 
 bool begin(int screenIndex, uint32_t timeoutMs) { return bridge.begin(screenIndex, timeoutMs); }
@@ -899,7 +899,7 @@ void loop() {
     if (cfg().home_configured) {
       applyRedraw(mask);
     } else if (mask & kRedrawFull) {
-      showSetupPrompt();  // "set your home location" until config_portal is used
+      showSetupPrompt();  // "set your home location" until web_server is used
     }
   }
   pendingRedraw = RedrawEvents{};

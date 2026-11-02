@@ -1,7 +1,7 @@
 // net_task — the network task on core 0 (spec/done/04-dual-core.md §5.6).
 //
 // Owns everything that talks to the network: WiFi (wifi_manager), NTP
-// (time_sync), the config web page + mDNS (config_portal), OpenSky polling
+// (time_sync), the config web page + mDNS (web_server), OpenSky polling
 // (opensky_client), hexdb.io enrichment with its caches (aircraft_lookup,
 // route_lookup, lookup_store, via poll_pipeline), the GitHub release check
 // and both OTA paths, and marking a new image valid. It never touches the

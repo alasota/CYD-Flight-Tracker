@@ -1,7 +1,7 @@
 // ota_update — firmware updates over WiFi (spec/done/01-ota-updates.md): checks
 // that an uploaded file really is this project's app image before the new
 // slot is activated, drives the write through a small OtaWriter interface
-// (config_portal plugs in arduino-esp32's Update), and decides when a freshly
+// (ota_flash plugs in arduino-esp32's Update), and decides when a freshly
 // booted image counts as good (cancelling the bootloader's rollback).
 //
 // Pure — no Update / WebServer / Arduino dependency — tested under
@@ -90,7 +90,7 @@ WebStr otaResultMessage(OtaResult r);
 // HTTP status for the /update response.
 int otaResultHttpStatus(OtaResult r);
 
-// What config_portal's Update adapter does — a seam for the native tests.
+// What ota_flash's Update writer does — a seam for the native tests.
 class OtaWriter {
  public:
   virtual ~OtaWriter() = default;

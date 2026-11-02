@@ -1,7 +1,7 @@
 // screenshot — pure helpers for the config page's /screenshot.bmp endpoint:
 // the 24-bit BMP header and row layout, and the ?screen= argument. The
 // pixels themselves are read off the panel by main.cpp (LovyanGFX
-// readRect()) and streamed by config_portal; nothing here touches hardware.
+// readRect()) and streamed by web_server; nothing here touches hardware.
 //
 // BMP instead of PNG on purpose: a few lines of header code vs. pulling in
 // a compressor, with flash ~96% full.
