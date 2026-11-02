@@ -7,7 +7,7 @@
 // It never waits for the network, and the network never draws.
 //
 // setup(): initializes LovyanGFX (configured via display/adapters/lgfx/LGFX_CYD.hpp) and
-// its built-in XPT2046 touch driver (read via touch_input), the backlight,
+// its built-in XPT2046 touch driver (read via touch_xpt2046), the backlight,
 // loads the persisted config (config_store) — restoring which of the three
 // screens was last active (last_screen 0/1/2) into screen_nav — offers the
 // forgotten-password reset, paints the first frame (before WiFi is up), then
@@ -62,6 +62,7 @@
 #include <vector>
 
 #include "display/adapters/lgfx/LGFX_CYD.hpp"
+#include "display/adapters/touch_xpt2046.h"
 #include "display/adapters/lgfx/lcars_theme_draw.h"
 #include "display/adapters/lgfx/table_view_draw.h"
 #include "display/adapters/lgfx/flight_screen_draw.h"
