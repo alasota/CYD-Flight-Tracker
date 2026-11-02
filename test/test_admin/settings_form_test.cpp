@@ -1,7 +1,7 @@
-// config_portal: credentials JSON, form helpers. CLAUDE.md "Code conventions" (config_portal).
+// settings_form: credentials JSON, form number checks. CLAUDE.md "Code conventions" (settings_form).
 #include <unity.h>
 
-#include "admin/adapters/config_portal.h"
+#include "admin/core/settings_form.h"
 
 namespace {
 
@@ -98,7 +98,7 @@ static void test_valid_unsigned_int_string_rejects_non_digits(void) {
 
 }  // namespace
 
-void run_config_portal_tests() {
+void run_settings_form_tests() {
   UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
   RUN_TEST(test_parse_credentials_json_valid);
   RUN_TEST(test_parse_credentials_json_ignores_extra_fields_and_whitespace);

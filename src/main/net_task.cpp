@@ -1,7 +1,5 @@
 #include "main/net_task.h"
 
-#ifdef ARDUINO
-
 #include <Arduino.h>
 #include <esp_ota_ops.h>
 
@@ -421,5 +419,3 @@ void netTaskStart(std::shared_ptr<const Config> bootCfg, bool pendingVerify) {
   xTaskCreatePinnedToCore(netTask, "net", kNetTaskStackBytes, nullptr, kNetTaskPriority, nullptr,
                           kNetTaskCore);
 }
-
-#endif  // ARDUINO

@@ -12,8 +12,6 @@
 // Device-only (FreeRTOS task, Arduino networking).
 #pragma once
 
-#ifdef ARDUINO
-
 #include <freertos/FreeRTOS.h>
 
 #include <cstdint>
@@ -30,5 +28,3 @@ constexpr uint32_t kNetIdleSleepMs = 5;             // each pass: the web page s
 // Starts the task. `bootCfg` is what setup() loaded (no second NVS read);
 // `appPendingVerify`: the running image still has to be marked valid.
 void netTaskStart(std::shared_ptr<const Config> bootCfg, bool appPendingVerify);
-
-#endif  // ARDUINO
