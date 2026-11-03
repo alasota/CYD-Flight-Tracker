@@ -694,10 +694,10 @@ Feature: Reorganizacja kodu według DDD — etapy 1–4: katalogi kontekstów i 
 
   @manual
   Scenario: Etap 4 nie zmienia liczby testów ani firmware'u
-    Given na gałęzi przed etapem 4 (koniec etapu 3, 4c58782): przypadki w 6 grupach pio test -e native (admin 258, airspace 71, display 312, enrichment 80, opensky 73, platform 83 = 877), RUN_TEST( 877, firmware.bin 1 477 568 B, „Flash: used” / „RAM: used” (62 044 B) i lista bibliotek z pio run -e cyd
+    Given na gałęzi przed etapem 4 (koniec etapu 3, 4c58782): przypadki w 6 grupach pio test -e native (admin 258, airspace 71, display 312, enrichment 80, opensky 73, platform 83 = 877), RUN_TEST( 877, firmware.bin 1 345 520 B (9320f6f zbudowany z -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables; zmienione w kroku 11b, wcześniej 1 477 568 B), „Flash: used” / „RAM: used” (62 044 B) i lista bibliotek z pio run -e cyd
     When mierzę to samo po każdym kroku i na końcu etapu (po usunięciu .pio/build/native i .pio/build/cyd)
     Then wszystkie grupy są zielone, a przypadków jest razem 878: admin 258, airspace 71, display 312, enrichment 80, opensky 74, platform 83 (testy config_portal i time_sync przeszły do settings_form i clock w tych samych grupach, 1 nowy: wspólna funkcja mapująca stany OpenSky)
-    And RUN_TEST( jest 878, firmware.bin na końcu różni się od 1 477 568 B o najwyżej 1024 bajty, RAM bez zmian, lista bibliotek ta sama
+    And RUN_TEST( jest 878, firmware.bin na końcu (z tymi flagami) różni się od 1 345 520 B (zmienione w kroku 11b) o najwyżej 1024 bajty, RAM bez zmian, lista bibliotek ta sama
     And grep -rl "ifdef ARDUINO" src --include=*.cpp zwraca tylko pliki w src/platform/ i src/*/adapters/
     And python tools/check_layers.py zgłasza dokładnie 14 naruszeń: 47 z etapu 3 minus 38 (SDK, adaptery i platform/ dołączane z core/, LGFX_CYD.hpp w nagłówkach ekranów, config_portal_test → admin/adapters, release_check.h → config_portal.h) plus 5 (service_screen_draw.cpp, backlight_ldr.cpp i opensky_http.cpp → admin/core, alert_sources.cpp → display/core i opensky/core)
     And python tools/rewrite_includes.py --check kończy się kodem 0, python tools/check_comments.py --strict nic nie zgłasza, python tools/check_bdd.py 0 problemów
