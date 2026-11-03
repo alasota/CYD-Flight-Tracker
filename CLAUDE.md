@@ -35,28 +35,28 @@ heading only together with its references.
 - Pinout (randomnerdtutorials.com CYD guide): TFT MISO 12, MOSI 13, SCLK 14, CS 15, DC 2,
   RST -1 (software), backlight 21 · touch CS 33, IRQ 36, MOSI 32, MISO 39, CLK 25 · light sensor
   (LDR) 34.
-- Display driver **LovyanGFX**, configured in C++ in `include/LGFX_CYD.hpp` (`LGFX_Device`
-  subclass: bus, panel, `Light_PWM`, `Touch_XPT2046`) — never by editing library internals, no
-  display `build_flags`. Display on `HSPI_HOST`, touch on `VSPI_HOST`, `bus_shared = false`.
-  `include/LGFX_CYD.hpp` and `platformio.ini` are the source of truth for pins and versions.
+- Display driver **LovyanGFX**, configured in C++ in `src/display/adapters/lgfx/LGFX_CYD.hpp`
+  (`LGFX_Device` subclass: bus, panel, `Light_PWM`, `Touch_XPT2046`) — never by editing library
+  internals, no display `build_flags`. Display on `HSPI_HOST`, touch on `VSPI_HOST`,
+  `bus_shared = false`. `LGFX_CYD.hpp` and `platformio.ini` are the truth for pins and versions.
 - Touch: LovyanGFX's built-in XPT2046 driver, no separate library. `tft.getTouch()` gives screen
-  coordinates (follows `setRotation()`); calibration in `include/touch_calibration.h`, mapping
-  explained in docs/screens.md "Screen navigation".
-- `platformio.ini`: board `esp32dev` (no CYD entry), partitions `min_spiffs.csv` (two 1.875 MB
-  OTA slots — the firmware must stay under one), envs `cyd`, `cyd-ota`, `native`,
-  `native-asan`.
+  coordinates (follows `setRotation()`); calibration in `display/core/touch_calibration.h`,
+  mapping explained in docs/screens.md "Screen navigation".
+- `platformio.ini`: board `esp32dev`, partitions `min_spiffs.csv` (two 1.875 MB OTA slots — the
+  firmware must stay under one), envs `cyd`, `cyd-ota`, `native`, `native-asan`. `cyd` builds with
+  `-fno-exceptions -fno-unwind-tables`: no `try` / `throw` (docs/history.md "Tooling and docs").
 
 ## Code conventions
 
 Arduino framework on ESP32 (not raw ESP-IDF). One `.h`/`.cpp` pair per module, one responsibility
 each, in `src/<context>/<layer>/` (contexts `airspace`, `enrichment`, `opensky`, `display`,
 `admin`; layers `core`, `services`, `adapters`; plus `shared/`, `platform/`, roots in `main/`),
-included by full path from `src/`. Pure logic is separate from LovyanGFX / HTTP / touch calls
-(adapters behind `#ifdef ARDUINO`) so it runs under `native`, which skips `main/` and
-`*/adapters/` (except `admin/adapters/config_portal.cpp` until spec 12 stage 4). Layout and
-layer rules: docs/architecture.md "Source layout".
+included by full path from `src/`. Pure logic (`core/`, `services/`) is apart from LovyanGFX /
+HTTP / NVS / touch calls (`adapters/`, never built by `native`): a core header declares the device
+functions with plain types too, an adapter defines them (`LGFX &` ones: in the adapter's header).
+`#ifdef ARDUINO` only in `platform/` and adapters. Layers: docs/architecture.md "Source layout".
 
-- **Data, core 0:** `wifi_manager` (connect + captive portal) · `opensky_client` (token +
+- **Data, core 0:** `wifi_manager` (connect + captive portal) · `opensky_client` (JSON of
   `/states/all` → `Aircraft`, **no drawing**) · `opensky_auth` (login, 30-min retry, Bearer /
   refresh / anonymous) · `opensky_quota` (credits left) · `scan_area` (credit cost) ·
   `aircraft_lookup` (icao24 → airline / type) · `route_lookup` (callsign → route, airport → IATA /
@@ -64,18 +64,22 @@ layer rules: docs/architecture.md "Source layout".
   `asciiFold()`) · `lookup_cache` (LRU) · `lookup_store` (NVS copy) · `lookup_budget` (new lookups
   per poll) · `hexdb_http` (HTTPS GET) · `poll_pipeline` (one answer → `DataSnapshot`: sort,
   lookups, phases, CPA, NOW pick) · `net_task` (the core-0 task) · `net_config` (HTTP timeouts).
-- **Settings and maintenance:** `config_store` (NVS settings) · `config_portal` (WebServer + mDNS,
-  routes) · `config_page` (page HTML, pure) · `config_backup` (JSON backup / restore) · `web_auth`
-  (password, throttle, origin check) · `web_i18n` (page strings) · `ota_update` (image checks,
-  marker, `OtaSession`) · `release_check` (GitHub releases) · `version` · `device_alerts` (the
-  "!") · `screenshot` (BMP + band hand-over) · `perf_stats`.
-- **Shared / platform:** `core_link` (what crosses the cores) · `time_sync` (NTP, pure formatting) ·
-  `sun_times` (sunrise / sunset) · `geo` (distance, bearing, compass point) · `backlight`
-  (brightness, night mode) · `i18n` (display strings) · `touch_input` (raw → screen).
+- **Settings and maintenance:** `config_store` (settings, sanitizing) · `settings_form` (form
+  checks, credentials file) · `config_page` (page HTML) · `config_backup` (JSON backup / restore)
+  · `web_auth` (password, throttle, origin check) · `web_i18n` (page strings) · `ota_update`
+  (image checks, marker, `OtaSession`) · `release_check` (GitHub releases) · `version` ·
+  `device_alerts` (the "!") · `screenshot` (BMP + band hand-over) · `perf_stats`.
+- **Shared / platform:** `core_link` (what crosses the cores) · `time_sync` (NTP) · `clock` (date
+  / time text) · `sun_times` (sunrise / sunset) · `geo` (distance, bearing, compass point) ·
+  `backlight` (brightness, night mode) · `i18n` (display strings) · `touch_input` (raw → screen).
+- **Adapters (device halves):** `opensky_http` (token, `/states/all`) · `hexdb_sources` (hexdb.io
+  lookups) · `lookup_store_nvs` · `settings_nvs` · `web_server` (WebServer + mDNS, routes) ·
+  `ota_flash` (`Update`) · `github_http` (check / install) · `alert_sources` (alert inputs) ·
+  `backlight_ldr` (LDR, PWM) · `touch_xpt2046` · `lgfx/<module>_draw` (screens, theme, fonts).
 - **Sky model (`airspace/core`):** `aircraft_state` (`Aircraft`, `inferOnGround()`) ·
   `tracked_flight` (`AircraftRow`) · `flight_ordering` (order, featured split) · `now_pick` (NOW
   aircraft) · `feed_health` (`OpenSkyHealth`) · `flight_phase` · `cpa_predictor`.
-- **Display, core 1:** `lcars_theme` (palette roles, fonts, pills, tabs, phase icons, arrows) ·
+- **Display, core 1:** `lcars_theme` (palette roles, font metrics, icon / arrow shapes) ·
   `text/` (`utf8`, `fit_to_width`, `font_set` = the character set) · `status_bar` (header) ·
   `screen_nav` (screen, hit tests, auto-cycle) · `redraw_policy` (events → redraw mask) ·
   `aircraft_summary` (identity block of all screens) · `featured_panel` · `table_view` ·
@@ -101,9 +105,8 @@ Rules:
 - Module boundaries exist so logic runs in `pio test -e native` — no ESP32, display or network.
   Only thin adapters that call hardware / SDK APIs (TFT draw, HTTP request, touch read) may go
   untested; everything they delegate to gets a test.
-- New module or feature → propose its test file with it, unasked.
-- A milestone is done when `pio test -e native` is green **and** the new logic has coverage —
-  compiling is not correct.
+- New module or feature → propose its test file with it, unasked. A milestone is done when
+  `pio test -e native` is green **and** the new logic has coverage — compiling is not correct.
 - **Layout** (spec 07, details in `test/README.md`): six suites by context — `test_airspace`,
   `test_enrichment`, `test_opensky`, `test_display`, `test_admin`, `test_platform`. A module's
   tests are `test/test_<suite>/<module>_test.cpp`: an anonymous namespace plus one
@@ -227,23 +230,20 @@ two cores". Spec: `spec/done/04-dual-core.md`.
 
 - Build: `pio run` · upload: `pio run -t upload` · over WiFi: `pio run -e cyd-ota -t upload`
   (`$CYD_WEB_PASSWORD`) · monitor: `pio device monitor -b 115200`
-- Tests: `pio test -e native` (one suite: `-f test_display`; sanitizers on Linux:
-  `pio test -e native-asan`)
+- Tests: `pio test -e native` (one suite: `-f test_display`; Linux sanitizers: `-e native-asan`)
 - Checks: `python tools/check_bdd.py`, `python tools/check_comments.py [--strict]` (comment doc
   references, removed symbols, `main.cpp` in core-0 modules, CLAUDE.md size),
   `python tools/check_layers.py [--strict]` (spec 12 layer rules; report only in CI)
 - Tool tests (CI): `python tools/test_<name>.py` for check_bdd, release_plan, build_site,
   check_comments, check_layers, rewrite_includes, subset_efont
 - Project page: `python tools/build_site.py --out _site` (`--firmware DIR` adds the installer)
-- Screenshots of the settings page / update question:
-  `python tools/screenshots.py [--device cyd-sky.local]`
+- Settings page / update question screenshots: `python tools/screenshots.py [--device cyd-sky.local]`
 - Spec / issue → PR: `/implement 05`, `/implement #12`; bug → PR: `/fix <description>`,
   `/fix #14`; release: `/release` (`python tools/release_plan.py` shows the plan)
 
 ## Out of scope
 
 - Historical tracks (`/flights/*`, `/tracks/*`) — only live `/states/all`.
-- MQTT / Home Assistant — a standalone display, not a sensor node.
+- MQTT / Home Assistant, own-receiver mode (`/states/own`) — a standalone display of network data.
 - Trails, multi-aircraft or turn-aware prediction — `cpa_predictor` is straight-line on purpose.
-- Own-receiver mode (`/states/own`) — network-wide data, not a personal ADS-B feeder.
 - Animated screen transitions — instant redraw is fine.

@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **etap 3 z 8 zrobiony (vNEXT)**, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 4 **w trakcie**, etapy 5–8 do zrobienia. Jedna specyfikacja dla całej
+Status: **etap 4 z 8 zrobiony (vNEXT)**, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 w vNEXT, etapy 5–8 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -285,8 +285,23 @@ a ekran czyta z niego tylko swoje obiekty.
    przed etapem 8; wyjątek `config_portal.cpp` w filtrze `native` zostaje do etapu 4; kryterium
    `check_layers.py`: **47** (51 − 6 + 2), limit w teście narzędzi obniżony do 47.
 4. **Podział czyste / sprzętowe.** Każdy plik z `#ifdef ARDUINO` → `core|services/x.cpp` +
-   `adapters/x_esp32.cpp` (albo `adapters/lgfx/x_draw.cpp`). Po tym etapie `grep -rl "ifdef
-   ARDUINO" src --include=*.cpp` zwraca tylko `platform/` i `adapters/`.
+   adapter (pierwotnie `adapters/x_esp32.cpp` albo `adapters/lgfx/x_draw.cpp`). Po tym etapie
+   `grep -rl "ifdef ARDUINO" src --include=*.cpp` zwraca tylko `platform/` i `adapters/`.
+   Decyzje (plan etapu 4, właściciel 2026-11-01 / 02):
+   - adaptery mają od razu nazwy z §4, nie `x_esp32`: `display/adapters/lgfx/<moduł>_draw`,
+     `touch_xpt2046`, `backlight_ldr`, `hexdb_sources` (aircraft + route), `lookup_store_nvs`,
+     `opensky_http`, `ota_flash`, `github_http`, `settings_nvs`, `alert_sources`
+     (`deviceAlertInputs()`, nazwa spoza §4); `hexdb_http` bez zmian;
+   - deklaracje z typami prostymi zostają w nagłówkach `core/` bez `#ifdef` (port), adapter je
+     definiuje; adaptery widzą tylko swój kontekst (§5 bez zmian) → 5 nowych naruszeń, razem 14;
+   - czyste funkcje `config_portal` → `admin/core/settings_form`, potem `config_portal` →
+     `admin/adapters/web_server` jako osobny krok (`MOVES_STAGE_4` w `rewrite_includes.py`;
+     funkcje `configPortal*()` zmieniają nazwy w etapie 7); formatowanie daty / czasu z
+     `time_sync` → `shared/clock`; `include/LGFX_CYD.hpp` → `display/adapters/lgfx/`,
+     `include/touch_calibration.h` → `display/core/`;
+   - krok 11b: firmware bez wyjątków C++ i tablic unwind (`-fno-exceptions -fno-unwind-tables
+     -fno-asynchronous-unwind-tables`), kryterium ± 1 KB liczone od 1 345 520 B (start etapu
+     zbudowany z tymi flagami) zamiast 1 477 568 B.
 5. **Warstwa `services/`** z §6 + testy (to jedyny etap, który dodaje testy, a nie tylko je przenosi).
    `main.cpp` < 250 linii, `config_portal` bez `handleSave` logiki.
 6. **Ustawienia per kontekst** (§7) + zasoby WWW jako pliki (`admin/assets/`, `embed_assets.py`).
@@ -425,6 +440,73 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   (62 044 B), więc to nie regresja. Po przeglądzie `baa5ae4` poprawił include'y (`table_view.h`
   bierze `OpenSkyHealth` z `feed_health.h`, `radar_view.cpp` dołącza `status_bar.h`) — bez
   zmiany zachowania i rozmiaru. Dotyk — do sprawdzenia przez właściciela.
+
+### Wynik etapu 4 (2026-11-02, wydany w vNEXT)
+
+- **Co przeszło gdzie** (połowy `#ifdef ARDUINO` z `core/` do adapterów, pisane ręcznie; część
+  czysta bez zmian; jeden krok = jeden commit, płytka sprawdzana po każdym):
+  - `display/adapters/lgfx/` — `LGFX_CYD.hpp` (z `include/`), `status_bar_draw`,
+    `service_screen_draw`, `radar_view_draw`, `flight_screen_draw` (z globalnym sprite'em
+    odliczania), `table_view_draw`, `featured_panel_draw`, `aircraft_summary_draw`,
+    `lcars_theme_draw` (fonty efont, `LCARS_FONT_*`, `gfxTextMeasure()`, ikony, strzałki,
+    pigułki, pasek zakładek); dzielone od wołających (bez przejściowych `display/core ->
+    display/adapters`);
+  - `display/adapters/touch_xpt2046` (`touchInputRead()`), `display/adapters/backlight_ldr`
+    (LDR, PWM, okno nocne); `touch_calibration.h` → `display/core/`;
+  - `enrichment/adapters/hexdb_sources` (pobieranie samolotów, tras i lotnisk + `lookup*()`),
+    `lookup_store_nvs`; `opensky/adapters/opensky_http` (token, `/states/all`, 401 / 429,
+    harmonogram; `extractAircraftFromStates()` publiczna w `opensky_client.h`);
+  - `admin/adapters/ota_flash`, `github_http`, `settings_nvs`, `alert_sources`; `OtaObserver`
+    do `ota_update.h`; czyste funkcje `config_portal` → `admin/core/settings_form`; potem
+    `config_portal` → `web_server`; `formatDate()` / `formatTime()` / `minuteOf()` →
+    `shared/clock` (`time_sync` ma tylko NTP); `main/net_task` bez osłony `#ifdef` całego pliku.
+
+  Stałe wspólne dla obu połówek w nagłówkach `core/` jako `constexpr` z prefiksem modułu
+  (`kTableRowStep`, `kFlightCountdownTop` …), tablica kolumn tabeli zdefiniowana raz
+  (`kTableColumns`). `grep -rl "ifdef ARDUINO" src --include=*.cpp` → tylko
+  `enrichment/adapters/hexdb_http.cpp` i `platform/` (`core_link`, `time_sync`, `wifi_manager`).
+  Filtr `native`: `+<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp>`, bez wyjątku.
+- **Testy:** 1 nowy (`test_extract_aircraft_from_states_matches_parse_states_response`),
+  `config_portal_test.cpp` → `settings_form_test.cpp`, `time_sync_test.cpp` → `clock_test.cpp`.
+  Wszystkie 6 grup zielone: admin 258 (3 pominięte) / airspace 71 / display 312 / enrichment 80 /
+  opensky 74 / platform 83 = **878**; `RUN_TEST(` = 878. Testy narzędzi zielone,
+  `check_bdd.py` 0 problemów (191 scenariuszy), `rewrite_includes.py --check` = 0,
+  `check_comments.py --strict` czysto.
+- **`tools/check_layers.py`: 14 naruszeń** (47 − 38 + 5, dokładnie jak w planie), limit w teście
+  narzędzi 47 → 14. Zostają: `web_server.cpp` × 4, `tracked_flight.h -> enrichment/core` × 2,
+  `poll_pipeline.h -> platform`, `place_names.h` / `opensky_quota.h -> display/core` (`Language`)
+  i 5 nowych (adapter widzi tylko swój kontekst): `service_screen_draw.cpp`, `backlight_ldr.cpp`,
+  `opensky_http.cpp -> admin/core`, `alert_sources.cpp -> display/core` i `-> opensky/core`.
+- **Firmware:** po krokach (bajty względem poprzedniego): 2 ±0 · 3 +256 · 4 +48 · 5 +48 · 6 +160 ·
+  7 −16 · 8 ±0 · 9 +48 · 10 +64 · 11 +1 248 · 11b −133 408 (flagi) · 12 +464 · 13 −16 · 14 +80 ·
+  15 ±0 · 16 ±0. Do kroku 11 etap kosztował +1 856 B (ponad ± 1 KB): każdy nowy `.cpp` dokładał
+  ok. 50 B `.eh_frame`, a podział `opensky_client` +1 248 B — linker ESP32 zostawia całe
+  `.eh_frame` każdego obiektu, więc szablony ArduinoJson wspólne dla dwóch plików mają
+  zdublowane rekordy unwind. Decyzja właściciela (krok 11b): `env:cyd` bez wyjątków i tablic
+  unwind, −133 408 B; nowa baza 1 345 520 B (start etapu z tymi flagami). Koniec: **1 346 544 B
+  (+1 024 B — dokładnie na granicy ± 1 KB)**, Flash used 1 339 961, RAM bez zmian (62 044 B).
+  `AircraftInfo()` zadeklarowany w `aircraft_lookup.h`, `= default` w `.cpp` (inaczej GCC
+  wstawiał go inline, +112 B). Dźwignia w rezerwie: `~FirmwareMarkerScanner()` poza linią.
+- **Odstępstwa od §8 pkt 4:** nazwy adapterów z §4 zamiast `x_esp32`; zmiana nazwy
+  `config_portal` → `web_server` i `shared/clock` już w tym etapie; flagi kompilacji (krok 11b) i
+  nowa baza rozmiaru (wyżej, decyzje właściciela).
+- **`@manual` (płytka, 2026-11-02):** po każdym kroku wgrane (USB COM3, od kroku 12 też OTA), log
+  szeregowy 2–17 min, `/perf.json`, zrzuty ekranów. Obraz końcowy `c32297d`: bez paniki przez
+  5 min, jedyny restart programowy to restart po OTA; ekrany 0–2 poprawne; zegar i data w
+  nagłówku (22:46 → 22:47, `shared/clock`); karta Firmware „sprawdzono 02.11.2026 22:46”;
+  „Sprawdź teraz”: HTTP 200, weryfikowany TLS przy 144 KB wolnej sterty; formularz: zapis bez
+  zmian zachowuje wartości, szerokość „abc” odrzucona i zachowana, uszkodzony plik poświadczeń
+  odrzucony (poświadczenia zachowane); `/light.json` noc 10 %; OTA przez WiFi 1,35 MB w 17 s →
+  app1, oznaczony jako ważny po 30 s; przerwa pętli UI maks. 102 ms, 0 wolnych przejść, sterta
+  148 / 66 KB. Po drodze: dotyk sprawdzony przez właściciela (zakładki, krawędzie, stronicowanie
+  tabeli, „!”) po krokach 2 i 8; po kroku 10 cache NVS (23 trafienia po restarcie); po kroku 12
+  OTA przez WiFi i „Sprawdź teraz”; po kroku 13 zapis ustawień przetrwał restart.
+  **Raz (krok 8, `efe4b11`) panika rdzenia 0** w timerze DNS lwIP (`dns_tmr` → `dns_send` →
+  `udp_sendto`, LoadProhibited na pustym pcb UDP); płytka sama wstała. Krok 8 zmienił tylko odczyt
+  dotyku na rdzeniu 1 (kod wynikowy identyczny), więc nie przypisana etapowi — jedno wystąpienie
+  na ok. 15 uruchomień etapów 3–4; zalecana osobna poprawka (`/fix`). Po kroku 14 raz odczyt
+  czasu pracy 57 s bez paniki w logu — niewyjaśniony, nie powtórzył się (najpewniej start po
+  wgraniu przez USB).
 
 ## 9. Testy
 

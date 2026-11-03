@@ -52,12 +52,12 @@ Linia MISO wyświetlacza (pin 12) jest podłączona, bo z niej czyta zrzut ekran
   - `const char *boardVariantName(BoardVariant)`: `"cyd-r"` / `"cyd-2usb"`, do logu i panelu;
   - kalibracja dotyku dla danej płytki: na 2USB mierzona z logu `[touch]`; jeśli zgadza się z R,
     to jeden zestaw.
-- **Adapter** (`include/LGFX_CYD.hpp`): w klasie `LGFX` oba panele (`Panel_ILI9341`,
+- **Adapter** (`src/display/adapters/lgfx/LGFX_CYD.hpp`): w klasie `LGFX` oba panele (`Panel_ILI9341`,
   `Panel_ST7789`) i metoda `beginDetected()` z krokami 1–4. Piny SPI, podświetlenie (21) i
   XPT2046 bez zmian i wspólne dla obu paneli. Dla ST7789 `invert` i `rgb_order` ustawione na
   płytce; oczekiwane `invert = true`. Kryterium: kolory motywu LCARS takie jak na R
-  (porównać z `docs/screenshots/`). Konfiguracja zostaje w `include/` (spec 12 przenosi ją
-  w etapie 4).
+  (porównać z `docs/screenshots/`). Konfiguracja jest w `src/display/adapters/lgfx/` (przeniesiona
+  w etapie 4 spec 12).
 - `main.cpp` (`setup()`) woła `tft.beginDetected()` zamiast `tft.init()`. Wynik trafia do
   `core_link` **przed** startem `net_task`, bo zapis przed utworzeniem zadania jest widoczny dla
   rdzenia 0 bez blokady.
