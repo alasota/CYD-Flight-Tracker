@@ -182,7 +182,7 @@ static void test_extract_aircraft_from_states_matches_parse_states_response(void
       "]}";
 
   JsonDocument doc;
-  TEST_ASSERT_TRUE(deserializeJson(doc, body) == DeserializationError::Ok);
+  ASSERT_STR_EQ("Ok", deserializeJson(doc, body).c_str());
   const std::vector<Aircraft> streamed =
       extractAircraftFromStates(doc["states"].as<JsonArrayConst>());
   const std::vector<Aircraft> parsed = parseStatesResponse(body);

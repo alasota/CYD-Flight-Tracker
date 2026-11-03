@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+#include <algorithm>
 #include <ctime>
 
 #include "admin/core/config_store.h"

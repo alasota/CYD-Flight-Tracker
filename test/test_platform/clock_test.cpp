@@ -61,6 +61,7 @@ static void test_minute_of_same_within_a_minute(void) {
 static void test_minute_of_changes_at_minute_boundary(void) {
   // 1500000000 is exactly 02:40:00.
   TEST_ASSERT_NOT_EQUAL(minuteOf(1500000000 - 1), minuteOf(1500000000));
+  TEST_ASSERT_EQUAL(minuteOf(1500000000), minuteOf(1500000000 + 59));  // same minute
   TEST_ASSERT_NOT_EQUAL(minuteOf(1500000000 + 59), minuteOf(1500000000 + 60));
 }
 
