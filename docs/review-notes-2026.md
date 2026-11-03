@@ -1,6 +1,7 @@
 # Senior embedded review — CYD Sky Tracker
 
-Przegląd modułów: `wifi_manager`, `config_store`, `config_portal`, `opensky_client`,
+Przegląd modułów: `wifi_manager`, `config_store`, `config_portal` (od spec 12 etap 4: `web_server`,
+czyste funkcje w `settings_form`), `opensky_client`,
 `aircraft_lookup`, `lcars_theme`, `table_view`, `main.cpp`. Numeracja `X.Y` do
 wskazywania konkretnych pozycji do wdrożenia.
 

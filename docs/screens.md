@@ -197,7 +197,7 @@ empty-state text ("BRAK LOTU").
 - **Screens are switched only by the tab bar.** Tapping a segment jumps to that screen. There
   are no edge-swipe zones; taps above the tab bar belong to the active screen (Screen 1's table
   paging) or to the header's "!" (`alertBadgeHit()`, checked first).
-- **Touch calibration** (`include/touch_calibration.h`, handed to LovyanGFX's
+- **Touch calibration** (`display/core/touch_calibration.h`, handed to LovyanGFX's
   `Touch_XPT2046`): in LovyanGFX raw terms **raw X is the vertical axis** (~340 at the bottom
   .. ~3900 at the top) and **raw Y the horizontal one, running right-to-left** (~3900 at the
   left .. ~200 at the right — passed as `y_min > y_max`); with `offset_rotation = 0` and
@@ -261,7 +261,7 @@ from LovyanGFX primitives, original execution, no copied assets or trademarked t
   rate-limited health dot; phase icons coloured by `phaseColor()` (takeoff green `#66CC66`
   `0x666C`, landing peach, overflight sky, ground / none muted); background `LCARS_BLACK`.
   Standard RGB565 values — the ILI9341 runs in 16-bit colour.
-- **Fonts** (`lcars_theme`): `LCARS_FONT_BODY` efont 16 px (8 px per char), `LCARS_FONT_TABLE`
+- **Fonts** (`lcars_theme_draw`, metrics in `lcars_theme`): `LCARS_FONT_BODY` efont 16 px (8 px per char), `LCARS_FONT_TABLE`
   efont 14 px (7 px), `LCARS_FONT_SMALL` efont 10 px (5 px) — subsets with Polish letters, see
   CLAUDE.md "Language"; `LCARS_FONT_CLOCK` DejaVu12 (header date / time);
   `LCARS_FONT_HEADING` Font4 and `fonts::Font8` (countdown digits) never show Polish text.
@@ -324,7 +324,7 @@ turn, so it degrades further out. Turn-aware prediction is out of scope.
   Europe/Warsaw, handles CEST). If the clock is ever off by an hour, check the EU DST rule.
 - Until the first sync `isTimeSynced()` is false and the header shows `--.--.----` / `--:--`,
   not the ESP32's 1970 date.
-- `time_sync` formatting is pure and takes the `time_t` as a parameter (testable regardless of
+- The formatting is the pure `shared/clock` (`time_sync` keeps only NTP) and takes the `time_t` as a parameter (testable regardless of
   when the test runs): `formatDate()` → `"DD.MM.YYYY"` (zero-padded, e.g. `07.03.2026`),
   `formatTime()` → `"HH:MM"` (24 h), `minuteOf()` (changes exactly when `formatTime()` does).
 - The header has no WiFi signal indicator.

@@ -3,17 +3,17 @@
 The current architecture in detail: the source layout, the two cores, the settings page,
 updates, brightness, the "!" alerts, CI and the agent harness. The rules a session must follow
 are in CLAUDE.md; this file is the reference behind them. (Spec 12 reorganises the code into
-contexts in eight stages; stages 1–3 — folders, full-path includes, layer report, layer names,
-misplaced types moved to their contexts — are done. Stage 8 rewrites this file around the
+contexts in eight stages; stages 1–4 — folders, full-path includes, layer report, layer names,
+misplaced types moved to their contexts, pure / hardware halves split — are done. Stage 8 rewrites this file around the
 contexts.)
 
 ## Source layout (spec 12)
 
 Spec: `spec/planned/12-code-reorganization-ddd.md` (§2 layer names, §4 contexts, §5 dependency
 table, §8 stages). Stage 1 moved the files with `git mv`, **unsplit and unrenamed**; stage 2
-renamed the layer folders; stage 3 moved misplaced types into their contexts. Stages 4–8 split
-pure / hardware halves, add the `services/` logic, settings per context, rename to the glossary
-and make the layer check block CI.
+renamed the layer folders; stage 3 moved misplaced types into their contexts; stage 4 split
+every `#ifdef ARDUINO` half out into `adapters/`. Stages 5–8 add the `services/` logic, settings
+per context, rename to the glossary and make the layer check block CI.
 
 - **Folders:** `src/<context>/<layer>/` — contexts `airspace` (the sky model: aircraft state,
   tracked flights, their order, the NOW pick, feed health, flight phase, CPA; the poll pipeline),
@@ -23,21 +23,26 @@ and make the layer check block CI.
   `core/` (pure logic of the context: types, rules, maths, screen layouts, texts — native, tested),
   `services/` (state machines, pipelines, use cases that combine `core` parts and ports — native,
   tested), `adapters/` (SDK calls: ESP32, LovyanGFX, HTTP, NVS, `WebServer` — not native). Plus
-  `shared/` (`sun_times`, `geo`), `platform/` (`core_link`, `time_sync`, `wifi_manager`,
+  `shared/` (`sun_times`, `geo`, `clock`), `platform/` (`core_link`, `time_sync`, `wifi_manager`,
   `perf_stats`, `net_config`) and `src/main/` (`main.cpp`, `net_task` — composition roots, one
   per core). Subfolders: `display/core/screens/`, `display/core/theme/` (+ `fonts/`),
-  `display/core/text/` (`utf8`, `fit_to_width`, `font_set`).
-- **Placement rule (until stage 4):** a file sits where its pure half will live, named as before;
-  its `#ifdef ARDUINO` half stays inside until stage 4 moves it to `adapters/`. Only files that
-  are entirely hardware are in `adapters/` / `main/` already (`enrichment/adapters/hexdb_http`,
-  `admin/adapters/github_ca.h`, `main/net_task`, `main/main.cpp`).
-  `admin/adapters/config_portal` is the exception: mostly `WebServer` routes, but it still holds
-  three pure functions with native tests, so the `native` filter adds it back (below) until
-  stage 4 takes them out. `include/LGFX_CYD.hpp` and `include/touch_calibration.h` stay in `include/`
-  until stage 4.
+  `display/core/text/` (`utf8`, `fit_to_width`, `font_set`), `display/adapters/lgfx/` (the
+  `LGFX_CYD.hpp` device class and one `<module>_draw.{h,cpp}` per screen / the theme).
+- **Adapters** (stage 4, names from spec 12 §4): `display/adapters/` — `lgfx/status_bar_draw`,
+  `service_screen_draw`, `radar_view_draw`, `flight_screen_draw` (+ the countdown sprite),
+  `table_view_draw`, `featured_panel_draw`, `aircraft_summary_draw`, `lcars_theme_draw` (the
+  efont objects, `LCARS_FONT_*`, `gfxTextMeasure()`, icons, arrows, pills, tabs),
+  `touch_xpt2046` (`touchInputRead()`), `backlight_ldr` (LDR, PWM, night window);
+  `enrichment/adapters/` — `hexdb_sources` (aircraft / route / airport fetch + `lookup*()`),
+  `lookup_store_nvs`, `hexdb_http`; `opensky/adapters/opensky_http` (token, `/states/all`
+  HTTP/1.0 stream, 401 / 429, schedule); `admin/adapters/` — `web_server` (routes + mDNS, was
+  `config_portal`), `settings_nvs` (`loadConfig()` / `saveConfig()` …), `ota_flash` (`Update`,
+  SHA-256, `otaFlashSession()`), `github_http` (release check / install), `alert_sources`
+  (`deviceAlertInputs()`), `github_ca.h`. `#ifdef ARDUINO` is left only in `platform/`
+  (`core_link`, `time_sync`, `wifi_manager`) and `enrichment/adapters/hexdb_http`.
 - **Stage 2** (`git mv` of 80 files, include lines only): `<ctx>/domain/` → `<ctx>/core/`,
   `<ctx>/app/` → `<ctx>/services/`, `src/app/` → `src/main/`; `admin/app/` split —
-  `config_page`, `web_i18n` (pure) → `admin/core/`, `config_portal` (the `WebServer` routes) →
+  `config_page`, `web_i18n` (pure) → `admin/core/`, `config_portal` (the `WebServer` routes, now `web_server`) →
   `admin/adapters/`. Today only `airspace/services/` (`poll_pipeline`) and `display/services/`
   (`screenshot`) exist.
 - **Stage 3** (symbols, not files — written by hand, no move table): each misplaced type left its
@@ -53,24 +58,47 @@ and make the layer check block CI.
   `lcars_theme`). `opensky/core/scan_area`: `bboxAreaSqDeg()`, `openSkyCreditCost()` (from
   `config_portal`). `display/core/text/`: `utf8` (`utf8Length()`, `utf8IsCharBoundary()` — was an
   anonymous helper), `fit_to_width` (`TextMeasure`, `fitToWidth()`), `font_set`
-  (`isFontSafeText()`, `isFontCodepoint()`, `fontHasGlyph()` — from `lcars_theme`, which still
-  includes `fit_to_width.h` for its `#ifdef ARDUINO` `gfxTextMeasure()`). Companions moved with
+  (`isFontSafeText()`, `isFontCodepoint()`, `fontHasGlyph()` — from `lcars_theme`). Companions moved with
   their partners (`DistanceBearing`, `FeaturedSplit`, `NowPick`) so `poll_pipeline` includes no
   screen header. `core_link.h` now includes `tracked_flight.h` and `feed_health.h`, no
   `display/core/screens/` header (`LayoutTest.test_core_link_includes_no_screen_headers`).
   `AircraftRow`'s copy / move constructors, assignments and destructor are declared in
   `tracked_flight.h` and `= default` in `tracked_flight.cpp` — out of line on purpose, for
   firmware size (docs/history.md "Tooling and docs").
+- **Stage 4** (pure / hardware split, owner 2026-11-01): the whole `#ifdef ARDUINO` half of a
+  `core/` file (definitions, its file-local helpers and globals, SDK includes) went to the adapter
+  `.cpp`; the pure part stayed as it was. Declarations with plain types (`Config`, `std::string`,
+  core structs) **stay unguarded in the core header** — it is the port, the adapter implements it
+  (`config_store.h`, `lookup_store.h`, `opensky_client.h`, `release_check.h`, `ota_update.h`,
+  `backlight.h`, `device_alerts.h`); a native caller would fail to link, which is the guard.
+  Signatures with `LGFX &` / `LGFX_Sprite` / `lgfx::IFont` went to the adapter's own header.
+  Constants both halves use moved to the core header as plain `constexpr` with a module prefix
+  (`kTableRowStep`, `kFlightCountdownTop`, `kFeaturedPanelTop`, `kStatusBarDotGap` …; the `cyd`
+  env compiles as gnu++11, so no `inline` variables); the table's column array is
+  `extern const TableColumn kTableColumns[]`, defined once in `table_view.cpp`. An adapter reaches
+  other contexts' types through its own core header: `aircraft_summary.h`, `featured_panel.h` and
+  `flight_screen.h` include `tracked_flight.h` instead of declaring `struct AircraftRow;`. Draw
+  files were split callers first (status bar / service screens → radar → NOW → table + featured +
+  identity block → theme), so no step added a `display/core -> display/adapters` include. Also:
+  `extractAircraftFromStates()` is public in `opensky_client.h` (`opensky_http` calls it; one new
+  test), `OtaObserver` moved from the web server's header to `ota_update.h`, `config_portal`'s
+  pure functions went to `admin/core/settings_form` (`OpenSkyCredentials`,
+  `parseOpenSkyCredentialsJson()`, `isValidFloatString()`, `isValidUnsignedIntString()`), then
+  `config_portal` was renamed `web_server` (`MOVES_STAGE_4`; the `configPortal*()` functions keep
+  their names until stage 7), `time_sync`'s formatters (`formatDate()`, `formatTime()`,
+  `minuteOf()`) went to `shared/clock`, `main/net_task` lost its whole-file guard, and
+  `include/LGFX_CYD.hpp` / `include/touch_calibration.h` moved to `display/adapters/lgfx/` /
+  `display/core/` (`include/` holds only PlatformIO's README). `AircraftInfo`'s constructor is
+  declared in `aircraft_lookup.h` and `= default` in the `.cpp`, like `AircraftRow`'s copies
+  (docs/history.md "Tooling and docs").
 - **Includes** are full paths from `src/` (`#include "display/core/i18n.h"`), in `src/` and
   `test/` alike; `-I src` is in `env:cyd` and `env:native` (`cyd-ota`, `native-asan` inherit).
   `test/support/` headers and test-local headers (`github_fixtures.h`) stay short.
-- **`native` filter:** `+<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp>
-  +<admin/adapters/config_portal.cpp>` (patterns apply in order, so the last one re-adds one
-  file). `config_portal.cpp` has three pure functions above its `#ifdef ARDUINO` —
-  `parseOpenSkyCredentialsJson`, `isValidFloatString`, `isValidUnsignedIntString` — used by its
-  own routes and tested by `test_admin/config_portal_test.cpp` (11 cases), which is now the only
-  reason for the exception. It goes when stage 4 splits the file (stage 3 moved
-  `openSkyCreditCost` / `bboxAreaSqDeg` out to `opensky/core/scan_area`, owner 2026-11-01).
+- **`native` filter:** `+<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp>` — no exception
+  since stage 4 (`config_portal.cpp` was re-added until its three pure functions moved to
+  `settings_form`, tested by `settings_form_test.cpp`). `-<*/adapters/>` covers
+  `display/adapters/lgfx/` too; `-<platform/*_esp32.cpp>` matches nothing yet and stays for
+  later platform splits.
 - **`tools/check_layers.py`** classifies each file (`classify()`, `LAYERS = ("core", "services",
   "adapters", "assets")`, root `main`) and checks every `#include` against the §5 table
   (`ALLOWED`): `core` sees `shared/` and other cores as the table allows, `*/services` and
@@ -98,11 +126,21 @@ and make the layer check block CI.
   `aircraft_lookup.h` and `route_lookup.h` because `AircraftRow` carries `AircraftInfo`,
   `RouteInfo`, `AirportInfo` by value (§4.1 puts it in `airspace/core`, §5 lets that layer see
   only `shared/`; owner 2026-11-01: accepted for now, decided before stage 8).
-  `admin/core -> admin/adapters` keeps 2 (`release_check` → `github_ca.h`, `config_portal.h` for
-  `OtaObserver`, stage 4). `tools/test_check_layers.py`'s
+  **14 after stage 4** (47 − 38 + 5): gone are every SDK include in `core/`, every
+  `core -> adapters` include (10 × `display/core -> display/adapters` through `LGFX_CYD.hpp`,
+  `github_ca.h`, `config_portal.h`, `hexdb_http.h`), `core -> platform` from `release_check`,
+  `backlight`, `opensky_client`, `config_page` / `status_bar` (`time_sync.h`, now
+  `shared/clock.h`), `opensky/core -> admin/core` and `test -> admin/adapters`. New, because an
+  adapter sees only its own context (§5 kept as is, owner): `service_screen_draw.cpp ->
+  admin/core` (`release_check.h`, `kUpdatePromptTimeoutMs`), `backlight_ldr.cpp` and
+  `opensky_http.cpp -> admin/core` (`config_store.h`), `alert_sources.cpp -> display/core`
+  (`backlight.h`) and `-> opensky/core` (`opensky_client.h`). The 14: those 5, `web_server.cpp`
+  × 4 (`backlight.h`, `service_screen.h`, `opensky_client.h`, `screenshot.h`),
+  `tracked_flight.h -> enrichment/core` × 2, `poll_pipeline.h -> platform` (`core_link.h`),
+  `place_names.h` / `opensky_quota.h -> display/core` (`Language`). `tools/test_check_layers.py`'s
   `LayoutTest.test_layer_findings_do_not_exceed_the_stage_limit` fails above
-  `LAYER_FINDINGS_LIMIT = 47`; each stage that lowers the count lowers the limit with it (stage 3
-  did, 51 → 47), so progress can't slip back unnoticed.
+  `LAYER_FINDINGS_LIMIT = 14`; each stage that lowers the count lowers the limit with it (51 → 47
+  → 14), so progress can't slip back unnoticed.
   A short include (resolving only from the file's own folder) and a file outside any context are
   findings too; `LayoutTest` keeps the tree free of them, of old `domain/` / `app/` paths in code,
   build files and tools, and keeps the `RUN_TEST(` count ≥ 874.
@@ -113,7 +151,12 @@ and make the layer check block CI.
   default run rewrites any quoted include that doesn't resolve from `src/` to its full path in
   place, `--check` exits 1 if anything would change. A later stage that moves files adds its
   table to `STAGES`; stage 3 moved symbols, not files, so it has none (its new includes were
-  written as full paths by hand, `--check` = 0). The tool stays until stage 8.
+  written as full paths by hand, `--check` = 0). Stage 4's `MOVES_STAGE_4` is the one rename,
+  `admin/adapters/config_portal.{h,cpp}` → `web_server.{h,cpp}` (`STAGES` = stages 1, 2, 4); the
+  index also maps the old basename of every renamed header to its final path (`"config_portal.h"`
+  → `"admin/adapters/web_server.h"`) and refuses one that a live header still uses. The new
+  adapter files were written by hand, and the two `include/` headers were `git mv`ed by hand,
+  their includes fixed by the default rewrite. The tool stays until stage 8.
 
 ## Concurrency — two cores (core_link, net_task)
 
@@ -121,7 +164,7 @@ Spec: `spec/done/04-dual-core.md`. Rules (what may run where) are in CLAUDE.md "
 two cores"; this is how it works.
 
 - **Core 0 — `net_task`** (FreeRTOS task, 16 KB stack, priority 1, next to WiFi and lwIP):
-  `wifi_manager`, `time_sync` (NTP), `config_portal` (WebServer + mDNS), `opensky_client`,
+  `wifi_manager`, `time_sync` (NTP), `web_server` (WebServer + mDNS), `opensky_client`,
   the hexdb.io lookups with their caches, `poll_pipeline`, `release_check`, both OTA paths,
   marking the image valid. It owns the in-memory `Config` and reloads it after a settings save
   (`configPortalSaveCount()`). Each pass ends with `vTaskDelay(kNetIdleSleepMs = 5)`.
@@ -188,9 +231,12 @@ two cores"; this is how it works.
   | cache ac=40 rt=38 ap=12` and serves the same as `GET /perf.json` (`"cache": {ac, rt, ap}` =
   entries in the hexdb.io RAM caches).
 
-## Settings page (config_portal, config_page, config_backup)
+## Settings page (web_server, config_page, config_backup)
 
-- `config_portal` runs the `WebServer` + mDNS (`cyd-sky.local`) on core 0. The HTML is rendered
+- `web_server` (`admin/adapters/`, was `config_portal`) runs the `WebServer` + mDNS
+  (`cyd-sky.local`) on core 0; the form's checks (`isValidFloatString()`,
+  `isValidUnsignedIntString()`) and the credentials-file parser (`parseOpenSkyCredentialsJson()`)
+  are the pure `settings_form` (`admin/core/`), settings storage is `settings_nvs`. The HTML is rendered
   by the pure **`config_page`** (`renderConfigPage(model, sink)`, native-tested) and sent by
   `sendPage()` in ~1.4 KB chunks (see CLAUDE.md "Concurrency — two cores": send in large
   pieces).
@@ -231,11 +277,11 @@ Spec: `spec/done/01-ota-updates.md`. Released in v1.1.0.
   `firmwareMarker()`; `FW_BOARD` defaults to `cyd-r` — builds for other CYD variants will set it
   per env and reject a mismatch). `firmware.yml` greps the built `.bin` for it. Builds older
   than v1.1.0 have no marker: going back to them needs USB / the web installer.
-- **Image checks** (`ota_update`, pure, behind an `OtaWriter` seam — `Update` on the board, a
+- **Image checks** (`ota_update`, pure, behind an `OtaWriter` seam — `Update` in `ota_flash` on the board, a
   fake in tests): `checkImageHeader()` wants the 0xE9 magic and this chip's id, and refuses a
   leading `0xFF` (the merged `-full.bin`, meant for 0x0); `checkImageSize()`;
   `FirmwareMarkerScanner` finds the marker even across chunk boundaries.
-- **Display:** `config_portal` and `release_check` draw nothing; their `OtaObserver` callbacks
+- **Display:** `web_server` and `github_http` draw nothing; their `OtaObserver` (`ota_update.h`) callbacks
   (start / every 16 KB / end, on core 0) go to `net_task`, which publishes them as
   `NetState::ota` (`OtaProgress`, phase + seq); the UI draws `service_screen` from it. The
   16 KB callback also does `vTaskDelay(1)` (core 0's watchdog). Success: answer page, ~1.5 s,
@@ -397,7 +443,7 @@ green dot, red "!").
   `WebStr` title + action, log code) + a rule in `collectAlerts()` + texts in `i18n.h` /
   `web_i18n.h` (PL + EN; numbers via `fillTemplate()` "{}" placeholders) + the body / why case
   in `alertDisplayBody()` / `alertWebWhy()`. Drawing code doesn't change.
-- **Flow:** `net_task` derives them every pass (`deviceAlertInputs(cfg)` =
+- **Flow:** `net_task` derives them every pass (`deviceAlertInputs(cfg)` in `alert_sources` =
   `openSkyAuthStatus()`, `openSkyQuota()`, the night pause) into `NetState::alerts` /
   `alertDetails`; logs each change once (`[alert] + opensky_budget_over_limit`).
   `netStateDiffers()` ignores `quotaObservedMs`; `diffNetState()` sets
@@ -432,8 +478,13 @@ green dot, red "!").
   the settings page footer, not on the display. The script also writes
   `.pio/build/cyd/cyd-sky-tracker-<version>.bin` (copy of firmware.bin) and `version.txt`.
 - **Partitions:** `min_spiffs.csv` — two 1.875 MB OTA slots, NVS at the same offset as before.
-  The firmware (~1.47 MB) must stay under one slot; the efont subset (CLAUDE.md "Language") is
-  what makes it fit.
+  The firmware (~1.35 MB) must stay under one slot; the efont subset (CLAUDE.md "Language") and
+  the build without exceptions help it fit.
+- **Build flags:** `env:cyd` (and `cyd-ota`, which extends it) has `build_unflags = -fexceptions`
+  and `-fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables` — no `.eh_frame`, no
+  exception tables (−133 408 B, why: docs/history.md "Tooling and docs"). Nothing may use `try` /
+  `catch` / `throw`; an error that would throw (`std::bad_alloc`) aborts, as an uncaught
+  exception did before. `native` / `native-asan` keep the default flags.
 - **Pinned versions:** platform and libraries are pinned in `platformio.ini` so CI and local
   builds match — bump them deliberately (and rerun `tools/subset_efont.py` after a LovyanGFX
   bump).

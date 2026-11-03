@@ -153,7 +153,7 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   deploy took the latest Release before the v1.7.0 one existed. Release commits no longer
   deploy on push; `release.yml` deploys with its own firmware.
 - **Display driver.** The first plan used TFT_eSPI with `build_flags`; LovyanGFX (configured in
-  C++, `include/LGFX_CYD.hpp`) replaced it. CLAUDE.md once carried a "platformio.ini starting
+  C++, `include/LGFX_CYD.hpp`, since spec 12 stage 4 `src/display/adapters/lgfx/`) replaced it. CLAUDE.md once carried a "platformio.ini starting
   point"; `platformio.ini` and `LGFX_CYD.hpp` are the truth now.
 - **CLAUDE.md split** (spec 11): it had grown to ~1550 lines mixing rules, screen specs and
   history, and contradicted itself (25 vs 15 px header, an "orange block" in the status bar, the
@@ -184,7 +184,7 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   the roots got their own word, `main/`. Done as its own stage (80 × `git mv` + include lines,
   firmware +16 B) before the types move, so no later diff mixes a rename with a real change.
   `admin/app/` didn't map to one layer: `config_page` and `web_i18n` are pure (→ `admin/core/`),
-  `config_portal` is `WebServer` routes (→ `admin/adapters/`). `config_portal.cpp` still carries
+  `config_portal` (now `web_server`) is `WebServer` routes (→ `admin/adapters/`). `config_portal.cpp` still carries
   five pure, tested functions, so the `native` filter re-adds that one file
   (`+<admin/adapters/config_portal.cpp>`) until stages 3–4 move them out — splitting it now
   would have put real code changes into a rename-only stage, and leaving it in
@@ -213,3 +213,37 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   in `tracked_flight.cpp` (same semantics, moves still `noexcept`) brought it to 1 477 568 B
   (+368). Without the out-of-line destructor it was 32 B bigger. Turning them back into implicit
   members "for simplicity" costs ~830 B of flash.
+- **Pure / hardware halves split** (spec 12, stage 4, owner 2026-11-01). Every `#ifdef ARDUINO`
+  half of a `core/` file moved to an adapter named as in spec 12 §4 (`opensky_http`,
+  `settings_nvs`, `touch_xpt2046` …, `lgfx/<module>_draw`), not §8's `x_esp32` — the owner wanted
+  names that say what the file talks to. Declarations with plain types stayed in the core headers,
+  unguarded: they are the port, every caller keeps its include, and a native caller fails to link
+  — moving them to adapter headers would have made `web_server`, `net_task`, `alert_sources`
+  include other contexts' adapters. Draw files were split callers first, so a draw adapter could
+  still include its callee's core header and no step added a `display/core -> display/adapters`
+  include. Adapters see only their own context (§5 unchanged), which costs 5 accepted findings
+  (47 → 14 overall). Every step was flashed and checked on the board.
+- **`config_portal` → `web_server`** (stage 4, owner 2026-11-01). Once its pure functions had
+  gone (`openSkyCreditCost` to `scan_area` in stage 3, the credentials parser and the number
+  validators to `admin/core/settings_form` in stage 4) the file held only `WebServer` routes and
+  mDNS, which spec 12 §4.5 calls `web_server`. Renamed as its own step through
+  `rewrite_includes.py`'s `MOVES_STAGE_4`, after the split, so no diff mixes a rename with code
+  changes; the `configPortal*()` functions keep their names until stage 7. Older entries here and
+  `docs/review-notes-2026.md` say `config_portal`.
+- **`AircraftInfo`'s constructor is out of line** (stage 4), for the same reason as `AircraftRow`'s
+  copies: once the hexdb.io fetchers left `aircraft_lookup.cpp`, GCC inlined the 106 B default
+  constructor into every caller (+176 B). Declared in `aircraft_lookup.h`, `= default` in the
+  `.cpp` → +64 B for the step.
+- **No C++ exceptions or unwind tables in the firmware** (stage 4 step 11b, owner 2026-11-02).
+  arduino-esp32 2.x compiles with `-fexceptions`; the image carried ~84 KB of `.eh_frame` plus
+  exception tables / landing pads. The ESP32 link keeps every object's `.eh_frame` in full, so a
+  template function shared by two files (ArduinoJson in `opensky_client` + `opensky_http`) leaves
+  a duplicate unwind record even though the linker drops the duplicate code: each new `.cpp` of
+  the split cost ~50 B, and splitting `opensky_client` +1 248 B — the stage stood at +1 856 B,
+  over its ± 1 KB. `env:cyd` now has `build_unflags = -fexceptions` and `-fno-exceptions
+  -fno-unwind-tables -fno-asynchronous-unwind-tables`: −133 408 B (1 479 424 → 1 346 016). Against
+  the stage's start built the same way (1 345 520 B, the new baseline) the split cost +496 B at
+  that step and +1 024 B at the end. Nothing in `src/` or the libraries uses `try` / `catch` /
+  `throw`; an error that would throw (`std::bad_alloc`) aborts, as an uncaught exception did
+  before. Xtensa panic backtraces come from the stack frames, not `.eh_frame`, so crash logs are
+  unchanged. Checked on the board (4 min, OpenSky login + polls, settings page, OTA).
