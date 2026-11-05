@@ -1192,7 +1192,10 @@ def function_body(text, name):
     return code[m.end():i - 1]
 
 
-_NOT_A_TYPE = {"return", "else", "case", "throw", "delete", "new", "goto", "sizeof", "co_return"}
+# Words that can stand before `name(` without it declaring `name`: statements, and `explicit` (a
+# constructor of the class, already declared by its `class name {` line).
+_NOT_A_TYPE = {"return", "else", "case", "throw", "delete", "new", "goto", "sizeof", "co_return",
+               "explicit"}
 
 
 def declaration_lines(text, symbol, bodies_only=False):
