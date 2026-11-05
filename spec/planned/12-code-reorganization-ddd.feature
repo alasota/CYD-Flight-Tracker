@@ -1,4 +1,4 @@
-Feature: Reorganizacja kodu według DDD — etapy 1–4: katalogi kontekstów i warstw (core / services / adapters, korzenie w main/), include'y z pełną ścieżką, raport zależności, źle położone typy w swoich kontekstach, podział czyste / sprzętowe
+Feature: Reorganizacja kodu według DDD — etapy 1–5: katalogi kontekstów i warstw (core / services / adapters, korzenie w main/), include'y z pełną ścieżką, raport zależności, źle położone typy w swoich kontekstach, podział czyste / sprzętowe, przepływy UI i formularz ustawień w services/ i core/ z testami
   Etap 1 przeniósł pliki z płaskiego src/ (git mv, bez dzielenia) do katalogów kontekstów i warstw
   z §4; każdy #include "…" podaje ścieżkę od src/ (flaga -I src), środowisko native nie kompiluje
   korzeni kompozycji ani adapterów, a tools/check_layers.py raportuje naruszenia tabeli z §5
@@ -12,8 +12,12 @@ Feature: Reorganizacja kodu według DDD — etapy 1–4: katalogi kontekstów i 
   touch_xpt2046…; rysowanie w display/adapters/lgfx/x_draw.cpp), przenosi LGFX_CYD.hpp i touch_calibration.h z include/ do
   kontekstu display, a ostatnie czyste funkcje config_portal do admin/core/settings_form — wyjątek
   w filtrze native znika; config_portal (już tylko trasy WebServer) dostaje nazwę z §4.5: web_server. Zachowanie urządzenia się nie zmienia: testy zielone, liczba RUN_TEST
-  nie maleje, firmware ma ten sam rozmiar ± 1 KB. Wyniki płytki z etapów 1–3 są w specyfikacji
-  (§8 „Wynik etapu N”); etapy 5–8 dostaną swoje scenariusze w tym pliku, gdy przyjdzie ich kolej.
+  nie maleje, firmware ma ten sam rozmiar ± 1 KB. Etap 5 wyciąga z main.cpp automaty stanów
+  (dotyk i strony tabeli, pytanie o aktualizację, ekran OTA, ekran ostrzeżeń, reset hasła, zrzut
+  ekranu, pomiar pętli UI) do display/services/, a z trasy POST /save logikę formularza do
+  admin/core/settings_form — każdy z testami natywnymi; main.cpp ma mniej niż 250 linii, zachowanie
+  urządzenia się nie zmienia. Wyniki płytki z etapów 1–4 są w specyfikacji (§8 „Wynik etapu N”);
+  etapy 6–8 dostaną swoje scenariusze w tym pliku, gdy przyjdzie ich kolej.
 
   # ---- etap 1 (aktualne po etapie 2): układ katalogów i include'y
 
@@ -713,3 +717,451 @@ Feature: Reorganizacja kodu według DDD — etapy 1–4: katalogi kontekstów i 
     And na końcu etapu aktualizacja OTA przez WiFi (POST /update z firmware.bin gałęzi) pokazuje ekran aktualizacji na wyświetlaczu, kończy się HTTP 200, a nowy obraz zostaje oznaczony jako ważny
     And zapis ustawień w panelu (zmiana np. interwału auto-cycle i z powrotem) przetrwa restart, szerokość „abc” jest odrzucona z komunikatem, a plik poświadczeń z błędnym JSON-em nie zmienia zapisanych poświadczeń
     And „Sprawdź teraz” na karcie Firmware łączy się z GitHubem (zweryfikowany TLS) bez błędu pamięci
+
+  # ---- etap 5: warstwa services/ (§6) — automaty stanów z main.cpp i formularz z POST /save, z testami
+
+  @test=tools/test_check_layers.py:LayoutTest.test_main_cpp_is_under_250_lines
+  Scenario: main.cpp ma mniej niż 250 linii (§8 pkt 5, §10 pkt 3)
+    Given src/main/main.cpp po etapie 5
+    When liczę jego linie
+    Then jest ich mniej niż 250 (przed etapem 909)
+
+  @test=tools/test_check_layers.py:LayoutTest.test_main_cpp_keeps_no_flow_state
+  Scenario: main.cpp nie trzyma stanu automatów w zmiennych static
+    Given kod (bez komentarzy) src/main/main.cpp
+    When szukam deklaracji static zmiennych typów prostych (bool, int, long, uint*_t, int*_t, size_t, std::string) — w zasięgu pliku i w funkcjach
+    Then nie ma żadnej poza static constexpr / static const i numerem ostatniej odebranej migawki NetState (netSeen)
+    And stan ekranów, timerów i pytań leży w obiektach typów z src/display/services/
+
+  @test=tools/test_check_layers.py:LayoutTest.test_stage_5_flows_left_main_cpp
+  Scenario Outline: Automat z main.cpp ma nowy dom w display/services/ i nie jest już zdefiniowany w main.cpp
+    Given drzewo src/ po etapie 5
+    When szukam definicji funkcji <dziś> w src/main/main.cpp i deklaracji <nowy_symbol> w nagłówkach
+    Then main.cpp nie definiuje <dziś>
+    And <nowy_symbol> ma dokładnie jedną deklarację, w src/<nowy_nagłówek>
+
+    Examples:
+      | dziś                  | nowy_symbol          | nowy_nagłówek                                |
+      | handleTap             | routeTap             | display/services/ui_flow.h                   |
+      | clampPage             | TablePager           | display/services/ui_flow.h                   |
+      | maybeShowUpdatePrompt | UpdatePromptFlow     | display/services/update_prompt_flow.h        |
+      | serviceUpdatePrompt   | UpdatePromptFlow     | display/services/update_prompt_flow.h        |
+      | serviceOtaScreen      | OtaScreenFlow        | display/services/ota_screen_flow.h           |
+      | serviceAlertScreen    | AlertScreenFlow      | display/services/alert_screen_flow.h         |
+      | offerWebPasswordReset | PasswordResetFlow    | display/services/password_reset_flow.h       |
+      | screenshotPrepare     | screenshotPrepareTarget | display/services/screenshot_bridge.h      |
+      | serviceScreenshot     | screenshotUiPass     | display/services/screenshot_bridge.h         |
+      | perfLoopTick          | UiPerfMeter          | display/services/ui_perf.h                   |
+
+  @test=tools/test_check_layers.py:LayoutTest.test_web_server_save_route_has_no_form_logic
+  Scenario: Trasa POST /save tylko zbiera pola, zapisuje i odpowiada — logika formularza jest w admin/core/settings_form
+    Given funkcja handleSave() w src/admin/adapters/web_server.cpp
+    When czytam jej ciało
+    Then ma najwyżej 30 linii i nie woła isValidFloatString, isValidUnsignedIntString, decidePasswordChange, parseClockMinutes, nightModeFromCode, languageFromCode, strtof, strtoul ani atoi
+    And woła applySettingsForm() z src/admin/core/settings_form.h
+
+  @test=tools/test_check_layers.py:LayoutTest.test_stage_5_services_have_their_tests
+  Scenario Outline: Każdy nowy moduł z §6 ma plik testów w grupie swojego kontekstu, zarejestrowany w main.cpp grupy
+    Given drzewo src/ i test/ po etapie 5
+    When szukam src/<moduł>.h, test/<plik_testów> i wywołania run_<nazwa>_tests() w main.cpp grupy
+    Then wszystkie trzy istnieją, a plik testów ma co najmniej 3 wywołania RUN_TEST
+
+    Examples:
+      | moduł                                  | plik_testów                                  | nazwa               |
+      | display/services/ui_flow               | test_display/ui_flow_test.cpp                | ui_flow             |
+      | display/services/update_prompt_flow    | test_display/update_prompt_flow_test.cpp     | update_prompt_flow  |
+      | display/services/ota_screen_flow       | test_display/ota_screen_flow_test.cpp        | ota_screen_flow     |
+      | display/services/alert_screen_flow     | test_display/alert_screen_flow_test.cpp      | alert_screen_flow   |
+      | display/services/password_reset_flow   | test_display/password_reset_flow_test.cpp    | password_reset_flow |
+      | display/services/screenshot_bridge     | test_display/screenshot_bridge_test.cpp      | screenshot_bridge   |
+      | display/services/ui_perf               | test_display/ui_perf_test.cpp                | ui_perf             |
+      | admin/core/settings_form               | test_admin/settings_form_test.cpp            | settings_form       |
+
+  @test=tools/test_check_layers.py:LayoutTest.test_stage_5_moved_tests_follow_their_code
+  Scenario Outline: Testy mostu zrzutu ekranu idą za kodem do test_display, testy BMP zostają w test_admin
+    Given katalog test/ po etapie 5
+    When szukam definicji i wywołania RUN_TEST testu <test>
+    Then oba są w test/<nowy_plik>, a w test/<stary_plik> nie ma ani definicji, ani wywołania
+
+    Examples:
+      | test                                                       | nowy_plik                               | stary_plik                         |
+      | test_bridge_normal_capture_fills_every_band                | test_display/screenshot_bridge_test.cpp | test_admin/screenshot_test.cpp     |
+      | test_bridge_concurrent_random_timeouts_never_touch_freed_buffers | test_display/screenshot_bridge_test.cpp | test_admin/screenshot_test.cpp |
+      | test_bridge_idle_rule_across_millis_rollover               | test_display/screenshot_bridge_test.cpp | test_admin/screenshot_test.cpp     |
+      | test_screen_returns_to_previous_after_capture              | test_display/screenshot_bridge_test.cpp | test_admin/screenshot_test.cpp     |
+      | test_return_not_triggered_without_prepare                  | test_display/screenshot_bridge_test.cpp | test_admin/screenshot_test.cpp     |
+      | test_header_fields                                         | test_admin/screenshot_test.cpp          | test_display/screenshot_bridge_test.cpp |
+
+  # ---- etap 5: ui_flow — dotyk, strony tabeli, zmiany ekranu, zegar, auto-cycle, stan źródła (dziś handleTap, clampPage, onScreenChanged, updateShownHealth, część loop())
+
+  @test=test_display/ui_flow_test.cpp:test_route_tap_bottom_nav_jumps_to_its_screen
+  Scenario Outline: Dotknięcie zakładki na dole przełącza na jej ekran z każdego ekranu
+    Given aktywny ekran <ekran> i ekran 320 × 240
+    When routeTap() dostaje dotknięcie w (<x>, 225)
+    Then wynik to JumpTo z celem <cel>
+
+    Examples:
+      | ekran | x   | cel |
+      | 0     | 50  | 0   |
+      | 0     | 160 | 1   |
+      | 1     | 300 | 2   |
+      | 2     | 10  | 0   |
+
+  @test=test_display/ui_flow_test.cpp:test_route_tap_alert_badge_comes_first
+  Scenario: Dotknięcie „!” w nagłówku otwiera ekran ostrzeżeń, zanim zadziała cokolwiek innego
+    Given dom ustawiony, nagłówek z narysowaną odznaką „!” i ekran LOTY na drugiej stronie tabeli
+    When routeTap() dostaje dotknięcie w strefie odznaki (także 8 px za nią i do y = 24)
+    Then wynik to OpenAlerts, a nie zmiana strony ani ekranu
+
+  @test=test_display/ui_flow_test.cpp:test_route_tap_badge_zone_without_badge_or_home_falls_through
+  Scenario: Strefa odznaki bez odznaki albo bez ustawionego domu nie otwiera ostrzeżeń
+    Given nagłówek bez odznaki (alert_x < 0) albo dom jeszcze nieustawiony
+    When routeTap() dostaje dotknięcie w tym samym miejscu
+    Then wynik nie jest OpenAlerts
+
+  @test=test_display/ui_flow_test.cpp:test_route_tap_pages_table_within_bounds
+  Scenario Outline: Pas pierwszego i ostatniego wiersza tabeli zmienia stronę, ale nie poza pierwszą i ostatnią
+    Given ekran LOTY, <stron> stron(y) tabeli i aktywna strona <strona>
+    When routeTap() dostaje dotknięcie w pasie <pas> (górny: od y = 116, wysokość wiersza; dolny: tuż nad paskiem zakładek)
+    Then wynik to <wynik>
+
+    Examples:
+      | stron | strona | pas    | wynik    |
+      | 2     | 0      | górny  | None     |
+      | 2     | 1      | górny  | PagePrev |
+      | 2     | 0      | dolny  | PageNext |
+      | 2     | 1      | dolny  | None     |
+      | 0     | 0      | dolny  | None     |
+      | 1     | 0      | dolny  | None     |
+
+  @test=test_display/ui_flow_test.cpp:test_route_tap_content_of_flight_and_radar_does_nothing
+  Scenario: Na ekranach TERAZ i RADAR dotknięcie treści nic nie robi
+    Given aktywny ekran TERAZ albo RADAR
+    When routeTap() dostaje dotknięcie w pasie stronicowania tabeli albo na środku ekranu
+    Then wynik to None
+
+  @test=test_display/ui_flow_test.cpp:test_table_pager_clamps_after_shorter_list
+  Scenario: Nowy poll z krótszą listą cofa stronę tabeli na ostatnią istniejącą
+    Given TablePager na stronie 3
+    When nowy poll daje 2 strony, a potem pustą listę
+    Then strona to najpierw 1, potem 0
+
+  @test=test_display/ui_flow_test.cpp:test_screen_change_resets_page_and_auto_cycle_timer
+  Scenario: Każda zmiana ekranu zeruje stronę tabeli i timer auto-cycle i zleca przerysowanie
+    Given strona tabeli 2 i ostatnia zmiana ekranu 40 s temu
+    When ekran zmienia się z dotyku, z auto-cycle albo ze zrzutu ekranu
+    Then strona to 0, timer auto-cycle liczy od teraz, a zdarzenia przerysowania mają screenChanged
+
+  @test=test_display/ui_flow_test.cpp:test_screen_change_persists_only_a_new_screen
+  Scenario: Zapis ostatniego ekranu: dotyk od razu, auto-cycle najwyżej co 10 min, zrzut nigdy, ten sam ekran wcale
+    Given ostatni zapisany ekran 0, zapisany 1 min temu
+    When ekran zmienia się na 1 z dotyku, potem na 2 z auto-cycle, potem na 0 ze zrzutu, a po 10 min na 2 z auto-cycle
+    Then zapis jest zlecony dla dotyku i dla auto-cycle po 10 min, nie dla auto-cycle po 1 min ani dla zrzutu
+    And powrót na już zapisany ekran nie zleca zapisu
+
+  @test=test_display/ui_flow_test.cpp:test_minute_watch_first_sync_and_rollover
+  Scenario: Zegar w nagłówku odświeża się przy pierwszej synchronizacji NTP i przy zmianie minuty, nie częściej
+    Given zegar jeszcze niezsynchronizowany (minuta -1) po pierwszym przejściu
+    When przychodzi synchronizacja, potem przejścia w tej samej minucie, potem w następnej
+    Then minuteChanged jest ustawione przy synchronizacji i przy nowej minucie, a w tej samej minucie nie
+
+  @test=test_display/ui_flow_test.cpp:test_auto_cycle_never_on_dark_screen_or_without_home
+  Scenario: Auto-cycle nie przełącza wygaszonego ekranu, ekranu bez ustawionego domu ani gdy jest wyłączony
+    Given minął interwał auto-cycle i nic nie wstrzymuje przełączenia
+    When auto-cycle jest wyłączony, dom nieustawiony albo ekran wygaszony nocą
+    Then przełączenia nie ma
+    But z włączonym auto-cycle, ustawionym domem i świecącym ekranem przełączenie jest
+
+  @test=test_display/ui_flow_test.cpp:test_shown_health_network_error_after_silence_marks_empty_screen
+  Scenario: Po 60 s ciszy rdzenia 0 nagłówek pokazuje błąd sieci, a pusty ekran mówi dlaczego
+    Given stan źródła Ok i ostatnie bicie rdzenia 0 sprzed 60 001 ms
+    When UI liczy stan pokazywany w nagłówku
+    Then to NetworkError ze zdarzeniem healthChanged
+    And przy pustej liście lotów jest też newPoll (treść pokazuje powód), a przy niepustej nie
+
+  # ---- etap 5: update_prompt_flow — pytanie „nowa wersja — zainstalować?” (dziś maybeShowUpdatePrompt, serviceUpdatePrompt, 7 zmiennych static)
+
+  @test=test_display/update_prompt_flow_test.cpp:test_prompt_opens_once_per_boot
+  Scenario: Pytanie o nową wersję pojawia się najwyżej raz na uruchomienie
+    Given brama shouldShowUpdatePrompt() przepuszcza (wersja dostępna, nie pominięta, ekran świeci)
+    When pytanie się otwiera, zostaje zamknięte i brama znów przepuszcza
+    Then drugi raz się nie otwiera (alreadyPromptedThisBoot)
+
+  @test=test_display/update_prompt_flow_test.cpp:test_prompt_ignores_tap_before_release_or_arm_time
+  Scenario: Palec, który był na ekranie przy pojawieniu się pytania, albo dotknięcie przed upływem 300 ms nie odpowiada
+    Given pytanie otwarte przy dotkniętym ekranie
+    When palec trzyma dalej na TAK, a potem — po puszczeniu — dotyka TAK po 299 ms od otwarcia
+    Then nie ma odpowiedzi
+    But dotknięcie TAK po puszczeniu i po 300 ms jest odpowiedzią
+
+  @test=test_display/update_prompt_flow_test.cpp:test_prompt_yes_installs_no_skips_with_full_redraw
+  Scenario Outline: TAK wysyła InstallTag, NIE wysyła SkipTag z tagiem pytania, a ekrany wracają w całości
+    Given otwarte pytanie o v1.3.0, palec puszczony, minęło 300 ms
+    When dotknięcie trafia w przycisk <przycisk>
+    Then pytanie się zamyka, komenda do rdzenia 0 to <komenda> z tagiem v1.3.0, a zdarzenia przerysowania mają firstDraw
+
+    Examples:
+      | przycisk | komenda    |
+      | TAK      | InstallTag |
+      | NIE      | SkipTag    |
+
+  @test=test_display/update_prompt_flow_test.cpp:test_prompt_times_out_at_exactly_30_s
+  Scenario: Bez odpowiedzi pytanie znika dokładnie po 30 s, bez komendy
+    Given otwarte pytanie
+    When mija 29 999 ms, a potem 30 000 ms bez dotknięcia
+    Then po 29 999 ms jest nadal otwarte, po 30 000 ms zamknięte z firstDraw i bez komendy (zapyta po następnym uruchomieniu)
+
+  @test=test_display/update_prompt_flow_test.cpp:test_prompt_timer_redraws_every_250_ms
+  Scenario: Pasek czasu pytania odświeża się co 250 ms i UI budzi się na ten moment
+    Given pytanie otwarte w chwili 0
+    When przejścia przychodzą w 249, 250 i 499 ms
+    Then pasek jest rysowany w 250 ms z pozostałym czasem 29 750 ms, w 249 i 499 ms nie
+    And czas do następnego budzenia po 250 ms to 250 ms
+
+  @test=test_display/update_prompt_flow_test.cpp:test_prompt_closed_by_panel_install_without_redraw
+  Scenario: Instalacja zlecona z panelu w trakcie pytania zamyka je bez przerysowania ekranów (ekran OTA przejmuje)
+    Given otwarte pytanie
+    When NetState zgłasza installPending
+    Then pytanie się zamyka bez komendy i bez firstDraw
+
+  # ---- etap 5: ota_screen_flow — ekran aktualizacji rysowany z NetState::ota (dziś serviceOtaScreen)
+
+  @test=test_display/ota_screen_flow_test.cpp:test_ota_first_progress_draws_screen_then_only_bar
+  Scenario: Pierwszy postęp aktualizacji rysuje ekran OTA w pełnej jasności, kolejne tylko pasek postępu
+    Given OtaProgress Running, written 0, nowa sekwencja
+    When przychodzi ta sekwencja, a potem kolejna z written 400 000 z 1 300 000
+    Then pierwsze przejście zleca pełną jasność, ekran OTA i pasek; drugie tylko pasek z 400 000 / 1 300 000
+
+  @test=test_display/ota_screen_flow_test.cpp:test_ota_owns_display_while_running_done_or_restarting
+  Scenario Outline: Ekran OTA trzyma wyświetlacz w trakcie, po sukcesie i przed restartem, a zamyka ekran ostrzeżeń
+    Given OtaProgress w fazie <faza> i restartPending <restart>
+    When UI wykonuje przejście
+    Then ekran OTA trzyma wyświetlacz: <trzyma>, a gdy trzyma, ekran ostrzeżeń jest zamknięty
+
+    Examples:
+      | faza    | restart | trzyma |
+      | Running | false   | tak    |
+      | Done    | false   | tak    |
+      | Idle    | true    | tak    |
+      | Idle    | false   | nie    |
+
+  @test=test_display/ota_screen_flow_test.cpp:test_ota_failure_shown_5_s_then_back_to_screens
+  Scenario: Nieudana aktualizacja zostaje na ekranie dokładnie 5 s, potem wracają zwykłe ekrany
+    Given przejście z nową sekwencją w fazie Failed w chwili t (nieparzystej, np. 10 001)
+    When przychodzą przejścia w t + 4 999 i t + 5 000 ms
+    Then w t rysuje się wynik „nieudana”, w t + 4 999 ekran OTA dalej trzyma wyświetlacz i jasność, w t + 5 000 już nie, z firstDraw
+
+  @test=test_display/ota_screen_flow_test.cpp:test_ota_failure_timer_survives_millis_wrap
+  Scenario: 5 s po błędzie liczy się poprawnie także przez przekręcenie millis()
+    Given błąd aktualizacji w chwili 0xFFFFF001 (nieparzystej — znacznik czasu ma ustawiony najniższy bit, żeby 0 znaczyło „brak błędu”, jak dziś)
+    When mijają 4 999, a potem 5 000 ms
+    Then ekran wraca po 5 000 ms, nie wcześniej i nie później
+
+  @test=test_display/ota_screen_flow_test.cpp:test_ota_retry_after_failure_redraws_screen
+  Scenario: Ponowna próba po błędzie rysuje ekran OTA od nowa
+    Given błąd aktualizacji pokazany i 5 s minęło
+    When przychodzi nowa sekwencja Running z written 0
+    Then przejście zleca znów ekran OTA (z pełną jasnością) i pasek
+
+  @test=test_display/ota_screen_flow_test.cpp:test_ota_same_seq_draws_nothing
+  Scenario: Bez nowej sekwencji postępu ekran OTA niczego nie rysuje
+    Given ekran OTA już narysowany dla sekwencji 7 w fazie Running
+    When kolejne przejścia widzą tę samą sekwencję 7
+    Then nic nie jest rysowane, a ekran OTA dalej trzyma wyświetlacz
+
+  # ---- etap 5: alert_screen_flow — ekran ostrzeżeń za „!” (dziś openAlertMessage, closeAlertMessage, serviceAlertScreen)
+
+  @test=test_display/alert_screen_flow_test.cpp:test_alert_flow_redraws_list_when_alerts_change
+  Scenario: Zmiana listy ostrzeżeń przy otwartym ekranie przerysowuje listę, a odliczanie biegnie dalej
+    Given ekran ostrzeżeń otwarty w chwili 0 z jednym ostrzeżeniem
+    When po 3 s przychodzi drugie ostrzeżenie
+    Then przejście zleca narysowanie całej listy z 12 s na przycisku ZAMKNIJ, nie od nowa 15 s
+
+  @test=test_display/alert_screen_flow_test.cpp:test_alert_flow_close_returns_with_full_redraw
+  Scenario: Zamknięcie ekranu ostrzeżeń wraca do tego samego ekranu i strony z pełnym przerysowaniem i świeżym auto-cycle
+    Given ekran ostrzeżeń otwarty nad ekranem LOTY, strona 1
+    When upływa 15 s albo pada świeże dotknięcie ZAMKNIJ
+    Then ekran się zamyka, zdarzenia mają firstDraw, timer auto-cycle liczy od teraz, a ekran i strona są te same
+    And wynik każe połknąć bieżący dotyk (swallowTouch) — ani dotknięcia przy otwartym ekranie, ani to, które go zamknęło, nie są dotknięciami dla ekranu pod spodem
+
+  @test=test_display/alert_screen_flow_test.cpp:test_alert_flow_closed_by_ota_screen
+  Scenario: Ekran aktualizacji zamyka ekran ostrzeżeń bez przerysowania (ekran OTA ma pierwszeństwo)
+    Given otwarty ekran ostrzeżeń
+    When ekran OTA przejmuje wyświetlacz
+    Then ekran ostrzeżeń jest zamknięty i nie zleca rysowania
+
+  # ---- etap 5: password_reset_flow — reset zapomnianego hasła panelu przy starcie (dziś offerWebPasswordReset)
+
+  @test=test_display/password_reset_flow_test.cpp:test_reset_offered_only_with_password_and_finger
+  Scenario Outline: Reset hasła jest proponowany tylko z ustawionym hasłem i palcem na ekranie przy starcie
+    Given hasło panelu <hasło> i ekran przy starcie <dotyk>
+    When setup() pyta, czy zaproponować reset
+    Then odpowiedź to <propozycja>
+
+    Examples:
+      | hasło      | dotyk       | propozycja |
+      | ustawione  | dotknięty   | tak        |
+      | ustawione  | niedotknięty| nie        |
+      | puste      | dotknięty   | nie        |
+
+  @test=test_display/password_reset_flow_test.cpp:test_reset_hold_5_s_then_confirm_after_release
+  Scenario: Przytrzymanie palca 5 s prowadzi do pytania TAK / NIE dopiero po puszczeniu palca
+    Given reset rozpoczęty w chwili 1 000 z palcem na ekranie
+    When palec trzyma do 6 000 ms i dłużej, a potem puszcza
+    Then do 5 999 ms rysuje się pasek trzymania, w 6 000 ms trzymanie się kończy
+    And pytanie TAK / NIE pojawia się dopiero, gdy od ostatniego odczytu dotyku minęło 300 ms, nie wcześniej i nie w trakcie trzymania
+
+  @test=test_display/password_reset_flow_test.cpp:test_reset_release_over_300_ms_cancels_glitch_does_not
+  Scenario: Puszczenie palca na dłużej niż 300 ms przerywa reset, krótszy zanik odczytu nie
+    Given reset rozpoczęty z palcem na ekranie
+    When odczyt dotyku znika na 300 ms i wraca, a później znika na 301 ms
+    Then po zaniku 300 ms trzymanie trwa dalej, po 301 ms reset się kończy czystym ekranem, bez zmiany hasła
+
+  @test=test_display/password_reset_flow_test.cpp:test_reset_confirm_yes_clears_once_no_and_timeout_keep
+  Scenario Outline: TAK czyści hasło dokładnie raz, NIE i brak odpowiedzi przez 15 s je zostawiają
+    Given pytanie TAK / NIE po przytrzymaniu
+    When <co_się_dzieje>
+    Then czyszczenie hasła jest zlecone <ile> raz(y), a reset się kończy <ekran>
+
+    Examples:
+      | co_się_dzieje                               | ile | ekran                                            |
+      | świeże dotknięcie TAK                        | 1   | ekranem „hasło usunięte” na 1,5 s, potem czystym |
+      | świeże dotknięcie NIE                        | 0   | czystym ekranem                                  |
+      | brak dotknięcia przez 15 000 ms              | 0   | czystym ekranem                                  |
+      | dotknięcie poza przyciskami, potem nic przez 15 000 ms | 0 | czystym ekranem                        |
+
+  # ---- etap 5: screenshot_bridge — zrzut ekranu, strona UI (dziś shot::, screenshotPrepare, serviceScreenshot)
+
+  @test=test_display/screenshot_bridge_test.cpp:test_screenshot_prepare_target_screens_and_demos
+  Scenario Outline: ?screen=N wybiera ekran albo jeden z dwóch ekranów demo
+    Given 3 ekrany (LOTY, TERAZ, RADAR)
+    When zlecenie zrzutu prosi o ekran <n>
+    Then przygotowanie to <cel>
+
+    Examples:
+      | n  | cel                                          |
+      | -1 | bieżący ekran, bez przełączenia              |
+      | 0  | ekran 0                                      |
+      | 2  | ekran 2                                      |
+      | 3  | demo pytania o aktualizację                  |
+      | 4  | demo ekranu ostrzeżeń                        |
+
+  @test=test_display/screenshot_bridge_test.cpp:test_screenshot_ui_pass_returns_to_previous_screen
+  Scenario: Przejście UI obsługuje zrzut tą samą funkcją na płytce i w testach i wraca na poprzedni ekran
+    Given ekran LOTY i zlecenie zrzutu ekranu RADAR z dwoma pasami
+    When przejścia UI wołają screenshotUiPass() z mostem na std::mutex (test) — na płytce na SpinLock, z tą samą funkcją
+    Then pierwsze przejście woła przygotowanie z ekranem 2 i zgłasza trwający zrzut, kolejne wołają odczyt pasów od dolnego wiersza pasa
+    And po end() pierwsze przejście bez zrzutu zwraca ekran 0 do przywrócenia (dokładnie raz), a następne już nic
+
+  # ---- etap 5: ui_perf — przerwy pętli UI do /perf.json (dziś perfLoopTick)
+
+  @test=test_display/ui_perf_test.cpp:test_ui_perf_gap_subtracts_planned_sleep
+  Scenario: Przerwa pętli UI to czas od poprzedniego przejścia minus zaplanowany sen
+    Given przejście w chwili 1 000 ms, które zaplanowało sen 20 ms
+    When następne przejście zaczyna się w 1 035 ms, a kolejne (sen 1 000 ms) wcześniej niż po 1 000 ms
+    Then przerwy to 15 ms i 0 ms (nigdy ujemna), a pierwsze przejście po starcie nie jest liczone
+
+  @test=test_display/ui_perf_test.cpp:test_ui_perf_slow_pass_from_250_ms
+  Scenario: Przerwa od 250 ms liczy się jako wolne przejście, 249 ms nie
+    Given licznik wolnych przejść 0
+    When przychodzą przerwy 249 ms i 250 ms
+    Then wolnych przejść jest 1, a największa przerwa od startu to 250 ms
+
+  @test=test_display/ui_perf_test.cpp:test_ui_perf_window_closes_every_60_s
+  Scenario: Okno statystyk zamyka się co 60 s i oddaje UiPerfShare rdzeniowi 0
+    Given pierwsze przejście w chwili 1 000 (także w 0xFFFF0000, tuż przed przekręceniem millis())
+    When przejścia przychodzą do 60 999 ms, a potem w 61 000 ms (60 000 ms po pierwszym)
+    Then okno zamyka się dopiero 60 000 ms po pierwszym przejściu, UiPerfShare ma liczbę przejść, maksimum i przedziały okna, a następne okno zaczyna się od zera
+
+  # ---- etap 5: settings_form — formularz ustawień (dziś handleSave w web_server)
+
+  @test=test_admin/settings_form_test.cpp:test_form_valid_submit_sets_every_field_and_home_configured
+  Scenario: Poprawny formularz ustawia wszystkie pola i oznacza dom jako ustawiony
+    Given zapisane ustawienia i formularz z każdym polem (szerokość, długość, zasięg, odświeżanie, auto-cycle, jasność, noc, języki, poświadczenia)
+    When applySettingsForm() go stosuje
+    Then każde pole ma wartość z formularza, home_configured = true, brak odrzuconych pól, komunikat „Zapisano.”
+
+  @test=test_admin/settings_form_test.cpp:test_form_rejects_malformed_number_and_keeps_old_value
+  Scenario Outline: Błędna wartość pola zostaje odrzucona, a pole zachowuje poprzednią wartość
+    Given zapisane ustawienia
+    When formularz ma <pole> = "<wartość>"
+    Then pole w ustawieniach się nie zmienia, odrzucone pola to [<etykieta>], komunikat to SavedWithInvalid
+
+    Examples:
+      | pole                | wartość  | etykieta          |
+      | lat                 | abc      | Latitude          |
+      | lon                 | 12.3.4   | Longitude         |
+      | radius              |          | Radius            |
+      | poll_interval       | -5       | PollInterval      |
+      | auto_cycle_interval | 10s      | AutoCycleInterval |
+      | near_airport_km     | 1e       | NearAirport       |
+      | climb_rate_mps      | x        | ClimbRate         |
+      | bl_min              | 12345    | BrightnessMin     |
+      | night_wake_s        | 3.5      | NightWake         |
+      | night_from          | 25:00    | NightFrom         |
+
+  @test=test_admin/settings_form_test.cpp:test_form_rejected_labels_in_form_order_in_panel_language
+  Scenario: Kilka błędnych pól jest wymienionych w kolejności formularza, w języku panelu
+    Given formularz z błędną szerokością, długością i hasłami, które się różnią
+    When rejectedFieldsText() składa listę po polsku i po angielsku
+    Then to „Szerokość geograficzna, Długość geograficzna, hasło panelu (wpisane hasła się różnią)” i „Latitude, Longitude, …” — w tej kolejności, rozdzielone „, ”
+
+  @test=test_admin/settings_form_test.cpp:test_form_missing_checkbox_unchecked_missing_text_unchanged
+  Scenario: Brak pola wyboru znaczy „odznaczone”, a brak pola tekstowego „bez zmian”
+    Given zapisane ustawienia z włączonym auto-cycle, sprawdzaniem aktualizacji i pauzą nocą
+    When formularz nie ma auto_cycle, update_check, night_pause ani lat
+    Then te trzy opcje są wyłączone, a szerokość geograficzna się nie zmienia
+
+  @test=test_admin/settings_form_test.cpp:test_form_empty_secret_keeps_saved_clear_removes_both
+  Scenario: Puste pole sekretu OpenSky zachowuje zapisany sekret, a „wyczyść” usuwa id i sekret
+    Given zapisane client id i sekret OpenSky
+    When formularz ma nowe client_id i puste client_secret, a drugi formularz ma clear_credentials
+    Then po pierwszym id jest nowe, a sekret ten sam; po drugim oba są puste
+
+  @test=test_admin/settings_form_test.cpp:test_form_password_outcomes_and_messages
+  Scenario Outline: Hasło panelu z formularza: komunikat i zmiana
+    Given zapisane hasło panelu "stare-haslo"
+    When formularz ma new_password "<nowe>", new_password2 "<powtórzone>" i clear_password <wyczyść>
+    Then hasło to "<wynik>", a komunikat / odrzucone pole to <komunikat>
+
+    Examples:
+      | nowe         | powtórzone   | wyczyść | wynik        | komunikat        |
+      |              |              | nie     | stare-haslo  | Saved            |
+      | nowe-haslo-1 | nowe-haslo-1 | nie     | nowe-haslo-1 | PasswordChanged  |
+      | nowe-haslo-1 | inne-haslo-2 | nie     | stare-haslo  | PasswordMismatch |
+      | krotkie      | krotkie      | nie     | stare-haslo  | PasswordTooShort |
+      | nowe-haslo-1 | nowe-haslo-1 | tak     |              | PasswordCleared  |
+
+  @test=test_admin/settings_form_test.cpp:test_form_brightness_out_of_range_is_clamped
+  Scenario: Liczby jasności i nocy poza zakresem są przycinane, a nie odrzucane
+    Given formularz z bl_max 150, bl_min 0, night_pct 101 i night_wake_s 5
+    When applySettingsForm() go stosuje
+    Then jasność maks. to 100, min. 5, w nocy 100, wybudzenie 10 s — i żadne z tych pól nie jest odrzucone
+
+  @test=test_admin/settings_form_test.cpp:test_form_args_first_value_wins
+  Scenario: Pole wysłane dwa razy liczy się w pierwszej wersji, jak w WebServer::arg()
+    Given FormArgs z lat = "52.1" i potem lat = "abc"
+    When applySettingsForm() go stosuje
+    Then szerokość to 52.1 i nic nie jest odrzucone
+
+  # ---- etap 5: rozmiar, liczby testów, płytka
+
+  @manual
+  Scenario: Etap 5 nie zmienia zachowania, dodaje testy, a firmware rośnie najwyżej o ustalony budżet
+    Given na gałęzi przed etapem 5 (v1.11.2, 8a82b39): przypadki w 6 grupach pio test -e native (admin 258, airspace 71, display 312, enrichment 80, opensky 74, platform 83 = 878), RUN_TEST( 878, firmware.bin 1 346 544 B, „Flash: used” 1 339 961, „RAM: used” 62 044 B, lista bibliotek, wc -l src/main/main.cpp = 909, src/admin/adapters/web_server.cpp = 834, check_layers 14
+    When mierzę to samo po każdym kroku i na końcu etapu (po usunięciu .pio/build/native i .pio/build/cyd)
+    Then wszystkie grupy są zielone, przypadków jest 878 + nowe testy z tests.md (19 testów mostu zrzutu przeszło z test_admin do test_display), RUN_TEST( rośnie o tyle samo
+    And firmware.bin na końcu jest większy od 1 346 544 B najwyżej o budżet z planu (domyślnie 4 096 B), RAM statyczny najwyżej o 256 B, lista bibliotek ta sama
+    And python tools/check_layers.py zgłasza dalej dokładnie te same 14 naruszeń, python tools/rewrite_includes.py --check kończy się kodem 0, python tools/check_comments.py --strict nic nie zgłasza, python tools/check_bdd.py 0 problemów
+
+  @manual
+  Scenario: Płytka po każdym kroku etapu 5 działa jak przedtem: dotyk, ekrany serwisowe, zrzuty, formularz
+    Given firmware z każdego kroku wgrany (USB COM3 albo pio run -e cyd-ota -t upload, za zgodą właściciela) i pio device monitor -b 115200 przez 2–3 minuty
+    When płytka startuje, łączy się z WiFi i odbiera kilka pollów
+    Then log szeregowy nie pokazuje paniki ani restartu poza startem, /screenshot.bmp?screen=0, 1, 2 pokazują LOTY, TERAZ z odliczaniem i RADAR jak po etapie 4, a ekran po zrzucie wraca na poprzedni
+    And /screenshot.bmp?screen=3 i 4 pokazują demo pytania o aktualizację i ekranu ostrzeżeń, a potem wraca zwykły ekran
+    And /perf.json po ponad 60 s ma okno UI z liczbą przejść, wolnych przejść 0, sterta i największy blok w zakresie etapu 4 (140–148 KB / 53–70 KB)
+    And właściciel sprawdza dotyk: zakładki przełączają ekrany, pasy tabeli zmieniają stronę, „!” (gdy jest) otwiera ekran ostrzeżeń, który zamyka ZAMKNIJ albo 15 s; auto-cycle (gdy włączony) przełącza ekrany, a ostatni ekran wraca po restarcie
+    And aktualizacja OTA przez WiFi pokazuje ekran aktualizacji z paskiem i kończy się nowym obrazem oznaczonym jako ważny; wysłanie pliku, który nie jest firmware'em, pokazuje „aktualizacja nieudana” przez 5 s i wraca do ekranów
+    And z ustawionym hasłem panelu palec na ekranie przy włączeniu daje ekran trzymania, po 5 s pytanie TAK / NIE; NIE zostawia hasło
+    And zapis formularza bez zmian zachowuje wartości, szerokość „abc” i długość „x” są odrzucone z komunikatem wymieniającym oba pola w tej kolejności, a zmiana interwału auto-cycle przetrwa restart
