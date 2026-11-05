@@ -33,6 +33,12 @@ struct PromptStep {
   uint32_t remainingMs = 0;
 };
 
+// The gate for tryOpen() from net_task's state and the UI's: the release
+// check's answer, the skipped tag and home from the settings in `s`, the NOW
+// aircraft's CPA at `nowMs` (alreadyPromptedThisBoot is the flow's own).
+PromptGate updatePromptGate(const NetState &s, int currentScreen, uint32_t nowMs,
+                            bool touchActive, bool screenOff, bool alertScreenOpen);
+
 class UpdatePromptFlow {
  public:
   // Opens the question when shouldShowUpdatePrompt(gate) — gate's

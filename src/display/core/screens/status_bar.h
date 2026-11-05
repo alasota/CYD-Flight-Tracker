@@ -90,3 +90,7 @@ constexpr int kStatusBarDateClockGap = 8;
 HeaderZones statusBarZones(int screenWidth, const std::string &appName,
                            const std::string &countLabel, const std::string &date,
                            const std::string &clock, bool badge = false);
+// The zones of the header as drawStatusBar() draws it from these values (the
+// app name, statusBarBlockLabel(), statusBarDate(), statusBarClock()).
+HeaderZones statusBarZonesNow(int screenWidth, int aircraftCount, bool hasData, Language lang,
+                              std::time_t localEpoch, bool timeSynced, bool badge);

@@ -1,10 +1,41 @@
 #include "display/services/ui_flow.h"
 
+#include "airspace/core/cpa_predictor.h"       // extrapolateCpa()
 #include "airspace/core/flight_ordering.h"     // splitFeaturedAndRest()
 #include "display/core/screens/table_view.h"   // getPageCount(), table row geometry
 #include "display/core/theme/lcars_theme.h"    // LCARS_BOTTOM_NAV_HEIGHT
 #include "display/core/touch_input.h"          // Rect, hitTest()
 #include "platform/core_link.h"                // msUntilPeriod(), heartbeatStale()
+
+// ---- What the screens show -------------------------------------------------------
+
+const std::vector<AircraftRow> &netRows(const NetState &s) {
+  static const std::vector<AircraftRow> kNone;
+  return s.data != nullptr ? s.data->rows : kNone;
+}
+
+CpaPrediction netCpaAt(const NetState &s, uint32_t nowMs) {
+  if (s.data == nullptr) return CpaPrediction{};
+  return extrapolateCpa(s.data->cpa, nowMs - s.data->polledAtMs);
+}
+
+UiView makeUiView(const NetState &s, int screen, int page, OpenSkyHealth shownHealth,
+                  uint32_t nowMs, std::time_t local, bool synced) {
+  UiView v;
+  v.screen = screen;
+  v.page = page;
+  v.rows = &netRows(s);
+  v.hasData = s.data != nullptr;
+  v.nowRowIndex = v.hasData ? s.data->nowRowIndex : -1;
+  v.cpa = netCpaAt(s, nowMs);
+  v.radiusDeg = s.cfg != nullptr ? s.cfg->radius_deg : 0.0f;
+  v.health = shownHealth;
+  v.alertBadge = s.alerts.displaySeverity();
+  v.local = local;
+  v.synced = synced;
+  v.homeConfigured = s.cfg != nullptr && s.cfg->home_configured;
+  return v;
+}
 
 // ---- Taps ---------------------------------------------------------------------
 
@@ -43,6 +74,19 @@ TapAction routeTap(int16_t x, int16_t y, const TapContext &c) {
     a.kind = TapKind::PageNext;
   }
   return a;
+}
+
+TapContext tapContextOf(const UiView &v, int16_t screenW, int16_t screenH, Language lang) {
+  TapContext c;
+  c.currentScreen = v.screen;
+  c.page = v.page;
+  c.pageCount = tablePageCount(*v.rows);
+  c.homeConfigured = v.homeConfigured;
+  c.header = statusBarZonesNow(screenW, static_cast<int>(v.rows->size()), v.hasData, lang, v.local,
+                               v.synced, v.alertBadge != AlertSeverity::None);
+  c.screenW = screenW;
+  c.screenH = screenH;
+  return c;
 }
 
 int tablePageCount(const std::vector<AircraftRow> &rows) {
@@ -126,6 +170,21 @@ bool shouldAutoCycleNow(const AutoCycleInput &in) {
   if (!in.enabled || !in.homeConfigured || in.screenOff) return false;
   const bool deferHold = shouldDeferAutoSwitch(in.currentScreen, in.cpaFound, in.tCpaSeconds);
   return shouldAutoAdvance(in.elapsedMs, in.intervalS, deferHold);
+}
+
+AutoCycleInput autoCycleInputAt(const NetState &s, int currentScreen, bool screenOff,
+                                uint32_t elapsedMs, uint32_t nowMs) {
+  AutoCycleInput in;
+  in.enabled = s.cfg->auto_cycle_enabled;
+  in.homeConfigured = s.cfg->home_configured;
+  in.screenOff = screenOff;
+  in.currentScreen = currentScreen;
+  const CpaPrediction cpa = netCpaAt(s, nowMs);
+  in.cpaFound = cpa.found;
+  in.tCpaSeconds = cpa.t_cpa_seconds;
+  in.elapsedMs = elapsedMs;
+  in.intervalS = s.cfg->auto_cycle_interval_s;
+  return in;
 }
 
 // ---- The health the header shows ------------------------------------------------

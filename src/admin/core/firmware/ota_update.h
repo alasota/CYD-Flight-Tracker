@@ -194,3 +194,7 @@ struct OtaObserver {
 OtaSession &otaFlashSession();
 // Update.errorString() of the last failed write / verify.
 const char *otaFlashError();
+// At boot: logs the running app slot and whether it is still "pending
+// verify" (a fresh update, rollback armed) — returned for net_task, which
+// marks it valid (shouldMarkAppValid()).
+bool otaFlashRunningPendingVerify();

@@ -23,3 +23,8 @@ struct TouchPoint {
 // (x/y meaningless) when nothing is touching the panel. No separate init:
 // tft.init() brings up the touch controller too.
 TouchPoint touchInputRead(LGFX &gfx);
+
+// One serial line per tap: the raw XPT2046 values, where they mapped to and
+// the nav button there — what touch calibration is tuned from
+// (display/core/touch_calibration.h).
+void touchLogTap(LGFX &gfx, const TouchPoint &t);

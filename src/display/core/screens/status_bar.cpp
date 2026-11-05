@@ -111,3 +111,11 @@ HeaderZones statusBarZones(int screenWidth, const std::string &appName,
   z.count_end = z.count_start + countW;
   return z;
 }
+
+HeaderZones statusBarZonesNow(int screenWidth, int aircraftCount, bool hasData, Language lang,
+                              std::time_t localEpoch, bool timeSynced, bool badge) {
+  return statusBarZones(screenWidth, kStatusBarAppName,
+                        statusBarBlockLabel(aircraftCount, hasData, lang),
+                        statusBarDate(localEpoch, timeSynced),
+                        statusBarClock(localEpoch, timeSynced), badge);
+}

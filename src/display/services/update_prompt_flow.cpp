@@ -1,6 +1,25 @@
 #include "display/services/update_prompt_flow.h"
 
 #include "display/core/screens/service_screen.h"  // confirmHit()
+#include "display/services/ui_flow.h"               // netCpaAt()
+
+PromptGate updatePromptGate(const NetState &s, int currentScreen, uint32_t nowMs,
+                            bool touchActive, bool screenOff, bool alertScreenOpen) {
+  PromptGate g;
+  g.status = s.update.status;
+  g.latestTag = s.update.latestTag;
+  g.skippedTag = s.cfg->update_skipped_tag;
+  g.installedIsDev = isDevelopmentBuild(parseFwVersion(s.update.installed));
+  g.homeConfigured = s.cfg->home_configured;
+  g.currentScreen = currentScreen;
+  const CpaPrediction cpa = netCpaAt(s, nowMs);
+  g.cpaFound = cpa.found;
+  g.tCpaSeconds = static_cast<int>(cpa.t_cpa_seconds);
+  g.touchActive = touchActive;
+  g.screenOff = screenOff;
+  g.alertScreenOpen = alertScreenOpen;
+  return g;
+}
 
 bool UpdatePromptFlow::tryOpen(PromptGate gate, const std::string &tag, uint32_t nowMs) {
   gate.alreadyPromptedThisBoot = promptedThisBoot_;

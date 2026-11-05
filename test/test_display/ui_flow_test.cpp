@@ -4,6 +4,7 @@
 #include "display/services/ui_flow.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -319,6 +320,109 @@ static void test_shown_health_network_error_after_silence_marks_empty_screen(voi
   TEST_ASSERT_FALSE(fresh.newPoll);
 }
 
+// ---- What the screens show (helpers main.cpp reads NetState with) ------------------
+
+// A snapshot after a poll: three rows, the second one NOW, its CPA 40 s ahead at `polledAt`.
+static NetState polledState(uint32_t polledAt) {
+  auto data = std::make_shared<DataSnapshot>();
+  data->rows = {makeRow("LOT1", 3.0f), makeRow("LOT2", 5.0f), makeRow("LOT3", 9.0f)};
+  data->nowRowIndex = 1;
+  data->cpa.found = true;
+  data->cpa.t_cpa_seconds = 40.0f;
+  data->polledAtMs = polledAt;
+  Config cfg = makeConfig();
+  cfg.radius_deg = 1.5f;
+  NetState s;
+  s.data = data;
+  s.cfg = std::make_shared<const Config>(cfg);
+  return s;
+}
+
+// -- edge case: before the first poll there are no rows and no CPA; after it, the CPA ages
+static void test_net_rows_and_cpa_before_and_after_first_poll(void) {
+  NetState empty;
+  empty.cfg = std::make_shared<const Config>(makeConfig());
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(netRows(empty).size()));
+  TEST_ASSERT_FALSE(netCpaAt(empty, 5000).found);
+
+  const NetState s = polledState(0xFFFFF000u);  // the extrapolation wraps with millis()
+  TEST_ASSERT_EQUAL_INT(3, static_cast<int>(netRows(s).size()));
+  const CpaPrediction cpa = netCpaAt(s, 0xFFFFF000u + 10000);
+  TEST_ASSERT_TRUE(cpa.found);
+  TEST_ASSERT_FLOAT_WITHIN(0.01f, 30.0f, cpa.t_cpa_seconds);
+}
+
+// -- edge case: the view carries the snapshot, the UI's screen / page / shown health and the clock
+static void test_make_ui_view_reads_the_snapshot(void) {
+  NetState s = polledState(1000);
+  s.alerts.set(AlertId::OpenSkyLoginFailed);
+  const UiView v =
+      makeUiView(s, kScreenRadar, 2, OpenSkyHealth::NetworkError, 21000, 1760770000, true);
+  TEST_ASSERT_EQUAL_INT(kScreenRadar, v.screen);
+  TEST_ASSERT_EQUAL_INT(2, v.page);
+  TEST_ASSERT_TRUE(v.rows == &s.data->rows);
+  TEST_ASSERT_TRUE(v.hasData);
+  TEST_ASSERT_EQUAL_INT(1, v.nowRowIndex);
+  TEST_ASSERT_FLOAT_WITHIN(0.01f, 20.0f, v.cpa.t_cpa_seconds);
+  TEST_ASSERT_FLOAT_WITHIN(1e-6f, 1.5f, v.radiusDeg);
+  ASSERT_ENUM_EQ(OpenSkyHealth::NetworkError, v.health);
+  ASSERT_ENUM_EQ(s.alerts.displaySeverity(), v.alertBadge);
+  ASSERT_ENUM_NE(AlertSeverity::None, v.alertBadge);
+  TEST_ASSERT_EQUAL_INT64(1760770000, static_cast<int64_t>(v.local));
+  TEST_ASSERT_TRUE(v.synced);
+  TEST_ASSERT_TRUE(v.homeConfigured);
+
+  NetState first;  // setup()'s first snapshot: the settings only
+  first.cfg = std::make_shared<const Config>(defaultConfig());
+  const UiView w = makeUiView(first, kScreenFlights, 0, OpenSkyHealth::Ok, 100, 0, false);
+  TEST_ASSERT_FALSE(w.hasData);
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(w.rows->size()));
+  TEST_ASSERT_EQUAL_INT(-1, w.nowRowIndex);
+  TEST_ASSERT_FALSE(w.cpa.found);
+  TEST_ASSERT_FALSE(w.homeConfigured);
+  ASSERT_ENUM_EQ(AlertSeverity::None, w.alertBadge);
+}
+
+// -- edge case: a tap's context comes from the view: the pages of its rows, the header with its "!"
+static void test_tap_context_of_view_has_pages_and_header(void) {
+  NetState s = polledState(1000);
+  auto data = std::make_shared<DataSnapshot>(*s.data);
+  for (int i = 0; i < tableRowsPerPage(); ++i) data->rows.push_back(makeRow("LOT9", 20.0f + i));
+  s.data = data;
+  s.alerts.set(AlertId::OpenSkyLoginFailed);
+  const UiView v = makeUiView(s, kScreenFlights, 1, OpenSkyHealth::Ok, 1000, 0, false);
+  const TapContext c = tapContextOf(v, kW, kH, Language::EN);
+  TEST_ASSERT_EQUAL_INT(kScreenFlights, c.currentScreen);
+  TEST_ASSERT_EQUAL_INT(1, c.page);
+  TEST_ASSERT_EQUAL_INT(2, c.pageCount);
+  TEST_ASSERT_EQUAL_INT(tablePageCount(data->rows), c.pageCount);
+  TEST_ASSERT_TRUE(c.homeConfigured);
+  const HeaderZones want = statusBarZonesNow(kW, static_cast<int>(data->rows.size()), true,
+                                             Language::EN, 0, false, true);
+  TEST_ASSERT_EQUAL_INT(want.alert_x, c.header.alert_x);
+  TEST_ASSERT_TRUE(c.header.alert_x >= 0);
+  TEST_ASSERT_EQUAL_INT(kW, c.screenW);
+  TEST_ASSERT_EQUAL_INT(kH, c.screenH);
+}
+
+// -- edge case: the auto-cycle input takes the settings and the CPA at that moment
+static void test_auto_cycle_input_from_settings_and_cpa(void) {
+  NetState s = polledState(1000);
+  Config cfg = *s.cfg;
+  cfg.auto_cycle_enabled = true;
+  cfg.auto_cycle_interval_s = 25;
+  s.cfg = std::make_shared<const Config>(cfg);
+  const AutoCycleInput in = autoCycleInputAt(s, kScreenFlight, true, 7000, 11000);
+  TEST_ASSERT_TRUE(in.enabled);
+  TEST_ASSERT_TRUE(in.homeConfigured);
+  TEST_ASSERT_TRUE(in.screenOff);
+  TEST_ASSERT_EQUAL_INT(kScreenFlight, in.currentScreen);
+  TEST_ASSERT_TRUE(in.cpaFound);
+  TEST_ASSERT_FLOAT_WITHIN(0.01f, 30.0f, in.tCpaSeconds);
+  TEST_ASSERT_EQUAL_UINT32(7000, in.elapsedMs);
+  TEST_ASSERT_EQUAL_UINT32(25, in.intervalS);
+}
+
 // -- edge case: one tap per press; a swallowed press needs a new one
 static void test_touch_edge_one_tap_per_press_and_swallow(void) {
   TouchEdge edge;
@@ -358,4 +462,8 @@ void run_ui_flow_tests() {
   RUN_TEST(test_auto_cycle_never_on_dark_screen_or_without_home);
   RUN_TEST(test_shown_health_network_error_after_silence_marks_empty_screen);
   RUN_TEST(test_touch_edge_one_tap_per_press_and_swallow);
+  RUN_TEST(test_net_rows_and_cpa_before_and_after_first_poll);
+  RUN_TEST(test_make_ui_view_reads_the_snapshot);
+  RUN_TEST(test_tap_context_of_view_has_pages_and_header);
+  RUN_TEST(test_auto_cycle_input_from_settings_and_cpa);
 }

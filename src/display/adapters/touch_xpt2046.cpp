@@ -1,5 +1,9 @@
 #include "display/adapters/touch_xpt2046.h"
 
+#include <Arduino.h>
+
+#include "display/core/screen_nav.h"  // navHitTest()
+
 TouchPoint touchInputRead(LGFX &gfx) {
   TouchPoint p;
   lgfx::touch_point_t raw;
@@ -18,4 +22,11 @@ TouchPoint touchInputRead(LGFX &gfx) {
   p.raw_y = static_cast<int16_t>(raw.y);
   p.pressed = true;
   return p;
+}
+
+void touchLogTap(LGFX &gfx, const TouchPoint &t) {
+  const NavHit hit = navHitTest(t.x, t.y, static_cast<int16_t>(gfx.width()),
+                                static_cast<int16_t>(gfx.height()));
+  Serial.printf("[touch] raw=(%d,%d) -> screen=(%d,%d) nav=%d\n", t.raw_x, t.raw_y, t.x, t.y,
+                static_cast<int>(hit.action));
 }
