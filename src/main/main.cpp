@@ -402,24 +402,16 @@ static bool otaScreenPass() {
 // --- New version on GitHub: the question on the display ------------------------
 
 // "NEW VERSION AVAILABLE — INSTALL IT?" — shown at most once per boot, over
-// the normal screens, until YES / NO / 30 s.
-static bool promptActive = false;
-static bool promptShownThisBoot = false;
-static bool promptReleased = false;  // finger lifted since the prompt appeared
-static bool promptWasPressed = false;
-static uint32_t promptShownAtMs = 0;
-static uint32_t promptTimerDrawnMs = 0;
-static std::string promptTag;
-static constexpr uint32_t kPromptTimerStepMs = 250;
+// the normal screens, until YES / NO / 30 s (update_prompt_flow).
+static UpdatePromptFlow prompt;
 
-static void maybeShowUpdatePrompt(bool touchPressed) {
+static void maybeAskAboutUpdate(bool touchPressed) {
   const UpdateSummary &u = net->update;
   PromptGate g;
   g.status = u.status;
   g.latestTag = u.latestTag;
   g.skippedTag = cfg().update_skipped_tag;
   g.installedIsDev = isDevelopmentBuild(parseFwVersion(u.installed));
-  g.alreadyPromptedThisBoot = promptShownThisBoot;
   g.homeConfigured = cfg().home_configured;
   g.currentScreen = nav.current();
   const CpaPrediction cpa = currentCpa();
@@ -428,18 +420,7 @@ static void maybeShowUpdatePrompt(bool touchPressed) {
   g.touchActive = touchPressed;
   g.screenOff = backlightDecision().screen_off;
   g.alertScreenOpen = alertScreen.open;
-  if (!shouldShowUpdatePrompt(g)) return;
-
-  promptActive = true;
-  promptShownThisBoot = true;
-  promptReleased = false;
-  promptWasPressed = true;
-  promptShownAtMs = millis();
-  promptTimerDrawnMs = promptShownAtMs;
-  promptTag = u.latestTag;
-  Serial.printf("[update] asking on the display: %s -> %s\n", u.installed.c_str(),
-                promptTag.c_str());
-  drawUpdatePromptScreen(tft, u.installed, promptTag);
+  if (prompt.tryOpen(g, u.latestTag, millis())) openUpdatePrompt(tft, prompt, u.installed);
 }
 
 // YES / NO go to net_task as a NetCommand. If the queue is full the command
@@ -447,44 +428,14 @@ static void maybeShowUpdatePrompt(bool touchPressed) {
 // must not get lost (spec 09 §2).
 static PendingCommand pendingCmd;
 
-static void submitUpdateCommand(const NetCommand &c) {
-  pendingCmd = submitCommand(c, core_link::sendCommand);
-  if (pendingCmd.logQueueFull) Serial.println("[update] command queue full, retrying");
-}
-
-// While the prompt is up it owns the touchscreen; returns once answered.
-static void serviceUpdatePrompt() {
-  const uint32_t shownFor = millis() - promptShownAtMs;
-  const TouchPoint t = touchInputRead(tft);
-  if (!t.pressed) promptReleased = true;
-  if (t.pressed && !promptWasPressed && acceptPromptTap(promptReleased, shownFor)) {
-    const ResetChoice c = confirmHit(t.x, t.y, static_cast<int16_t>(tft.width()),
-                                     static_cast<int16_t>(tft.height()));
-    if (c == ResetChoice::Yes) {
-      promptActive = false;
-      // net_task starts the install; its OTA screen follows. If it can't
-      // (no longer on offer), the normal screens come back.
-      submitUpdateCommand(makeNetCommand(NetCommandType::InstallTag, promptTag));
-      pendingRedraw.firstDraw = true;
-      return;
-    }
-    if (c == ResetChoice::No) {
-      submitUpdateCommand(makeNetCommand(NetCommandType::SkipTag, promptTag));
-      promptActive = false;
-      pendingRedraw.firstDraw = true;
-      return;
-    }
+// While the prompt is up it owns the touchscreen.
+static void updatePromptPass() {
+  const PromptStep r = runUpdatePrompt(tft, prompt);
+  if (r.command.type != NetCommandType::None) {
+    pendingCmd = submitCommand(r.command, core_link::sendCommand);
+    if (pendingCmd.logQueueFull) Serial.println("[update] command queue full, retrying");
   }
-  promptWasPressed = t.pressed;
-  if (shownFor >= kUpdatePromptTimeoutMs) {
-    promptActive = false;  // "later": asked again after the next boot
-    pendingRedraw.firstDraw = true;
-    return;
-  }
-  if (millis() - promptTimerDrawnMs >= kPromptTimerStepMs) {
-    promptTimerDrawnMs = millis();
-    drawUpdatePromptTimer(tft, kUpdatePromptTimeoutMs - shownFor);
-  }
+  if (r.firstDraw) pendingRedraw.firstDraw = true;
 }
 
 // --- Forgotten web panel password: hold a finger on the screen at power-up
@@ -599,9 +550,7 @@ static void sleepUntilNextDeadline() {
     const std::time_t local = timeSyncNowLocal();
     w.untilMinuteMs = msUntilNextMinute(static_cast<int>(local % 60), 0);
   }
-  if (promptActive) {
-    w.untilPromptTimerMs = msUntilPeriod(now, promptTimerDrawnMs, kPromptTimerStepMs);
-  }
+  w.untilPromptTimerMs = prompt.msUntilTimer(now);
   if (alertScreen.open) w.untilAlertTimerMs = alertScreenMsToNextSecond(alertScreen, now);
   const uint32_t sleepMs = uiSleepMs(w);
   perfMeter.setPlannedSleep(sleepMs);
@@ -676,7 +625,7 @@ void loop() {
 
   // Backlight: sensor, night mode, ramps. Service screens get full brightness.
   backlightLoop(tft, cfg(),
-                promptActive || otaScreen.holdsBacklight(net->ota, net->restartPending));
+                prompt.active() || otaScreen.holdsBacklight(net->ota, net->restartPending));
   core_link::pollingAllowed.store(
       shouldPollOpenSky(backlightDecision(), cfg().night_pause_polling));
 
@@ -694,12 +643,12 @@ void loop() {
   }
 
   // --- The update question owns the screen until it's answered ----------
-  if (promptActive && net->update.installPending) {
-    promptActive = false;  // installed from the config page meanwhile: the OTA screen follows
+  if (prompt.active() && net->update.installPending) {
+    prompt.supersededByInstall();  // installed from the settings page: the OTA screen follows
   }
-  if (promptActive) {
-    serviceUpdatePrompt();
-    if (promptActive) {
+  if (prompt.active()) {
+    updatePromptPass();
+    if (prompt.active()) {
       sleepUntilNextDeadline();
       return;
     }
@@ -743,8 +692,8 @@ void loop() {
   }
 
   // --- New version on GitHub: ask once ------------------------------------
-  if (!promptActive && !net->update.installPending) maybeShowUpdatePrompt(touch.pressed);
-  if (promptActive) {
+  if (!prompt.active() && !net->update.installPending) maybeAskAboutUpdate(touch.pressed);
+  if (prompt.active()) {
     pendingRedraw = RedrawEvents{};
     sleepUntilNextDeadline();
     return;
