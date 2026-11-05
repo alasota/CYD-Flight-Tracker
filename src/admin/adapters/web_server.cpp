@@ -227,203 +227,29 @@ void handleLangGet() {
   server.send(405, "text/plain", "Method not allowed: use POST");
 }
 
-// Turns a refused password into the label listed after "these fields were invalid".
-WebStr passwordProblem(const PasswordChange &c) {
-  if (c.outcome == PasswordChange::Outcome::Mismatch) return WebStr::PasswordMismatch;
-  switch (c.check) {
-    case WebPasswordCheck::TooShort:
-      return WebStr::PasswordTooShort;
-    case WebPasswordCheck::TooLong:
-      return WebStr::PasswordTooLong;
-    default:
-      return WebStr::PasswordBadChar;
-  }
-}
-
+// POST /save — the settings form. The form itself is applySettingsForm()
+// (settings_form); this collects the fields, saves and answers.
 void handleSave() {
   if (!requireSameOrigin() || !authorize()) return;
+  FormArgs args;
+  for (int i = 0; i < server.args(); ++i) args.add(server.argName(i).c_str(), server.arg(i).c_str());
   Config cfg = loadConfig();
-
-  // Reject malformed numeric input instead of silently treating it as 0
-  // (which sanitizeConfig would then just clamp to a "valid-looking"
-  // value with no feedback to the user) — see docs/review-notes-2026.md 1.6.
-  // Rejected fields keep their previous value.
-  // Labels of the rejected fields, shown in the page's own language.
-  std::vector<WebStr> rejected;
-
-  if (server.hasArg("lat")) {
-    std::string v = server.arg("lat").c_str();
-    if (isValidFloatString(v)) {
-      cfg.home_lat = std::strtof(v.c_str(), nullptr);
-    } else {
-      rejected.push_back(WebStr::Latitude);
-    }
-  }
-  if (server.hasArg("lon")) {
-    std::string v = server.arg("lon").c_str();
-    if (isValidFloatString(v)) {
-      cfg.home_lon = std::strtof(v.c_str(), nullptr);
-    } else {
-      rejected.push_back(WebStr::Longitude);
-    }
-  }
-  if (server.hasArg("radius")) {
-    std::string v = server.arg("radius").c_str();
-    if (isValidFloatString(v)) {
-      cfg.radius_deg = std::strtof(v.c_str(), nullptr);
-    } else {
-      rejected.push_back(WebStr::Radius);
-    }
-  }
-  if (server.hasArg("poll_interval")) {
-    std::string v = server.arg("poll_interval").c_str();
-    if (isValidUnsignedIntString(v)) {
-      cfg.poll_interval_s = static_cast<uint32_t>(std::strtoul(v.c_str(), nullptr, 10));
-    } else {
-      rejected.push_back(WebStr::PollInterval);
-    }
-  }
-  // Checkbox: the browser sends this arg only when it's ticked. handleSave
-  // always runs on a full settings-form submit, so a missing arg here
-  // genuinely means "unchecked", not "field absent".
-  cfg.auto_cycle_enabled = server.hasArg("auto_cycle");
-  cfg.update_check_enabled = server.hasArg("update_check");
-
-  if (server.hasArg("auto_cycle_interval")) {
-    std::string v = server.arg("auto_cycle_interval").c_str();
-    if (isValidUnsignedIntString(v)) {
-      cfg.auto_cycle_interval_s = static_cast<uint32_t>(std::strtoul(v.c_str(), nullptr, 10));
-    } else {
-      rejected.push_back(WebStr::AutoCycleInterval);
-    }
-  }
-  if (server.hasArg("near_airport_km")) {
-    std::string v = server.arg("near_airport_km").c_str();
-    if (isValidFloatString(v)) {
-      cfg.near_airport_km = std::strtof(v.c_str(), nullptr);
-    } else {
-      rejected.push_back(WebStr::NearAirport);
-    }
-  }
-  if (server.hasArg("climb_rate_mps")) {
-    std::string v = server.arg("climb_rate_mps").c_str();
-    if (isValidFloatString(v)) {
-      cfg.climb_rate_threshold_mps = std::strtof(v.c_str(), nullptr);
-    } else {
-      rejected.push_back(WebStr::ClimbRate);
-    }
-  }
-
-  // Screen brightness + night mode (spec/03). Out-of-range numbers are
-  // clamped by sanitizeConfig(); malformed ones keep the previous value.
-  if (server.hasArg("brightness_mode")) {
-    cfg.brightness_auto = server.arg("brightness_mode") != "fixed";
-  }
-  auto percent = [&](const char *arg, WebStr label, int &out) {
-    if (!server.hasArg(arg)) return;
-    std::string v = server.arg(arg).c_str();
-    if (isValidUnsignedIntString(v) && v.size() <= 4) {
-      out = std::atoi(v.c_str());
-    } else {
-      rejected.push_back(label);
-    }
-  };
-  int blMin = cfg.brightness_min_pct, blMax = cfg.brightness_max_pct;
-  int blFixed = cfg.brightness_fixed_pct, ntPct = cfg.night_pct, ntWake = cfg.night_wake_s;
-  percent("bl_min", WebStr::BrightnessMin, blMin);
-  percent("bl_max", WebStr::BrightnessMax, blMax);
-  percent("bl_fixed", WebStr::BrightnessFixedPct, blFixed);
-  percent("night_pct", WebStr::NightBrightness, ntPct);
-  percent("night_wake_s", WebStr::NightWake, ntWake);
-  cfg.brightness_min_pct = clampBrightnessPct(blMin);
-  cfg.brightness_max_pct = clampBrightnessPct(blMax);
-  cfg.brightness_fixed_pct = clampBrightnessPct(blFixed);
-  cfg.night_pct = clampNightPct(ntPct);
-  cfg.night_wake_s = clampNightWakeS(ntWake);
-  if (server.hasArg("night_mode")) {
-    NightMode mode;
-    if (nightModeFromCode(server.arg("night_mode").c_str(), &mode)) cfg.night_mode = mode;
-  }
-  auto clockArg = [&](const char *arg, WebStr label, uint16_t &out) {
-    if (!server.hasArg(arg)) return;
-    int minutes = 0;
-    if (parseClockMinutes(server.arg(arg).c_str(), &minutes)) {
-      out = static_cast<uint16_t>(minutes);
-    } else {
-      rejected.push_back(label);
-    }
-  };
-  clockArg("night_from", WebStr::NightFrom, cfg.night_from_min);
-  clockArg("night_to", WebStr::NightTo, cfg.night_to_min);
-  cfg.night_pause_polling = server.hasArg("night_pause");
-
-  if (server.hasArg("language")) {
-    cfg.language = languageFromCode(server.arg("language").c_str());  // unknown -> default
-  }
-  if (server.hasArg("web_language")) {
-    cfg.web_language = languageFromCode(server.arg("web_language").c_str());
-  }
-
-  if (server.hasArg("client_id")) cfg.opensky_client_id = server.arg("client_id").c_str();
-  // The page never shows the saved secret, so an empty field means "keep it".
-  if (server.hasArg("client_secret") && server.arg("client_secret").length() > 0) {
-    cfg.opensky_client_secret = server.arg("client_secret").c_str();
-  }
-  if (server.hasArg("clear_credentials")) {
-    cfg.opensky_client_id.clear();
-    cfg.opensky_client_secret.clear();
-  }
-
-  // Panel password (web_auth): both fields empty = no change.
-  const PasswordChange pw = decidePasswordChange(server.arg("new_password").c_str(),
-                                                 server.arg("new_password2").c_str(),
-                                                 server.hasArg("clear_password"));
-  bool passwordMessage = false;
-  WebStr passwordResult = WebStr::Saved;
-  switch (pw.outcome) {
-    case PasswordChange::Outcome::Set:
-      cfg.web_password = pw.value;
-      passwordMessage = true;
-      passwordResult = WebStr::PasswordChanged;
-      break;
-    case PasswordChange::Outcome::Cleared:
-      cfg.web_password.clear();
-      passwordMessage = true;
-      passwordResult = WebStr::PasswordCleared;
-      break;
-    case PasswordChange::Outcome::Mismatch:
-    case PasswordChange::Outcome::Invalid:
-      rejected.push_back(passwordProblem(pw));
-      break;
-    case PasswordChange::Outcome::Unchanged:
-    default:
-      break;
-  }
-
-  // The user has now been through the settings form at least once — see
-  // docs/review-notes-2026.md 1.5. This is what the UI checks (it reaches the
-  // display through NetState) to tell "not configured yet" apart from
-  // "home really is at (0,0)".
-  cfg.home_configured = true;
-
+  const SettingsFormOutcome out = applySettingsForm(cfg, args);
   saveConfig(cfg);  // sanitizes internally (see config_store)
   ++saveCount;
   refreshPassword();
-  if (passwordMessage) {
+  if (out.password.outcome == PasswordChange::Outcome::Set ||
+      out.password.outcome == PasswordChange::Outcome::Cleared) {
     Serial.println(webPassword.empty() ? "[auth] web password removed" : "[auth] web password changed");
   }
 
-  Config saved = loadConfig();
+  const Config saved = loadConfig();
   const SettingsTab tab = requestedTab();
-  if (!rejected.empty()) {
-    std::string fields;
-    for (WebStr f : rejected) {
-      if (!fields.empty()) fields += ", ";
-      fields += webTr(f, saved.web_language);
-    }
-    sendConfigPage(saved, tab, WebStr::SavedWithInvalid, true, fields);
+  if (!out.rejected.empty()) {
+    sendConfigPage(saved, tab, WebStr::SavedWithInvalid, true,
+                   rejectedFieldsText(out.rejected, saved.web_language));
   } else {
-    sendConfigPage(saved, tab, passwordResult, false);
+    sendConfigPage(saved, tab, out.message, false);
   }
 }
 
