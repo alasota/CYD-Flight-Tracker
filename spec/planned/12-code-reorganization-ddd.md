@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **etap 4 z 8 zrobiony (vNEXT)**, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 w vNEXT, etapy 5–8 do zrobienia. Jedna specyfikacja dla całej
+Status: **etap 4 z 8 zrobiony (v1.11.2)**, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 w v1.11.2, etapy 5–8 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -376,7 +376,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   kryterium 55 → 51 (wyżej); tabela przeniesień etapu 1 zostaje obok tabeli etapu 2.
 - **`@manual` (płytka, 2026-11-01):** wgrane przez USB (`2b29f48`): bez paniki i restartów w logu szeregowym przez 3 min; trzy ekrany z lotem na żywo (`/screenshot.bmp?screen=0..2`); stopka panelu `v1.11.0-6-g2b29f48-dirty`; `/perf.json` po 3,5 min: przerwa pętli UI maks. 93 ms, 0 wolnych przejść, sterta 147 KB (największy blok 59 KB). Po etapie 1 było: 74 ms, 0, 146 / 59 KB; dłuższa przerwa (93 ms) mieści się poniżej progu wolnego przejścia, wolnych przejść dalej 0. OTA przez WiFi (`POST /update`, trasa z przeniesionego `config_portal`): 1,48 MB w 16 s, HTTP 200, nowy obraz `c9b49d5` oznaczony jako ważny po 30 s. `pio run -e cyd-ota -t upload` przy panelu bez hasła kończy się 400 — `curl --digest` wysyła pierwsze żądanie bez treści; błąd sprzed etapu 2, osobna poprawka. Dotyk — do sprawdzenia przez właściciela.
 
-### Wynik etapu 3 (2026-11-01, wydany w vNEXT)
+### Wynik etapu 3 (2026-11-01, wydany w v1.11.2)
 
 - **Co przeszło gdzie** (symbole, nie pliki — nowe pliki pisane ręcznie, bez `git mv` i bez
   tabeli w `rewrite_includes.py`; każdy symbol znikał ze starego nagłówka w tym samym commicie):
@@ -441,7 +441,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   bierze `OpenSkyHealth` z `feed_health.h`, `radar_view.cpp` dołącza `status_bar.h`) — bez
   zmiany zachowania i rozmiaru. Dotyk — do sprawdzenia przez właściciela.
 
-### Wynik etapu 4 (2026-11-02, wydany w vNEXT)
+### Wynik etapu 4 (2026-11-02, wydany w v1.11.2)
 
 - **Co przeszło gdzie** (połowy `#ifdef ARDUINO` z `core/` do adapterów, pisane ręcznie; część
   czysta bez zmian; jeden krok = jeden commit, płytka sprawdzana po każdym):
