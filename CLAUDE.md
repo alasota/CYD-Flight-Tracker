@@ -64,18 +64,19 @@ functions with plain types too, an adapter defines them (`LGFX &` ones: in the a
   `asciiFold()`) · `lookup_cache` (LRU) · `lookup_store` (NVS copy) · `lookup_budget` (new lookups
   per poll) · `hexdb_http` (HTTPS GET) · `poll_pipeline` (one answer → `DataSnapshot`: sort,
   lookups, phases, CPA, NOW pick) · `net_task` (the core-0 task) · `net_config` (HTTP timeouts).
-- **Settings and maintenance:** `config_store` (settings, sanitizing) · `settings_form` (form
-  checks, credentials file) · `config_page` (page HTML) · `config_backup` (JSON backup / restore)
-  · `web_auth` (password, throttle, origin check) · `web_i18n` (page strings) · `ota_update`
-  (image checks, marker, `OtaSession`) · `release_check` (GitHub releases) · `version` ·
-  `device_alerts` (the "!") · `screenshot` (BMP + band hand-over) · `perf_stats`.
+- **Settings and maintenance:** `config_store` (settings, sanitizing) · `settings_form` (`/save`
+  form → `Config`, checks, credentials file) · `config_page` (page HTML) · `config_backup` (JSON
+  backup / restore) · `web_auth` (password, throttle, origin check) · `web_i18n` (page strings) ·
+  `ota_update` (image checks, marker, `OtaSession`) · `release_check` (GitHub releases) ·
+  `version` · `device_alerts` (the "!") · `screenshot` (BMP, `?screen=`) · `perf_stats`.
 - **Shared / platform:** `core_link` (what crosses the cores) · `time_sync` (NTP) · `clock` (date
   / time text) · `sun_times` (sunrise / sunset) · `geo` (distance, bearing, compass point) ·
   `backlight` (brightness, night mode) · `i18n` (display strings) · `touch_input` (raw → screen).
 - **Adapters (device halves):** `opensky_http` (token, `/states/all`) · `hexdb_sources` (hexdb.io
   lookups) · `lookup_store_nvs` · `settings_nvs` · `web_server` (WebServer + mDNS, routes) ·
   `ota_flash` (`Update`) · `github_http` (check / install) · `alert_sources` (alert inputs) ·
-  `backlight_ldr` (LDR, PWM) · `touch_xpt2046` · `lgfx/<module>_draw` (screens, theme, fonts).
+  `backlight_ldr` (LDR, PWM) · `touch_xpt2046` · `service_flows` (service-screen drivers) ·
+  `lgfx/<module>_draw` (screens, theme, fonts) · `lgfx/ui_draw` · `lgfx/screenshot_panel`.
 - **Sky model (`airspace/core`):** `aircraft_state` (`Aircraft`, `inferOnGround()`) ·
   `tracked_flight` (`AircraftRow`) · `flight_ordering` (order, featured split) · `now_pick` (NOW
   aircraft) · `feed_health` (`OpenSkyHealth`) · `flight_phase` · `cpa_predictor`.
@@ -84,7 +85,11 @@ functions with plain types too, an adapter defines them (`LGFX &` ones: in the a
   `screen_nav` (screen, hit tests, auto-cycle) · `redraw_policy` (events → redraw mask) ·
   `aircraft_summary` (identity block of all screens) · `featured_panel` · `table_view` ·
   `flight_screen` · `radar_view` · `radar_geometry` (polar → screen) · `service_screen` (OTA,
-  password reset, alert screen) · `main.cpp` (`setup()`, the UI `loop()`).
+  password reset, alert screen).
+- **UI flows (`display/services`):** `ui_flow` (taps, table page, screen changes, ticks,
+  auto-cycle, health, `UiView`) · `service_screen_flows` (`ota_screen_flow`, `update_prompt_flow`,
+  `alert_screen_flow` as one step) · `password_reset_flow` · `screenshot_bridge` · `ui_perf` ·
+  `main.cpp` (wiring only: `setup()`, the UI `loop()`).
 
 Rules:
 - Never hardcode WiFi / OpenSky secrets. `millis()`-based timing, no `delay()` in the UI.
@@ -103,20 +108,17 @@ Rules:
   phase / CPA, wraparound, boundaries such as the auto-cycle hold at exactly 6 / -5 s), write
   its test in `test/`, or at least alongside. "Later" doesn't happen on a solo project.
 - Module boundaries exist so logic runs in `pio test -e native` — no ESP32, display or network.
-  Only thin adapters that call hardware / SDK APIs (TFT draw, HTTP request, touch read) may go
-  untested; everything they delegate to gets a test.
+  Only thin adapters that call hardware / SDK APIs may go untested; all they delegate to gets a test.
 - New module or feature → propose its test file with it, unasked. A milestone is done when
   `pio test -e native` is green **and** the new logic has coverage — compiling is not correct.
 - **Layout** (spec 07, details in `test/README.md`): six suites by context — `test_airspace`,
   `test_enrichment`, `test_opensky`, `test_display`, `test_admin`, `test_platform`. A module's
-  tests are `test/test_<suite>/<module>_test.cpp`: an anonymous namespace plus one
-  `run_<module>_tests()`; the suite's `main.cpp` is the only place with `setUp()`
-  (→ `resetAllForTesting()`; new global state gets its reset there). One module:
-  `PLATFORMIO_BUILD_FLAGS="-DTEST_MODULE=<module>"`.
-- **Assertions that print values** (`test/support/test_support.h`): `ASSERT_ENUM_EQ`,
-  `ASSERT_STR_EQ`, `ASSERT_CONTAINS` / `ASSERT_NOT_CONTAINS`, JSON via `json_assert.h` — never
-  `TEST_ASSERT_TRUE(a == b)` for one value. Fixtures: `fixtures.h` (`makeAircraft()`,
-  `makeRow()`, `makeConfig()`, `stubPorts()`).
+  tests are `test/test_<suite>/<module>_test.cpp` (anonymous namespace + one `run_<module>_tests()`);
+  only the suite's `main.cpp` has `setUp()` (→ `resetAllForTesting()`; new global state gets its
+  reset there). One module: `PLATFORMIO_BUILD_FLAGS="-DTEST_MODULE=<module>"`.
+- **Assertions that print values** (`test/support/test_support.h`): `ASSERT_ENUM_EQ`, `ASSERT_STR_EQ`,
+  `ASSERT_CONTAINS` / `ASSERT_NOT_CONTAINS`, JSON via `json_assert.h`; never `TEST_ASSERT_TRUE(a == b)`.
+  Fixtures: `fixtures.h` (`makeAircraft()`, `makeRow()`, `makeConfig()`, `stubPorts()`).
 - `native` builds with `-Wall -Wextra -Werror` (tests and `src/`); CI also runs `native-asan`
   (AddressSanitizer + UBSan, Linux only).
 - Python tooling (`tools/*.py`) has `unittest` tests next to it (`tools/test_*.py`).
@@ -132,7 +134,7 @@ A full `fillScreen()` flashes visibly on the ILI9341 over SPI (why: docs/history
 - NOW countdown tick (1 Hz) → only the countdown zone + status strip, through the 8-bit sprite
   pushed in one go; identity panel, header and tabs untouched.
 - The decision is the pure `computeRedrawMask(events, currentScreen)` (`redraw_policy`); events
-  come from `diffNetState()` and the UI's timers; `main.cpp` only acts on the mask.
+  come from `diffNetState()` and the UI's timers (`ui_flow`); `ui_draw` only acts on the mask.
 
 ## Language — Polish / English
 
@@ -159,8 +161,7 @@ A full `fillScreen()` flashes visibly on the ILI9341 over SPI (why: docs/history
 
 ## Concurrency — two cores
 
-Details (channels, screenshot bridge, poll phases, perf): docs/architecture.md "Concurrency —
-two cores". Spec: `spec/done/04-dual-core.md`.
+Details: docs/architecture.md "Concurrency — two cores". Spec: `spec/done/04-dual-core.md`.
 - **Core 0, `net_task`** (16 KB stack): WiFi, NTP, settings page, OpenSky, hexdb.io, GitHub,
   OTA, the in-memory `Config`. **Core 1, `loop()` in `main.cpp`** (8 KB): `tft`, touch,
   navigation, redraw, backlight, update question, service screens; sleeps between passes.
@@ -173,10 +174,9 @@ two cores". Spec: `spec/done/04-dual-core.md`.
   writes don't — send in large pieces (the settings page goes out in ~1.4 KB chunks).
 - ⚠️ Flash writes (OTA, NVS: `lookup_store`, `saveLastScreen`) stall both cores for ms to tens of
   ms — visible in `[perf]`.
-- ⚠️ Heap: ~143 KB free, largest block ~57 KB; verified TLS (`release_check`) needs ≥ 50 KB in
-  one block. Allocate long-lived buffers at boot (the NOW sprite: `flightScreenReserveSprite()`
-  in `setup()`), not on first use. Watch `[perf] stack net=` — the web handler runs nested
-  inside a poll.
+- ⚠️ Heap: ~144 KB free, largest block ~55 KB; verified TLS (`release_check`) needs ≥ 50 KB in
+  one block. Allocate long-lived buffers at boot (`flightScreenReserveSprite()` in `setup()`).
+  Watch `[perf] stack net=` — the web handler runs nested inside a poll.
 - Liveness: no net heartbeat for 60 s → the header shows a network error; no UI heartbeat for
   2 s → a new OTA image isn't marked valid and is restarted (rollback).
 

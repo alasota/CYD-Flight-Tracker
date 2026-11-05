@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **w trakcie** (etap 5 z 8), etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etapy 5–8 do zrobienia. Jedna specyfikacja dla całej
+Status: **etap 5 z 8 zrobiony (vNEXT)** 2026-11-05, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w vNEXT, etapy 6–8 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -304,6 +304,22 @@ a ekran czyta z niego tylko swoje obiekty.
      zbudowany z tymi flagami) zamiast 1 477 568 B.
 5. **Warstwa `services/`** z §6 + testy (to jedyny etap, który dodaje testy, a nie tylko je przenosi).
    `main.cpp` < 250 linii, `config_portal` bez `handleSave` logiki.
+   Decyzje (plan etapu 5, właściciel 2026-11-05 — domyślne odpowiedzi na Q1–Q7):
+   - `ui_flow` obejmuje poza `TablePager` / `routeTap()` też księgowość zmian ekranu (zapis,
+     strona, licznik auto-cycle), `MinuteWatch`, tik odliczania, bramkę auto-cycle, zdrowie w
+     nagłówku i wykrywanie zbocza dotyku;
+   - nowe adaptery spoza §4.4: `display/adapters/lgfx/ui_draw`, `display/adapters/service_flows`
+     (sterowniki przepływów: dotyk → krok → rysowanie), `display/adapters/lgfx/screenshot_panel`;
+   - `alert_screen_flow` to cienka nakładka; `AlertScreen` / `alertScreenStep()` zostają w
+     `display/core/screens/service_screen`;
+   - `applySettingsForm()` zmienia `Config` w miejscu i zwraca `{rejected, password, message}`
+     (bez drugiej kopii `Config` na stosie rdzenia 0), zamiast `{Settings, …}` z §6;
+   - budżet rozmiaru: `firmware.bin` ≤ +4 096 B, RAM statyczny ≤ +256 B (§9 zwalnia etap 5 z ± 1 KB);
+   - `net_task.cpp` (421 linii, §10 pkt 3 chce < 300) — nie w tym etapie;
+   - 19 testów mostu zrzutu idzie z kodem do `test_display`, 9 testów BMP / pasów / `?screen=`
+     zostaje w `test_admin`.
+   Gdy `main.cpp` stanął na 327 liniach, właściciel wybrał sterownik `ServiceScreens` (czysty
+   `ServiceScreenFlows` + adapter) i agregat `UiFlow` w `ui_flow` (wynik niżej).
 6. **Ustawienia per kontekst** (§7) + zasoby WWW jako pliki (`admin/assets/`, `embed_assets.py`).
 7. **Nazwy ze słownika** (§3), po jednej zmianie nazwy na commit (`AircraftRow` →
    `TrackedFlight` itd.), automatycznie (`sed` + kompilacja), bez innych zmian w tym commicie.
@@ -507,6 +523,68 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   na ok. 15 uruchomień etapów 3–4; zalecana osobna poprawka (`/fix`). Po kroku 14 raz odczyt
   czasu pracy 57 s bez paniki w logu — niewyjaśniony, nie powtórzył się (najpewniej start po
   wgraniu przez USB).
+
+### Wynik etapu 5 (2026-11-05, wydany w vNEXT)
+
+- **§6 → moduły** (wszystkie czyste, bez `#ifdef ARDUINO`, krok → struktura odpowiedzi, testy
+  pisane najpierw):
+
+  | §6 „dziś” | Teraz | Testy |
+  |---|---|---|
+  | `handleTap()` + `clampPage()`, zmiany ekranu, tiki, auto-cycle, zdrowie, `wasTouchPressed` | `display/services/ui_flow`: `routeTap()`, `tablePageCount()` + `TablePager`, `ScreenChangeTracker`, `MinuteWatch`, `CountdownTick`, `shouldAutoCycleNow()`, `shownHealthStep()`, `TouchEdge`, `UiView` (`makeUiView()`, `tapContextOf()`, `netRows()`, `netCpaAt()`, `autoCycleInputAt()`), agregat `UiFlow` | `ui_flow_test.cpp` |
+  | `maybeShowUpdatePrompt()`, `serviceUpdatePrompt()` | `update_prompt_flow` (`UpdatePromptFlow`, `updatePromptGate()`) | `update_prompt_flow_test.cpp` |
+  | `serviceOtaScreen()` | `ota_screen_flow` (`OtaScreenFlow`, `holdsBacklight()`) | `ota_screen_flow_test.cpp` |
+  | `openAlertMessage()` / `serviceAlertScreen()` | `alert_screen_flow` (`AlertScreenFlow`) | `alert_screen_flow_test.cpp` |
+  | (spoza §6) kolejność ekranów serwisowych, komenda czekająca na kolejkę | `service_screen_flows` (`ServiceScreenFlows`, `ServiceOutcome`) | `service_screen_flows_test.cpp` |
+  | `offerWebPasswordReset()` | `password_reset_flow` (`PasswordResetFlow`) | `password_reset_flow_test.cpp` |
+  | `shot::` | `screenshot_bridge` (wydzielony z `screenshot.h`: `ScreenshotBridge`, `ScreenshotReturn`, `screenshotPrepareTarget()`, `screenshotUiPass()`) | `screenshot_bridge_test.cpp` (19 przeniesionych + nowe) |
+  | `perfLoopTick()` | `ui_perf` (`UiPerfMeter`) | `ui_perf_test.cpp` |
+  | `handleSave()` | `admin/core/settings_form` (`FormArgs`, `applySettingsForm()`, `passwordProblem()`, `rejectedFieldsText()`); `handleSave()` ma 22 linie | `settings_form_test.cpp` |
+
+  Połówki sprzętowe: `display/adapters/service_flows` (`runOtaScreen()`, `runUpdatePrompt()`,
+  `runAlertScreen()`, `runPasswordReset()`, `ServiceScreens`), `lgfx/ui_draw` (`applyRedraw()`,
+  `drawSetupPrompt()`), `lgfx/screenshot_panel` (instancje mostu i powrotu, funkcje dla
+  `ScreenshotSource`, `screenshotPanelPass()`, dema). Do tego `statusBarZonesNow()` (`status_bar`),
+  `touchLogTap()` (`touch_xpt2046`), `otaFlashRunningPendingVerify()` (`ota_flash`).
+- **`main.cpp`: 909 → 249 linii**, jedyna zwykła zmienna `static` to `netSeen`; `handleSave()`
+  bez logiki formularza. Pilnują tego testy narzędzi (`LayoutTest`:
+  `test_main_cpp_is_under_250_lines`, `test_main_cpp_keeps_no_flow_state`,
+  `test_stage_5_flows_left_main_cpp`, `test_web_server_save_route_has_no_form_logic`,
+  `test_stage_5_services_have_their_tests`, `test_stage_5_moved_tests_follow_their_code`).
+  `web_server.cpp` 834 → 660 linii; `net_task.cpp` 421 — §10 pkt 3 dla niego czeka (Q6).
+- **Testy:** wszystkie 6 grup zielone: admin 251 (3 pominięte; −19 przeniesionych, +12 nowych),
+  airspace 71, display 408 (+19 przeniesionych, +77 nowych), enrichment 80, opensky 74, platform
+  83 = **967** (było 878); `RUN_TEST(` = 967. `check_bdd.py` 0 problemów (242 scenariusze),
+  `check_comments.py --strict` czysto, `rewrite_includes.py --check` = 0, testy narzędzi zielone
+  (`test_check_layers.py`: 71). `tools/check_layers.py`: **te same 14 naruszeń** co przed etapem.
+  Tagi `@test` w `spec/done/09-concurrency-robustness.feature` (7) i
+  `spec/done/10-web-panel-security.feature` (3) wskazują teraz na
+  `test_display/screenshot_bridge_test.cpp` (treść scenariuszy bez zmian).
+- **Firmware:** po krokach (bajty względem poprzedniego): 2 −544 · 3 +32 · 4 +128 · 5 +320 ·
+  6 +320 · 7 +240 · 8 +336 · 9 +272 · 10 +336 · 11 −160 · `ServiceScreens` + `UiFlow` +928.
+  Koniec: **1 348 752 B (+2 208 B wobec 1 346 544, budżet +4 096)**, Flash used 1 342 169, RAM
+  62 036 B (−8). Tabela pól formularza z funkcjami zamiast lambd: pod gnu++11 konwersja lambdy na
+  wskaźnik nie jest `constexpr`, a tabela inicjowana przy starcie kosztowała +160 B RAM.
+- **Odstępstwa od planu:** `main.cpp` po krokach 2–12 miał 327 linii — potrzebny był sterownik
+  `ServiceScreens` i agregat `UiFlow` (decyzja właściciela, docs/history.md); `UiView` w
+  `ui_flow` (czysty, testowalny), nie w adapterze; instancja `ScreenshotReturn` w
+  `screenshot_panel`, nie w `main.cpp`; `runPasswordReset()` woła callback czyszczący hasło
+  przed ekranem „hasło usunięte” (stara kolejność), zamiast zwracać odpowiedź na końcu; wersja
+  zainstalowana podawana do `runOtaScreen()` jako parametr (bez nowego naruszenia warstw);
+  poprawka testu narzędzi (`explicit` przed konstruktorem to nie druga deklaracja klasy).
+  Drobne różnice bez widocznego skutku: dotyk czytany przy starcie także bez hasła; strefy
+  nagłówka i liczba stron liczone przy każdym dotknięciu; CPA dla auto-cycle liczone w każdym
+  przejściu; jeden `nowMs` na całe przejście zrzutu.
+- **`@manual` (płytka, 2026-11-05):** obraz `02eeb6a` wgrany przez USB (COM3).
+  `/screenshot.bmp?screen=0..4`: LOTY, TERAZ, RADAR, demo pytania o aktualizację i ekranu
+  ostrzeżeń poprawne, potem ekran wraca na LOTY (pokazany przed zrzutem). `/perf.json` po 77 s:
+  przerwa pętli UI maks. 103 ms, p99 20 ms, 0 wolnych przejść, 11 429 przejść; wolny stos UI
+  5 244 B (v1.11.2: 4 684), net 9 692 B; sterta 144 484 B, największy blok 55 284 B.
+  **Zostaje dla właściciela** (końcowe sprawdzenie na płytce): dotyk (zakładki, pasy tabeli,
+  „!” → ZAMKNIJ / 15 s), auto-cycle i ostatni ekran po restarcie, OTA z dobrym i złym plikiem,
+  reset hasła przy starcie (NIE), formularz („abc” / „x” odrzucone w tej kolejności, zmiana
+  przetrwa restart). Na wersji `-dev` pytanie o aktualizację na żywo się nie pokaże
+  (`installedIsDev`) — dowodem są testy natywne i demo `screen=3`.
 
 ## 9. Testy
 

@@ -39,23 +39,32 @@ test — it wouldn't link; docs/architecture.md "Source layout"). Tests follow t
 spec 12 stage 3 moved a type to another context, its tests moved to that context's suite with
 their names unchanged (`git log -S test_<name>` finds them); stage 4 renamed
 `config_portal_test.cpp` → `settings_form_test.cpp` and `time_sync_test.cpp` → `clock_test.cpp`
-with their code.
+with their code; stage 5 moved the 19 screenshot hand-over tests (`ScreenshotBridge`,
+`ScreenshotReturn`) from `test_admin/screenshot_test.cpp` to
+`test_display/screenshot_bridge_test.cpp` with their code, names and bodies unchanged.
 
 | Suite | What | Modules (`<module>_test.cpp`) |
 |---|---|---|
 | `test_airspace` | the sky over home: aircraft state, tracked flights, order, NOW pick, phase, overhead pass, sky snapshot | aircraft_state, tracked_flight, flight_ordering, now_pick, flight_phase, cpa_predictor, poll_pipeline |
 | `test_enrichment` | aircraft / route / airport data (hexdb.io, caches, NVS) | aircraft_lookup, route_lookup, lookup_cache, lookup_store, lookup_budget, aircraft_names, place_names |
 | `test_opensky` | the OpenSky data source | opensky_client, opensky_quota, opensky_auth, scan_area |
-| `test_display` | screens, theme, navigation, touch, brightness, display texts | table_view, featured_panel, flight_screen, radar_view, radar_geometry, aircraft_summary, status_bar, service_screen, screen_nav, redraw_policy, touch_input, lcars_theme, utf8, fit_to_width, font_set, fonts, backlight, i18n |
+| `test_display` | screens, theme, navigation, touch, brightness, display texts; the UI flows (`display/services`) | table_view, featured_panel, flight_screen, radar_view, radar_geometry, aircraft_summary, status_bar, service_screen, screen_nav, redraw_policy, touch_input, lcars_theme, utf8, fit_to_width, font_set, fonts, backlight, i18n, ui_flow, update_prompt_flow, ota_screen_flow, alert_screen_flow, service_screen_flows, password_reset_flow, screenshot_bridge, ui_perf |
 | `test_admin` | settings, web panel, backups, password, updates | config_page, settings_form, config_backup, config_store, web_auth, web_i18n, ota_update, release_check, version, screenshot¹, device_alerts |
 | `test_platform` | concurrency, perf, WiFi, time; the shared kernel (`src/shared/`) | core_link, perf_stats, wifi_manager, clock, sun_times, geo |
 
-¹ `screenshot` lives in `src/display/services/` but its test stays in `test_admin` for now (the
-settings page serves the screenshot; spec 12 stage 1 moved no test files).
+¹ `screenshot` (the BMP header / band / `?screen=` helpers `web_server` uses) lives in
+`src/display/services/` but its 9 tests stay in `test_admin` (the settings page serves the
+screenshot); the hand-over between the cores is `screenshot_bridge`, tested in `test_display`.
 
-Cases per suite (spec 12 stage 4): admin 258 (3 skipped), airspace 71, display 312, enrichment
-80, opensky 74, platform 83 — 878, the same as the `RUN_TEST(` count (`LayoutTest` keeps it
+Cases per suite (spec 12 stage 5): admin 251 (3 skipped), airspace 71, display 408, enrichment
+80, opensky 74, platform 83 — 967, the same as the `RUN_TEST(` count (`LayoutTest` keeps it
 ≥ 874).
+
+The UI flows are tested as plain step functions: build the flow, feed it `millis()` values
+(odd ones where a `0` sentinel matters, and across the 32-bit wrap) and touch states, assert the
+answer struct (`PromptStep`, `OtaScreenStep`, `ServiceOutcome` …). `service_screen_flows_test.cpp`
+injects a fake command queue as the `CommandSender`; `screenshot_bridge_test.cpp` runs
+`screenshotUiPass()` against a `std::mutex` bridge.
 
 `support/` (on the include path via `-I test/support`, header-only):
 
@@ -84,7 +93,7 @@ Cases per suite (spec 12 stage 4): admin 258 (3 skipped), airspace 71, display 3
 - Native `SpinLock` is a no-op (the tests are single-threaded), so code shared between the
   cores is templated on its lock (`LatestBox`, `Guarded`, `ScreenshotBridge`) and a threaded
   test plugs in a `std::mutex` adapter. One such test exists:
-  `screenshot_test.cpp:test_bridge_concurrent_random_timeouts_never_touch_freed_buffers` — two
+  `test_display/screenshot_bridge_test.cpp:test_bridge_concurrent_random_timeouts_never_touch_freed_buffers` — two
   long-lived `std::thread`s, a fake clock, a seeded `std::mt19937`, never real time; its
   `delete[]` variant is there for `native-asan` to catch a use-after-free. No `-pthread` flag
   is needed (MinGW posix threads, glibc ≥ 2.34).
