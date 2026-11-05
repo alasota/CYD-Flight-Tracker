@@ -4,9 +4,12 @@
 #include "display/services/update_prompt_flow.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
+#include "display/core/screen_nav.h"               // kScreen*
 #include "display/core/screens/service_screen.h"  // confirmButtonRect()
+#include "fixtures.h"
 #include "test_support.h"
 
 namespace {
@@ -160,6 +163,41 @@ static void test_prompt_no_answer_tap_outside_buttons_keeps_waiting(void) {
   ASSERT_ENUM_EQ(PromptAnswer::Skip, flow.step(tapOn(false, 1200)).answer);  // still answerable
 }
 
+// -- edge case: the gate from net_task's state: release answer, settings, the CPA at that moment
+static void test_update_prompt_gate_from_net_state(void) {
+  auto data = std::make_shared<DataSnapshot>();
+  data->cpa.found = true;
+  data->cpa.t_cpa_seconds = 50.0f;
+  data->polledAtMs = 1000;
+  Config cfg = makeConfig();
+  cfg.update_skipped_tag = "v1.2.9";
+  NetState s;
+  s.data = data;
+  s.cfg = std::make_shared<const Config>(cfg);
+  s.update.status = UpdateStatus::Available;
+  s.update.latestTag = kTag;
+  s.update.installed = "v1.2.0";
+  const PromptGate g = updatePromptGate(s, kScreenFlight, 21000, true, true, true);
+  ASSERT_ENUM_EQ(UpdateStatus::Available, g.status);
+  ASSERT_STR_EQ(kTag, g.latestTag);
+  ASSERT_STR_EQ("v1.2.9", g.skippedTag);
+  TEST_ASSERT_FALSE(g.installedIsDev);
+  TEST_ASSERT_TRUE(g.homeConfigured);
+  TEST_ASSERT_EQUAL_INT(kScreenFlight, g.currentScreen);
+  TEST_ASSERT_TRUE(g.cpaFound);
+  TEST_ASSERT_EQUAL_INT(30, g.tCpaSeconds);  // 20 s after the poll
+  TEST_ASSERT_TRUE(g.touchActive);
+  TEST_ASSERT_TRUE(g.screenOff);
+  TEST_ASSERT_TRUE(g.alertScreenOpen);
+  TEST_ASSERT_FALSE(g.alreadyPromptedThisBoot);
+
+  s.update.installed = "v1.2.0-3-g1a2b3c4";  // a development build
+  s.data = nullptr;                          // before the first poll
+  const PromptGate dev = updatePromptGate(s, kScreenFlights, 21000, false, false, false);
+  TEST_ASSERT_TRUE(dev.installedIsDev);
+  TEST_ASSERT_FALSE(dev.cpaFound);
+}
+
 // -- edge case: no wake-up for the timer strip while the question isn't open
 static void test_prompt_ms_until_timer_is_no_deadline_when_closed(void) {
   UpdatePromptFlow flow;
@@ -183,4 +221,5 @@ void run_update_prompt_flow_tests() {
   RUN_TEST(test_prompt_closed_by_panel_install_without_redraw);
   RUN_TEST(test_prompt_no_answer_tap_outside_buttons_keeps_waiting);
   RUN_TEST(test_prompt_ms_until_timer_is_no_deadline_when_closed);
+  RUN_TEST(test_update_prompt_gate_from_net_state);
 }

@@ -3,22 +3,55 @@
 // what a screen change sets off (ScreenChangeTracker: persist, page, the
 // auto-cycle timer), the header clock's minute (MinuteWatch), the NOW
 // countdown's 1 Hz tick (CountdownTick), whether auto-cycle switches now
-// (shouldAutoCycleNow()), the health the header shows (shownHealthStep()) and
-// touch edges (TouchEdge). See docs/screens.md "Screen navigation" and
-// docs/screens.md "Auto screen cycling".
+// (shouldAutoCycleNow()), the health the header shows (shownHealthStep()),
+// touch edges (TouchEdge) and what the normal screens are drawn from
+// (UiView, read out of net_task's NetState). See docs/screens.md "Screen
+// navigation" and docs/screens.md "Auto screen cycling".
 //
 // Pure — tested under `pio test -e native`; main.cpp reads the touch, calls
 // these and acts on the answers.
 #pragma once
 
 #include <cstdint>
+#include <ctime>
 #include <vector>
 
 #include "airspace/core/feed_health.h"     // OpenSkyHealth
 #include "airspace/core/tracked_flight.h"  // AircraftRow
+#include "display/core/i18n.h"             // Language
 #include "display/core/redraw_policy.h"    // RedrawEvents
 #include "display/core/screen_nav.h"       // kScreen*, ScreenChangeCause, alertBadgeHit()
 #include "display/core/screens/status_bar.h"  // HeaderZones
+#include "platform/core_link.h"               // NetState
+
+// ---- What the screens show -------------------------------------------------------
+
+// The rows of net_task's last good poll; empty before the first one.
+const std::vector<AircraftRow> &netRows(const NetState &s);
+
+// The NOW aircraft's CPA extrapolated from its poll to `nowMs` (cpa_predictor
+// owns the math — docs/review-notes-2026.md 3.4); not found before the first poll.
+CpaPrediction netCpaAt(const NetState &s, uint32_t nowMs);
+
+// Everything the normal screens are drawn from in one pass
+// (display/adapters/lgfx/ui_draw). `rows` points into the NetState.
+struct UiView {
+  int screen = kScreenFlights;
+  int page = 0;
+  const std::vector<AircraftRow> *rows = nullptr;
+  bool hasData = false;   // a poll has come in
+  int nowRowIndex = -1;   // the NOW aircraft in rows, -1 = none
+  CpaPrediction cpa;      // netCpaAt()
+  float radiusDeg = 0.0f;
+  OpenSkyHealth health = OpenSkyHealth::Ok;  // the one the header shows
+  AlertSeverity alertBadge = AlertSeverity::None;
+  std::time_t local = 0;  // timeSyncNowLocal()
+  bool synced = false;
+  bool homeConfigured = false;
+};
+
+UiView makeUiView(const NetState &s, int screen, int page, OpenSkyHealth shownHealth,
+                  uint32_t nowMs, std::time_t local, bool synced);
 
 // ---- Taps ---------------------------------------------------------------------
 
@@ -50,6 +83,10 @@ struct TapContext {
 // (first row from tableFirstRowY(), last row just above the nav, both
 // tableRowHeightPx() tall), never past the first or the last page.
 TapAction routeTap(int16_t x, int16_t y, const TapContext &c);
+
+// The context of a tap on the screens drawn from `v`: its screen and page, the
+// pages of its rows, the header with the "!" as drawStatusBar() draws it.
+TapContext tapContextOf(const UiView &v, int16_t screenW, int16_t screenH, Language lang);
 
 // Pages of the table below the featured row (splitFeaturedAndRest()).
 int tablePageCount(const std::vector<AircraftRow> &rows);
@@ -135,6 +172,11 @@ struct AutoCycleInput {
 // enabled && homeConfigured && !screenOff && shouldAutoAdvance(elapsed,
 // interval, shouldDeferAutoSwitch(...)).
 bool shouldAutoCycleNow(const AutoCycleInput &in);
+
+// The input from the settings in `s` (auto_cycle_*, home) and the NOW
+// aircraft's CPA at `nowMs`.
+AutoCycleInput autoCycleInputAt(const NetState &s, int currentScreen, bool screenOff,
+                                uint32_t elapsedMs, uint32_t nowMs);
 
 // ---- The health the header shows ------------------------------------------------
 

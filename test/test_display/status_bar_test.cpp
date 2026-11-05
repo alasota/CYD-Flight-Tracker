@@ -203,6 +203,30 @@ static void test_count_centred_between_badge_and_date(void) {
   TEST_ASSERT_INT_WITHIN(1, (left + z.right_start) / 2, (z.count_start + z.count_end) / 2);
 }
 
+// -- statusBarZonesNow(): the zones from the values drawStatusBar() gets
+static void test_zones_now_follow_the_drawn_texts(void) {
+  const std::time_t t = 1760770000;  // synced: a real date and clock
+  for (bool badge : {false, true}) {
+    for (Language lang : {Language::PL, Language::EN}) {
+      const HeaderZones want =
+          statusBarZones(320, kStatusBarAppName, statusBarBlockLabel(7, true, lang),
+                         statusBarDate(t, true), statusBarClock(t, true), badge);
+      const HeaderZones got = statusBarZonesNow(320, 7, true, lang, t, true, badge);
+      TEST_ASSERT_EQUAL_INT(want.alert_x, got.alert_x);
+      TEST_ASSERT_EQUAL_INT(want.count_start, got.count_start);
+      TEST_ASSERT_EQUAL_INT(want.count_end, got.count_end);
+      TEST_ASSERT_EQUAL_INT(want.right_start, got.right_start);
+    }
+  }
+  // Unsynced, before the first poll: the placeholders' zones, no badge.
+  const HeaderZones none = statusBarZonesNow(320, 0, false, Language::PL, 0, false, false);
+  const HeaderZones placeholders =
+      statusBarZones(320, kStatusBarAppName, "--", "--.--.----", "--:--");
+  TEST_ASSERT_EQUAL_INT(-1, none.alert_x);
+  TEST_ASSERT_EQUAL_INT(placeholders.count_start, none.count_start);
+  TEST_ASSERT_EQUAL_INT(placeholders.right_start, none.right_start);
+}
+
 static void test_no_badge_means_no_alert_x(void) {
   TEST_ASSERT_EQUAL_INT(-1, statusBarZones(320, kStatusBarAppName, "--", "--.--.----", "--:--").alert_x);
   TEST_ASSERT_EQUAL_INT(-1, statusBarZones(320, kStatusBarAppName, "--", "--.--.----", "--:--", false).alert_x);
@@ -240,4 +264,5 @@ void run_status_bar_tests() {
   RUN_TEST(test_zones_with_badge_do_not_overlap_for_longest_texts);
   RUN_TEST(test_count_centred_between_badge_and_date);
   RUN_TEST(test_no_badge_means_no_alert_x);
+  RUN_TEST(test_zones_now_follow_the_drawn_texts);
 }

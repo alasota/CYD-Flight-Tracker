@@ -4,6 +4,7 @@
 // Unity (CLAUDE.md "Testing").
 #include "admin/core/firmware/ota_update.h"
 
+#include <Arduino.h>
 #include <Update.h>
 #include <esp_ota_ops.h>
 #include <mbedtls/sha256.h>
@@ -56,3 +57,14 @@ OtaSession &otaFlashSession() {
 }
 
 const char *otaFlashError() { return Update.errorString(); }
+
+bool otaFlashRunningPendingVerify() {
+  const esp_partition_t *running = esp_ota_get_running_partition();
+  esp_ota_img_states_t state;
+  const bool pending = running != nullptr &&
+                       esp_ota_get_state_partition(running, &state) == ESP_OK &&
+                       state == ESP_OTA_IMG_PENDING_VERIFY;
+  Serial.printf("[ota] running from %s, %s\n", running != nullptr ? running->label : "?",
+                pending ? "pending verify (rollback armed)" : "valid");
+  return pending;
+}
