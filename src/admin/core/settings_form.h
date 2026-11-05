@@ -6,6 +6,12 @@
 
 #include <cstddef>
 #include <string>
+#include <utility>
+#include <vector>
+
+#include "admin/core/config_store.h"  // Config
+#include "admin/core/web_auth.h"      // PasswordChange
+#include "admin/core/web_i18n.h"      // WebStr, Language
 
 // Parsed OpenSky OAuth client credentials from the JSON file OpenSky's
 // account page generates for download: {"clientId":"...","clientSecret":
@@ -41,3 +47,34 @@ bool isValidFloatString(const std::string &s);
 // least one digit) — same idea as isValidFloatString(), for the
 // poll-interval field.
 bool isValidUnsignedIntString(const std::string &s);
+
+// ---- The settings form (POST /save) ------------------------------------------
+
+// The fields of one submit, by name. Like WebServer::arg() / hasArg(), the
+// first value of a name counts (a later one with the same name is ignored).
+class FormArgs {
+ public:
+  void add(const std::string &name, const std::string &value);
+  bool has(const std::string &name) const;
+  std::string get(const std::string &name) const;  // "" when absent
+
+ private:
+  std::vector<std::pair<std::string, std::string>> args_;
+};
+
+struct SettingsFormOutcome {
+  std::vector<WebStr> rejected;     // labels of the fields that kept their old value, form order
+  PasswordChange password;          // what the submit did to the panel password
+  WebStr message = WebStr::Saved;   // Saved / PasswordChanged / PasswordCleared / SavedWithInvalid
+};
+
+// Applies one settings-form submit to `cfg` in place (no second Config on
+// core 0's stack): numbers that don't parse are rejected and keep their old
+// value (docs/review-notes-2026.md 1.6), percent fields are clamped, a missing
+// checkbox means unchecked, a missing text field means unchanged, an empty
+// OpenSky secret keeps the saved one; sets home_configured
+// (docs/review-notes-2026.md 1.5). The caller saves it.
+SettingsFormOutcome applySettingsForm(Config &cfg, const FormArgs &args);
+
+// "Latitude, Longitude, …" — the rejected labels in `lang`, joined by ", ".
+std::string rejectedFieldsText(const std::vector<WebStr> &rejected, Language lang);

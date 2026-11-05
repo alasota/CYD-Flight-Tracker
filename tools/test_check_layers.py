@@ -2,7 +2,7 @@
 
 The rule tests feed the pure functions {relpath: text} dicts (the included targets are in the
 dict too, so they resolve); LayoutTest / BuildConfigTest / WorkflowTest read this repository
-and pin the state spec 12 stages 2–4 leave behind.
+and pin the state spec 12 stages 2–5 leave behind.
 """
 
 import configparser
@@ -240,6 +240,63 @@ STAGE_4_GONE_PAIRS = [
     ("opensky/core", "admin/core"),
     ("test", "admin/adapters"),
 ]
+
+# Stage 5 (spec 12 section 6, section 8 item 5, section 10 item 3): main.cpp's line limit and
+# the state machines that leave it -- function main.cpp no longer defines -> (new symbol, its
+# header from src/).
+MAIN_CPP_LINE_LIMIT = 250
+STAGE_5_FLOWS = [
+    ("handleTap", "routeTap", "display/services/ui_flow.h"),
+    ("clampPage", "TablePager", "display/services/ui_flow.h"),
+    ("maybeShowUpdatePrompt", "UpdatePromptFlow", "display/services/update_prompt_flow.h"),
+    ("serviceUpdatePrompt", "UpdatePromptFlow", "display/services/update_prompt_flow.h"),
+    ("serviceOtaScreen", "OtaScreenFlow", "display/services/ota_screen_flow.h"),
+    ("serviceAlertScreen", "AlertScreenFlow", "display/services/alert_screen_flow.h"),
+    ("offerWebPasswordReset", "PasswordResetFlow", "display/services/password_reset_flow.h"),
+    ("screenshotPrepare", "screenshotPrepareTarget", "display/services/screenshot_bridge.h"),
+    ("serviceScreenshot", "screenshotUiPass", "display/services/screenshot_bridge.h"),
+    ("perfLoopTick", "UiPerfMeter", "display/services/ui_perf.h"),
+]
+
+# Stage 5: the only plain static variable main.cpp may keep (the last NetState it took).
+MAIN_CPP_STATIC_ALLOWED = {"netSeen"}
+
+# Stage 5: what POST /save may no longer call itself -- the form logic is applySettingsForm().
+SAVE_ROUTE_FORBIDDEN = ["isValidFloatString", "isValidUnsignedIntString", "decidePasswordChange",
+                        "parseClockMinutes", "nightModeFromCode", "languageFromCode", "strtof",
+                        "strtoul", "atoi"]
+SAVE_ROUTE_LINE_LIMIT = 30
+
+# Stage 5: every new module from section 6 -> (its test file from test/, run_<name>_tests).
+STAGE_5_SERVICES = [
+    ("display/services/ui_flow", "test_display/ui_flow_test.cpp", "ui_flow"),
+    ("display/services/update_prompt_flow", "test_display/update_prompt_flow_test.cpp",
+     "update_prompt_flow"),
+    ("display/services/ota_screen_flow", "test_display/ota_screen_flow_test.cpp",
+     "ota_screen_flow"),
+    ("display/services/alert_screen_flow", "test_display/alert_screen_flow_test.cpp",
+     "alert_screen_flow"),
+    ("display/services/password_reset_flow", "test_display/password_reset_flow_test.cpp",
+     "password_reset_flow"),
+    ("display/services/screenshot_bridge", "test_display/screenshot_bridge_test.cpp",
+     "screenshot_bridge"),
+    ("display/services/ui_perf", "test_display/ui_perf_test.cpp", "ui_perf"),
+    ("admin/core/settings_form", "test_admin/settings_form_test.cpp", "settings_form"),
+]
+
+# Stage 5: screenshot bridge tests follow ScreenshotBridge / ScreenshotReturn to test_display,
+# the BMP tests stay -- test -> (new file, old file), both from test/ (the .feature's examples).
+_BRIDGE_TESTS = "test_display/screenshot_bridge_test.cpp"
+_SHOT_TESTS = "test_admin/screenshot_test.cpp"
+STAGE_5_MOVED_TESTS = {
+    "test_bridge_normal_capture_fills_every_band": (_BRIDGE_TESTS, _SHOT_TESTS),
+    "test_bridge_concurrent_random_timeouts_never_touch_freed_buffers": (_BRIDGE_TESTS,
+                                                                         _SHOT_TESTS),
+    "test_bridge_idle_rule_across_millis_rollover": (_BRIDGE_TESTS, _SHOT_TESTS),
+    "test_screen_returns_to_previous_after_capture": (_BRIDGE_TESTS, _SHOT_TESTS),
+    "test_return_not_triggered_without_prepare": (_BRIDGE_TESTS, _SHOT_TESTS),
+    "test_header_fields": (_SHOT_TESTS, _BRIDGE_TESTS),
+}
 
 # Old layer folder names in a path: <ctx>/domain, <ctx>/app, src/app/, the -<app/> filter.
 OLD_LAYER_PATH_RE = re.compile(r"\b(airspace|enrichment|opensky|display|admin)/(domain|app)\b"
@@ -992,6 +1049,97 @@ class LayoutTest(unittest.TestCase):
                 self.assertEqual([], hits, show(hits, limit=len(hits)))
 
 
+    # Scenario: main.cpp ma mniej niż 250 linii (§8 pkt 5, §10 pkt 3)
+    def test_main_cpp_is_under_250_lines(self):
+        text = (ROOT / "src" / "main" / "main.cpp").read_text(encoding="utf-8", errors="replace")
+        lines = len(text.splitlines())
+        self.assertGreater(lines, 50, "src/main/main.cpp looks empty")
+        self.assertLess(lines, MAIN_CPP_LINE_LIMIT, f"src/main/main.cpp has {lines} lines")
+
+    # Scenario: main.cpp nie trzyma stanu automatów w zmiennych static
+    def test_main_cpp_keeps_no_flow_state(self):
+        # The pattern itself: file scope and function scope, const / constexpr and functions
+        # don't count.
+        sample = ("static bool a = false;\nstatic uint32_t b;\nstatic const int c = 1;\n"
+                  "static constexpr uint32_t d = 2;\nstatic bool e() { return true; }\n"
+                  "void f() {\n  static long g = -2;\n  static std::string h;\n}\n"
+                  "// static int i = 0;\nstatic unsigned long j = 0;\nstatic size_t k{0};\n")
+        self.assertEqual(["a", "b", "g", "h", "j", "k"], static_state_names(sample))
+        text = (ROOT / "src" / "main" / "main.cpp").read_text(encoding="utf-8", errors="replace")
+        state = [n for n in static_state_names(text) if n not in MAIN_CPP_STATIC_ALLOWED]
+        self.assertEqual([], state, "plain static variables left in src/main/main.cpp")
+
+    # Scenario Outline: Automat z main.cpp ma nowy dom w display/services/ i nie jest już
+    # zdefiniowany w main.cpp
+    def test_stage_5_flows_left_main_cpp(self):
+        self.assertEqual(10, len(STAGE_5_FLOWS))
+        main = (ROOT / "src" / "main" / "main.cpp").read_text(encoding="utf-8", errors="replace")
+        headers = {p: t for p, t in repo_sources("src").items() if p.endswith((".h", ".hpp"))}
+        self.assertGreater(len(headers), 30)
+        for old, symbol, header in STAGE_5_FLOWS:
+            with self.subTest(old=old, symbol=symbol):
+                self.assertEqual([], declaration_lines(main, old, bodies_only=True),
+                                 f"src/main/main.cpp still defines {old}()")
+                hits = [f"{p}:{n}" for p, t in headers.items()
+                        for n in declaration_lines(t, symbol)]
+                self.assertEqual([f"src/{header}"], [h.rsplit(":", 1)[0] for h in hits],
+                                 f"declarations of {symbol}: {hits or 'none'}")
+
+    # Scenario: Trasa POST /save tylko zbiera pola, zapisuje i odpowiada — logika formularza
+    # jest w admin/core/settings_form
+    def test_web_server_save_route_has_no_form_logic(self):
+        text = (ROOT / "src" / "admin" / "adapters" / "web_server.cpp").read_text(
+            encoding="utf-8", errors="replace")
+        body = function_body(text, "handleSave")
+        self.assertIsNotNone(body, "no void handleSave() { ... } in web_server.cpp")
+        lines = len(body.strip("\n").splitlines())
+        self.assertLessEqual(lines, SAVE_ROUTE_LINE_LIMIT, f"handleSave() has {lines} lines")
+        called = [name for name in SAVE_ROUTE_FORBIDDEN
+                  if re.search(r"\b" + re.escape(name) + r"\s*\(", body)]
+        self.assertEqual([], called, "handleSave() still parses the form itself")
+        self.assertRegex(body, r"\bapplySettingsForm\s*\(",
+                         "handleSave() calls applySettingsForm()")
+        form = (ROOT / "src" / "admin" / "core" / "settings_form.h").read_text(
+            encoding="utf-8", errors="replace")
+        self.assertEqual(1, len(declaration_lines(form, "applySettingsForm")),
+                         "applySettingsForm() declared in src/admin/core/settings_form.h")
+
+    # Scenario Outline: Każdy nowy moduł z §6 ma plik testów w grupie swojego kontekstu,
+    # zarejestrowany w main.cpp grupy
+    def test_stage_5_services_have_their_tests(self):
+        self.assertEqual(8, len(STAGE_5_SERVICES))
+        for module, test_file, name in STAGE_5_SERVICES:
+            with self.subTest(module=module):
+                self.assertTrue((ROOT / "src" / f"{module}.h").is_file(), f"src/{module}.h")
+                path = ROOT / "test" / test_file
+                self.assertTrue(path.is_file(), f"test/{test_file}")
+                calls = strip_comments(path.read_text(encoding="utf-8",
+                                                      errors="replace")).count("RUN_TEST(")
+                self.assertGreaterEqual(calls, 3, f"RUN_TEST calls in test/{test_file}")
+                suite = Path(test_file).parent.as_posix()
+                main = strip_comments((ROOT / "test" / suite / "main.cpp").read_text(
+                    encoding="utf-8", errors="replace"))
+                self.assertRegex(main, r"\bRUN_MODULE\(\s*" + name + r"\s*\)\s*\)\s*run_"
+                                 + name + r"_tests\(\)", f"test/{suite}/main.cpp")
+
+    # Scenario Outline: Testy mostu zrzutu ekranu idą za kodem do test_display, testy BMP
+    # zostają w test_admin
+    def test_stage_5_moved_tests_follow_their_code(self):
+        self.assertEqual(6, len(STAGE_5_MOVED_TESTS))
+        sources = {p[len("test/"):]: t for p, t in repo_sources("test").items()}
+        for name, (new, old) in STAGE_5_MOVED_TESTS.items():
+            with self.subTest(test=name):
+                old_text = sources.get(old, "")
+                self.assertEqual(([], 0), (defined_test_lines(old_text, name),
+                                           run_test_calls(old_text, name)),
+                                 f"{name} still defined / run in test/{old}")
+                defs = [f"{p}:{n}" for p, t in sources.items() for n in defined_test_lines(t, name)]
+                self.assertEqual([new], [d.rsplit(":", 1)[0] for d in defs],
+                                 f"definitions of {name}: {defs or 'none'}")
+                self.assertEqual(1, run_test_calls(sources[new], name),
+                                 f"RUN_TEST({name}) in test/{new}")
+
+
 def strip_comments(text):
     """`text` with // and /* */ comments blanked (newlines kept, so line numbers stay); string
     and char literals are kept as they are, so a "//" inside one doesn't start a comment."""
@@ -1016,6 +1164,32 @@ def strip_comments(text):
             out.append(c)
             i += 1
     return "".join(out)
+
+
+_STATIC_STATE_RE = re.compile(
+    r"\bstatic\s+(?:(?:unsigned|signed|long|short)\s+)*"
+    r"(?:bool|int|long|unsigned|short|u?int\d+_t|size_t|std::string)\s+(\w+)\s*(?:=|;|\{|\[)")
+
+
+def static_state_names(text):
+    """Names of the static variables of plain types (bool, int, long, unsigned, [u]intN_t,
+    size_t, std::string) in the code of `text`, at file and function scope -- not static
+    const / constexpr ones and not functions. Comments are ignored."""
+    return [m.group(1) for m in _STATIC_STATE_RE.finditer(strip_comments(text))]
+
+
+def function_body(text, name):
+    """The body (between its braces, comments blanked) of the first definition `void
+    <name>()` in `text`, or None."""
+    code = strip_comments(text)
+    m = re.search(r"(?m)^[ \t]*void\s+" + re.escape(name) + r"\s*\(\s*\)\s*\{", code)
+    if m is None:
+        return None
+    depth, i = 1, m.end()
+    while i < len(code) and depth:
+        depth += {"{": 1, "}": -1}.get(code[i], 0)
+        i += 1
+    return code[m.end():i - 1]
 
 
 _NOT_A_TYPE = {"return", "else", "case", "throw", "delete", "new", "goto", "sizeof", "co_return"}

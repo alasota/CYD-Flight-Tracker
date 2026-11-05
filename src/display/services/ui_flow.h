@@ -1,0 +1,166 @@
+// ui_flow — the UI loop's own bookkeeping on core 1, apart from drawing and
+// touch reading: what a tap does (routeTap()), the table page (TablePager),
+// what a screen change sets off (ScreenChangeTracker: persist, page, the
+// auto-cycle timer), the header clock's minute (MinuteWatch), the NOW
+// countdown's 1 Hz tick (CountdownTick), whether auto-cycle switches now
+// (shouldAutoCycleNow()), the health the header shows (shownHealthStep()) and
+// touch edges (TouchEdge). See docs/screens.md "Screen navigation" and
+// docs/screens.md "Auto screen cycling".
+//
+// Pure — tested under `pio test -e native`; main.cpp reads the touch, calls
+// these and acts on the answers.
+#pragma once
+
+#include <cstdint>
+#include <vector>
+
+#include "airspace/core/feed_health.h"     // OpenSkyHealth
+#include "airspace/core/tracked_flight.h"  // AircraftRow
+#include "display/core/redraw_policy.h"    // RedrawEvents
+#include "display/core/screen_nav.h"       // kScreen*, ScreenChangeCause, alertBadgeHit()
+#include "display/core/screens/status_bar.h"  // HeaderZones
+
+// ---- Taps ---------------------------------------------------------------------
+
+enum class TapKind : uint8_t {
+  None,        // nothing to do
+  OpenAlerts,  // the header's "!" — the alert message screen
+  JumpTo,      // a bottom nav tab — TapAction::target
+  PagePrev,    // the table's first-row strip, not on the first page
+  PageNext,    // the table's last-row strip, not on the last page
+};
+
+struct TapAction {
+  TapKind kind = TapKind::None;
+  int target = -1;  // screen index, only for JumpTo
+};
+
+struct TapContext {
+  int currentScreen = kScreenFlights;
+  int page = 0;       // the table page shown
+  int pageCount = 0;  // tablePageCount() of the rows shown
+  bool homeConfigured = false;
+  HeaderZones header;  // the header as drawn (alert_x < 0: no "!")
+  int16_t screenW = 320;
+  int16_t screenH = 240;
+};
+
+// One tap: the "!" first (only with home set and a badge drawn), then the
+// bottom nav, then — on the Flights screen only — the table's paging strips
+// (first row from tableFirstRowY(), last row just above the nav, both
+// tableRowHeightPx() tall), never past the first or the last page.
+TapAction routeTap(int16_t x, int16_t y, const TapContext &c);
+
+// Pages of the table below the featured row (splitFeaturedAndRest()).
+int tablePageCount(const std::vector<AircraftRow> &rows);
+
+// The Flights table's page.
+class TablePager {
+ public:
+  int page() const;
+  void reset();                // back to the first page
+  void clamp(int pageCount);   // a shorter list: the last page that exists (0 when empty)
+  bool prev();                 // true = the page changed
+  bool next(int pageCount);    // true = the page changed
+
+ private:
+  int page_ = 0;
+};
+
+// ---- Screen changes -------------------------------------------------------------
+
+struct ScreenChangeResult {
+  bool persist = false;  // saveLastScreen(screen) now
+};
+
+// What a change of the active screen sets off: the table back to page 0, the
+// auto-cycle timer from now, screenChanged for the redraw, and whether to
+// write last_screen to NVS (shouldPersistScreenChange(); never when the
+// screen is the one already saved).
+class ScreenChangeTracker {
+ public:
+  // Boot: `screen` is the one saved, both timers start at `nowMs`.
+  void begin(int screen, uint32_t nowMs);
+  ScreenChangeResult onChange(int screen, ScreenChangeCause cause, uint32_t nowMs,
+                              TablePager &pager, RedrawEvents &pending);
+  // A fresh auto-cycle interval without a screen change (alert screen closed,
+  // a touch that only woke a dark screen).
+  void restartAutoCycle(uint32_t nowMs);
+  // Ms since the last screen change (or restart) — shouldAutoAdvance()'s elapsedMs.
+  uint32_t autoCycleElapsedMs(uint32_t nowMs) const;
+
+ private:
+  int persistedScreen_ = 0;
+  uint32_t persistedAtMs_ = 0;
+  uint32_t changedAtMs_ = 0;
+};
+
+// ---- Header clock, NOW countdown --------------------------------------------------
+
+// The header's HH:MM: changed() is true on the first pass, at the first NTP
+// sync and when the minute rolls over — not more often.
+class MinuteWatch {
+ public:
+  // `minuteNow`: minuteOf(local time) when synced, -1 when not.
+  bool changed(long minuteNow);
+
+ private:
+  long last_ = -2;
+};
+
+// The NOW screen's countdown: due() once a second, and only on kScreenFlight.
+class CountdownTick {
+ public:
+  bool due(int currentScreen, uint32_t nowMs);
+  // Ms until the next due() on the NOW screen (UiWake::untilCountdownMs).
+  uint32_t msUntilNext(uint32_t nowMs) const;
+
+ private:
+  uint32_t lastMs_ = 0;
+};
+
+// ---- Auto-cycle ---------------------------------------------------------------
+
+struct AutoCycleInput {
+  bool enabled = false;         // auto_cycle_enabled
+  bool homeConfigured = false;  // the setup prompt has the screen otherwise
+  bool screenOff = false;       // night, backlight off — nobody sees it change
+  int currentScreen = kScreenFlights;
+  bool cpaFound = false;        // for shouldDeferAutoSwitch()
+  float tCpaSeconds = 0.0f;
+  uint32_t elapsedMs = 0;       // ScreenChangeTracker::autoCycleElapsedMs()
+  uint32_t intervalS = 15;      // auto_cycle_interval_s
+};
+
+// enabled && homeConfigured && !screenOff && shouldAutoAdvance(elapsed,
+// interval, shouldDeferAutoSwitch(...)).
+bool shouldAutoCycleNow(const AutoCycleInput &in);
+
+// ---- The health the header shows ------------------------------------------------
+
+struct ShownHealthStep {
+  OpenSkyHealth shown = OpenSkyHealth::Ok;
+  bool healthChanged = false;  // the header must be redrawn
+  bool newPoll = false;        // the empty content says why it is empty
+  bool stalled = false;        // net_task silent for kNetStallLimitMs (log it)
+};
+
+// net_task's health, or NetworkError once its heartbeat (`netBeatMs`) is older
+// than kNetStallLimitMs. A change sets healthChanged, and newPoll too when
+// the list is empty.
+ShownHealthStep shownHealthStep(OpenSkyHealth shownNow, OpenSkyHealth netHealth, uint32_t nowMs,
+                                uint32_t netBeatMs, bool rowsEmpty);
+
+// ---- Touch edges ----------------------------------------------------------------
+
+// One tap per press: tap() is true on the pass where the finger comes down.
+class TouchEdge {
+ public:
+  bool tap(bool pressed);
+  // The finger now on the screen is not a tap (it belongs to a screen that
+  // just closed) — the next tap needs a new press.
+  void swallow();
+
+ private:
+  bool wasPressed_ = false;
+};
