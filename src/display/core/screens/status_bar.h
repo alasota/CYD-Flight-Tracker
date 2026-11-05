@@ -7,7 +7,7 @@
 // the bottom-nav tabs, not here. Occupies y:0..LCARS_HEADER_HEIGHT, full
 // width, with a 1px rule along its bottom edge.
 //
-// Drawn by the UI (main.cpp) when the redraw mask has kRedrawHeader —
+// Drawn by the UI (ui_draw) when the redraw mask has kRedrawHeader —
 // screens draw their content from LCARS_CONTENT_TOP and don't know
 // status_bar exists. The text and layout here are pure; the LovyanGFX
 // drawing is display/adapters/lgfx/status_bar_draw.

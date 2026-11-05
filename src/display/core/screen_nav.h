@@ -34,7 +34,7 @@ int prevScreen(int current);
 // Stateful current-screen tracker — the "current index + nextScreen()/
 // prevScreen()" docs/screens.md's "Screen navigation" describes. main.cpp keeps
 // one, seeds it from config_store's persisted last_screen at boot, and
-// re-persists current() whenever a mutator reports a change. Header-only:
+// re-persists current() when a change calls for it (ui_flow's ScreenChangeTracker). Header-only:
 // it's just wrapScreen() bookkeeping, still exercised under
 // `pio test -e native`.
 class ScreenNav {
@@ -61,7 +61,7 @@ class ScreenNav {
 // ---- Auto screen cycling ------------------------------------------------
 //
 // See docs/screens.md "Auto screen cycling". The auto-cycle timer itself lives
-// in main.cpp (a millis() delta from the last screen change); the one
+// in ui_flow (ScreenChangeTracker: a millis() delta from the last screen change); the one
 // piece worth isolating and testing here is the "don't interrupt an
 // imminent overhead moment" hold condition.
 //
@@ -85,7 +85,7 @@ constexpr float kAutoSwitchHoldAfterS = -5.0f;
 bool shouldDeferAutoSwitch(int currentScreen, bool cpaFound, float tCpaSeconds);
 
 // Auto-cycle "advance now?" decision, pure so it's testable without
-// main.cpp or a real millis() clock. Inputs:
+// the UI loop or a real millis() clock. Inputs:
 //   elapsedMs  - millis() elapsed since the last screen change
 //   intervalS  - configured auto_cycle_interval_s (config_store)
 //   deferHold  - the current shouldDeferAutoSwitch() result

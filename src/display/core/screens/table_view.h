@@ -28,7 +28,7 @@
 // paged through via touch (getPageSlice()), not scrolled.
 constexpr int kTableRowsPerPage = 5;
 
-// Accessors so other modules (e.g. main.cpp's touch tap-zone sizing) stay
+// Accessors so other modules (e.g. ui_flow's routeTap() tap-zone sizing) stay
 // in sync with these instead of hardcoding their own copies — see
 // docs/review-notes-2026.md 5.5.
 int tableRowsPerPage();   // kTableRowsPerPage (5)

@@ -13,7 +13,7 @@
 // Zero networking code — draws from an already-enriched AircraftRow
 // (airspace/core/tracked_flight), its two route-endpoint AirportInfos, and a
 // cpa_predictor::CpaPrediction. The between-polls "local ticking" of the
-// countdown is the UI's job (main.cpp) — this module just renders
+// countdown is the UI's job (ui_flow's CountdownTick) — this module just renders
 // whatever CpaPrediction it's handed. Layout and texts are pure; the
 // LovyanGFX drawing (and the countdown sprite) is
 // display/adapters/lgfx/flight_screen_draw.

@@ -25,6 +25,6 @@ std::string formatDate(std::time_t epoch);
 std::string formatTime(std::time_t epoch);
 
 // Whole minutes since the epoch — changes exactly when formatTime()'s
-// "HH:MM" would. main.cpp compares successive values to know when the
+// "HH:MM" would. The UI compares successive values (MinuteWatch) to know when the
 // header clock needs repainting (CLAUDE.md "Redraw policy").
 long minuteOf(std::time_t epoch);
