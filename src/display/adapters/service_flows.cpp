@@ -5,6 +5,7 @@
 #include "display/adapters/backlight_ldr.h"
 #include "display/adapters/lgfx/service_screen_draw.h"
 #include "display/adapters/touch_xpt2046.h"
+#include "display/core/theme/lcars_theme.h"  // LCARS_BLACK
 
 OtaScreenStep runOtaScreen(LGFX &tft, OtaScreenFlow &flow, const OtaProgress &o,
                            bool restartPending, const char *installedVersion) {
@@ -68,4 +69,41 @@ AlertFlowStep runAlertScreen(LGFX &tft, AlertScreenFlow &flow, const AlertSet &a
                          r.secondsLeft);
   }
   return r;
+}
+
+void runPasswordReset(LGFX &tft, bool passwordSet, const std::function<void()> &clearPassword) {
+  if (!shouldOfferPasswordReset(passwordSet, touchInputRead(tft).pressed)) return;
+  drawResetHoldScreen(tft);
+  PasswordResetFlow flow(millis());
+  for (;;) {
+    const TouchPoint t = touchInputRead(tft);
+    ResetInput in;
+    in.nowMs = millis();
+    in.pressed = t.pressed;
+    in.x = t.x;
+    in.y = t.y;
+    in.screenW = static_cast<int16_t>(tft.width());
+    in.screenH = static_cast<int16_t>(tft.height());
+    const ResetStep r = flow.step(in);
+    if (r.clearPassword) clearPassword();
+    switch (r.draw) {
+      case ResetDraw::HoldProgress:
+        drawResetHoldProgress(tft, r.heldMs);
+        break;
+      case ResetDraw::ConfirmScreen:
+        drawResetConfirmScreen(tft);
+        break;
+      case ResetDraw::DoneScreen:
+        drawResetDoneScreen(tft);
+        break;
+      case ResetDraw::Clear:
+        tft.fillScreen(LCARS_BLACK);
+        break;
+      case ResetDraw::None:
+      default:
+        break;
+    }
+    if (r.finished) return;
+    if (r.sleepMs != 0) delay(r.sleepMs);
+  }
 }

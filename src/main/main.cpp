@@ -400,60 +400,6 @@ static void updatePromptPass() {
   if (r.firstDraw) pendingRedraw.firstDraw = true;
 }
 
-// --- Forgotten web panel password: hold a finger on the screen at power-up
-// (runs in setup(), before net_task exists — the delay() loops are fine here).
-
-static void offerWebPasswordReset(Config &bootCfg) {
-  if (bootCfg.web_password.empty() || !touchInputRead(tft).pressed) return;
-
-  const int16_t w = static_cast<int16_t>(tft.width());
-  const int16_t h = static_cast<int16_t>(tft.height());
-  drawResetHoldScreen(tft);
-  const uint32_t holdStart = millis();
-  uint32_t lastPressedMs = holdStart;
-  for (;;) {
-    if (touchInputRead(tft).pressed) lastPressedMs = millis();
-    const uint32_t held = millis() - holdStart;
-    const ResetHoldState st = resetHoldState(millis() - lastPressedMs, held);
-    if (st == ResetHoldState::Released) {
-      tft.fillScreen(LCARS_BLACK);
-      return;
-    }
-    drawResetHoldProgress(tft, held);
-    if (st == ResetHoldState::Done) break;
-    delay(30);
-  }
-
-  // Wait for the finger to come off, then ask.
-  uint32_t releasedSince = millis();
-  while (millis() - releasedSince < kResetReleaseGraceMs) {
-    if (touchInputRead(tft).pressed) releasedSince = millis();
-    delay(20);
-  }
-  drawResetConfirmScreen(tft);
-  const uint32_t askedAt = millis();
-  bool wasPressed = false;
-  while (millis() - askedAt < kResetConfirmTimeoutMs) {
-    const TouchPoint t = touchInputRead(tft);
-    if (t.pressed && !wasPressed) {
-      const ResetChoice c = confirmHit(t.x, t.y, w, h);
-      if (c == ResetChoice::Yes) {
-        bootCfg.web_password.clear();
-        saveConfig(bootCfg);
-        bootCfg = loadConfig();
-        Serial.println("[auth] web password cleared from the touchscreen");
-        drawResetDoneScreen(tft);
-        delay(1500);
-        break;
-      }
-      if (c == ResetChoice::No) break;
-    }
-    wasPressed = t.pressed;
-    delay(20);
-  }
-  tft.fillScreen(LCARS_BLACK);
-}
-
 // --- /screenshot.bmp: the web handler (core 0) asks, this loop reads -------
 // (display/adapters/lgfx/screenshot_panel; the hand-over is screenshot_bridge).
 
@@ -546,7 +492,14 @@ void setup() {
   // allocating — created later it split the largest free block (spec/04 §10).
   flightScreenReserveSprite(static_cast<int16_t>(tft.width()));
 
-  offerWebPasswordReset(bootCfg);  // finger on the screen at power-up + a password set
+  // A forgotten panel password: a finger on the screen at power-up (before
+  // net_task exists — the blocking delay() steps are fine here).
+  runPasswordReset(tft, !bootCfg.web_password.empty(), [&bootCfg] {
+    bootCfg.web_password.clear();
+    saveConfig(bootCfg);
+    bootCfg = loadConfig();
+    Serial.println("[auth] web password cleared from the touchscreen");
+  });
   nav.set(bootCfg.last_screen);    // restore the last-active screen
   lastPersistedScreen = nav.current();
   lastScreenChangeMs = millis();
