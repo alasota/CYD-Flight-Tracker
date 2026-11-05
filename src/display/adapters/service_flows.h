@@ -1,0 +1,18 @@
+// service_flows — the device halves of the UI's service flows
+// (display/services: ota_screen_flow, update_prompt_flow, alert_screen_flow,
+// password_reset_flow): read the touch, take one step of the pure flow, draw
+// what the step asks for (service_screen_draw) and set the backlight. Not
+// under lgfx/ because they read the touch and drive the backlight too.
+// Hardware adapter, not covered by Unity (CLAUDE.md "Testing").
+#pragma once
+
+#include <cstdint>
+
+#include "display/adapters/lgfx/LGFX_CYD.hpp"
+#include "display/services/ota_screen_flow.h"
+
+// The firmware-update screen from NetState::ota: full brightness and the
+// frame on a new update, then the bar / the result. `installedVersion` is
+// the version line's "from".
+OtaScreenStep runOtaScreen(LGFX &tft, OtaScreenFlow &flow, const OtaProgress &o,
+                           bool restartPending, const char *installedVersion);

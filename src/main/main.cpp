@@ -70,6 +70,7 @@
 #include "display/adapters/lgfx/service_screen_draw.h"
 #include "display/adapters/lgfx/status_bar_draw.h"
 #include "display/adapters/lgfx/table_view_draw.h"
+#include "display/adapters/service_flows.h"
 #include "display/adapters/touch_xpt2046.h"
 #include "display/core/backlight.h"
 #include "admin/adapters/web_server.h"
@@ -387,49 +388,15 @@ static void handleTap(int16_t x, int16_t y) {
 // runs (ota_update::shouldMarkAppValid(), including "this UI loop is alive").
 extern "C" bool verifyRollbackLater() { return true; }
 
-static uint32_t otaSeenSeq = 0;
-static bool otaScreenDrawn = false;
-static uint32_t otaFailedAtMs = 0;  // != 0: "update failed" on screen since then
-static constexpr uint32_t kOtaFailedShowMs = 5000;  // long enough to read on the board
+static OtaScreenFlow otaScreen;
 
 // True while the OTA screens own the display (running, done, a failure on show).
-static bool serviceOtaScreen() {
-  const OtaProgress &o = net->ota;
-  if (o.seq != otaSeenSeq) {
-    otaSeenSeq = o.seq;
-    if (o.phase == OtaProgress::Phase::Running && o.written == 0) otaScreenDrawn = false;
-    if (!otaScreenDrawn) {
-      backlightFullNow(tft);
-      drawOtaScreen(tft, firmwareVersion(), o.fromGithub);
-      otaScreenDrawn = true;
-    }
-    switch (o.phase) {
-      case OtaProgress::Phase::Running:
-        drawOtaProgress(tft, firmwareVersion(), o.newVersion.c_str(), o.written, o.total);
-        break;
-      case OtaProgress::Phase::Done:
-        drawOtaResult(tft, true);  // net_task restarts the board in a moment
-        break;
-      case OtaProgress::Phase::Failed:
-        drawOtaResult(tft, false);
-        otaFailedAtMs = millis() | 1;
-        break;
-      default:
-        break;
-    }
-  }
-  if (o.phase == OtaProgress::Phase::Running || o.phase == OtaProgress::Phase::Done ||
-      net->restartPending) {
-    alertScreen.open = false;  // the OTA screen comes first
-    return true;
-  }
-  if (otaFailedAtMs != 0) {
-    if (millis() - otaFailedAtMs < kOtaFailedShowMs) return true;
-    otaFailedAtMs = 0;  // back to the normal screens
-    otaScreenDrawn = false;
-    pendingRedraw.firstDraw = true;
-  }
-  return false;
+static bool otaScreenPass() {
+  const OtaScreenStep r = runOtaScreen(tft, otaScreen, net->ota, net->restartPending,
+                                       firmwareVersion());
+  if (r.ownsDisplay) alertScreen.open = false;  // the OTA screen comes first
+  if (r.backToScreens) pendingRedraw.firstDraw = true;
+  return r.ownsDisplay;
 }
 
 // --- New version on GitHub: the question on the display ------------------------
@@ -708,15 +675,13 @@ void loop() {
   updateShownHealth();
 
   // Backlight: sensor, night mode, ramps. Service screens get full brightness.
-  const bool otaOnScreen = net->ota.phase == OtaProgress::Phase::Running ||
-                           net->ota.phase == OtaProgress::Phase::Done || otaFailedAtMs != 0 ||
-                           net->restartPending;
-  backlightLoop(tft, cfg(), promptActive || otaOnScreen);
+  backlightLoop(tft, cfg(),
+                promptActive || otaScreen.holdsBacklight(net->ota, net->restartPending));
   core_link::pollingAllowed.store(
       shouldPollOpenSky(backlightDecision(), cfg().night_pause_polling));
 
   // --- Firmware update in progress (or just failed): its screen only ---------
-  if (serviceOtaScreen()) {
+  if (otaScreenPass()) {
     pendingRedraw = RedrawEvents{};
     sleepUntilNextDeadline();
     return;
