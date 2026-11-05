@@ -39,3 +39,33 @@ PromptStep runUpdatePrompt(LGFX &tft, UpdatePromptFlow &flow) {
   if (r.redrawTimer) drawUpdatePromptTimer(tft, r.remainingMs);
   return r;
 }
+
+void showAlertScreen(LGFX &tft, AlertScreenFlow &flow, const AlertSet &alerts,
+                     const AlertDetails &details) {
+  const uint32_t now = millis();
+  const uint32_t secondsLeft = flow.open(now, alerts);
+  Serial.printf("[alert] message screen opened (%u alert(s))\n",
+                static_cast<unsigned>(alertsInOrder(alerts, true).size()));
+  drawAlertScreen(tft, alerts, details, now, secondsLeft);
+}
+
+AlertFlowStep runAlertScreen(LGFX &tft, AlertScreenFlow &flow, const AlertSet &alerts,
+                             const AlertDetails &details) {
+  const TouchPoint t = touchInputRead(tft);
+  AlertScreenInput in;
+  in.nowMs = millis();
+  in.pressed = t.pressed;
+  in.x = t.x;
+  in.y = t.y;
+  in.anyDisplayAlerts = alerts.displaySeverity() != AlertSeverity::None;
+  in.screenW = static_cast<int16_t>(tft.width());
+  in.screenH = static_cast<int16_t>(tft.height());
+  const AlertFlowStep r = flow.step(in, alerts);
+  if (r.redrawList) {
+    drawAlertScreen(tft, alerts, details, in.nowMs, r.secondsLeft);
+  } else if (r.redrawTimer) {
+    drawAlertCloseButton(tft, static_cast<int>(alertsInOrder(alerts, true).size()),
+                         r.secondsLeft);
+  }
+  return r;
+}
