@@ -5,7 +5,7 @@ Feature: Odporność współpracy rdzeni — zrzut ekranu bez wyścigu, żadne �
 
   # ---- 1. ScreenshotBridge (screenshot.h): licznik generacji zamiast flagi `cancelled`
 
-  @test=test_admin/screenshot_test.cpp:test_bridge_normal_capture_fills_every_band
+  @test=test_display/screenshot_bridge_test.cpp:test_bridge_normal_capture_fills_every_band
   Scenario: Zwykły zrzut — wszystkie pasy trafiają do buforów, potem ekran rysuje dalej
     Given handler zaczyna zrzut ekranu i UI odpowiada na begin
     When handler prosi kolejno o k pasów na zmianę do dwóch buforów, a UI każdy wypełnia
@@ -13,7 +13,7 @@ Feature: Odporność współpracy rdzeni — zrzut ekranu bez wyścigu, żadne �
     And dopóki trwa zrzut, UI nie rysuje
     And po end() UI od razu znowu rysuje
 
-  @test=test_admin/screenshot_test.cpp:test_bridge_timeout_mid_band_leaves_no_band_done
+  @test=test_display/screenshot_bridge_test.cpp:test_bridge_timeout_mid_band_leaves_no_band_done
   Scenario: Timeout w trakcie pasa nie zostawia „BandDone” i nie blokuje rysowania
     Given UI zaczęło czytać pas z panelu
     When handlerowi kończy się czas oczekiwania na ten pas
@@ -21,27 +21,27 @@ Feature: Odporność współpracy rdzeni — zrzut ekranu bez wyścigu, żadne �
     Then pas nie zostaje oznaczony jako gotowy, a stan mostu to bezczynność
     And przy następnym przejściu UI znowu rysuje — nie czeka 5 s
 
-  @test=test_admin/screenshot_test.cpp:test_bridge_late_prepare_after_begin_timeout_is_ignored
+  @test=test_display/screenshot_bridge_test.cpp:test_bridge_late_prepare_after_begin_timeout_is_ignored
   Scenario: Spóźnione przygotowanie ekranu po timeoucie begin nie wznawia zrzutu
     Given handler zaczął zrzut, a UI nie odpowiedziało w czasie
     When UI kończy przygotowanie ekranu już po timeoucie
     Then begin zwróciło false, a stan mostu to bezczynność
     And UI nie wstrzymuje rysowania
 
-  @test=test_admin/screenshot_test.cpp:test_bridge_stale_band_does_not_write_new_buffer
+  @test=test_display/screenshot_bridge_test.cpp:test_bridge_stale_band_does_not_write_new_buffer
   Scenario: Pas ze starego żądania nie pisze do bufora nowego żądania
     Given UI czyta pas żądania A, a handler A przekroczył czas i zwolnił swoje bufory
     When przychodzi nowe żądanie B z nowymi buforami, zanim UI skończy stary pas
     Then żaden wiersz starego pasa nie trafia ani do buforów A, ani do buforów B
     And stary pas nie oznacza się jako gotowy dla żądania B
 
-  @test=test_admin/screenshot_test.cpp:test_bridge_end_invalidates_outstanding_band
+  @test=test_display/screenshot_bridge_test.cpp:test_bridge_end_invalidates_outstanding_band
   Scenario: Po end() spóźniony pas niczego już nie zapisuje
     Given UI czyta pas, o który handler poprosił
     When handler woła end() i zwalnia bufory
     Then UI porzuca pas bez zapisu do bufora
 
-  @test=test_admin/screenshot_test.cpp:test_bridge_idle_client_resumes_drawing_after_5_s
+  @test=test_display/screenshot_bridge_test.cpp:test_bridge_idle_client_resumes_drawing_after_5_s
   Scenario Outline: Klient zniknął bez end() — UI wraca do rysowania po 5 s bez aktywności
     Given zrzut trwa, a ostatni pas UI oddało w chwili T
     When od T minęło <ms> ms bez kolejnego żądania
@@ -53,7 +53,7 @@ Feature: Odporność współpracy rdzeni — zrzut ekranu bez wyścigu, żadne �
       | 5000 | nie    |
       | 5001 | znowu  |
 
-  @test=test_admin/screenshot_test.cpp:test_bridge_concurrent_random_timeouts_never_touch_freed_buffers
+  @test=test_display/screenshot_bridge_test.cpp:test_bridge_concurrent_random_timeouts_never_touch_freed_buffers
   Scenario: Współbieżnie — 10 000 zrzutów z losowymi timeoutami nie pisze do zwolnionej pamięci
     Given wątek „handler” i wątek „UI” pracują równolegle na jednym moście
     When handler wykonuje 10 000 zrzutów, losowo przerywając je timeoutem w dowolnym miejscu

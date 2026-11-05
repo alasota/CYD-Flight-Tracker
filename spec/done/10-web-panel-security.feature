@@ -137,20 +137,20 @@ Feature: Bezpieczeństwo panelu WWW — żądania z innych stron odrzucone, żad
     Then dotyk zapisuje zawsze
     And auto-cykl zapisuje dopiero po kScreenPersistMinIntervalMs od poprzedniego zapisu
 
-  @test=test_admin/screenshot_test.cpp:test_screen_returns_to_previous_after_capture
+  @test=test_display/screenshot_bridge_test.cpp:test_screen_returns_to_previous_after_capture
   Scenario: Po zrzucie innego ekranu urządzenie wraca na ekran sprzed zrzutu
     Given urządzenie pokazuje ekran 0 (LOTY)
     When przychodzi zrzut z screen=2 i kończy się przez end()
     Then w trakcie zrzutu pokazany jest ekran 2
     And po zrzucie powrót wskazuje ekran 0, dokładnie raz
 
-  @test=test_admin/screenshot_test.cpp:test_screen_returns_after_abandoned_capture
+  @test=test_display/screenshot_bridge_test.cpp:test_screen_returns_after_abandoned_capture
   Scenario: Powrót następuje także, gdy klient zniknął w trakcie zrzutu
     Given trwa zrzut z screen=1, a urządzenie pokazywało wcześniej ekran 2
     When klient przestaje prosić o pasy i mija ponad 5 s bez aktywności
     Then po wznowieniu rysowania powrót wskazuje ekran 2
 
-  @test=test_admin/screenshot_test.cpp:test_no_return_when_capture_did_not_switch_screen
+  @test=test_display/screenshot_bridge_test.cpp:test_no_return_when_capture_did_not_switch_screen
   Scenario Outline: Bez przełączenia ekranu nie ma do czego wracać
     Given urządzenie pokazuje ekran 1
     When przychodzi zrzut z <parametr> i się kończy
