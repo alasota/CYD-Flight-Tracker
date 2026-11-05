@@ -1,8 +1,10 @@
 // service_flows — the device halves of the UI's service flows
 // (display/services: ota_screen_flow, update_prompt_flow, alert_screen_flow,
 // password_reset_flow): read the touch, take one step of the pure flow, draw
-// what the step asks for (service_screen_draw) and set the backlight. Not
-// under lgfx/ because they read the touch and drive the backlight too.
+// what the step asks for (service_screen_draw) and set the backlight; and
+// ServiceScreens, the three screens of the UI loop together
+// (service_screen_flows). Not under lgfx/ because they read the touch and
+// drive the backlight too.
 // Hardware adapter, not covered by Unity (CLAUDE.md "Testing").
 #pragma once
 
@@ -14,6 +16,7 @@
 #include "display/services/alert_screen_flow.h"
 #include "display/services/ota_screen_flow.h"
 #include "display/services/password_reset_flow.h"
+#include "display/services/service_screen_flows.h"
 #include "display/services/update_prompt_flow.h"
 
 // The firmware-update screen from NetState::ota: full brightness and the
@@ -42,3 +45,21 @@ AlertFlowStep runAlertScreen(LGFX &tft, AlertScreenFlow &flow, const AlertSet &a
 // password_reset_flow. On YES `clearPassword` runs (the caller clears and
 // saves it) before "password removed" is shown.
 void runPasswordReset(LGFX &tft, bool passwordSet, const std::function<void()> &clearPassword);
+
+// The OTA screen, the update question and the alert message as loop() runs
+// them: each pass reads the touch, steps the flows, draws, and answers with
+// one ServiceOutcome (service_screen_flows decides). YES / NO go to net_task
+// through core_link::sendCommand.
+class ServiceScreens : public ServiceScreenFlows {
+ public:
+  ServiceScreens();
+  // The OTA screen: first in every pass.
+  ServiceOutcome otaPass(LGFX &tft, const NetState &s, const char *installedVersion);
+  // After a screenshot: the update question, then the alert message (each only while up).
+  ServiceOutcome dialogsPass(LGFX &tft, const NetState &s);
+  // The header's "!" was tapped.
+  void openAlerts(LGFX &tft, const NetState &s);
+  // On the normal screens: asks the update question when it may (once per boot).
+  void askAboutUpdateIfDue(LGFX &tft, const NetState &s, int currentScreen, bool touchPressed,
+                           bool screenOff);
+};

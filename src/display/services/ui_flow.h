@@ -22,7 +22,8 @@
 #include "display/core/redraw_policy.h"    // RedrawEvents
 #include "display/core/screen_nav.h"       // kScreen*, ScreenChangeCause, alertBadgeHit()
 #include "display/core/screens/status_bar.h"  // HeaderZones
-#include "platform/core_link.h"               // NetState
+#include "display/services/service_screen_flows.h"  // ServiceOutcome
+#include "platform/core_link.h"               // NetState, UiWake
 
 // ---- What the screens show -------------------------------------------------------
 
@@ -205,4 +206,41 @@ class TouchEdge {
 
  private:
   bool wasPressed_ = false;
+};
+
+// ---- The UI loop's bookkeeping together ---------------------------------------------
+
+// What main.cpp keeps between passes, apart from the active screen and the
+// snapshot: the redraw events since the last redraw, the health the header
+// shows, and the pieces above. Its steps are the ones every pass takes.
+class UiFlow {
+ public:
+  RedrawEvents pending;
+  OpenSkyHealth shownHealth = OpenSkyHealth::Ok;
+  TablePager pager;
+  ScreenChangeTracker screenChanges;
+  MinuteWatch minuteWatch;
+  CountdownTick countdown;
+  TouchEdge touch;
+
+  // A new snapshot `next` with diffNetState()'s events: all but its health
+  // (the shown one is updateHealth()'s); a new poll clamps the table page.
+  void takeNetEvents(const RedrawEvents &e, const NetState &next);
+  // shownHealthStep() applied: a change redraws the header (and an empty
+  // screen). True = net_task has just gone silent (log it).
+  bool updateHealth(const NetState &s, uint32_t nowMs, uint32_t netBeatMs);
+  // The active screen changed (ScreenChangeTracker); true = save last_screen now.
+  bool screenChanged(int screen, ScreenChangeCause cause, uint32_t nowMs);
+  // Carries out a service screen pass's outcome (pending cleared before
+  // firstDraw). True = a service screen owns the display.
+  bool apply(const ServiceOutcome &o, uint32_t nowMs);
+  // A PagePrev / PageNext tap: the page moves within `pageCount`, the table is redrawn.
+  void pageTap(TapKind kind, int pageCount);
+  // A normal pass's clocks: the NOW countdown second, the header minute
+  // (`minuteNow` -1 while unsynced). True = auto-cycle switches now.
+  bool tick(const NetState &s, int screen, uint32_t nowMs, long minuteNow, bool screenOff);
+  // The regions to repaint now (computeRedrawMask()); nothing pending afterwards.
+  uint8_t takeRedrawMask(int screen);
+  // The NOW countdown's wake-up while `screen` is the NOW screen.
+  void addWakeTimes(UiWake &w, int screen, uint32_t nowMs) const;
 };

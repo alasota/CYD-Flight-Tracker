@@ -107,3 +107,36 @@ void runPasswordReset(LGFX &tft, bool passwordSet, const std::function<void()> &
     if (r.sleepMs != 0) delay(r.sleepMs);
   }
 }
+
+ServiceScreens::ServiceScreens() : ServiceScreenFlows(core_link::sendCommand) {}
+
+ServiceOutcome ServiceScreens::otaPass(LGFX &tft, const NetState &s, const char *installedVersion) {
+  return afterOtaStep(runOtaScreen(tft, otaFlow(), s.ota, s.restartPending, installedVersion));
+}
+
+ServiceOutcome ServiceScreens::dialogsPass(LGFX &tft, const NetState &s) {
+  ServiceOutcome prompt;
+  if (promptRuns(s.update.installPending)) {
+    prompt = afterPromptStep(runUpdatePrompt(tft, promptFlow()));
+    if (prompt.logQueueFull) Serial.println("[update] command queue full, retrying");
+    if (prompt.ownsDisplay) return prompt;
+  }
+  if (!alertFlow().isOpen()) return prompt;
+  ServiceOutcome alert = afterAlertStep(runAlertScreen(tft, alertFlow(), s.alerts, s.alertDetails));
+  alert.firstDraw |= prompt.firstDraw;  // an answer this pass, before the message's own
+  return alert;
+}
+
+void ServiceScreens::openAlerts(LGFX &tft, const NetState &s) {
+  showAlertScreen(tft, alertFlow(), s.alerts, s.alertDetails);
+}
+
+void ServiceScreens::askAboutUpdateIfDue(LGFX &tft, const NetState &s, int currentScreen,
+                                         bool touchPressed, bool screenOff) {
+  if (!mayAskAboutUpdate(s.update.installPending)) return;
+  const PromptGate g = updatePromptGate(s, currentScreen, millis(), touchPressed, screenOff,
+                                        alertFlow().isOpen());
+  if (promptFlow().tryOpen(g, s.update.latestTag, millis())) {
+    openUpdatePrompt(tft, promptFlow(), s.update.installed);
+  }
+}

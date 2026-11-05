@@ -29,7 +29,6 @@
 #include "display/core/screen_nav.h"
 #include "display/services/ui_flow.h"
 #include "display/services/ui_perf.h"
-#include "display/services/update_prompt_flow.h"
 #include "main/net_task.h"
 #include "platform/core_link.h"
 #include "platform/time_sync.h"
@@ -45,23 +44,12 @@ static ScreenNav nav;  // the active screen, restored from last_screen at boot
 static std::shared_ptr<const NetState> net;
 static uint32_t netSeen = 0;
 
-// The UI's own bookkeeping (ui_flow) and the service screens' flows.
-static ScreenChangeTracker screenChanges;
-static TablePager pager;
-static MinuteWatch minuteWatch;
-static CountdownTick countdownTick;
-static TouchEdge touchEdge;
-static OtaScreenFlow otaScreen;
-static UpdatePromptFlow prompt;
-static AlertScreenFlow alertScreen;
+// The UI's own bookkeeping (ui_flow: redraw events, shown health, page,
+// screen changes, ticks, touch edges), the service screens (OTA, update
+// question, alert message) and the loop's timing for /perf.json.
+static UiFlow ui;
+static ServiceScreens services;
 static UiPerfMeter perfMeter;
-
-// What happened since the last redraw (computeRedrawMask()), the health the
-// header shows, and a YES / NO answer still waiting for room in the command
-// queue — retried every pass, it must not get lost (spec 09 §2).
-static RedrawEvents pendingRedraw;
-static OpenSkyHealth shownHealth = OpenSkyHealth::Ok;
-static PendingCommand pendingCmd;
 
 // The arduino-esp32 core marks a freshly updated image valid right at boot
 // unless this says "later" — net_task does it once the board has proven it
@@ -71,15 +59,14 @@ extern "C" bool verifyRollbackLater() { return true; }
 static const Config &cfg() { return *net->cfg; }
 
 static UiView view() {
-  return makeUiView(*net, nav.current(), pager.page(), shownHealth, millis(), timeSyncNowLocal(),
-                    isTimeSynced());
+  return makeUiView(*net, nav.current(), ui.pager.page(), ui.shownHealth, millis(),
+                    timeSyncNowLocal(), isTimeSynced());
 }
 
-// The regions pendingRedraw asks for, then nothing pending. Without a home
-// location the setup prompt stands in for the screens (`setupPrompt`: on a full redraw).
+// The regions the pending events ask for. Without a home location the setup
+// prompt stands in for the screens (`setupPrompt`: on a full redraw).
 static void redrawPending(bool setupPrompt) {
-  const uint8_t mask = computeRedrawMask(pendingRedraw, nav.current());
-  pendingRedraw = RedrawEvents{};
+  const uint8_t mask = ui.takeRedrawMask(nav.current());
   if (mask != 0 && cfg().home_configured) {
     applyRedraw(tft, mask, view());
   } else if (setupPrompt && (mask & kRedrawFull)) {
@@ -95,35 +82,16 @@ static void takeNetState() {
     const RedrawEvents e = diffNetState(net.get(), *next);
     if (next->cfg->language != net->cfg->language) i18nSetLanguage(next->cfg->language);
     net = std::move(next);
-    pendingRedraw.firstDraw |= e.firstDraw;
-    pendingRedraw.languageChanged |= e.languageChanged;
-    pendingRedraw.newPoll |= e.newPoll;
-    pendingRedraw.minuteChanged |= e.minuteChanged;
-    pendingRedraw.alertsChanged |= e.alertsChanged;
-    if (e.newPoll) pager.clamp(tablePageCount(netRows(*net)));  // a shorter list: its last page
+    ui.takeNetEvents(e, *net);
   }
-  const ShownHealthStep h = shownHealthStep(shownHealth, net->health, millis(),
-                                            core_link::netBeatMs.load(), netRows(*net).empty());
-  if (!h.healthChanged) return;
-  if (h.stalled) Serial.println("[main] network task silent for 60 s");
-  shownHealth = h.shown;
-  pendingRedraw.healthChanged = true;
-  pendingRedraw.newPoll |= h.newPoll;
+  if (ui.updateHealth(*net, millis(), core_link::netBeatMs.load())) {
+    Serial.println("[main] network task silent for 60 s");
+  }
 }
 
-// After nav changed the active screen: page 0, a fresh auto-cycle interval, a
-// redraw, and last_screen written when screenChanges says so (a single NVS key).
+// After nav changed the active screen; last_screen is one NVS key.
 static void onScreenChanged(ScreenChangeCause cause) {
-  if (screenChanges.onChange(nav.current(), cause, millis(), pager, pendingRedraw).persist) {
-    saveLastScreen(nav.current());
-  }
-}
-
-// Back from the alert message: same screen and page, a full repaint, a fresh auto-cycle.
-static void closeAlertMessage() {
-  alertScreen.closeQuietly();
-  screenChanges.restartAutoCycle(millis());
-  pendingRedraw.firstDraw = true;
+  if (ui.screenChanged(nav.current(), cause, millis())) saveLastScreen(nav.current());
 }
 
 // One tap (edge-detected, once per press): routeTap() says what it is.
@@ -132,13 +100,11 @@ static void onTap(int16_t x, int16_t y) {
                                     static_cast<int16_t>(tft.height()), i18nLanguage());
   const TapAction a = routeTap(x, y, c);
   if (a.kind == TapKind::OpenAlerts) {
-    showAlertScreen(tft, alertScreen, net->alerts, net->alertDetails);
+    services.openAlerts(tft, *net);
   } else if (a.kind == TapKind::JumpTo) {
     if (nav.set(a.target)) onScreenChanged(ScreenChangeCause::Touch);
-  } else if (a.kind == TapKind::PagePrev || a.kind == TapKind::PageNext) {
-    if (a.kind == TapKind::PagePrev ? pager.prev() : pager.next(c.pageCount)) {
-      pendingRedraw.pageChanged = true;
-    }
+  } else {
+    ui.pageTap(a.kind, c.pageCount);
   }
 }
 
@@ -149,89 +115,47 @@ static void prepareCapture(int screenIndex) {
   if (p.kind == ScreenshotPrepareKind::UpdatePromptDemo ||
       p.kind == ScreenshotPrepareKind::AlertDemo) {
     drawScreenshotDemo(tft, p.kind);
-    alertScreen.closeQuietly();
-    pendingRedraw = RedrawEvents{};
-    pendingRedraw.firstDraw = true;
+    ui.apply(services.screenshotDemoShown(), millis());
     return;
   }
-  if (alertScreen.isOpen()) closeAlertMessage();  // a normal screen was asked for
+  ui.apply(services.closeAlertScreen(), millis());  // a normal screen was asked for
   if (p.kind == ScreenshotPrepareKind::Screen && nav.set(p.screen)) {
     onScreenChanged(ScreenChangeCause::Screenshot);
   }
   redrawPending(/*setupPrompt=*/false);
 }
 
-// The service screens, first come first. True = one of them owns the display
-// this pass and the normal screens wait.
+// The service screens, first come first: the OTA screen, a screenshot (hold
+// still; afterwards the screen shown before it comes back, repainted, not
+// saved), the update question, the alert message. True = one owns the display.
 static bool serviceScreensPass() {
-  const OtaScreenStep ota =
-      runOtaScreen(tft, otaScreen, net->ota, net->restartPending, firmwareVersion());
-  if (ota.backToScreens) pendingRedraw.firstDraw = true;
-  if (ota.ownsDisplay) {
-    alertScreen.closeQuietly();  // the OTA screen comes first
-    pendingRedraw = RedrawEvents{};
-    return true;
-  }
-  // A screenshot is being taken: hold still. Afterwards the screen shown
-  // before the capture comes back — repainted, not saved.
+  if (ui.apply(services.otaPass(tft, *net, firmwareVersion()), millis())) return true;
   const ScreenshotPassResult shot =
       screenshotPanelPass(tft, nav.current(), kScreenCount, prepareCapture);
   if (shot.backTo >= 0 && nav.set(shot.backTo)) onScreenChanged(ScreenChangeCause::Screenshot);
   if (shot.capturing) return true;
-
-  // The update question, until it's answered (an install from the settings
-  // page closes it: the OTA screen follows).
-  if (prompt.active() && net->update.installPending) prompt.supersededByInstall();
-  if (prompt.active()) {
-    const PromptStep r = runUpdatePrompt(tft, prompt);
-    if (r.command.type != NetCommandType::None) {
-      pendingCmd = submitCommand(r.command, core_link::sendCommand);
-      if (pendingCmd.logQueueFull) Serial.println("[update] command queue full, retrying");
-    }
-    if (r.firstDraw) pendingRedraw.firstDraw = true;
-    if (prompt.active()) return true;
-  }
-
-  // The alert message: its finger (the CLOSE tap too) is no tap below.
-  if (!alertScreen.isOpen()) return false;
-  const AlertFlowStep r = runAlertScreen(tft, alertScreen, net->alerts, net->alertDetails);
-  if (r.swallowTouch) touchEdge.swallow();
-  if (r.close) closeAlertMessage();
-  if (!alertScreen.isOpen()) return false;
-  pendingRedraw = RedrawEvents{};
-  return true;
+  return ui.apply(services.dialogsPass(tft, *net), millis());
 }
 
 // The normal screens: a tap, the update question (asked once), the NOW
 // countdown and header clock ticks, auto-cycle, then the redraw.
 static void screensPass() {
   const TouchPoint touch = touchInputRead(tft);
-  if (touchEdge.tap(touch.pressed)) {
+  if (ui.touch.tap(touch.pressed)) {
     touchLogTap(tft, touch);
     if (backlightHandleTouch(cfg())) {
-      screenChanges.restartAutoCycle(millis());  // it only woke a dark screen
+      ui.screenChanges.restartAutoCycle(millis());  // it only woke a dark screen
     } else {
       onTap(touch.x, touch.y);
     }
   }
-  if (!alertScreen.isOpen() && !prompt.active() && !net->update.installPending &&
-      prompt.tryOpen(updatePromptGate(*net, nav.current(), millis(), touch.pressed,
-                                      backlightDecision().screen_off, false),
-                     net->update.latestTag, millis())) {
-    openUpdatePrompt(tft, prompt, net->update.installed);
-  }
-  if (alertScreen.isOpen() || prompt.active()) {  // the tap opened the "!", or the question is up
-    pendingRedraw = RedrawEvents{};
-    return;
-  }
+  const bool screenOff = backlightDecision().screen_off;
+  services.askAboutUpdateIfDue(tft, *net, nav.current(), touch.pressed, screenOff);
+  if (ui.apply(services.afterNormalTap(), millis())) return;
 
-  if (countdownTick.due(nav.current(), millis())) pendingRedraw.countdownTick = true;
-  // -1 while unsynced, so the first NTP sync also counts as a change.
-  if (minuteWatch.changed(isTimeSynced() ? minuteOf(timeSyncNowLocal()) : -1)) {
-    pendingRedraw.minuteChanged = true;
-  }
-  if (shouldAutoCycleNow(autoCycleInputAt(*net, nav.current(), backlightDecision().screen_off,
-                                          screenChanges.autoCycleElapsedMs(millis()), millis()))) {
+  // -1 while unsynced, so the first NTP sync also counts as a minute change.
+  const long minuteNow = isTimeSynced() ? minuteOf(timeSyncNowLocal()) : -1;
+  if (ui.tick(*net, nav.current(), millis(), minuteNow, screenOff)) {
     nav.next();  // 3 distinct screens, wraps
     onScreenChanged(ScreenChangeCause::AutoCycle);
   }
@@ -243,12 +167,11 @@ static void screensPass() {
 static void sleepUntilNextDeadline() {
   const uint32_t now = millis();
   UiWake w;
-  if (nav.current() == kScreenFlight) w.untilCountdownMs = countdownTick.msUntilNext(now);
+  ui.addWakeTimes(w, nav.current(), now);
   if (isTimeSynced()) {
     w.untilMinuteMs = msUntilNextMinute(static_cast<int>(timeSyncNowLocal() % 60), 0);
   }
-  w.untilPromptTimerMs = prompt.msUntilTimer(now);
-  if (alertScreen.isOpen()) w.untilAlertTimerMs = alertScreen.msToNextSecond(now);
+  services.addWakeTimes(w, now);
   const uint32_t sleepMs = uiSleepMs(w);
   perfMeter.setPlannedSleep(sleepMs);
   ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(sleepMs));
@@ -279,7 +202,7 @@ void setup() {
     Serial.println("[auth] web password cleared from the touchscreen");
   });
   nav.set(bootCfg.last_screen);  // restore the last-active screen
-  screenChanges.begin(nav.current(), millis());
+  ui.screenChanges.begin(nav.current(), millis());
 
   // The first snapshot: the settings, no data yet — the chrome and "--" go on
   // screen right away, before WiFi is even up.
@@ -303,7 +226,7 @@ void setup() {
   core_link::netBeatMs.store(millis());
   netTaskStart(cfgPtr, appPendingVerify);
 
-  pendingRedraw.firstDraw = true;  // paint the (empty) active screen + chrome immediately
+  ui.pending.firstDraw = true;  // paint the (empty) active screen + chrome immediately
 }
 
 void loop() {
@@ -313,12 +236,11 @@ void loop() {
     core_link::uiPerf.set(share);
   }
   core_link::uiBeatMs.store(millis());
-  pendingCmd = retryPendingCommand(pendingCmd, core_link::sendCommand);
+  services.retryCommand();
   takeNetState();
 
   // Backlight: sensor, night mode, ramps. Service screens get full brightness.
-  backlightLoop(tft, cfg(),
-                prompt.active() || otaScreen.holdsBacklight(net->ota, net->restartPending));
+  backlightLoop(tft, cfg(), services.holdsBacklight(net->ota, net->restartPending));
   core_link::pollingAllowed.store(
       shouldPollOpenSky(backlightDecision(), cfg().night_pause_polling));
 
