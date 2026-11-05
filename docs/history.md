@@ -247,3 +247,32 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   `throw`; an error that would throw (`std::bad_alloc`) aborts, as an uncaught exception did
   before. Xtensa panic backtraces come from the stack frames, not `.eh_frame`, so crash logs are
   unchanged. Checked on the board (4 min, OpenSky login + polls, settings page, OTA).
+- **The UI's state machines left `main.cpp`** (spec 12, stage 5, owner 2026-11-05). `main.cpp`
+  had grown to 909 lines with seven hand-written state machines in file-scope `static`s (update
+  question, OTA screen, alert screen, password reset, screenshot hand-over, loop timing, taps /
+  pages / screen changes / ticks), none of them testable because `main.cpp` isn't built by
+  `native`; `handleSave()` (~185 lines) in `web_server` was the same for the settings form. Each
+  became a pure class or function in `display/services/` (`admin/core/settings_form` for the
+  form) with a step in → one answer struct out (draw what, send which command, owns the display,
+  full redraw), so the tests drive it with plain values and odd `millis()` values, and the
+  device half only reads the touch, steps and draws. The device halves went to display adapters
+  (`service_flows`, `lgfx/ui_draw`, `lgfx/screenshot_panel`), not back into `main.cpp`: they
+  touch LovyanGFX, the XPT2046 and the backlight, and §10 wants the root as wiring only.
+  Behaviour was copied, quirks included: the OTA flow keeps `millis() | 1` as "failed since"
+  (0 = none) and `ui_perf` the `0` = unset sentinels, because those are what the timing was
+  checked with on the board; the update question still sets `released` before the tap check and
+  doesn't update `wasPressed` on an accepted answer; percent fields are clamped even when not
+  sent. The settings form's number setters are named functions, not lambdas: under gnu++11 a
+  lambda → function pointer isn't `constexpr`, the table was initialized at boot (+160 B RAM).
+- **`ServiceScreens` and `UiFlow`** (stage 5, owner 2026-11-05). With every flow moved out,
+  `main.cpp` still came out at 327 lines — the plan's estimate (≈ 245) assumed `loop()` and
+  `setup()` would shrink further, but the glue (which flow runs when, what each answer does to
+  nav / redraw / NVS / the command queue) is ~300 lines of plain calls. The plan's fallback alone
+  (a `UiFlow` aggregate in `ui_flow` for net state, health and ticks) would have left ~290. The
+  owner chose both: `ServiceScreenFlows` (pure) owns the OTA, update-question and alert flows plus
+  the pending command and answers one `ServiceOutcome`; its adapter `ServiceScreens` reads the
+  touch and draws; `UiFlow` holds the UI bookkeeping and applies a `ServiceOutcome`
+  (`apply()` drops the pending events *before* setting `firstDraw`, the order the screenshot
+  demo needs). `main.cpp` → 249 lines, no formatting squeezed and nothing moved to another root.
+  Firmware +2 208 B over the stage's start (1 346 544 → 1 348 752 B, budget +4 096), static RAM
+  −8 B; on the board the UI loop's stack has more room (5 244 B free vs 4 684 on v1.11.2).

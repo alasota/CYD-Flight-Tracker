@@ -20,8 +20,8 @@ content is paginated (the table) or truncated, not scrolled.
 ## Screen chrome — header bar and tab bar
 
 Drawn by `status_bar` (header) and `drawBottomNav()` (`lcars_theme`, geometry from
-`screen_nav`), called by the UI (`main.cpp`) when the redraw mask says so. Screens don't know
-the chrome exists; they draw inside the content area.
+`screen_nav`), called by the UI (`applyRedraw()` in `ui_draw`) when the redraw mask says so.
+Screens don't know the chrome exists; they draw inside the content area.
 
 **Header, y 0..15, three zones, nothing filled** (`statusBarZones()`, native-tested so the zones
 never overlap for the longest texts in either language):
@@ -65,7 +65,8 @@ Empty screens say **why** they are empty (`emptyStateText(health, shortForm)`, `
 only with a healthy feed "BRAK LOTÓW W ZASIĘGU" / "BRAK LOTU"; credits exhausted "LIMIT OPENSKY
 WYCZERPANY" / "LIMIT API"; login rejected even anonymously "BŁĄD LOGOWANIA OPENSKY"; no answer
 "BRAK DOSTĘPU DO OPENSKY" ("BŁĄD API" short). Aircraft from the last good poll stay on screen;
-`main.cpp` repaints the content when the health changes and the list is empty.
+the UI repaints the content when the health changes and the list is empty (`shownHealthStep()`
+in `ui_flow`).
 
 ## Screen 1 — Flights (LOTY, the default view)
 
@@ -126,7 +127,8 @@ on black, left-aligned.
   altitude nor speed reported. Null altitude / speed are tracked (`has_altitude` /
   `has_velocity`) and shown as `--`. Ground rows get the top-view plane in FAZA.
 - **Paging:** more than 5 aircraft → tap the first data row to page back, the row-tall strip
-  just above the tab bar to page forward (`main.cpp`, zones one `tableRowHeightPx()` tall).
+  just above the tab bar to page forward (`routeTap()` in `ui_flow`, zones one
+  `tableRowHeightPx()` tall; `TablePager` keeps the page inside the new page count after a poll).
   Paging swaps which 5 are shown; it never scrolls. "1/2" (`tablePageLabel()`) right-aligned in the TYP column header when
   there is more than one page.
 
@@ -160,9 +162,9 @@ One aircraft, one number that matters: when will it be overhead. In code it's `k
   While the CPA is still ahead (t > 0) a small muted caption `NAD TOBĄ ZA` / `OVERHEAD IN`
   (`CountdownDisplay::caption`) sits above the digits; the digits are centred below it.
 - **Status strip, y 190..215** (`kStatusTop`, `kStatusHeight` 25), centred label from the table.
-- **Ticking:** the countdown ticks every second between polls — the UI (`main.cpp`,
-  `currentCpa()`) extrapolates the poll's prediction to now with `extrapolateCpa()` and repaints
-  only the countdown zone and the status strip; each new poll re-syncs it. Once t drops below
+- **Ticking:** the countdown ticks every second between polls — the UI (`ui_flow`'s
+  `CountdownTick`, `netCpaAt()`) extrapolates the poll's prediction to now with
+  `extrapolateCpa()` and repaints only the countdown zone and the status strip; each new poll re-syncs it. Once t drops below
   -10 the next poll simply picks again.
 - Speeds everywhere are km/h (OpenSky's m/s × 3.6).
 
@@ -196,7 +198,9 @@ empty-state text ("BRAK LOTU").
   index, `nextScreen()` / `prevScreen()` with wraparound, `set()`.
 - **Screens are switched only by the tab bar.** Tapping a segment jumps to that screen. There
   are no edge-swipe zones; taps above the tab bar belong to the active screen (Screen 1's table
-  paging) or to the header's "!" (`alertBadgeHit()`, checked first).
+  paging) or to the header's "!" (`alertBadgeHit()`, checked first). One tap per press
+  (`TouchEdge`); what it does is the pure `routeTap()` (`ui_flow`: `TapKind` None / OpenAlerts /
+  JumpTo / PagePrev / PageNext), `main.cpp` carries it out.
 - **Touch calibration** (`display/core/touch_calibration.h`, handed to LovyanGFX's
   `Touch_XPT2046`): in LovyanGFX raw terms **raw X is the vertical axis** (~340 at the bottom
   .. ~3900 at the top) and **raw Y the horizontal one, running right-to-left** (~3900 at the
@@ -209,8 +213,8 @@ empty-state text ("BRAK LOTU").
   4-corner calibration is ever wanted.
 - **Persistence:** the screen index is saved as `last_screen` (0/1/2) and restored on boot.
   Whether a change is written depends on its cause (`ScreenChangeCause`,
-  `shouldPersistScreenChange()`): `Touch` always, `AutoCycle` at most every 10 min
-  (`kScreenPersistMinIntervalMs`), `Screenshot` never (a `/screenshot.bmp?screen=N` switch is
+  `shouldPersistScreenChange()`, applied by `ui_flow`'s `ScreenChangeTracker`): `Touch` always,
+  `AutoCycle` at most every 10 min (`kScreenPersistMinIntervalMs`), `Screenshot` never (a `/screenshot.bmp?screen=N` switch is
   only for the capture; the previous screen comes back afterwards).
 - **Any screen change resets the auto-cycle timer** — manual or automatic — so a tap is never
   undone by an auto-switch a moment later.
@@ -221,7 +225,8 @@ Off by default. Settings (General tab): `auto_cycle_enabled` (default false),
 `auto_cycle_interval_s` (default 15).
 
 - A `millis()` timer counts from the last screen change; at the interval the UI advances with
-  the same `nextScreen()` as manual navigation and restarts the timer.
+  the same `nextScreen()` as manual navigation and restarts the timer. The gate is the pure
+  `shouldAutoCycleNow()` (`ui_flow`): enabled, home set, screen not dark, interval over, no hold.
 - **Don't interrupt an imminent pass on NOW:** `shouldDeferAutoSwitch(currentScreen, cpaFound,
   tCpaSeconds)` (`screen_nav`, pure) holds the switch while
   `currentScreen == FLIGHT && cpaFound && tCpaSeconds < 6 && tCpaSeconds > -5`

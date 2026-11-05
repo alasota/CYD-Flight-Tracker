@@ -3,17 +3,19 @@
 The current architecture in detail: the source layout, the two cores, the settings page,
 updates, brightness, the "!" alerts, CI and the agent harness. The rules a session must follow
 are in CLAUDE.md; this file is the reference behind them. (Spec 12 reorganises the code into
-contexts in eight stages; stages 1–4 — folders, full-path includes, layer report, layer names,
-misplaced types moved to their contexts, pure / hardware halves split — are done. Stage 8 rewrites this file around the
-contexts.)
+contexts in eight stages; stages 1–5 — folders, full-path includes, layer report, layer names,
+misplaced types moved to their contexts, pure / hardware halves split, the UI flows and the
+settings form as tested `services/` / `core/` code — are done. Stage 8 rewrites this file around
+the contexts.)
 
 ## Source layout (spec 12)
 
 Spec: `spec/planned/12-code-reorganization-ddd.md` (§2 layer names, §4 contexts, §5 dependency
 table, §8 stages). Stage 1 moved the files with `git mv`, **unsplit and unrenamed**; stage 2
 renamed the layer folders; stage 3 moved misplaced types into their contexts; stage 4 split
-every `#ifdef ARDUINO` half out into `adapters/`. Stages 5–8 add the `services/` logic, settings
-per context, rename to the glossary and make the layer check block CI.
+every `#ifdef ARDUINO` half out into `adapters/`; stage 5 moved the UI's state machines out of
+`main.cpp` into `display/services/` and the form logic of `POST /save` into `settings_form`.
+Stages 6–8 add settings per context, rename to the glossary and make the layer check block CI.
 
 - **Folders:** `src/<context>/<layer>/` — contexts `airspace` (the sky model: aircraft state,
   tracked flights, their order, the NOW pick, feed health, flight phase, CPA; the poll pipeline),
@@ -32,7 +34,9 @@ per context, rename to the glossary and make the layer check block CI.
   `service_screen_draw`, `radar_view_draw`, `flight_screen_draw` (+ the countdown sprite),
   `table_view_draw`, `featured_panel_draw`, `aircraft_summary_draw`, `lcars_theme_draw` (the
   efont objects, `LCARS_FONT_*`, `gfxTextMeasure()`, icons, arrows, pills, tabs),
-  `touch_xpt2046` (`touchInputRead()`), `backlight_ldr` (LDR, PWM, night window);
+  `touch_xpt2046` (`touchInputRead()`, `touchLogTap()`), `backlight_ldr` (LDR, PWM, night
+  window); since stage 5 also `service_flows` (the service-screen drivers, `ServiceScreens`),
+  `lgfx/ui_draw` and `lgfx/screenshot_panel` (see the stage 5 bullet);
   `enrichment/adapters/` — `hexdb_sources` (aircraft / route / airport fetch + `lookup*()`),
   `lookup_store_nvs`, `hexdb_http`; `opensky/adapters/opensky_http` (token, `/states/all`
   HTTP/1.0 stream, 401 / 429, schedule); `admin/adapters/` — `web_server` (routes + mDNS, was
@@ -43,8 +47,8 @@ per context, rename to the glossary and make the layer check block CI.
 - **Stage 2** (`git mv` of 80 files, include lines only): `<ctx>/domain/` → `<ctx>/core/`,
   `<ctx>/app/` → `<ctx>/services/`, `src/app/` → `src/main/`; `admin/app/` split —
   `config_page`, `web_i18n` (pure) → `admin/core/`, `config_portal` (the `WebServer` routes, now `web_server`) →
-  `admin/adapters/`. Today only `airspace/services/` (`poll_pipeline`) and `display/services/`
-  (`screenshot`) exist.
+  `admin/adapters/`. Until stage 5 only `airspace/services/` (`poll_pipeline`) and
+  `display/services/` (`screenshot`) existed.
 - **Stage 3** (symbols, not files — written by hand, no move table): each misplaced type left its
   old header in the same commit it appeared in the new one, and its tests moved with it into the
   suite of the new context (49 tests, names unchanged). `airspace/core/`: `aircraft_state`
@@ -91,6 +95,45 @@ per context, rename to the glossary and make the layer check block CI.
   `display/core/` (`include/` holds only PlatformIO's README). `AircraftInfo`'s constructor is
   declared in `aircraft_lookup.h` and `= default` in the `.cpp`, like `AircraftRow`'s copies
   (docs/history.md "Tooling and docs").
+- **Stage 5** (the `services/` layer, spec 12 §6; owner 2026-11-05: the plan's defaults, then the
+  `ServiceScreens` driver + `UiFlow` aggregate when `main.cpp` stopped at 327 lines). The state
+  machines of `main.cpp` (909 lines) and the form logic of `handleSave()` became pure modules —
+  a step in, one answer struct out, no `#ifdef ARDUINO`, native-tested:
+  - `display/services/ui_flow` — `routeTap()` (`TapKind` None / OpenAlerts / JumpTo / PagePrev /
+    PageNext), `tablePageCount()` + `TablePager`, `ScreenChangeTracker` (persist, page reset,
+    auto-cycle timer), `MinuteWatch`, `CountdownTick`, `shouldAutoCycleNow()`,
+    `shownHealthStep()`, `TouchEdge`, `UiView` (`makeUiView()`, `tapContextOf()`, `netRows()`,
+    `netCpaAt()`, `autoCycleInputAt()`) and `UiFlow`, which holds them for the loop
+    (`takeNetEvents()`, `updateHealth()`, `screenChanged()`, `apply(ServiceOutcome)`,
+    `pageTap()`, `tick()`, `takeRedrawMask()`, `addWakeTimes()`).
+  - `ota_screen_flow` (`OtaScreenFlow`, `holdsBacklight()`), `update_prompt_flow`
+    (`UpdatePromptFlow`, `updatePromptGate()`), `alert_screen_flow` (`AlertScreenFlow` around
+    `service_screen`'s `alertScreenStep()`), together in `service_screen_flows`
+    (`ServiceScreenFlows`: the three flows + the `PendingCommand`, the sender injected; each pass →
+    one `ServiceOutcome {ownsDisplay, clearPending, firstDraw, restartAutoCycle, swallowTouch,
+    logQueueFull}`).
+  - `password_reset_flow` (`shouldOfferPasswordReset()`, `PasswordResetFlow`: Hold → WaitRelease
+    → Confirm → Finished, `sleepMs` 30 / 20 / 1500), `ui_perf` (`UiPerfMeter`), `screenshot_bridge`
+    (`ScreenshotBridge<Lock>` and `ScreenshotReturn` split out of `screenshot.h`, plus
+    `screenshotPrepareTarget()` and `screenshotUiPass()`; `screenshot.h` keeps the BMP / band /
+    `?screen=` helpers `web_server` uses).
+  - `admin/core/settings_form` — `FormArgs`, `applySettingsForm()`, `passwordProblem()`,
+    `rejectedFieldsText()` (see "Settings page"); `handleSave()` is 22 lines of HTTP.
+
+  Device halves: `display/adapters/service_flows` (`runOtaScreen()`, `openUpdatePrompt()` /
+  `runUpdatePrompt()`, `showAlertScreen()` / `runAlertScreen()`, `runPasswordReset()` and
+  `ServiceScreens : ServiceScreenFlows` — `otaPass()`, `dialogsPass()`, `openAlerts()`,
+  `askAboutUpdateIfDue()`), `lgfx/ui_draw` (`applyRedraw(tft, mask, UiView)`,
+  `drawSetupPrompt()`), `lgfx/screenshot_panel` (the bridge and return instances, the four
+  `ScreenshotSource` functions, `screenshotPanelPass()`, `drawScreenshotDemo()`). Also new:
+  `status_bar`'s `statusBarZonesNow()`, `ota_flash`'s `otaFlashRunningPendingVerify()`,
+  `touch_xpt2046`'s `touchLogTap()`. The adapters see other contexts only through display / platform
+  headers (the installed version comes in as a parameter, the demo states through
+  `core_link.h`), so no new layer finding. `main.cpp` is 249 lines of wiring; its only plain
+  static is `netSeen`. `LayoutTest` keeps it so: `test_main_cpp_is_under_250_lines`,
+  `test_main_cpp_keeps_no_flow_state`, `test_stage_5_flows_left_main_cpp`,
+  `test_web_server_save_route_has_no_form_logic`, `test_stage_5_services_have_their_tests`,
+  `test_stage_5_moved_tests_follow_their_code`.
 - **Includes** are full paths from `src/` (`#include "display/core/i18n.h"`), in `src/` and
   `test/` alike; `-I src` is in `env:cyd` and `env:native` (`cyd-ota`, `native-asan` inherit).
   `test/support/` headers and test-local headers (`github_fixtures.h`) stay short.
@@ -140,7 +183,8 @@ per context, rename to the glossary and make the layer check block CI.
   `place_names.h` / `opensky_quota.h -> display/core` (`Language`). `tools/test_check_layers.py`'s
   `LayoutTest.test_layer_findings_do_not_exceed_the_stage_limit` fails above
   `LAYER_FINDINGS_LIMIT = 14`; each stage that lowers the count lowers the limit with it (51 → 47
-  → 14), so progress can't slip back unnoticed.
+  → 14), so progress can't slip back unnoticed. **Still 14 after stage 5** — the same list (the
+  new modules include only what §5 allows).
   A short include (resolving only from the file's own folder) and a file outside any context are
   findings too; `LayoutTest` keeps the tree free of them, of old `domain/` / `app/` paths in code,
   build files and tools, and keeps the `RUN_TEST(` count ≥ 874.
@@ -169,10 +213,22 @@ two cores"; this is how it works.
   marking the image valid. It owns the in-memory `Config` and reloads it after a settings save
   (`configPortalSaveCount()`). Each pass ends with `vTaskDelay(kNetIdleSleepMs = 5)`.
 - **Core 1 — `loop()` in `main.cpp`** (Arduino loopTask, default 8 KB stack): `tft`, touch,
-  `screen_nav`, redraw, `backlight`, the update question, service screens. It **sleeps**
+  `screen_nav`, redraw, `backlight`, the update question, service screens. `main.cpp` only wires:
+  the decisions are in `display/services` (`UiFlow`, `ServiceScreenFlows`, `UiPerfMeter`), the
+  drawing in `display/adapters` (`ui_draw`, `service_flows`, `screenshot_panel`). It **sleeps**
   between passes (`ulTaskNotifyTake`, `uiSleepMs()`: touch poll every 20 ms — one GPIO read
   without a finger, LovyanGFX checks the XPT2046 IRQ pin first — the countdown second, the clock
-  minute, the prompt timer); `net_task` wakes it when it publishes.
+  minute, the prompt / alert timers from `UiFlow::addWakeTimes()` and
+  `ServiceScreens::addWakeTimes()`); `net_task` wakes it when it publishes.
+- **One UI pass:** `UiPerfMeter::tick()`, the UI heartbeat, the pending command's retry, the
+  newest `NetState` (`UiFlow::takeNetEvents()`, then `updateHealth()`), the backlight. Then
+  `serviceScreensPass()`, first come first: the OTA screen (`ServiceScreens::otaPass()`), a
+  screenshot (`screenshotPanelPass()`), the update question and the alert message
+  (`dialogsPass()`); each answers a `ServiceOutcome` that `UiFlow::apply()` turns into dropped
+  events / a full redraw / a fresh auto-cycle interval / a swallowed touch. If none owns the
+  display, `screensPass()`: a new press (`TouchEdge`) either only wakes a dark screen or goes
+  through `routeTap()`; the update question is asked once when its gate opens; `UiFlow::tick()`
+  (countdown second, clock minute, auto-cycle); `applyRedraw()` with `takeRedrawMask()`.
 - **Three channels, nothing else shared** (`core_link`):
   1. `NetState` net → UI: an immutable snapshot (`shared_ptr<const NetState>`) in a
      `LatestBox` — latest wins, the lock only swaps a pointer, the old value is freed *after*
@@ -182,8 +238,9 @@ two cores"; this is how it works.
   2. `NetCommand` UI → net: a FreeRTOS queue of 8 POD commands (`None` by default,
      `InstallTag` = YES on the update question, `SkipTag` = NO); never blocks. A command the
      full queue refuses waits in a one-slot `PendingCommand` (`submitCommand()`, a newer one
-     replaces it) and is retried at the top of every `loop()` pass (`retryPendingCommand()`),
-     logged once: `[update] command queue full, retrying`.
+     replaces it, held by `ServiceScreenFlows`) and is retried at the top of every `loop()` pass
+     (`retryCommand()` → `retryPendingCommand()`), logged once: `[update] command queue full,
+     retrying`.
   3. Atomics / `Guarded<T>` (a POD copied under a spinlock): `uiBeatMs`, `netBeatMs`,
      `pollingAllowed` (the night pause, decided by the UI), UI perf numbers, and the backlight
      status `/light.json` reads.
@@ -204,8 +261,9 @@ two cores"; this is how it works.
   destructor `stop()`s the socket, so the HTTPClient lives as long as the session.
 - **Screenshots** — `/screenshot.bmp` is the one web route that needs the panel. The handler
   asks the UI for bands of 16 rows into two buffers (`ScreenshotSource::begin / requestBand /
-  waitBand / end`, forwarded by `shot::` in `main.cpp` to a `ScreenshotBridge<SpinLock>`, pure
-  and header-only in `screenshot.h`) — the UI reads band k+1 while band k goes out. Every
+  waitBand / end` = `screenshotPanelBegin()` … in the `screenshot_panel` adapter, forwarding to
+  a `ScreenshotBridge<SpinLock>`, pure and header-only in `screenshot_bridge.h`) — the UI reads
+  band k+1 while band k goes out (`screenshotUiPass()`, called by `screenshotPanelPass()`). Every
   `begin()` / `requestBand()` takes a new **generation** under the lock; a timeout or `end()`
   sets it to 0. The UI (`takeJob()` / `writeRow()` / `finishJob()`) copies a row or marks a band
   done only while its job's generation is still current, so a late band can neither write into
@@ -214,19 +272,23 @@ two cores"; this is how it works.
   wrap-safe). The native test runs handler and UI on two `std::thread`s with random timeouts
   (ASan in CI).
 - **`?screen=N`** switches the display only for the capture (spec 10): `ScreenshotReturn`
-  (`screenshot.h`, UI side) remembers the screen shown before — only for a real switch (0..2 and
+  (`screenshot_bridge.h`, UI side) remembers the screen shown before — only for a real switch (0..2 and
   not the current one; the demo screens 3 = update question and 4 = alert screen leave
   nothing) and only the first of a capture series — and `afterPass(capturing)` gives it back
-  once capturing ends. `main.cpp` then `nav.set()`s it with `ScreenChangeCause::Screenshot`:
-  repainted, never written to NVS. An alert screen closed by a capture stays closed.
+  once capturing ends; `screenshotPanelPass()` returns it as `backTo` and `main.cpp`
+  `nav.set()`s it with `ScreenChangeCause::Screenshot`: repainted, never written to NVS. What a
+  capture prepares is `screenshotPrepareTarget()`: a screen 0..2, the update question demo
+  (`kScreenCount`) or the alert screen demo (`kScreenCount + 1`). An alert screen closed by a
+  capture stays closed (`ServiceScreenFlows::closeAlertScreen()`).
 - **Liveness:** no `netBeatMs` for 60 s → the header shows a network error (stale data isn't
   presented as fresh); no `uiBeatMs` for 2 s → a new image isn't marked valid and is restarted
   (see "Firmware updates (OTA)").
 - **Heap:** ~143 KB free, largest block 57 KB (with ~8 aircraft). The NOW countdown sprite
   (~30 KB) is created in `setup()` (`flightScreenReserveSprite()`) before WiFi and `net_task`
   allocate, so the largest block stays above the 50 KB verified TLS (`release_check`) needs.
-- **Perf** (`perf_stats`, pure): the UI measures how much later than planned each pass starts
-  (drawing time + oversleep); `net_task` logs once a minute
+- **Perf** (`perf_stats`, pure): the UI (`ui_perf`'s `UiPerfMeter`) measures how much later
+  than planned each pass starts (drawing time + oversleep) and hands each 60 s window to
+  `core_link::uiPerf` with its stack high-water mark; `net_task` logs once a minute
   `[perf] ui gap max=85ms p99<20ms slow=0 | net busy 20.3% max=807ms | stack ui=… net=… | heap …
   | cache ac=40 rt=38 ap=12` and serves the same as `GET /perf.json` (`"cache": {ac, rt, ap}` =
   entries in the hexdb.io RAM caches).
@@ -234,12 +296,25 @@ two cores"; this is how it works.
 ## Settings page (web_server, config_page, config_backup)
 
 - `web_server` (`admin/adapters/`, was `config_portal`) runs the `WebServer` + mDNS
-  (`cyd-sky.local`) on core 0; the form's checks (`isValidFloatString()`,
-  `isValidUnsignedIntString()`) and the credentials-file parser (`parseOpenSkyCredentialsJson()`)
-  are the pure `settings_form` (`admin/core/`), settings storage is `settings_nvs`. The HTML is rendered
-  by the pure **`config_page`** (`renderConfigPage(model, sink)`, native-tested) and sent by
-  `sendPage()` in ~1.4 KB chunks (see CLAUDE.md "Concurrency — two cores": send in large
-  pieces).
+  (`cyd-sky.local`) on core 0; what a save does with the form, the form's checks
+  (`isValidFloatString()`, `isValidUnsignedIntString()`) and the credentials-file parser
+  (`parseOpenSkyCredentialsJson()`) are the pure `settings_form` (`admin/core/`), settings storage
+  is `settings_nvs`. The HTML is rendered by the pure **`config_page`** (`renderConfigPage(model,
+  sink)`, native-tested) and sent by `sendPage()` in ~1.4 KB chunks (see CLAUDE.md "Concurrency —
+  two cores": send in large pieces).
+- **Save** (`POST /save`, `handleSave()`): origin check, `authorize()`, the request's args into a
+  `FormArgs` (the first value of a name counts, like `WebServer::arg()`; query-string args are in
+  it too), `applySettingsForm(cfg, args)` — changes the `Config` **in place** (no second copy on
+  core 0's stack, the handler runs nested in a poll) and returns `SettingsFormOutcome {rejected,
+  password, message}` — then `saveConfig()` and the page again. One table `kNumberFields[]`
+  (`{name, label, apply}`, form order; plain functions, not lambdas, so it stays
+  constant-initialized in .rodata under gnu++11) covers the 14 fields that can be rejected (7
+  numbers, 5 clamped brightness / night fields, 2 clock times): a value that doesn't parse keeps
+  the old one and its label goes into `rejected` in form order, listed by
+  `rejectedFieldsText(rejected, web_language)` after `WebStr::SavedWithInvalid` ("Zapisano, ale te
+  pola były błędne …"). The clamped five are clamped even when not sent; a missing checkbox =
+  unchecked, a missing text field = unchanged, an empty `client_secret` keeps the saved one; a
+  refused password is listed under `passwordProblem()`'s label. Sets `home_configured`.
 - **Five tabs:** **Location** (lat/lon, radius + credits per request), **OpenSky client**
   (account pill, client id/secret, credentials-file upload, poll interval + credits per day vs.
   the limit), **General** (display + web-panel language, display brightness / night mode,
@@ -283,7 +358,9 @@ Spec: `spec/done/01-ota-updates.md`. Released in v1.1.0.
   `FirmwareMarkerScanner` finds the marker even across chunk boundaries.
 - **Display:** `web_server` and `github_http` draw nothing; their `OtaObserver` (`ota_update.h`) callbacks
   (start / every 16 KB / end, on core 0) go to `net_task`, which publishes them as
-  `NetState::ota` (`OtaProgress`, phase + seq); the UI draws `service_screen` from it. The
+  `NetState::ota` (`OtaProgress`, phase + seq); on the UI, `OtaScreenFlow` (`ota_screen_flow`)
+  decides from it what to draw — frame, bar or result — and `runOtaScreen()` (`service_flows`)
+  draws `service_screen`. The
   16 KB callback also does `vTaskDelay(1)` (core 0's watchdog). Success: answer page, ~1.5 s,
   `ESP.restart()` (`configPortalRestartPending()` keeps `net_task` off the network meanwhile;
   the UI keeps the OTA screen via `NetState::restartPending`). Failure: "update failed" for 5 s,
@@ -303,7 +380,8 @@ Spec: `spec/done/01-ota-updates.md`. Released in v1.1.0.
   `CYD Sky Tracker`, user `admin` — Basic accepted too); `AuthThrottle` (5 wrong in a row →
   60 s lock) → 429 + `Retry-After`. Upload callbacks check credentials *before* buffering or
   writing anything. Forgotten password: finger on the screen at power-up, 5 s, YES
-  (`offerWebPasswordReset()`, timing in `web_auth::resetHoldState()`).
+  (`PasswordResetFlow` in `password_reset_flow`, run by `runPasswordReset()` in `setup()` before
+  `net_task` starts; timing in `web_auth::resetHoldState()`).
 
 ### Web panel security — cross-site requests and framing
 
@@ -410,8 +488,8 @@ Spec: `spec/done/03-brightness-night-mode.md`.
   100 % at once (`backlightFullNow()` from the OTA observers). No night without a synced clock,
   and the night never brightens the screen (min of day and night level). At night with
   `night_pct` 0 the backlight is off: the first tap only lights it (`max(min, 10 %)`) for
-  `night_wake_s` and is **not** passed to `handleTap()`. A tap at night always restarts the wake
-  time. `night_pause_polling` (default off) skips `openSkyClientPoll()` in `net_task` (via the
+  `night_wake_s` and is **not** passed to `routeTap()` (`ui_flow`). A tap at night always
+  restarts the wake time. `night_pause_polling` (default off) skips `openSkyClientPoll()` in `net_task` (via the
   `core_link::pollingAllowed` flag the UI sets) during the night window except within the wake
   time. Auto-cycle stops and the update question isn't shown while the screen is dark
   (`PromptGate::screenOff`).
@@ -452,11 +530,14 @@ green dot, red "!").
 - **Header badge:** see screens.md "Screen chrome" (`alertBadgeColor()`, `statusBarZones(...,
   badge)` → `alert_x`; the count re-centres between badge and date).
 - **Tap → message screen** (`service_screen`): `alertBadgeHit()` (`screen_nav`) = x 0 .. badge
-  + 8 px, y 0..24, checked first in `handleTap()`. Full screen: "UWAGA", up to 3 entries
+  + 8 px, y 0..24, checked first in `routeTap()` (`TapKind::OpenAlerts`, only with home
+  set). Full screen: "UWAGA", up to 3 entries
   (errors first; more → "+ N więcej — zobacz panel WWW"), "Szczegóły: http://cyd-sky.local",
   **ZAMKNIJ 15 s** button (36 px tall). Pure state machine `alertScreenStep()`: closes on a
   fresh tap on the button (after the opening finger lifted, `acceptPromptTap()`), after exactly
   15 s, or at once when no display alert is left; the 1 Hz countdown repaints only the button.
+  `AlertScreenFlow` (`alert_screen_flow`) wraps it for the loop (list redraw on change, the
+  finger swallowed while open and on the closing pass, full redraw on close).
   While open: no auto-cycle (restarts on close), no update question
   (`PromptGate::alertScreenOpen`); OTA closes it. At night with the screen off the first tap
   only wakes it. `/screenshot.bmp?screen=4` = demo with all three alerts.
