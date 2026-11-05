@@ -66,6 +66,7 @@
 #include "display/adapters/lgfx/flight_screen_draw.h"
 #include "display/adapters/lgfx/lcars_theme_draw.h"
 #include "display/adapters/lgfx/radar_view_draw.h"
+#include "display/adapters/lgfx/screenshot_panel.h"
 #include "display/adapters/lgfx/service_screen_draw.h"
 #include "display/adapters/lgfx/status_bar_draw.h"
 #include "display/adapters/lgfx/table_view_draw.h"
@@ -85,7 +86,6 @@
 #include "display/core/redraw_policy.h"
 #include "admin/core/firmware/release_check.h"
 #include "display/core/screen_nav.h"
-#include "display/services/screenshot.h"
 #include "display/services/ui_perf.h"
 #include "display/core/screens/service_screen.h"
 #include "display/core/screens/status_bar.h"
@@ -575,95 +575,36 @@ static void offerWebPasswordReset(Config &bootCfg) {
 }
 
 // --- /screenshot.bmp: the web handler (core 0) asks, this loop reads -------
-//
-// One request at a time, handed over by ScreenshotBridge (screenshot.h): the
-// handler waits by polling (1 ms steps); every request carries a generation,
-// and a timed-out or ended one is invalidated under the lock, so a band this
-// loop is still reading never writes into a buffer the handler has freed nor
-// leaves "done" behind (spec 09 §1).
-
-namespace shot {
-
-ScreenshotBridge<SpinLock> bridge(ScreenshotBridge<SpinLock>::Hooks{
-    [] { return static_cast<uint32_t>(millis()); }, [] { core_link::wakeUi(); },
-    [] { vTaskDelay(1); }});
-
-// ---- called on core 0 (web_server's handler) — ScreenshotSource wants
-// plain function pointers.
-
-bool begin(int screenIndex, uint32_t timeoutMs) { return bridge.begin(screenIndex, timeoutMs); }
-
-void requestBand(int bandY0, int bandRows, uint32_t rowStride, uint8_t *dst) {
-  bridge.requestBand(bandY0, bandRows, rowStride, dst);
-}
-
-bool waitBand(uint32_t timeoutMs) { return bridge.waitBand(timeoutMs); }
-
-void end() { bridge.end(); }
-
-}  // namespace shot
+// (display/adapters/lgfx/screenshot_panel; the hand-over is screenshot_bridge).
 
 // ?screen=N: switch to that screen and repaint it right now, so the capture
-// shows it. Two more indices after the real screens, drawn from demo data:
-// the update question (release_check, docs/screenshots/update_prompt.png)
-// and the alert message screen (device_alerts, docs/screenshots/alert_screen.png).
-static constexpr int kScreenshotUpdatePrompt = kScreenCount;
-static constexpr int kScreenshotAlertScreen = kScreenCount + 1;
-
-static void screenshotPrepare(int screenIndex) {
-  if (screenIndex == kScreenshotUpdatePrompt || screenIndex == kScreenshotAlertScreen) {
-    if (screenIndex == kScreenshotUpdatePrompt) {
-      const UpdateState demo = updateDemoState(/*withPrerelease=*/false);
-      drawUpdatePromptScreen(tft, demo.installed, demo.latest.tag);
-      drawUpdatePromptTimer(tft, kUpdatePromptTimeoutMs * 2 / 3);
-    } else {
-      const AlertDemo demo = alertDemoState();
-      drawAlertScreen(tft, demo.alerts, demo.details, demo.details.quotaObservedMs, 12);
-    }
+// shows it — or draw one of the two demo screens over it.
+static void prepareCapture(int screenIndex) {
+  const ScreenshotPrepare p = screenshotPrepareTarget(screenIndex, kScreenCount);
+  if (p.kind == ScreenshotPrepareKind::UpdatePromptDemo ||
+      p.kind == ScreenshotPrepareKind::AlertDemo) {
+    drawScreenshotDemo(tft, p.kind);
     alertScreen.open = false;
     pendingRedraw = RedrawEvents{};
     pendingRedraw.firstDraw = true;  // repaints the real screen once the capture is out
     return;
   }
   if (alertScreen.open) closeAlertMessage();  // a normal screen was asked for
-  if (screenIndex >= 0 && nav.set(screenIndex)) onScreenChanged(ScreenChangeCause::Screenshot);
+  if (p.kind == ScreenshotPrepareKind::Screen && nav.set(p.screen)) {
+    onScreenChanged(ScreenChangeCause::Screenshot);
+  }
   const uint8_t mask = computeRedrawMask(pendingRedraw, nav.current());
   if (mask != 0 && cfg().home_configured) applyRedraw(mask);
   pendingRedraw = RedrawEvents{};
 }
 
-// The screen to put back once a ?screen=N capture is over (spec 10).
-static ScreenshotReturn shotReturn;
-
-// UI side: answers whatever the handler asked for. True while a capture runs.
-// When it is over (end(), timeout or the 5 s idle rule), the screen shown
-// before the capture comes back — repainted, not saved.
-static bool serviceScreenshot() {
-  using Job = ScreenshotBridge<SpinLock>::Job;
-  const Job job = shot::bridge.takeJob();
-  if (job.kind == Job::Prepare) {
-    shotReturn.onPrepare(nav.current(), job.screen, kScreenCount);
-    screenshotPrepare(job.screen);
-  } else if (job.kind == Job::Band) {
-    static lgfx::rgb888_t line[320];
-    static uint8_t bgr[320 * 3];
-    const int w = static_cast<int>(tft.width());
-    for (int i = 0; i < job.rows; ++i) {
-      const int y = job.y0 + job.rows - 1 - i;  // bottom row of the band first (BMP)
-      tft.readRect(0, y, w, 1, line);
-      for (int x = 0; x < w; ++x) {
-        bgr[3 * x + 0] = line[x].b;
-        bgr[3 * x + 1] = line[x].g;
-        bgr[3 * x + 2] = line[x].r;
-      }
-      if (!shot::bridge.writeRow(job, i, bgr, 3 * w)) break;  // timed out / ended: drop it
-    }
-  }
-  shot::bridge.finishJob(job, millis());
-  const bool capturing = shot::bridge.capturing(millis());
-  const int back = shotReturn.afterPass(capturing);
-  if (back >= 0 && nav.set(back)) onScreenChanged(ScreenChangeCause::Screenshot);
-  return capturing;
+// True while a capture runs. When it is over (end(), timeout or the 5 s idle
+// rule), the screen shown before the capture comes back — repainted, not saved.
+static bool screenshotPass() {
+  const ScreenshotPassResult r =
+      screenshotPanelPass(tft, nav.current(), kScreenCount, prepareCapture);
+  if (r.backTo >= 0 && nav.set(r.backTo)) onScreenChanged(ScreenChangeCause::Screenshot);
+  return r.capturing;
 }
 
 // --- Perf: UI loop gaps (ui_perf), handed to net_task once a minute -----------
@@ -744,10 +685,10 @@ void setup() {
   shotSrc.width = static_cast<int>(tft.width());
   shotSrc.height = static_cast<int>(tft.height());
   shotSrc.screenCount = kScreenCount + 2;  // + the update prompt and alert screen demos
-  shotSrc.begin = shot::begin;
-  shotSrc.requestBand = shot::requestBand;
-  shotSrc.waitBand = shot::waitBand;
-  shotSrc.end = shot::end;
+  shotSrc.begin = screenshotPanelBegin;
+  shotSrc.requestBand = screenshotPanelRequestBand;
+  shotSrc.waitBand = screenshotPanelWaitBand;
+  shotSrc.end = screenshotPanelEnd;
   configPortalSetScreenshotSource(shotSrc);
 
   core_link::begin(xTaskGetCurrentTaskHandle());
@@ -782,7 +723,7 @@ void loop() {
   }
 
   // --- A screenshot is being taken: hold still ---------------------------------
-  if (serviceScreenshot()) {
+  if (screenshotPass()) {
     sleepUntilNextDeadline();
     return;
   }
