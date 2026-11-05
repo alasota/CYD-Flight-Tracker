@@ -112,18 +112,16 @@ static ScreenNav nav;
 static std::shared_ptr<const NetState> net;
 static uint32_t netSeen = 0;
 
-// lastScreenChangeMs is the auto-cycle timer base, reset by
-// onScreenChanged() on every screen change — manual or auto.
-static uint32_t lastScreenChangeMs = 0;
-static TablePager pager;  // the Flights table's page
+// What a screen change sets off (persist, page, the auto-cycle timer), the
+// Flights table's page, the header clock's minute, the NOW countdown's tick.
+static ScreenChangeTracker screenChanges;
+static TablePager pager;
+static MinuteWatch minuteWatch;
+static CountdownTick countdownTick;
 
 // Everything that happened since the last redraw — turned into a region
 // mask by computeRedrawMask() at the end of loop(), then cleared.
 static RedrawEvents pendingRedraw;
-
-// last_screen NVS-write debouncing (docs/review-notes-2026.md 5.9).
-static int lastPersistedScreen = 0;
-static uint32_t lastScreenPersistMs = 0;
 
 // The health the header shows: net_task's, or NetworkError once its
 // heartbeat is stale (core_link::heartbeatStale()).
@@ -246,33 +244,21 @@ static void takeNetState() {
 
 // The header's health: net_task's, unless it stopped answering altogether.
 static void updateShownHealth() {
-  const bool stalled =
-      heartbeatStale(millis(), core_link::netBeatMs.load(), kNetStallLimitMs);
-  const OpenSkyHealth h = stalled ? OpenSkyHealth::NetworkError : net->health;
-  if (h == shownHealth) return;
-  if (stalled) Serial.println("[main] network task silent for 60 s");
-  shownHealth = h;
+  const ShownHealthStep h = shownHealthStep(shownHealth, net->health, millis(),
+                                            core_link::netBeatMs.load(), rows().empty());
+  if (!h.healthChanged) return;
+  if (h.stalled) Serial.println("[main] network task silent for 60 s");
+  shownHealth = h.shown;
   pendingRedraw.healthChanged = true;
-  // An empty screen says why it is empty (emptyStateText()).
-  if (rows().empty()) pendingRedraw.newPoll = true;
+  if (h.newPoll) pendingRedraw.newPoll = true;
 }
 
-// Persist (debounced) + redraw after screen_nav reports the active screen
-// changed. A touch persists at once, an auto-cycle advance rate-limited
-// (docs/review-notes-2026.md 5.9), a screenshot's switch never (spec 10).
+// After screen_nav reports the active screen changed: page, auto-cycle timer,
+// redraw, and last_screen saved when screenChanges says so.
 static void onScreenChanged(ScreenChangeCause cause) {
-  pager.reset();
-  lastScreenChangeMs = millis();  // any change resets the auto-cycle timer
-
-  if (nav.current() != lastPersistedScreen &&
-      shouldPersistScreenChange(cause, millis() - lastScreenPersistMs,
-                                kScreenPersistMinIntervalMs)) {
+  if (screenChanges.onChange(nav.current(), cause, millis(), pager, pendingRedraw).persist) {
     saveLastScreen(nav.current());  // targeted single-key write (see config_store)
-    lastPersistedScreen = nav.current();
-    lastScreenPersistMs = millis();
   }
-
-  pendingRedraw.screenChanged = true;
 }
 
 // --- Device alerts: the message screen behind the header's "!" (spec 08) -----
@@ -284,7 +270,7 @@ static TouchEdge touchEdge;  // one tap per press
 // fresh auto-cycle interval.
 static void closeAlertMessage() {
   alertScreen.closeQuietly();
-  lastScreenChangeMs = millis();
+  screenChanges.restartAutoCycle(millis());
   pendingRedraw.firstDraw = true;
 }
 
@@ -422,13 +408,11 @@ static void perfLoopStart() {
 
 // --- Sleep until the next thing to do --------------------------------------------
 
-static uint32_t lastFlightTickMs = 0;
-
 static void sleepUntilNextDeadline() {
   const uint32_t now = millis();
   UiWake w;
   if (nav.current() == kScreenFlight) {
-    w.untilCountdownMs = msUntilPeriod(now, lastFlightTickMs, 1000);
+    w.untilCountdownMs = countdownTick.msUntilNext(now);
   }
   if (isTimeSynced()) {
     const std::time_t local = timeSyncNowLocal();
@@ -477,9 +461,7 @@ void setup() {
     Serial.println("[auth] web password cleared from the touchscreen");
   });
   nav.set(bootCfg.last_screen);    // restore the last-active screen
-  lastPersistedScreen = nav.current();
-  lastScreenChangeMs = millis();
-  lastScreenPersistMs = millis();
+  screenChanges.begin(nav.current(), millis());
 
   // The first snapshot: the settings, no data yet — the chrome and "--" go on
   // screen right away, before WiFi is even up.
@@ -568,7 +550,7 @@ void loop() {
                                               static_cast<int16_t>(tft.height()))
                                        .action));
     if (backlightHandleTouch(cfg())) {
-      lastScreenChangeMs = millis();  // only woke a dark screen: no tap, a fresh auto-cycle
+      screenChanges.restartAutoCycle(millis());  // only woke a dark screen: no tap
     } else {
       onTap(touch.x, touch.y);
     }
@@ -589,30 +571,28 @@ void loop() {
   }
 
   // --- Flight screen: tick the countdown ~1 Hz between polls --------------
-  if (nav.current() == kScreenFlight && (millis() - lastFlightTickMs) >= 1000) {
-    lastFlightTickMs = millis();
-    pendingRedraw.countdownTick = true;
-  }
+  if (countdownTick.due(nav.current(), millis())) pendingRedraw.countdownTick = true;
 
   // --- Header clock: repaint its text when HH:MM rolls over -------------
   // -1 while unsynced, so the first NTP sync also counts as a change.
-  static long lastDrawnMinute = -2;
-  const long minuteNow = isTimeSynced() ? minuteOf(timeSyncNowLocal()) : -1;
-  if (minuteNow != lastDrawnMinute) {
-    lastDrawnMinute = minuteNow;
+  if (minuteWatch.changed(isTimeSynced() ? minuteOf(timeSyncNowLocal()) : -1)) {
     pendingRedraw.minuteChanged = true;
   }
 
   // --- Auto screen cycling (docs/screens.md "Auto screen cycling") ------------
-  if (cfg().auto_cycle_enabled && cfg().home_configured &&
-      !backlightDecision().screen_off) {  // nobody sees a dark screen change
-    CpaPrediction cpa = currentCpa();
-    bool deferHold = shouldDeferAutoSwitch(nav.current(), cpa.found, cpa.t_cpa_seconds);
-    if (shouldAutoAdvance(millis() - lastScreenChangeMs, cfg().auto_cycle_interval_s,
-                          deferHold)) {
-      nav.next();                                // 3 distinct screens, wraps
-      onScreenChanged(ScreenChangeCause::AutoCycle);  // resets the timer + page, forces redraw
-    }
+  AutoCycleInput ac;
+  ac.enabled = cfg().auto_cycle_enabled;
+  ac.homeConfigured = cfg().home_configured;
+  ac.screenOff = backlightDecision().screen_off;  // nobody sees a dark screen change
+  ac.currentScreen = nav.current();
+  const CpaPrediction cpa = currentCpa();
+  ac.cpaFound = cpa.found;
+  ac.tCpaSeconds = cpa.t_cpa_seconds;
+  ac.elapsedMs = screenChanges.autoCycleElapsedMs(millis());
+  ac.intervalS = cfg().auto_cycle_interval_s;
+  if (shouldAutoCycleNow(ac)) {
+    nav.next();                                     // 3 distinct screens, wraps
+    onScreenChanged(ScreenChangeCause::AutoCycle);  // resets the timer + page, forces redraw
   }
 
   // --- Redraw only what changed (CLAUDE.md "Redraw policy") -------------

@@ -70,34 +70,75 @@ bool TablePager::next(int pageCount) {
   return true;
 }
 
-// TODO(spec 12): stub from test-author
-void ScreenChangeTracker::begin(int /*screen*/, uint32_t /*nowMs*/) {}
-// TODO(spec 12): stub from test-author
-ScreenChangeResult ScreenChangeTracker::onChange(int /*screen*/, ScreenChangeCause /*cause*/,
-                                                 uint32_t /*nowMs*/, TablePager & /*pager*/,
-                                                 RedrawEvents & /*pending*/) {
-  return {};
+// ---- Screen changes -------------------------------------------------------------
+
+void ScreenChangeTracker::begin(int screen, uint32_t nowMs) {
+  persistedScreen_ = screen;
+  persistedAtMs_ = nowMs;
+  changedAtMs_ = nowMs;
 }
-// TODO(spec 12): stub from test-author
-void ScreenChangeTracker::restartAutoCycle(uint32_t /*nowMs*/) {}
-// TODO(spec 12): stub from test-author
-uint32_t ScreenChangeTracker::autoCycleElapsedMs(uint32_t /*nowMs*/) const { return 0; }
 
-// TODO(spec 12): stub from test-author
-bool MinuteWatch::changed(long /*minuteNow*/) { return false; }
+// A touch persists at once, an auto-cycle advance rate-limited
+// (docs/review-notes-2026.md 5.9), a screenshot's switch never (spec 10).
+ScreenChangeResult ScreenChangeTracker::onChange(int screen, ScreenChangeCause cause,
+                                                 uint32_t nowMs, TablePager &pager,
+                                                 RedrawEvents &pending) {
+  ScreenChangeResult r;
+  pager.reset();
+  changedAtMs_ = nowMs;  // any change resets the auto-cycle timer
+  if (screen != persistedScreen_ &&
+      shouldPersistScreenChange(cause, nowMs - persistedAtMs_, kScreenPersistMinIntervalMs)) {
+    r.persist = true;
+    persistedScreen_ = screen;
+    persistedAtMs_ = nowMs;
+  }
+  pending.screenChanged = true;
+  return r;
+}
 
-// TODO(spec 12): stub from test-author
-bool CountdownTick::due(int /*currentScreen*/, uint32_t /*nowMs*/) { return false; }
-// TODO(spec 12): stub from test-author
-uint32_t CountdownTick::msUntilNext(uint32_t /*nowMs*/) const { return 0; }
+void ScreenChangeTracker::restartAutoCycle(uint32_t nowMs) { changedAtMs_ = nowMs; }
 
-// TODO(spec 12): stub from test-author
-bool shouldAutoCycleNow(const AutoCycleInput & /*in*/) { return false; }
+uint32_t ScreenChangeTracker::autoCycleElapsedMs(uint32_t nowMs) const {
+  return nowMs - changedAtMs_;
+}
 
-// TODO(spec 12): stub from test-author
-ShownHealthStep shownHealthStep(OpenSkyHealth /*shownNow*/, OpenSkyHealth /*netHealth*/,
-                                uint32_t /*nowMs*/, uint32_t /*netBeatMs*/, bool /*rowsEmpty*/) {
-  return {};
+// ---- Header clock, NOW countdown --------------------------------------------------
+
+bool MinuteWatch::changed(long minuteNow) {
+  if (minuteNow == last_) return false;
+  last_ = minuteNow;
+  return true;
+}
+
+bool CountdownTick::due(int currentScreen, uint32_t nowMs) {
+  if (currentScreen != kScreenFlight || nowMs - lastMs_ < 1000) return false;
+  lastMs_ = nowMs;
+  return true;
+}
+
+uint32_t CountdownTick::msUntilNext(uint32_t nowMs) const {
+  return msUntilPeriod(nowMs, lastMs_, 1000);
+}
+
+// ---- Auto-cycle ---------------------------------------------------------------
+
+bool shouldAutoCycleNow(const AutoCycleInput &in) {
+  if (!in.enabled || !in.homeConfigured || in.screenOff) return false;
+  const bool deferHold = shouldDeferAutoSwitch(in.currentScreen, in.cpaFound, in.tCpaSeconds);
+  return shouldAutoAdvance(in.elapsedMs, in.intervalS, deferHold);
+}
+
+// ---- The health the header shows ------------------------------------------------
+
+ShownHealthStep shownHealthStep(OpenSkyHealth shownNow, OpenSkyHealth netHealth, uint32_t nowMs,
+                                uint32_t netBeatMs, bool rowsEmpty) {
+  ShownHealthStep r;
+  r.stalled = heartbeatStale(nowMs, netBeatMs, kNetStallLimitMs);
+  r.shown = r.stalled ? OpenSkyHealth::NetworkError : netHealth;
+  if (r.shown == shownNow) return r;
+  r.healthChanged = true;
+  r.newPoll = rowsEmpty;  // an empty screen says why it is empty (emptyStateText())
+  return r;
 }
 
 // ---- Touch edges ----------------------------------------------------------------
