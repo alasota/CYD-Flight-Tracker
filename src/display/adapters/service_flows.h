@@ -7,11 +7,13 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 
 #include "display/adapters/lgfx/LGFX_CYD.hpp"
 #include "display/services/alert_screen_flow.h"
 #include "display/services/ota_screen_flow.h"
+#include "display/services/password_reset_flow.h"
 #include "display/services/update_prompt_flow.h"
 
 // The firmware-update screen from NetState::ota: full brightness and the
@@ -34,3 +36,9 @@ void showAlertScreen(LGFX &tft, AlertScreenFlow &flow, const AlertSet &alerts,
 // CLOSE countdown. On close the caller repaints the normal screens.
 AlertFlowStep runAlertScreen(LGFX &tft, AlertScreenFlow &flow, const AlertSet &alerts,
                              const AlertDetails &details);
+
+// At power-up, before net_task (blocking, delay() between steps): with a
+// password set and a finger on the screen, the hold / confirm screens of
+// password_reset_flow. On YES `clearPassword` runs (the caller clears and
+// saves it) before "password removed" is shown.
+void runPasswordReset(LGFX &tft, bool passwordSet, const std::function<void()> &clearPassword);
