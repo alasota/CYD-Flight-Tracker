@@ -178,7 +178,7 @@ NavHit navHitTest(int16_t x, int16_t y, int16_t screenWidth, int16_t screenHeigh
 // calibration"): from the left screen edge to kAlertBadgeTouchSlackX px past
 // the badge, and from the top down to y = kAlertBadgeTouchBottom (the header
 // + 9 px). Far from the bottom nav (y >= 210) and the table's paging strip
-// (first row at y:116). Checked in handleTap() before anything else.
+// (first row at y:116). Checked in routeTap() (ui_flow) before anything else.
 constexpr int kAlertBadgeTouchSlackX = 8;
 constexpr int kAlertBadgeTouchBottom = 24;  // inclusive
 

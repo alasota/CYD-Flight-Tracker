@@ -87,11 +87,11 @@
 #include "display/core/redraw_policy.h"
 #include "admin/core/firmware/release_check.h"
 #include "display/core/screen_nav.h"
+#include "display/services/ui_flow.h"
 #include "display/services/ui_perf.h"
 #include "display/core/screens/service_screen.h"
 #include "display/core/screens/status_bar.h"
 #include "display/core/screens/table_view.h"
-#include "airspace/core/flight_ordering.h"  // splitFeaturedAndRest()
 #include "platform/time_sync.h"
 #include "shared/clock.h"  // minuteOf()
 #include "display/core/touch_input.h"
@@ -115,7 +115,7 @@ static uint32_t netSeen = 0;
 // lastScreenChangeMs is the auto-cycle timer base, reset by
 // onScreenChanged() on every screen change — manual or auto.
 static uint32_t lastScreenChangeMs = 0;
-static int currentPage = 0;
+static TablePager pager;  // the Flights table's page
 
 // Everything that happened since the last redraw — turned into a region
 // mask by computeRedrawMask() at the end of loop(), then cleared.
@@ -128,10 +128,6 @@ static uint32_t lastScreenPersistMs = 0;
 // The health the header shows: net_task's, or NetworkError once its
 // heartbeat is stale (core_link::heartbeatStale()).
 static OpenSkyHealth shownHealth = OpenSkyHealth::Ok;
-
-// Height of the table's page-back / page-forward tap strips — table_view's
-// own row height, so the two can't drift apart (docs/review-notes-2026.md 5.5).
-static const int16_t kPageTapZoneHeight = tableRowHeightPx();
 
 static const Config &cfg() { return *net->cfg; }
 
@@ -165,7 +161,7 @@ static void drawActiveContent() {
       break;
     case kScreenFlights:
     default:
-      drawTablePage(tft, rows(), screenW, currentPage, shownHealth);
+      drawTablePage(tft, rows(), screenW, pager.page(), shownHealth);
       break;
   }
 }
@@ -233,13 +229,6 @@ static void showSetupPrompt() {
   tft.drawString("http://cyd-sky.local", screenW / 2, screenH / 2 + 10);
 }
 
-// The table page can't point past the last page of a fresh list.
-static void clampPage() {
-  FeaturedSplit split = splitFeaturedAndRest(rows());
-  int pageCount = getPageCount(static_cast<int>(split.rest.size()), tableRowsPerPage());
-  if (currentPage >= pageCount) currentPage = pageCount > 0 ? pageCount - 1 : 0;
-}
-
 // A new snapshot from net_task (if there is one) -> redraw events.
 static void takeNetState() {
   std::shared_ptr<const NetState> next;
@@ -252,7 +241,7 @@ static void takeNetState() {
   pendingRedraw.newPoll |= e.newPoll;
   pendingRedraw.minuteChanged |= e.minuteChanged;
   pendingRedraw.alertsChanged |= e.alertsChanged;
-  if (e.newPoll) clampPage();
+  if (e.newPoll) pager.clamp(tablePageCount(rows()));  // a shorter list: its last page
 }
 
 // The header's health: net_task's, unless it stopped answering altogether.
@@ -272,7 +261,7 @@ static void updateShownHealth() {
 // changed. A touch persists at once, an auto-cycle advance rate-limited
 // (docs/review-notes-2026.md 5.9), a screenshot's switch never (spec 10).
 static void onScreenChanged(ScreenChangeCause cause) {
-  currentPage = 0;
+  pager.reset();
   lastScreenChangeMs = millis();  // any change resets the auto-cycle timer
 
   if (nav.current() != lastPersistedScreen &&
@@ -289,6 +278,7 @@ static void onScreenChanged(ScreenChangeCause cause) {
 // --- Device alerts: the message screen behind the header's "!" (spec 08) -----
 
 static AlertScreenFlow alertScreen;
+static TouchEdge touchEdge;  // one tap per press
 
 // Back to the normal screens: same screen and table page, a full repaint, a
 // fresh auto-cycle interval.
@@ -298,48 +288,34 @@ static void closeAlertMessage() {
   pendingRedraw.firstDraw = true;
 }
 
-// Dispatches one touch tap (edge-detected in loop(), once per press).
-static void handleTap(int16_t x, int16_t y) {
-  int16_t screenW = static_cast<int16_t>(tft.width());
-  int16_t screenH = static_cast<int16_t>(tft.height());
-
-  // The "!" first: its zone reaches a little into the content area.
-  if (cfg().home_configured && alertBadgeHit(x, y, headerZones())) {
-    showAlertScreen(tft, alertScreen, net->alerts, net->alertDetails);
-    return;
-  }
-
-  // Screens switch only via the bottom nav buttons.
-  NavHit hit = navHitTest(x, y, screenW, screenH);
-  if (hit.action == NavAction::JumpTo) {
-    if (nav.set(hit.target)) onScreenChanged(ScreenChangeCause::Touch);
-    return;
-  }
-
-  // Anywhere else: only the Flights table reacts (page the rows).
-  if (nav.current() != kScreenFlights) return;
-
-  FeaturedSplit split = splitFeaturedAndRest(rows());
-  int pageCount = getPageCount(static_cast<int>(split.rest.size()), tableRowsPerPage());
-
-  Rect prevZone;
-  prevZone.x = 0;
-  prevZone.y = tableFirstRowY();  // top of the data-row area
-  prevZone.w = screenW;
-  prevZone.h = kPageTapZoneHeight;
-
-  Rect nextZone;
-  nextZone.x = 0;
-  nextZone.y = static_cast<int16_t>(screenH - LCARS_BOTTOM_NAV_HEIGHT - kPageTapZoneHeight);
-  nextZone.w = screenW;
-  nextZone.h = kPageTapZoneHeight;
-
-  if (hitTest(x, y, prevZone) && currentPage > 0) {
-    currentPage--;
-    pendingRedraw.pageChanged = true;
-  } else if (hitTest(x, y, nextZone) && currentPage < pageCount - 1) {
-    currentPage++;
-    pendingRedraw.pageChanged = true;
+// One tap (edge-detected in loop(), once per press): routeTap() says what it
+// is, this does it.
+static void onTap(int16_t x, int16_t y) {
+  TapContext c;
+  c.currentScreen = nav.current();
+  c.page = pager.page();
+  c.pageCount = tablePageCount(rows());
+  c.homeConfigured = cfg().home_configured;
+  c.header = headerZones();
+  c.screenW = static_cast<int16_t>(tft.width());
+  c.screenH = static_cast<int16_t>(tft.height());
+  const TapAction a = routeTap(x, y, c);
+  switch (a.kind) {
+    case TapKind::OpenAlerts:
+      showAlertScreen(tft, alertScreen, net->alerts, net->alertDetails);
+      break;
+    case TapKind::JumpTo:
+      if (nav.set(a.target)) onScreenChanged(ScreenChangeCause::Touch);
+      break;
+    case TapKind::PagePrev:
+      if (pager.prev()) pendingRedraw.pageChanged = true;
+      break;
+    case TapKind::PageNext:
+      if (pager.next(c.pageCount)) pendingRedraw.pageChanged = true;
+      break;
+    case TapKind::None:
+    default:
+      break;
   }
 }
 
@@ -570,21 +546,20 @@ void loop() {
   }
 
   // --- The alert message screen owns the screen while it's open --------------
-  static bool wasTouchPressed = false;
   if (alertScreen.isOpen()) {
-    if (runAlertScreen(tft, alertScreen, net->alerts, net->alertDetails).close) closeAlertMessage();
+    const AlertFlowStep r = runAlertScreen(tft, alertScreen, net->alerts, net->alertDetails);
+    if (r.swallowTouch) touchEdge.swallow();  // its finger, the CLOSE tap too, is no tap below
+    if (r.close) closeAlertMessage();
     if (alertScreen.isOpen()) {
-      wasTouchPressed = true;  // whatever the finger does here isn't a tap below
       pendingRedraw = RedrawEvents{};
       sleepUntilNextDeadline();
       return;
     }
-    wasTouchPressed = touchInputRead(tft).pressed;  // the CLOSE tap isn't one either
   }
 
-  // --- Touch: edge-detected, one handleTap() per press --------------------
+  // --- Touch: edge-detected, one onTap() per press ---------------------------
   TouchPoint touch = touchInputRead(tft);
-  if (touch.pressed && !wasTouchPressed) {
+  if (touchEdge.tap(touch.pressed)) {
     // One line per tap: raw XPT2046 values + where they mapped to — what
     // touch calibration is tuned from (display/core/touch_calibration.h).
     Serial.printf("[touch] raw=(%d,%d) -> screen=(%d,%d) nav=%d\n", touch.raw_x, touch.raw_y,
@@ -595,10 +570,9 @@ void loop() {
     if (backlightHandleTouch(cfg())) {
       lastScreenChangeMs = millis();  // only woke a dark screen: no tap, a fresh auto-cycle
     } else {
-      handleTap(touch.x, touch.y);
+      onTap(touch.x, touch.y);
     }
   }
-  wasTouchPressed = touch.pressed;
 
   if (alertScreen.isOpen()) {  // the tap opened the "!" message
     pendingRedraw = RedrawEvents{};
