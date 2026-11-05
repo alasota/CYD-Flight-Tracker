@@ -1,22 +1,61 @@
 #include "display/services/update_prompt_flow.h"
 
-// TODO(spec 12): stub from test-author
-bool UpdatePromptFlow::tryOpen(PromptGate /*gate*/, const std::string & /*tag*/,
-                               uint32_t /*nowMs*/) {
-  return false;
+#include "display/core/screens/service_screen.h"  // confirmHit()
+
+bool UpdatePromptFlow::tryOpen(PromptGate gate, const std::string &tag, uint32_t nowMs) {
+  gate.alreadyPromptedThisBoot = promptedThisBoot_;
+  if (!shouldShowUpdatePrompt(gate)) return false;
+  active_ = true;
+  promptedThisBoot_ = true;
+  released_ = false;
+  wasPressed_ = true;  // a finger already down when it appears is no answer
+  shownAtMs_ = nowMs;
+  timerDrawnMs_ = nowMs;
+  tag_ = tag;
+  return true;
 }
 
-// TODO(spec 12): stub from test-author
-PromptStep UpdatePromptFlow::step(const PromptInput & /*in*/) { return {}; }
+PromptStep UpdatePromptFlow::step(const PromptInput &in) {
+  PromptStep r;
+  const uint32_t shownFor = in.nowMs - shownAtMs_;
+  if (!in.pressed) released_ = true;
+  if (in.pressed && !wasPressed_ && acceptPromptTap(released_, shownFor)) {
+    const ResetChoice c = confirmHit(in.x, in.y, in.screenW, in.screenH);
+    if (c != ResetChoice::None) {
+      // YES: net_task starts the install, its OTA screen follows (if it no
+      // longer can, the normal screens come back). NO: skip this tag.
+      const bool yes = c == ResetChoice::Yes;
+      active_ = false;
+      r.answer = yes ? PromptAnswer::Install : PromptAnswer::Skip;
+      r.command = makeNetCommand(yes ? NetCommandType::InstallTag : NetCommandType::SkipTag, tag_);
+      r.firstDraw = true;
+      return r;
+    }
+  }
+  wasPressed_ = in.pressed;
+  if (shownFor >= kUpdatePromptTimeoutMs) {
+    active_ = false;  // "later": asked again after the next boot
+    r.answer = PromptAnswer::TimedOut;
+    r.firstDraw = true;
+    return r;
+  }
+  if (in.nowMs - timerDrawnMs_ >= kPromptTimerStepMs) {
+    timerDrawnMs_ = in.nowMs;
+    r.redrawTimer = true;
+    r.remainingMs = kUpdatePromptTimeoutMs - shownFor;
+  }
+  return r;
+}
 
-// TODO(spec 12): stub from test-author
-PromptStep UpdatePromptFlow::supersededByInstall() { return {}; }
+PromptStep UpdatePromptFlow::supersededByInstall() {
+  active_ = false;
+  return PromptStep{};
+}
 
-// TODO(spec 12): stub from test-author
-bool UpdatePromptFlow::active() const { return false; }
+bool UpdatePromptFlow::active() const { return active_; }
 
-// TODO(spec 12): stub from test-author
 const std::string &UpdatePromptFlow::tag() const { return tag_; }
 
-// TODO(spec 12): stub from test-author
-uint32_t UpdatePromptFlow::msUntilTimer(uint32_t /*nowMs*/) const { return 0; }
+uint32_t UpdatePromptFlow::msUntilTimer(uint32_t nowMs) const {
+  return active_ ? msUntilPeriod(nowMs, timerDrawnMs_, kPromptTimerStepMs) : kNoDeadline;
+}
