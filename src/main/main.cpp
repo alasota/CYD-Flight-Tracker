@@ -81,12 +81,12 @@
 #include "display/core/theme/lcars_theme.h"
 #include "main/net_task.h"
 #include "admin/core/firmware/ota_update.h"
-#include "platform/perf_stats.h"
 #include "display/core/screens/radar_view.h"
 #include "display/core/redraw_policy.h"
 #include "admin/core/firmware/release_check.h"
 #include "display/core/screen_nav.h"
 #include "display/services/screenshot.h"
+#include "display/services/ui_perf.h"
 #include "display/core/screens/service_screen.h"
 #include "display/core/screens/status_bar.h"
 #include "display/core/screens/table_view.h"
@@ -666,39 +666,15 @@ static bool serviceScreenshot() {
   return capturing;
 }
 
-// --- Perf: UI loop gaps (perf_stats), handed to net_task once a minute --------
-//
-// The "gap" is how much later than planned this pass started: the time since
-// the previous pass minus the sleep that pass asked for — i.e. its own drawing
-// time plus any oversleep. A responsive UI keeps it at a few ms; a full
-// repaint shows up as ~100 ms.
+// --- Perf: UI loop gaps (ui_perf), handed to net_task once a minute -----------
 
-static GapStats uiWindow;
-static UiPerfShare uiShare;
-static uint32_t uiWindowStartMs = 0;
-static uint32_t lastLoopMs = 0;
-static uint32_t plannedSleepMs = 0;  // what the previous pass asked to sleep
+static UiPerfMeter perfMeter;
 
-static void perfLoopTick() {
-  const uint32_t now = millis();
-  if (lastLoopMs != 0) {
-    const uint32_t since = now - lastLoopMs;
-    const uint32_t gap = since > plannedSleepMs ? since - plannedSleepMs : 0;
-    uiWindow.add(gap);
-    if (gap > uiShare.maxEverMs) uiShare.maxEverMs = gap;
-    if (gap >= kPerfGapBucketMs[3]) ++uiShare.slowEver;
-  }
-  lastLoopMs = now;
-  if (uiWindowStartMs == 0) uiWindowStartMs = now;
-  if (now - uiWindowStartMs >= kPerfWindowMs) {
-    uiShare.windowCount = uiWindow.count;
-    uiShare.windowMaxMs = uiWindow.maxMs;
-    for (int i = 0; i < kPerfGapBuckets; ++i) uiShare.buckets[i] = uiWindow.buckets[i];
-    uiShare.stackFree = uxTaskGetStackHighWaterMark(nullptr);
-    core_link::uiPerf.set(uiShare);
-    uiWindow = GapStats{};
-    uiWindowStartMs = now;
-  }
+static void perfLoopStart() {
+  if (!perfMeter.tick(millis())) return;
+  UiPerfShare share = perfMeter.share();
+  share.stackFree = uxTaskGetStackHighWaterMark(nullptr);
+  core_link::uiPerf.set(share);
 }
 
 // --- Sleep until the next thing to do --------------------------------------------
@@ -719,8 +695,9 @@ static void sleepUntilNextDeadline() {
     w.untilPromptTimerMs = msUntilPeriod(now, promptTimerDrawnMs, kPromptTimerStepMs);
   }
   if (alertScreen.open) w.untilAlertTimerMs = alertScreenMsToNextSecond(alertScreen, now);
-  plannedSleepMs = uiSleepMs(w);
-  ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(plannedSleepMs));
+  const uint32_t sleepMs = uiSleepMs(w);
+  perfMeter.setPlannedSleep(sleepMs);
+  ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(sleepMs));
 }
 
 void setup() {
@@ -782,7 +759,7 @@ void setup() {
 }
 
 void loop() {
-  perfLoopTick();
+  perfLoopStart();
   core_link::uiBeatMs.store(millis());
   pendingCmd = retryPendingCommand(pendingCmd, core_link::sendCommand);
 
