@@ -209,3 +209,60 @@ bool TouchEdge::tap(bool pressed) {
 }
 
 void TouchEdge::swallow() { wasPressed_ = true; }
+
+// ---- The UI loop's bookkeeping together ---------------------------------------------
+
+void UiFlow::takeNetEvents(const RedrawEvents &e, const NetState &next) {
+  pending.firstDraw |= e.firstDraw;
+  pending.languageChanged |= e.languageChanged;
+  pending.newPoll |= e.newPoll;
+  pending.minuteChanged |= e.minuteChanged;
+  pending.alertsChanged |= e.alertsChanged;
+  if (e.newPoll) pager.clamp(tablePageCount(netRows(next)));  // a shorter list: its last page
+}
+
+bool UiFlow::updateHealth(const NetState &s, uint32_t nowMs, uint32_t netBeatMs) {
+  const ShownHealthStep h =
+      shownHealthStep(shownHealth, s.health, nowMs, netBeatMs, netRows(s).empty());
+  if (!h.healthChanged) return false;
+  shownHealth = h.shown;
+  pending.healthChanged = true;
+  pending.newPoll |= h.newPoll;
+  return h.stalled;
+}
+
+bool UiFlow::screenChanged(int screen, ScreenChangeCause cause, uint32_t nowMs) {
+  return screenChanges.onChange(screen, cause, nowMs, pager, pending).persist;
+}
+
+bool UiFlow::apply(const ServiceOutcome &o, uint32_t nowMs) {
+  if (o.clearPending) pending = RedrawEvents{};
+  if (o.firstDraw) pending.firstDraw = true;
+  if (o.restartAutoCycle) screenChanges.restartAutoCycle(nowMs);
+  if (o.swallowTouch) touch.swallow();
+  return o.ownsDisplay;
+}
+
+void UiFlow::pageTap(TapKind kind, int pageCount) {
+  bool moved = false;
+  if (kind == TapKind::PagePrev) moved = pager.prev();
+  if (kind == TapKind::PageNext) moved = pager.next(pageCount);
+  if (moved) pending.pageChanged = true;
+}
+
+bool UiFlow::tick(const NetState &s, int screen, uint32_t nowMs, long minuteNow, bool screenOff) {
+  if (countdown.due(screen, nowMs)) pending.countdownTick = true;
+  if (minuteWatch.changed(minuteNow)) pending.minuteChanged = true;
+  return shouldAutoCycleNow(
+      autoCycleInputAt(s, screen, screenOff, screenChanges.autoCycleElapsedMs(nowMs), nowMs));
+}
+
+uint8_t UiFlow::takeRedrawMask(int screen) {
+  const uint8_t mask = computeRedrawMask(pending, screen);
+  pending = RedrawEvents{};
+  return mask;
+}
+
+void UiFlow::addWakeTimes(UiWake &w, int screen, uint32_t nowMs) const {
+  if (screen == kScreenFlight) w.untilCountdownMs = countdown.msUntilNext(nowMs);
+}

@@ -423,6 +423,141 @@ static void test_auto_cycle_input_from_settings_and_cpa(void) {
   TEST_ASSERT_EQUAL_UINT32(25, in.intervalS);
 }
 
+// ---- UiFlow: the bookkeeping of one UI pass together ----------------------------------
+
+// -- a snapshot's events go into pending, except its health; a new poll clamps the page
+static void test_ui_flow_takes_net_events_but_not_their_health(void) {
+  UiFlow ui;
+  for (int i = 0; i < 3; ++i) ui.pager.next(5);
+  RedrawEvents e;
+  e.firstDraw = e.languageChanged = e.minuteChanged = e.alertsChanged = true;
+  e.healthChanged = true;  // the header's health is the shown one, not net_task's
+  ui.takeNetEvents(e, polledState(1000));
+  TEST_ASSERT_TRUE(ui.pending.firstDraw);
+  TEST_ASSERT_TRUE(ui.pending.languageChanged);
+  TEST_ASSERT_TRUE(ui.pending.minuteChanged);
+  TEST_ASSERT_TRUE(ui.pending.alertsChanged);
+  TEST_ASSERT_FALSE(ui.pending.healthChanged);
+  TEST_ASSERT_FALSE(ui.pending.newPoll);
+  TEST_ASSERT_EQUAL_INT(3, ui.pager.page());  // no new poll: the page stays
+
+  RedrawEvents poll;
+  poll.newPoll = true;
+  ui.takeNetEvents(poll, polledState(2000));  // 3 rows: one page at most
+  TEST_ASSERT_TRUE(ui.pending.newPoll);
+  TEST_ASSERT_EQUAL_INT(0, ui.pager.page());
+}
+
+// -- 60 s of silence: NetworkError in the header once, the empty screen says why
+static void test_ui_flow_health_silence_logged_once(void) {
+  UiFlow ui;
+  NetState empty;
+  empty.cfg = std::make_shared<const Config>(makeConfig());
+  const uint32_t now = 1000 + kNetStallLimitMs + 1;
+  TEST_ASSERT_TRUE(ui.updateHealth(empty, now, 1000));
+  ASSERT_ENUM_EQ(OpenSkyHealth::NetworkError, ui.shownHealth);
+  TEST_ASSERT_TRUE(ui.pending.healthChanged);
+  TEST_ASSERT_TRUE(ui.pending.newPoll);
+  ui.pending = RedrawEvents{};
+  TEST_ASSERT_FALSE(ui.updateHealth(empty, now + 20, 1000));  // still silent: no change
+  TEST_ASSERT_FALSE(ui.pending.healthChanged);
+  TEST_ASSERT_FALSE(ui.updateHealth(empty, now + 40, now + 30));  // back: Ok, not "silent"
+  ASSERT_ENUM_EQ(OpenSkyHealth::Ok, ui.shownHealth);
+  TEST_ASSERT_TRUE(ui.pending.healthChanged);
+}
+
+// -- a screen change: page 0, the redraw, a fresh auto-cycle, last_screen saved by touch
+static void test_ui_flow_screen_changed_resets_and_persists(void) {
+  UiFlow ui;
+  ui.screenChanges.begin(kScreenFlights, 1000);
+  ui.pager.next(3);
+  TEST_ASSERT_TRUE(ui.screenChanged(kScreenRadar, ScreenChangeCause::Touch, 9000));
+  TEST_ASSERT_EQUAL_INT(0, ui.pager.page());
+  TEST_ASSERT_TRUE(ui.pending.screenChanged);
+  TEST_ASSERT_EQUAL_UINT32(0, ui.screenChanges.autoCycleElapsedMs(9000));
+  TEST_ASSERT_FALSE(ui.screenChanged(kScreenFlight, ScreenChangeCause::Screenshot, 9500));
+}
+
+// -- a service outcome: pending cleared before firstDraw, auto-cycle restarted, touch swallowed
+static void test_ui_flow_applies_service_outcome_in_order(void) {
+  UiFlow ui;
+  ui.screenChanges.begin(kScreenFlights, 0);
+  ui.pending.newPoll = true;
+  ServiceOutcome o;
+  o.clearPending = true;
+  o.firstDraw = true;
+  o.restartAutoCycle = true;
+  o.swallowTouch = true;
+  TEST_ASSERT_FALSE(ui.apply(o, 5000));
+  TEST_ASSERT_FALSE(ui.pending.newPoll);
+  TEST_ASSERT_TRUE(ui.pending.firstDraw);
+  TEST_ASSERT_EQUAL_UINT32(100, ui.screenChanges.autoCycleElapsedMs(5100));
+  TEST_ASSERT_FALSE(ui.touch.tap(true));  // the swallowed finger
+  ServiceOutcome owns;
+  owns.ownsDisplay = true;
+  TEST_ASSERT_TRUE(ui.apply(owns, 6000));
+  TEST_ASSERT_TRUE(ui.pending.firstDraw);  // nothing cleared without clearPending
+}
+
+// -- a page tap moves the page within its bounds and redraws the table only when it moved
+static void test_ui_flow_page_tap_redraws_only_when_moved(void) {
+  UiFlow ui;
+  ui.pageTap(TapKind::PagePrev, 2);
+  TEST_ASSERT_FALSE(ui.pending.pageChanged);
+  ui.pageTap(TapKind::PageNext, 2);
+  TEST_ASSERT_TRUE(ui.pending.pageChanged);
+  TEST_ASSERT_EQUAL_INT(1, ui.pager.page());
+  ui.pending = RedrawEvents{};
+  ui.pageTap(TapKind::PageNext, 2);
+  TEST_ASSERT_FALSE(ui.pending.pageChanged);
+  ui.pageTap(TapKind::JumpTo, 2);  // not a page tap
+  TEST_ASSERT_EQUAL_INT(1, ui.pager.page());
+}
+
+// -- a normal pass's clocks: the countdown second, the minute, auto-cycle when due
+static void test_ui_flow_tick_countdown_minute_and_auto_cycle(void) {
+  NetState s = polledState(1000);
+  Config cfg = *s.cfg;
+  cfg.auto_cycle_enabled = true;
+  cfg.auto_cycle_interval_s = 15;
+  s.cfg = std::make_shared<const Config>(cfg);
+  UiFlow ui;
+  ui.screenChanges.begin(kScreenRadar, 1000);
+  TEST_ASSERT_FALSE(ui.tick(s, kScreenRadar, 2000, -1, false));
+  TEST_ASSERT_TRUE(ui.pending.minuteChanged);  // the first pass draws the clock
+  TEST_ASSERT_FALSE(ui.pending.countdownTick);  // not the NOW screen
+  ui.pending = RedrawEvents{};
+  TEST_ASSERT_FALSE(ui.tick(s, kScreenFlight, 3000, -1, false));
+  TEST_ASSERT_TRUE(ui.pending.countdownTick);
+  TEST_ASSERT_FALSE(ui.pending.minuteChanged);
+  TEST_ASSERT_TRUE(ui.tick(s, kScreenRadar, 16000, -1, false));  // 15 s since the change
+  TEST_ASSERT_FALSE(ui.tick(s, kScreenRadar, 16000, -1, true));  // dark screen: never
+}
+
+// -- the redraw mask is computeRedrawMask()'s, and nothing is pending afterwards
+static void test_ui_flow_take_redraw_mask_clears_pending(void) {
+  UiFlow ui;
+  ui.pending.newPoll = true;
+  RedrawEvents same;
+  same.newPoll = true;
+  const uint8_t want = computeRedrawMask(same, kScreenFlights);
+  TEST_ASSERT_EQUAL_UINT8(want, ui.takeRedrawMask(kScreenFlights));
+  TEST_ASSERT_EQUAL_UINT8(0, ui.takeRedrawMask(kScreenFlights));
+  TEST_ASSERT_FALSE(ui.pending.newPoll);
+}
+
+// -- the countdown wakes the loop only on the NOW screen
+static void test_ui_flow_wake_times_only_on_now_screen(void) {
+  UiFlow ui;
+  ui.countdown.due(kScreenFlight, 5000);
+  UiWake other;
+  ui.addWakeTimes(other, kScreenRadar, 5400);
+  TEST_ASSERT_EQUAL_UINT32(kNoDeadline, other.untilCountdownMs);
+  UiWake now;
+  ui.addWakeTimes(now, kScreenFlight, 5400);
+  TEST_ASSERT_EQUAL_UINT32(600, now.untilCountdownMs);
+}
+
 // -- edge case: one tap per press; a swallowed press needs a new one
 static void test_touch_edge_one_tap_per_press_and_swallow(void) {
   TouchEdge edge;
@@ -466,4 +601,12 @@ void run_ui_flow_tests() {
   RUN_TEST(test_make_ui_view_reads_the_snapshot);
   RUN_TEST(test_tap_context_of_view_has_pages_and_header);
   RUN_TEST(test_auto_cycle_input_from_settings_and_cpa);
+  RUN_TEST(test_ui_flow_takes_net_events_but_not_their_health);
+  RUN_TEST(test_ui_flow_health_silence_logged_once);
+  RUN_TEST(test_ui_flow_screen_changed_resets_and_persists);
+  RUN_TEST(test_ui_flow_applies_service_outcome_in_order);
+  RUN_TEST(test_ui_flow_page_tap_redraws_only_when_moved);
+  RUN_TEST(test_ui_flow_tick_countdown_minute_and_auto_cycle);
+  RUN_TEST(test_ui_flow_take_redraw_mask_clears_pending);
+  RUN_TEST(test_ui_flow_wake_times_only_on_now_screen);
 }

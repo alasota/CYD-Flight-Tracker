@@ -28,6 +28,7 @@ void run_alert_screen_flow_tests();
 void run_password_reset_flow_tests();
 void run_screenshot_bridge_tests();
 void run_ui_perf_tests();
+void run_service_screen_flows_tests();
 
 void setUp(void) { resetAllForTesting(); }
 void tearDown(void) {}
@@ -67,5 +68,6 @@ int main(int, char **) {
   if (RUN_MODULE(password_reset_flow)) run_password_reset_flow_tests();
   if (RUN_MODULE(screenshot_bridge)) run_screenshot_bridge_tests();
   if (RUN_MODULE(ui_perf)) run_ui_perf_tests();
+  if (RUN_MODULE(service_screen_flows)) run_service_screen_flows_tests();
   return UNITY_END();
 }
