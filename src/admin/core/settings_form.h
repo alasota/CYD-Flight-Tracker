@@ -76,5 +76,9 @@ struct SettingsFormOutcome {
 // (docs/review-notes-2026.md 1.5). The caller saves it.
 SettingsFormOutcome applySettingsForm(Config &cfg, const FormArgs &args);
 
+// The label a refused password (Mismatch / Invalid) is listed under among the
+// rejected fields.
+WebStr passwordProblem(const PasswordChange &c);
+
 // "Latitude, Longitude, …" — the rejected labels in `lang`, joined by ", ".
 std::string rejectedFieldsText(const std::vector<WebStr> &rejected, Language lang);
