@@ -24,7 +24,7 @@
 // `page` is
 // 0-based over the *rest* of the list (the featured row is never repeated
 // in the table); an out-of-range page draws no data rows. Which page is
-// current, and reacting to touch, is main.cpp's job — this only lays out
+// current, and reacting to touch, is ui_flow's job (TablePager, routeTap()) — this only lays out
 // whichever page it's told to draw.
 void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t screenWidth,
                    int page, OpenSkyHealth health);
