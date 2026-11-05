@@ -288,52 +288,14 @@ static void onScreenChanged(ScreenChangeCause cause) {
 
 // --- Device alerts: the message screen behind the header's "!" (spec 08) -----
 
-static AlertScreen alertScreen;
-static AlertSet alertScreenDrawn;  // what its list shows
-
-static void openAlertMessage() {
-  alertScreen = openAlertScreen(millis());
-  alertScreenDrawn = net->alerts;
-  Serial.printf("[alert] message screen opened (%u alert(s))\n",
-                static_cast<unsigned>(alertsInOrder(net->alerts, true).size()));
-  drawAlertScreen(tft, net->alerts, net->alertDetails, millis(),
-                  alertScreenSecondsLeft(alertScreen, millis()));
-}
+static AlertScreenFlow alertScreen;
 
 // Back to the normal screens: same screen and table page, a full repaint, a
 // fresh auto-cycle interval.
 static void closeAlertMessage() {
-  alertScreen.open = false;
+  alertScreen.closeQuietly();
   lastScreenChangeMs = millis();
   pendingRedraw.firstDraw = true;
-}
-
-// While it's open it owns the touchscreen.
-static void serviceAlertScreen() {
-  const TouchPoint t = touchInputRead(tft);
-  AlertScreenInput in;
-  in.nowMs = millis();
-  in.pressed = t.pressed;
-  in.x = t.x;
-  in.y = t.y;
-  in.anyDisplayAlerts = net->alerts.displaySeverity() != AlertSeverity::None;
-  in.screenW = static_cast<int16_t>(tft.width());
-  in.screenH = static_cast<int16_t>(tft.height());
-  const AlertScreenStepResult r = alertScreenStep(alertScreen, in);
-  alertScreen = r.state;
-  if (r.close) {
-    closeAlertMessage();
-    return;
-  }
-  if (net->alerts != alertScreenDrawn) {
-    // One came or went: the list again, the countdown runs on.
-    alertScreenDrawn = net->alerts;
-    drawAlertScreen(tft, net->alerts, net->alertDetails, millis(),
-                    alertScreenSecondsLeft(alertScreen, millis()));
-  } else if (r.redrawTimer) {
-    drawAlertCloseButton(tft, static_cast<int>(alertsInOrder(net->alerts, true).size()),
-                         alertScreen.secondsShown);
-  }
 }
 
 // Dispatches one touch tap (edge-detected in loop(), once per press).
@@ -343,7 +305,7 @@ static void handleTap(int16_t x, int16_t y) {
 
   // The "!" first: its zone reaches a little into the content area.
   if (cfg().home_configured && alertBadgeHit(x, y, headerZones())) {
-    openAlertMessage();
+    showAlertScreen(tft, alertScreen, net->alerts, net->alertDetails);
     return;
   }
 
@@ -394,7 +356,7 @@ static OtaScreenFlow otaScreen;
 static bool otaScreenPass() {
   const OtaScreenStep r = runOtaScreen(tft, otaScreen, net->ota, net->restartPending,
                                        firmwareVersion());
-  if (r.ownsDisplay) alertScreen.open = false;  // the OTA screen comes first
+  if (r.ownsDisplay) alertScreen.closeQuietly();  // the OTA screen comes first
   if (r.backToScreens) pendingRedraw.firstDraw = true;
   return r.ownsDisplay;
 }
@@ -419,7 +381,7 @@ static void maybeAskAboutUpdate(bool touchPressed) {
   g.tCpaSeconds = static_cast<int>(cpa.t_cpa_seconds);
   g.touchActive = touchPressed;
   g.screenOff = backlightDecision().screen_off;
-  g.alertScreenOpen = alertScreen.open;
+  g.alertScreenOpen = alertScreen.isOpen();
   if (prompt.tryOpen(g, u.latestTag, millis())) openUpdatePrompt(tft, prompt, u.installed);
 }
 
@@ -502,12 +464,12 @@ static void prepareCapture(int screenIndex) {
   if (p.kind == ScreenshotPrepareKind::UpdatePromptDemo ||
       p.kind == ScreenshotPrepareKind::AlertDemo) {
     drawScreenshotDemo(tft, p.kind);
-    alertScreen.open = false;
+    alertScreen.closeQuietly();
     pendingRedraw = RedrawEvents{};
     pendingRedraw.firstDraw = true;  // repaints the real screen once the capture is out
     return;
   }
-  if (alertScreen.open) closeAlertMessage();  // a normal screen was asked for
+  if (alertScreen.isOpen()) closeAlertMessage();  // a normal screen was asked for
   if (p.kind == ScreenshotPrepareKind::Screen && nav.set(p.screen)) {
     onScreenChanged(ScreenChangeCause::Screenshot);
   }
@@ -551,7 +513,7 @@ static void sleepUntilNextDeadline() {
     w.untilMinuteMs = msUntilNextMinute(static_cast<int>(local % 60), 0);
   }
   w.untilPromptTimerMs = prompt.msUntilTimer(now);
-  if (alertScreen.open) w.untilAlertTimerMs = alertScreenMsToNextSecond(alertScreen, now);
+  if (alertScreen.isOpen()) w.untilAlertTimerMs = alertScreen.msToNextSecond(now);
   const uint32_t sleepMs = uiSleepMs(w);
   perfMeter.setPlannedSleep(sleepMs);
   ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(sleepMs));
@@ -656,9 +618,9 @@ void loop() {
 
   // --- The alert message screen owns the screen while it's open --------------
   static bool wasTouchPressed = false;
-  if (alertScreen.open) {
-    serviceAlertScreen();
-    if (alertScreen.open) {
+  if (alertScreen.isOpen()) {
+    if (runAlertScreen(tft, alertScreen, net->alerts, net->alertDetails).close) closeAlertMessage();
+    if (alertScreen.isOpen()) {
       wasTouchPressed = true;  // whatever the finger does here isn't a tap below
       pendingRedraw = RedrawEvents{};
       sleepUntilNextDeadline();
@@ -685,7 +647,7 @@ void loop() {
   }
   wasTouchPressed = touch.pressed;
 
-  if (alertScreen.open) {  // the tap opened the "!" message
+  if (alertScreen.isOpen()) {  // the tap opened the "!" message
     pendingRedraw = RedrawEvents{};
     sleepUntilNextDeadline();
     return;

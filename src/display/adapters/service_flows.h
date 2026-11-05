@@ -10,6 +10,7 @@
 #include <string>
 
 #include "display/adapters/lgfx/LGFX_CYD.hpp"
+#include "display/services/alert_screen_flow.h"
 #include "display/services/ota_screen_flow.h"
 #include "display/services/update_prompt_flow.h"
 
@@ -25,3 +26,11 @@ void openUpdatePrompt(LGFX &tft, const UpdatePromptFlow &flow, const std::string
 // One pass while it's open: reads the touch, steps, redraws the timer strip.
 // The caller sends the step's command and repaints on firstDraw.
 PromptStep runUpdatePrompt(LGFX &tft, UpdatePromptFlow &flow);
+
+// Opens the alert message screen behind the header's "!" (log line + screen).
+void showAlertScreen(LGFX &tft, AlertScreenFlow &flow, const AlertSet &alerts,
+                     const AlertDetails &details);
+// One pass while it's open: reads the touch, steps, redraws the list or the
+// CLOSE countdown. On close the caller repaints the normal screens.
+AlertFlowStep runAlertScreen(LGFX &tft, AlertScreenFlow &flow, const AlertSet &alerts,
+                             const AlertDetails &details);
