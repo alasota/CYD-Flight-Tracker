@@ -21,6 +21,13 @@ void run_font_set_tests();
 void run_fonts_tests();
 void run_backlight_tests();
 void run_i18n_tests();
+void run_ui_flow_tests();
+void run_update_prompt_flow_tests();
+void run_ota_screen_flow_tests();
+void run_alert_screen_flow_tests();
+void run_password_reset_flow_tests();
+void run_screenshot_bridge_tests();
+void run_ui_perf_tests();
 
 void setUp(void) { resetAllForTesting(); }
 void tearDown(void) {}
@@ -53,5 +60,12 @@ int main(int, char **) {
   if (RUN_MODULE(fonts)) run_fonts_tests();
   if (RUN_MODULE(backlight)) run_backlight_tests();
   if (RUN_MODULE(i18n)) run_i18n_tests();
+  if (RUN_MODULE(ui_flow)) run_ui_flow_tests();
+  if (RUN_MODULE(update_prompt_flow)) run_update_prompt_flow_tests();
+  if (RUN_MODULE(ota_screen_flow)) run_ota_screen_flow_tests();
+  if (RUN_MODULE(alert_screen_flow)) run_alert_screen_flow_tests();
+  if (RUN_MODULE(password_reset_flow)) run_password_reset_flow_tests();
+  if (RUN_MODULE(screenshot_bridge)) run_screenshot_bridge_tests();
+  if (RUN_MODULE(ui_perf)) run_ui_perf_tests();
   return UNITY_END();
 }

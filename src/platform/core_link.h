@@ -258,10 +258,7 @@ constexpr uint32_t kUiAliveLimitMs = 2000;
 // True when `beatMs` (millis() of the last heartbeat) is older than `limitMs`.
 bool heartbeatStale(uint32_t nowMs, uint32_t beatMs, uint32_t limitMs);
 
-// ---- Device-side globals ----------------------------------------------------
-
-#ifdef ARDUINO
-#include <atomic>
+// ---- UI perf -------------------------------------------------------------------
 
 // UI-side perf numbers handed to the network task (which logs them and
 // serves /perf.json) — last complete window plus totals since boot.
@@ -271,6 +268,11 @@ struct UiPerfShare {
   uint32_t maxEverMs = 0, slowEver = 0;
   uint32_t stackFree = 0;
 };
+
+// ---- Device-side globals ----------------------------------------------------
+
+#ifdef ARDUINO
+#include <atomic>
 
 namespace core_link {
 

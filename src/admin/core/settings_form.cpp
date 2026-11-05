@@ -42,3 +42,20 @@ bool isValidUnsignedIntString(const std::string &s) {
   }
   return true;
 }
+
+// TODO(spec 12): stub from test-author
+void FormArgs::add(const std::string & /*name*/, const std::string & /*value*/) {}
+
+// TODO(spec 12): stub from test-author
+bool FormArgs::has(const std::string & /*name*/) const { return false; }
+
+// TODO(spec 12): stub from test-author
+std::string FormArgs::get(const std::string & /*name*/) const { return {}; }
+
+// TODO(spec 12): stub from test-author
+SettingsFormOutcome applySettingsForm(Config & /*cfg*/, const FormArgs & /*args*/) { return {}; }
+
+// TODO(spec 12): stub from test-author
+std::string rejectedFieldsText(const std::vector<WebStr> & /*rejected*/, Language /*lang*/) {
+  return {};
+}
