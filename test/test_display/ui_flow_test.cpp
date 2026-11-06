@@ -360,7 +360,7 @@ static void test_make_ui_view_reads_the_snapshot(void) {
       makeUiView(s, kScreenRadar, 2, OpenSkyHealth::NetworkError, 21000, 1760770000, true);
   TEST_ASSERT_EQUAL_INT(kScreenRadar, v.screen);
   TEST_ASSERT_EQUAL_INT(2, v.page);
-  TEST_ASSERT_TRUE(v.rows == &s.data->rows);
+  TEST_ASSERT_EQUAL_PTR(&s.data->rows, v.rows);
   TEST_ASSERT_TRUE(v.hasData);
   TEST_ASSERT_EQUAL_INT(1, v.nowRowIndex);
   TEST_ASSERT_FLOAT_WITHIN(0.01f, 20.0f, v.cpa.t_cpa_seconds);
