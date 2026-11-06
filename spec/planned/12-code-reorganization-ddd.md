@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **etap 5 z 8 zrobiony (vNEXT)** 2026-11-05, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w vNEXT, etapy 6–8 do zrobienia. Jedna specyfikacja dla całej
+Status: **etap 5 z 8 zrobiony (v1.11.3)** 2026-11-05, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etapy 6–8 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -524,10 +524,11 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   czasu pracy 57 s bez paniki w logu — niewyjaśniony, nie powtórzył się (najpewniej start po
   wgraniu przez USB).
 
-### Wynik etapu 5 (2026-11-05, wydany w vNEXT)
+### Wynik etapu 5 (2026-11-05, wydany w v1.11.3)
 
-- **§6 → moduły** (wszystkie czyste, bez `#ifdef ARDUINO`, krok → struktura odpowiedzi, testy
-  pisane najpierw):
+- **§6 → moduły** (wszystkie czyste, bez `#ifdef ARDUINO`, krok → struktura odpowiedzi; testy
+  w większości pisane najpierw — testy `ServiceScreens` / `UiFlow` i 6 testów funkcji
+  pomocniczych powstały razem z kodem):
 
   | §6 „dziś” | Teraz | Testy |
   |---|---|---|
