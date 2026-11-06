@@ -7,6 +7,8 @@
 #include <string>
 
 #include "display/services/alert_screen_flow.h"
+#include "display/services/service_screen_flows.h"  // the wiring the UI loop runs
+#include "display/services/ui_flow.h"
 #include "test_support.h"
 
 namespace {
@@ -60,19 +62,24 @@ static void test_ota_owns_display_while_running_done_or_restarting(void) {
   for (const Example &e : examples) {
     const std::string what = "phase " + std::to_string(static_cast<int>(e.phase)) +
                              ", restartPending " + (e.restart ? "true" : "false");
-    OtaScreenFlow flow;
+    // Wired as main.cpp wires it: the OTA step through ServiceScreenFlows into UiFlow.
+    ServiceScreenFlows services([](const NetCommand &) { return true; });
+    UiFlow ui;
     AlertSet alerts;
     alerts.set(AlertId::OpenSkyLoginFailed);
-    AlertScreenFlow alertScreen;
-    alertScreen.open(500, alerts);
-    TEST_ASSERT_TRUE_MESSAGE(alertScreen.isOpen(), what.c_str());
+    services.alertFlow().open(500, alerts);
+    TEST_ASSERT_TRUE_MESSAGE(services.alertFlow().isOpen(), what.c_str());
+    ui.pending.newPoll = true;  // a redraw waiting for the normal screens
 
     const uint32_t seq = e.phase == Phase::Idle ? 0 : 1;  // Idle: no progress reported yet
-    const OtaScreenStep r = flow.step(progress(seq, e.phase, 1000), e.restart, 1000);
+    const OtaScreenStep r = services.otaFlow().step(progress(seq, e.phase, 1000), e.restart, 1000);
     TEST_ASSERT_EQUAL_MESSAGE(e.owns, r.ownsDisplay, what.c_str());
-    // main.cpp: while the OTA screen owns the display the alert screen closes.
-    if (r.ownsDisplay) alertScreen.closeQuietly();
-    TEST_ASSERT_EQUAL_MESSAGE(!e.owns, alertScreen.isOpen(), what.c_str());
+    const bool owns = ui.apply(services.afterOtaStep(r), 1000);
+    TEST_ASSERT_EQUAL_MESSAGE(e.owns, owns, what.c_str());  // the normal screens wait
+    // While the OTA screen owns the display the alert screen closes, and the
+    // redraw waiting below is dropped (the OTA screen is not drawn over).
+    TEST_ASSERT_EQUAL_MESSAGE(!e.owns, services.alertFlow().isOpen(), what.c_str());
+    TEST_ASSERT_EQUAL_MESSAGE(!e.owns, ui.pending.newPoll, what.c_str());
   }
 }
 
