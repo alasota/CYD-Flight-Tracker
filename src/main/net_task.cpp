@@ -109,8 +109,8 @@ void otaOnEnd(bool ok) {
 
 // ---- Settings ----------------------------------------------------------------
 
-void reloadConfig() {
-  cfg = std::make_shared<const Settings>(loadConfig());
+void reloadSettings() {
+  cfg = std::make_shared<const Settings>(loadSettings());
   ++cfgSeq;
   releaseCheckBegin(cfg->update);
 }
@@ -167,7 +167,7 @@ void handleCommands() {
       case NetCommandType::SkipTag:
         Serial.printf("[update] NO on the display, %s skipped\n", tag.c_str());
         saveUpdateSkippedTag(tag);
-        reloadConfig();
+        reloadSettings();
         break;
       case NetCommandType::None:
       default:
@@ -396,7 +396,7 @@ void netTask(void *) {
     // Settings saved on the config page: reload them now (language etc.).
     if (webServerSaveCount() != seenSaveCount) {
       seenSaveCount = webServerSaveCount();
-      reloadConfig();
+      reloadSettings();
     }
     handleCommands();
     pollOpenSky();

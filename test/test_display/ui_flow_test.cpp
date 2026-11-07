@@ -330,7 +330,7 @@ static NetState polledState(uint32_t polledAt) {
   data->cpa.found = true;
   data->cpa.t_cpa_seconds = 40.0f;
   data->polledAtMs = polledAt;
-  Settings cfg = makeConfig();
+  Settings cfg = makeSettings();
   cfg.home.radius_deg = 1.5f;
   NetState s;
   s.data = data;
@@ -341,7 +341,7 @@ static NetState polledState(uint32_t polledAt) {
 // -- edge case: before the first poll there are no rows and no CPA; after it, the CPA ages
 static void test_net_rows_and_cpa_before_and_after_first_poll(void) {
   NetState empty;
-  empty.cfg = std::make_shared<const Settings>(makeConfig());
+  empty.cfg = std::make_shared<const Settings>(makeSettings());
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(netRows(empty).size()));
   TEST_ASSERT_FALSE(netCpaAt(empty, 5000).found);
 
@@ -373,7 +373,7 @@ static void test_make_ui_view_reads_the_snapshot(void) {
   TEST_ASSERT_TRUE(v.homeConfigured);
 
   NetState first;  // setup()'s first snapshot: the settings only
-  first.cfg = std::make_shared<const Settings>(defaultConfig());
+  first.cfg = std::make_shared<const Settings>(defaultSettings());
   const UiView w = makeUiView(first, kScreenFlights, 0, FeedHealth::Ok, 100, 0, false);
   TEST_ASSERT_FALSE(w.hasData);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(w.rows->size()));
@@ -452,7 +452,7 @@ static void test_ui_flow_takes_net_events_but_not_their_health(void) {
 static void test_ui_flow_health_silence_logged_once(void) {
   UiFlow ui;
   NetState empty;
-  empty.cfg = std::make_shared<const Settings>(makeConfig());
+  empty.cfg = std::make_shared<const Settings>(makeSettings());
   const uint32_t now = 1000 + kNetStallLimitMs + 1;
   TEST_ASSERT_TRUE(ui.updateHealth(empty, now, 1000));
   ASSERT_ENUM_EQ(FeedHealth::NetworkError, ui.shownHealth);

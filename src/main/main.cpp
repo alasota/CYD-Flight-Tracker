@@ -184,7 +184,7 @@ void setup() {
   tft.setRotation(1);   // landscape, 320x240
   tft.fillScreen(LCARS_BLACK);
 
-  Settings bootCfg = loadConfig();
+  Settings bootCfg = loadSettings();
   i18nSetLanguage(bootCfg.display.language);  // before anything is drawn
   Serial.printf("[ota] %s\n", firmwareMarker());
   const bool appPendingVerify = otaFlashRunningPendingVerify();
@@ -197,8 +197,8 @@ void setup() {
   // net_task exists — the blocking delay() steps are fine here).
   runPasswordReset(tft, !bootCfg.web.password.empty(), [&bootCfg] {
     bootCfg.web.password.clear();
-    saveConfig(bootCfg);
-    bootCfg = loadConfig();
+    saveSettings(bootCfg);
+    bootCfg = loadSettings();
     Serial.println("[auth] web password cleared from the touchscreen");
   });
   nav.set(bootCfg.display.last_screen);  // restore the last-active screen

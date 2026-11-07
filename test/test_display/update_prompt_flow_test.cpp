@@ -169,7 +169,7 @@ static void test_update_prompt_gate_from_net_state(void) {
   data->cpa.found = true;
   data->cpa.t_cpa_seconds = 50.0f;
   data->polledAtMs = 1000;
-  Settings cfg = makeConfig();
+  Settings cfg = makeSettings();
   cfg.update.skipped_tag = "v1.2.9";
   NetState s;
   s.data = data;

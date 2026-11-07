@@ -1,5 +1,5 @@
 // settings_nvs — the Preferences (NVS) half of config_store: loads every
-// setting through sanitizeConfig() and saves them back, plus the single-key
+// setting through sanitizeSettings() and saves them back, plus the single-key
 // writes (last screen, update choices). Hardware adapter, not covered by Unity
 // (CLAUDE.md "Testing").
 #include "admin/core/config_store.h"
@@ -12,11 +12,11 @@ namespace {
 constexpr char kNamespace[] = "cydsky";
 }  // namespace
 
-Settings loadConfig() {
+Settings loadSettings() {
   Preferences prefs;
   prefs.begin(kNamespace, /*readOnly=*/true);
 
-  Settings cfg = defaultConfig();
+  Settings cfg = defaultSettings();
   cfg.home.lat = prefs.getFloat("home_lat", cfg.home.lat);
   cfg.home.lon = prefs.getFloat("home_lon", cfg.home.lon);
   cfg.home.radius_deg = prefs.getFloat("radius_deg", cfg.home.radius_deg);
@@ -52,11 +52,11 @@ Settings loadConfig() {
   cfg.backlight.night_pause_polling = prefs.getBool("nt_poll", cfg.backlight.night_pause_polling);
 
   prefs.end();
-  return sanitizeConfig(cfg);
+  return sanitizeSettings(cfg);
 }
 
-void saveConfig(const Settings &cfg) {
-  Settings sanitized = sanitizeConfig(cfg);
+void saveSettings(const Settings &cfg) {
+  Settings sanitized = sanitizeSettings(cfg);
 
   Preferences prefs;
   prefs.begin(kNamespace, /*readOnly=*/false);

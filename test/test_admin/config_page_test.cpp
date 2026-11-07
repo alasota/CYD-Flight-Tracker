@@ -29,7 +29,7 @@ std::string render(const ConfigPageModel &m) {
 
 ConfigPageModel baseModel() {
   ConfigPageModel m;
-  m.cfg = defaultConfig();
+  m.cfg = defaultSettings();
   m.cfg.home.lat = 52.2297f;
   m.cfg.home.lon = 21.0122f;
   return m;
@@ -68,7 +68,7 @@ static void test_daily_credits_with_a_night_pause(void) {
 }
 
 static void test_paused_minutes_follow_the_settings(void) {
-  Settings c = defaultConfig();
+  Settings c = defaultSettings();
   BacklightStatus l;
   c.backlight.night_mode = NightMode::Schedule;  // 23:00-06:30 by default
   TEST_ASSERT_EQUAL_UINT32(450u, nightMinutesToday(c.backlight, l));
@@ -152,7 +152,7 @@ static void test_display_card(void) {
 }
 
 static void test_credentials_need_both_fields(void) {
-  Settings c = defaultConfig();
+  Settings c = defaultSettings();
   TEST_ASSERT_FALSE(hasOpenSkyCredentials(c));
   c.opensky.client_id = "id";
   TEST_ASSERT_FALSE(hasOpenSkyCredentials(c));

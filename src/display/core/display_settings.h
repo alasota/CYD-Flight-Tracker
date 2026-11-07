@@ -15,7 +15,7 @@
 struct DisplaySettings {
   // On-screen language (CLAUDE.md "Language"), chosen on the config page.
   // Stored in NVS as its numeric index; an out-of-range stored value is
-  // reset to kDefaultLanguage by sanitizeConfig().
+  // reset to kDefaultLanguage by sanitizeSettings().
   Language language = kDefaultLanguage;
   // Which of the three screens was showing at last power-down (0/1/2),
   // restored on boot (see docs/screens.md "Screen navigation").

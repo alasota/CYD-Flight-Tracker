@@ -56,9 +56,9 @@ inline TrackedFlight makeRow(const char *callsign, float km, bool onGround = fal
 
 // ---- Settings ------------------------------------------------------------------
 
-// defaultConfig() with the home set to central Warsaw.
-inline Settings makeConfig() {
-  Settings c = defaultConfig();
+// defaultSettings() with the home set to central Warsaw.
+inline Settings makeSettings() {
+  Settings c = defaultSettings();
   c.home.lat = 52.2297f;
   c.home.lon = 21.0122f;
   c.home.configured = true;
