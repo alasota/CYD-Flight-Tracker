@@ -26,10 +26,11 @@ RUN_TEST_BASELINE = 874
 # Layer findings (check_files + full_path_findings) on this repository after the last finished
 # stage: 51 after stage 2, 47 after stage 3 (-6 includes only the moved types needed, +2
 # tracked_flight.h -> enrichment/core), 14 after stage 4 (-38 SDK / adapter / platform includes
-# that left core/ with the hardware halves, +5 adapters reaching another context's core). A
-# limit, not a pin: a stage that lowers the count lowers this number with it, so a new finding
-# can't hide under the old limit.
-LAYER_FINDINGS_LIMIT = 14
+# that left core/ with the hardware halves, +5 adapters reaching another context's core), 12
+# after stage 6 (-2: opensky_http.cpp and backlight_ldr.cpp take their settings objects instead
+# of including config_store.h). A limit, not a pin: a stage that lowers the count lowers this
+# number with it, so a new finding can't hide under the old limit.
+LAYER_FINDINGS_LIMIT = 12
 
 # Stage 3 (spec 12 section 8 item 3): symbol -> (new header, old header), both from src/.
 STAGE_3_HOMES = {

@@ -160,14 +160,14 @@ class CountdownTick {
 // ---- Auto-cycle ---------------------------------------------------------------
 
 struct AutoCycleInput {
-  bool enabled = false;         // auto_cycle_enabled
+  bool enabled = false;         // auto_cycle.enabled
   bool homeConfigured = false;  // the setup prompt has the screen otherwise
   bool screenOff = false;       // night, backlight off — nobody sees it change
   int currentScreen = kScreenFlights;
   bool cpaFound = false;        // for shouldDeferAutoSwitch()
   float tCpaSeconds = 0.0f;
   uint32_t elapsedMs = 0;       // ScreenChangeTracker::autoCycleElapsedMs()
-  uint32_t intervalS = 15;      // auto_cycle_interval_s
+  uint32_t intervalS = 15;      // auto_cycle.interval_s
 };
 
 // enabled && homeConfigured && !screenOff && shouldAutoAdvance(elapsed,

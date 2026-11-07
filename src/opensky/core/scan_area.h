@@ -8,7 +8,7 @@
 
 // Area (in square degrees) of the lat/lon bounding box implied by a
 // ±radius_deg half-width scan radius (i.e. a 2*radius_deg x 2*radius_deg
-// box), matching config_store's Config::radius_deg.
+// box), matching airspace's Home::radius_deg.
 float bboxAreaSqDeg(float radius_deg);
 
 // OpenSky /states/all credit cost per call for that bbox area, per

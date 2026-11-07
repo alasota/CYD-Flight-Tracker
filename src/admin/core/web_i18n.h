@@ -1,5 +1,5 @@
 // web_i18n — Polish / English text of the config web page (config_page),
-// chosen independently of the display language (Config::web_language).
+// chosen independently of the display language (the settings' web.language).
 // Same X-macro pattern as i18n: one list with both translations side by
 // side, the enum and both tables generated from it, so a string can't be
 // added without both translations. Literals stay in flash.

@@ -39,7 +39,7 @@ struct RadarLayout {
 };
 RadarLayout computeRadarLayout(int16_t x, int16_t y, int16_t w, int16_t h, int16_t margin);
 
-// Converts a scan radius in degrees (config_store's Config::radius_deg —
+// Converts a scan radius in degrees (airspace's Home::radius_deg —
 // see docs/data-sources.md "Rate limits") to an approximate straight-line km value,
 // for use as radar_geometry's max_distance_km — this is the "convert
 // degrees to km at the call site, not inside radar_geometry" step

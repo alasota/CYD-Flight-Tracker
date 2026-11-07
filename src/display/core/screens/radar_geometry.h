@@ -5,8 +5,8 @@
 // expected to call into this the way `table_view` calls into
 // `lcars_theme`/`featured_panel`.
 //
-// `max_distance_km` is meant to come from config_store's configured scan
-// radius (Config::radius_deg) — converting that from degrees to km is the
+// `max_distance_km` is meant to come from the configured scan radius
+// (airspace's Home::radius_deg) — converting that from degrees to km is the
 // caller's job, not this module's, so it stays purely geometric with no
 // opinion on units conversion or where the radius comes from.
 #pragma once

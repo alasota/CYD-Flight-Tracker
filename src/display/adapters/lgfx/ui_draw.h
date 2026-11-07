@@ -14,6 +14,6 @@
 // clears the screen first, the content band is cleared with one fillRect().
 void applyRedraw(LGFX &tft, uint8_t mask, const UiView &v);
 
-// Shown instead of a screen while config_store's home_configured is still
+// Shown instead of a screen while the settings' home.configured is still
 // false (docs/review-notes-2026.md 1.5/1.6).
 void drawSetupPrompt(LGFX &tft);
