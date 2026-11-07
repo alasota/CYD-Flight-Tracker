@@ -23,9 +23,9 @@ std::string endpointLabel(const std::string &icao, const AirportInfo &airport, R
 
 }  // namespace
 
-std::string summaryFlight(const AircraftRow &row) { return orDash(row.aircraft.callsign); }
+std::string summaryFlight(const TrackedFlight &row) { return orDash(row.aircraft.callsign); }
 
-std::string summaryAirline(const AircraftRow &row) {
+std::string summaryAirline(const TrackedFlight &row) {
   // hexdb.io's registered owner first, then the airline the callsign's ICAO
   // prefix names (works even when hexdb.io doesn't know the airframe).
   if (row.info.found && !row.info.airline.empty()) return row.info.airline;
@@ -34,7 +34,7 @@ std::string summaryAirline(const AircraftRow &row) {
   return row.info_pending ? kPendingText : kUnknownText;
 }
 
-std::string summaryType(const AircraftRow &row) {
+std::string summaryType(const TrackedFlight &row) {
   // Short friendly name from the ICAO type code ("737 MAX 8"), else
   // hexdb.io's longer "Type" string.
   if (const char *friendly = friendlyAircraftType(row.info.icao_type)) return friendly;
@@ -42,7 +42,7 @@ std::string summaryType(const AircraftRow &row) {
   return row.info_pending ? kPendingText : kUnknownText;
 }
 
-std::string fitSummaryIdentity(const AircraftRow &row, int maxPx, const TextMeasure &measure) {
+std::string fitSummaryIdentity(const TrackedFlight &row, int maxPx, const TextMeasure &measure) {
   static const std::string kGap = "  ";
   const std::string flight = summaryFlight(row);
   const std::string airline = summaryAirline(row);
@@ -77,7 +77,7 @@ std::string formatSummaryRoute(const RouteInfo &route, const AirportInfo &origin
 namespace {
 
 // One endpoint of `row`'s route, pending-aware (see rowAirportCode()).
-std::string rowEndpoint(const AircraftRow &row, bool origin, RouteFormat fmt) {
+std::string rowEndpoint(const TrackedFlight &row, bool origin, RouteFormat fmt) {
   const AirportInfo &airport = origin ? row.origin_airport : row.dest_airport;
   const bool pending = origin ? row.origin_airport_pending : row.dest_airport_pending;
   const std::string &icao = origin ? row.route.origin_icao : row.route.dest_icao;
@@ -88,17 +88,17 @@ std::string rowEndpoint(const AircraftRow &row, bool origin, RouteFormat fmt) {
 
 }  // namespace
 
-std::string rowAirportCode(const AircraftRow &row, bool origin) {
+std::string rowAirportCode(const TrackedFlight &row, bool origin) {
   if (!row.route.found) return row.route_pending ? kPendingText : kUnknownText;
   return rowEndpoint(row, origin, RouteFormat::CodesOnly);
 }
 
-std::string formatRowRoute(const AircraftRow &row, RouteFormat fmt) {
+std::string formatRowRoute(const TrackedFlight &row, RouteFormat fmt) {
   if (!row.route.found) return row.route_pending ? kPendingText : kUnknownText;
   return rowEndpoint(row, true, fmt) + " -> " + rowEndpoint(row, false, fmt);
 }
 
-std::string rowPlaceName(const AircraftRow &row, bool origin, Language lang) {
+std::string rowPlaceName(const TrackedFlight &row, bool origin, Language lang) {
   if (!row.route.found) return row.route_pending ? kPendingText : kUnknownText;
   const bool pending = origin ? row.origin_airport_pending : row.dest_airport_pending;
   const AirportInfo &airport = origin ? row.origin_airport : row.dest_airport;
@@ -106,7 +106,7 @@ std::string rowPlaceName(const AircraftRow &row, bool origin, Language lang) {
   return orDash(placeName(airport, origin ? row.route.origin_icao : row.route.dest_icao, lang));
 }
 
-std::string formatRowRouteCities(const AircraftRow &row, Language lang, int maxPx,
+std::string formatRowRouteCities(const TrackedFlight &row, Language lang, int maxPx,
                                  const TextMeasure &measure) {
   if (!row.route.found) return row.route_pending ? kPendingText : kUnknownText;
 

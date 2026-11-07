@@ -161,7 +161,7 @@ static void test_table_pager_prev_next_stop_at_ends(void) {
   TEST_ASSERT_FALSE(pager.next(0));
   TEST_ASSERT_EQUAL_INT(0, pager.page());
 
-  std::vector<AircraftRow> rows;
+  std::vector<TrackedFlight> rows;
   for (int i = 0; i < 1 + tableRowsPerPage(); ++i) rows.push_back(makeRow("LOT1", 5.0f + i));
   TEST_ASSERT_EQUAL_INT(1, tablePageCount(rows));  // featured + one full page
   rows.push_back(makeRow("LOT9", 50.0f));

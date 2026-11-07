@@ -9,8 +9,8 @@
 
 // ---- What the screens show -------------------------------------------------------
 
-const std::vector<AircraftRow> &netRows(const NetState &s) {
-  static const std::vector<AircraftRow> kNone;
+const std::vector<TrackedFlight> &netRows(const NetState &s) {
+  static const std::vector<TrackedFlight> kNone;
   return s.data != nullptr ? s.data->rows : kNone;
 }
 
@@ -89,7 +89,7 @@ TapContext tapContextOf(const UiView &v, int16_t screenW, int16_t screenH, Langu
   return c;
 }
 
-int tablePageCount(const std::vector<AircraftRow> &rows) {
+int tablePageCount(const std::vector<TrackedFlight> &rows) {
   const FeaturedSplit split = splitFeaturedAndRest(rows);
   return getPageCount(static_cast<int>(split.rest.size()), tableRowsPerPage());
 }

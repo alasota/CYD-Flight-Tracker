@@ -17,7 +17,7 @@ int16_t flightCountdownHeightPx() { return kFlightCountdownHeight; }
 int16_t flightStatusTopPx() { return kFlightStatusTop; }
 int16_t flightStatusHeightPx() { return kFlightStatusHeight; }
 
-std::string nowStatsText(const AircraftRow &row, Language lang) {
+std::string nowStatsText(const TrackedFlight &row, Language lang) {
   // Same values as the featured panel's pills, distance first.
   const std::vector<std::string> p = featuredPillTexts(row, lang);
   if (p.size() == 2) return p[1] + "  " + p[0];  // "S 6km  NA ZIEMI"

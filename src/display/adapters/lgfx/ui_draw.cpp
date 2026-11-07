@@ -14,10 +14,10 @@ namespace {
 // The active screen's content, drawn over whatever is there — callers clear first.
 void drawActiveContent(LGFX &tft, const UiView &v) {
   const int16_t screenW = static_cast<int16_t>(tft.width());
-  const std::vector<AircraftRow> &rows = *v.rows;
+  const std::vector<TrackedFlight> &rows = *v.rows;
   switch (v.screen) {
     case kScreenFlight: {
-      static const AircraftRow kNoRow{};
+      static const TrackedFlight kNoRow{};
       const bool hasNow = v.nowRowIndex >= 0 && v.nowRowIndex < static_cast<int>(rows.size());
       drawFlightScreen(tft, hasNow ? rows[static_cast<size_t>(v.nowRowIndex)] : kNoRow, hasNow,
                        v.cpa, screenW, v.health);

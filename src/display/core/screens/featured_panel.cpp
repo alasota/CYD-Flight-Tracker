@@ -20,7 +20,7 @@ std::string pillValue(bool known, float value, const char *unit) {
 }
 }  // namespace
 
-std::vector<std::string> featuredPillTexts(const AircraftRow &row, Language lang) {
+std::vector<std::string> featuredPillTexts(const TrackedFlight &row, Language lang) {
   // Distance with its compass direction ("S 4km") — the arrow drawn next to
   // it shows the same thing graphically.
   const std::string distance =

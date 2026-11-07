@@ -13,7 +13,7 @@
 // the fixed y:18..95 bounds (no frame): the identity line + "WAW (PL) ->
 // FCO (IT)" route line (RouteFormat::WithCountry, airports from the row),
 // and the stat pills from featuredPillTexts().
-void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, int16_t screenWidth);
+void drawFeaturedPanel(LGFX &gfx, const TrackedFlight &row, int16_t screenWidth);
 
 // Draws the empty placeholder in the same bounds: "no aircraft in range",
 // or why there is no data (emptyStateText(health)).

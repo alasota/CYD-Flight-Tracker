@@ -10,7 +10,7 @@ namespace {
 // ---- sortRowsByDistance -----------------------------------------------------
 
 static void test_sort_orders_ascending_by_distance(void) {
-  AircraftRow far, mid, near;
+  TrackedFlight far, mid, near;
   far.aircraft.icao24 = "far";
   far.distance_km = 300.0f;
   far.has_distance = true;
@@ -21,7 +21,7 @@ static void test_sort_orders_ascending_by_distance(void) {
   near.distance_km = 10.0f;
   near.has_distance = true;
 
-  std::vector<AircraftRow> rows = {far, mid, near};
+  std::vector<TrackedFlight> rows = {far, mid, near};
   sortRowsByDistance(rows);
 
   TEST_ASSERT_EQUAL_STRING("near", rows[0].aircraft.icao24.c_str());
@@ -30,7 +30,7 @@ static void test_sort_orders_ascending_by_distance(void) {
 }
 
 static void test_sort_is_stable_for_equal_distances(void) {
-  AircraftRow a, b, c;
+  TrackedFlight a, b, c;
   a.aircraft.icao24 = "a";
   a.distance_km = 50.0f;
   a.has_distance = true;
@@ -41,7 +41,7 @@ static void test_sort_is_stable_for_equal_distances(void) {
   c.distance_km = 50.0f;
   c.has_distance = true;
 
-  std::vector<AircraftRow> rows = {a, b, c};
+  std::vector<TrackedFlight> rows = {a, b, c};
   sortRowsByDistance(rows);
 
   // All tied at 50km — original relative order (a, b, c) must be kept.
@@ -51,14 +51,14 @@ static void test_sort_is_stable_for_equal_distances(void) {
 }
 
 static void test_sort_puts_rows_without_distance_last(void) {
-  AircraftRow known, unknown;
+  TrackedFlight known, unknown;
   known.aircraft.icao24 = "known";
   known.distance_km = 42.0f;
   known.has_distance = true;
   unknown.aircraft.icao24 = "unknown";
   unknown.has_distance = false;
 
-  std::vector<AircraftRow> rows = {unknown, known};
+  std::vector<TrackedFlight> rows = {unknown, known};
   sortRowsByDistance(rows);
 
   TEST_ASSERT_EQUAL_STRING("known", rows[0].aircraft.icao24.c_str());
@@ -66,7 +66,7 @@ static void test_sort_puts_rows_without_distance_last(void) {
 }
 
 static void test_sort_empty_array_does_not_crash(void) {
-  std::vector<AircraftRow> rows;
+  std::vector<TrackedFlight> rows;
   sortRowsByDistance(rows);
   TEST_ASSERT_TRUE(rows.empty());
 }
@@ -76,7 +76,7 @@ static void test_sort_empty_array_does_not_crash(void) {
 static void test_display_order_puts_airborne_before_ground_traffic(void) {
   // The plane taxiing at the airport 3 km away must not take the featured
   // slot from one flying 9 km away.
-  std::vector<AircraftRow> rows = {makeRow("TAXI1", 3.0f, true), makeRow("AIR2", 9.0f, false),
+  std::vector<TrackedFlight> rows = {makeRow("TAXI1", 3.0f, true), makeRow("AIR2", 9.0f, false),
                                    makeRow("AIR1", 5.0f, false), makeRow("TAXI2", 6.0f, true)};
   sortRowsForDisplay(rows);
   TEST_ASSERT_EQUAL_STRING("AIR1", rows[0].aircraft.callsign.c_str());
@@ -86,7 +86,7 @@ static void test_display_order_puts_airborne_before_ground_traffic(void) {
 }
 
 static void test_display_order_puts_positionless_last(void) {
-  std::vector<AircraftRow> rows = {makeRow("NOPOS", 0.0f, false, false),
+  std::vector<TrackedFlight> rows = {makeRow("NOPOS", 0.0f, false, false),
                                    makeRow("TAXI", 2.0f, true), makeRow("AIR", 20.0f, false)};
   sortRowsForDisplay(rows);
   TEST_ASSERT_EQUAL_STRING("AIR", rows[0].aircraft.callsign.c_str());
@@ -95,7 +95,7 @@ static void test_display_order_puts_positionless_last(void) {
 }
 
 static void test_display_order_all_on_ground_still_nearest_first(void) {
-  std::vector<AircraftRow> rows = {makeRow("B", 4.0f, true), makeRow("A", 1.0f, true)};
+  std::vector<TrackedFlight> rows = {makeRow("B", 4.0f, true), makeRow("A", 1.0f, true)};
   sortRowsForDisplay(rows);
   TEST_ASSERT_EQUAL_STRING("A", rows[0].aircraft.callsign.c_str());
 }
@@ -103,12 +103,12 @@ static void test_display_order_all_on_ground_still_nearest_first(void) {
 // ---- splitFeaturedAndRest ---------------------------------------------------
 
 static void test_split_featured_and_rest_multiple_rows(void) {
-  AircraftRow closest, second, third;
+  TrackedFlight closest, second, third;
   closest.aircraft.icao24 = "closest";
   second.aircraft.icao24 = "second";
   third.aircraft.icao24 = "third";
 
-  std::vector<AircraftRow> rows = {closest, second, third};  // already sorted
+  std::vector<TrackedFlight> rows = {closest, second, third};  // already sorted
   FeaturedSplit split = splitFeaturedAndRest(rows);
 
   TEST_ASSERT_TRUE(split.hasFeatured);
@@ -119,10 +119,10 @@ static void test_split_featured_and_rest_multiple_rows(void) {
 }
 
 static void test_split_featured_and_rest_single_row(void) {
-  AircraftRow only;
+  TrackedFlight only;
   only.aircraft.icao24 = "only";
 
-  std::vector<AircraftRow> rows = {only};
+  std::vector<TrackedFlight> rows = {only};
   FeaturedSplit split = splitFeaturedAndRest(rows);
 
   TEST_ASSERT_TRUE(split.hasFeatured);
@@ -131,7 +131,7 @@ static void test_split_featured_and_rest_single_row(void) {
 }
 
 static void test_split_featured_and_rest_empty(void) {
-  std::vector<AircraftRow> rows;
+  std::vector<TrackedFlight> rows;
   FeaturedSplit split = splitFeaturedAndRest(rows);
 
   TEST_ASSERT_FALSE(split.hasFeatured);

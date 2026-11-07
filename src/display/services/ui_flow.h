@@ -17,7 +17,7 @@
 #include <vector>
 
 #include "airspace/core/feed_health.h"     // FeedHealth
-#include "airspace/core/tracked_flight.h"  // AircraftRow
+#include "airspace/core/tracked_flight.h"  // TrackedFlight
 #include "display/core/i18n.h"             // Language
 #include "display/core/redraw_policy.h"    // RedrawEvents
 #include "display/core/screen_nav.h"       // kScreen*, ScreenChangeCause, alertBadgeHit()
@@ -28,7 +28,7 @@
 // ---- What the screens show -------------------------------------------------------
 
 // The rows of net_task's last good poll; empty before the first one.
-const std::vector<AircraftRow> &netRows(const NetState &s);
+const std::vector<TrackedFlight> &netRows(const NetState &s);
 
 // The NOW aircraft's CPA extrapolated from its poll to `nowMs` (cpa_predictor
 // owns the math — docs/review-notes-2026.md 3.4); not found before the first poll.
@@ -39,7 +39,7 @@ CpaPrediction netCpaAt(const NetState &s, uint32_t nowMs);
 struct UiView {
   int screen = kScreenFlights;
   int page = 0;
-  const std::vector<AircraftRow> *rows = nullptr;
+  const std::vector<TrackedFlight> *rows = nullptr;
   bool hasData = false;   // a poll has come in
   int nowRowIndex = -1;   // the NOW aircraft in rows, -1 = none
   CpaPrediction cpa;      // netCpaAt()
@@ -90,7 +90,7 @@ TapAction routeTap(int16_t x, int16_t y, const TapContext &c);
 TapContext tapContextOf(const UiView &v, int16_t screenW, int16_t screenH, Language lang);
 
 // Pages of the table below the featured row (splitFeaturedAndRest()).
-int tablePageCount(const std::vector<AircraftRow> &rows);
+int tablePageCount(const std::vector<TrackedFlight> &rows);
 
 // The Flights table's page.
 class TablePager {

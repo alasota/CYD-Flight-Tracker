@@ -8,7 +8,7 @@ constexpr int16_t kLineHeight = 20;
 constexpr int16_t kIconGap = 6;  // min space between identity text and phase icon
 }  // namespace
 
-void drawIdentityLine(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, int16_t rightX) {
+void drawIdentityLine(LGFX &gfx, const TrackedFlight &row, int16_t x, int16_t y, int16_t rightX) {
   gfx.setFont(LCARS_FONT_BODY);
 
   // Phase icon first: a small aircraft pinned to the right edge, vertically
@@ -31,7 +31,7 @@ void drawIdentityLine(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, i
   gfx.drawString(summaryFlight(row).c_str(), x, y);
 }
 
-void drawAircraftSummary(LGFX &gfx, const AircraftRow &row, int16_t x, int16_t y, int16_t w,
+void drawAircraftSummary(LGFX &gfx, const TrackedFlight &row, int16_t x, int16_t y, int16_t w,
                          int16_t h) {
   (void)h;
 

@@ -1,5 +1,5 @@
 // tracked_flight — one aircraft in range as every screen shows it
-// (AircraftRow): its state joined with the hexdb.io airline / type and
+// (TrackedFlight): its state joined with the hexdb.io airline / type and
 // route, plus the distance and bearing from home and the flight phase
 // (docs/screens.md "Screen 1 — Flights"). poll_pipeline builds the list;
 // the screens only draw it.
@@ -22,7 +22,7 @@
 // structs kept as-is, no duplicated fields — plus the distance/bearing
 // from home (annotateDistances()) and the classified flight phase
 // (classifyPhases()) once those have run.
-struct AircraftRow {
+struct TrackedFlight {
   Aircraft aircraft;
   AircraftInfo info;
   RouteInfo route;
@@ -48,16 +48,16 @@ struct AircraftRow {
   // Copy, move and destructor are defined (= default) in tracked_flight.cpp,
   // not inline: a row holds many strings, and inlining its copy at every
   // call site in every translation unit costs ~1 KB of flash.
-  AircraftRow() = default;
-  AircraftRow(const AircraftRow &other);
-  AircraftRow(AircraftRow &&other) noexcept;
-  AircraftRow &operator=(const AircraftRow &other);
-  AircraftRow &operator=(AircraftRow &&other) noexcept;
-  ~AircraftRow();
+  TrackedFlight() = default;
+  TrackedFlight(const TrackedFlight &other);
+  TrackedFlight(TrackedFlight &&other) noexcept;
+  TrackedFlight &operator=(const TrackedFlight &other);
+  TrackedFlight &operator=(TrackedFlight &&other) noexcept;
+  ~TrackedFlight();
 };
 
 // Joins the aircraft states with their hexdb.io aircraft lookups (by
-// icao24) and route lookups (by callsign), producing the AircraftRow list
+// icao24) and route lookups (by callsign), producing the TrackedFlight list
 // every screen draws — the "connect Aircraft + AircraftInfo + RouteInfo"
 // step (CLAUDE.md "Code conventions"). A key
 // with no entry in the corresponding map (lookup still pending, or
@@ -68,7 +68,7 @@ struct AircraftRow {
 // are NOT computed here — call annotateDistances() then classifyPhases()
 // (then sortRowsByDistance()) on the result afterward. Pure — no HTTP call
 // happens here, just the join — tested under `pio test -e native`.
-std::vector<AircraftRow> buildEnrichedRecords(
+std::vector<TrackedFlight> buildEnrichedRecords(
     const std::vector<Aircraft> &aircraft, const std::map<std::string, AircraftInfo> &infoByIcao24,
     const std::map<std::string, RouteInfo> &routeByCallsign);
 
@@ -78,7 +78,7 @@ std::vector<AircraftRow> buildEnrichedRecords(
 // compute) and are left at distance_km=0/bearing_deg=0. Call this once
 // before classifyPhases()/sortRowsByDistance()/drawTablePage() — all read
 // the annotated fields rather than recomputing per call.
-void annotateDistances(std::vector<AircraftRow> &rows, float home_lat, float home_lon);
+void annotateDistances(std::vector<TrackedFlight> &rows, float home_lat, float home_lon);
 
 // Fills row.phase on every row via flight_phase's classifyPhase(), using
 // each row's own (already annotated) distance_km as the "distance to
@@ -87,5 +87,5 @@ void annotateDistances(std::vector<AircraftRow> &rows, float home_lat, float hom
 // what's actually available; see docs/screens.md "Flight phase". Rows with
 // has_distance == false get Phase::NONE (nothing meaningful to classify)
 // rather than a misleading guess. Call after annotateDistances().
-void classifyPhases(std::vector<AircraftRow> &rows, float near_airport_km,
+void classifyPhases(std::vector<TrackedFlight> &rows, float near_airport_km,
                      float climb_threshold_mps);

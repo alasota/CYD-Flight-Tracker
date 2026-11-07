@@ -10,7 +10,7 @@
 // Screen 3's narrower panel wants bare codes ("WAW -> FCO"). That's a
 // RouteFormat parameter, not three separate functions.
 //
-// Zero networking code — draws from an already-enriched AircraftRow plus
+// Zero networking code — draws from an already-enriched TrackedFlight plus
 // the two AirportInfo results for its route endpoints (looked up
 // elsewhere, exactly as featured_panel already receives them). The texts are
 // pure; the LovyanGFX drawing is display/adapters/lgfx/aircraft_summary_draw.
@@ -18,7 +18,7 @@
 
 #include <string>
 
-#include "airspace/core/tracked_flight.h"   // AircraftRow
+#include "airspace/core/tracked_flight.h"   // TrackedFlight
 #include "display/core/i18n.h"               // Language
 #include "display/core/text/fit_to_width.h"  // TextMeasure, fitToWidth()
 #include "enrichment/core/route_lookup.h"  // RouteInfo, AirportInfo
@@ -40,9 +40,9 @@ constexpr const char *kUnknownText = "--";
 // Individual identity fields. Airline/type show "..." while the aircraft
 // lookup is pending (row.info_pending), "--" when it resolved without that
 // field — same "show the row anyway" rule the rest of the UI uses.
-std::string summaryFlight(const AircraftRow &row);   // callsign
-std::string summaryAirline(const AircraftRow &row);  // RegisteredOwners
-std::string summaryType(const AircraftRow &row);     // aircraft type
+std::string summaryFlight(const TrackedFlight &row);   // callsign
+std::string summaryAirline(const TrackedFlight &row);  // RegisteredOwners
+std::string summaryType(const TrackedFlight &row);     // aircraft type
 
 // The one-line identity "<flight>  <airline>  <type>" used by Screen 1's
 // featured panel and Screen 2 (Screen 3 draws the fields on separate rows
@@ -56,7 +56,7 @@ std::string summaryType(const AircraftRow &row);     // aircraft type
 //   4. type cut to the remaining width, or dropped;
 //   5. "<flight>" alone — the callsign is never truncated, even if it
 //      alone overflows.
-std::string fitSummaryIdentity(const AircraftRow &row, int maxPx, const TextMeasure &measure);
+std::string fitSummaryIdentity(const TrackedFlight &row, int maxPx, const TextMeasure &measure);
 
 // "<origin> -> <dest>", each end formatted per `fmt`:
 //   WithCountry: "<IATA> (<country>)", e.g. "WAW (PL)"
@@ -72,23 +72,23 @@ std::string formatSummaryRoute(const RouteInfo &route, const AirportInfo &origin
 // airport is known; "..." while the route or that airport is still loading;
 // the ICAO code if hexdb.io has no airport record (better than nothing);
 // "--" when the flight has no known route.
-std::string rowAirportCode(const AircraftRow &row, bool origin);
+std::string rowAirportCode(const TrackedFlight &row, bool origin);
 
 // The route line for `row` using its own airports (row.origin_airport /
 // dest_airport) — "WAW (PL) -> FCO (IT)" / "WAW -> FCO"; "..." while the
 // route is loading, "--" when there is none; a still-loading endpoint shows
 // as "...".
-std::string formatRowRoute(const AircraftRow &row, RouteFormat fmt);
+std::string formatRowRoute(const TrackedFlight &row, RouteFormat fmt);
 
 // One route endpoint of `row` as a readable place name in `lang`
 // (place_names::placeName(): "Warszawa", "Londyn", "Rome-Fiumicino"...);
 // "..." while loading, "--" without a route.
-std::string rowPlaceName(const AircraftRow &row, bool origin, Language lang);
+std::string rowPlaceName(const TrackedFlight &row, bool origin, Language lang);
 
 // The detail views' route line with city names, fitted to `maxPx`:
 //   1. "Warszawa (PL) -> Rzym (IT)"  if it fits;
 //   2. "Warszawa -> Rzym"            (country codes dropped);
 //   3. both names cut to half the remaining width each.
 // "..." / "--" for a loading / missing route, "..." for a loading endpoint.
-std::string formatRowRouteCities(const AircraftRow &row, Language lang, int maxPx,
+std::string formatRowRouteCities(const TrackedFlight &row, Language lang, int maxPx,
                                  const TextMeasure &measure);

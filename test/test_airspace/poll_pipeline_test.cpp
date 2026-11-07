@@ -60,7 +60,7 @@ static void test_cache_only_makes_no_requests_and_marks_pending(void) {
       buildAirspaceSnapshot(sky(), cacheOnly(params(2, 3)), stubPorts(), 0);
   TEST_ASSERT_EQUAL_size_t(0, calls.size());
   TEST_ASSERT_EQUAL_UINT32(0, s.fetches);
-  for (const AircraftRow &r : s.rows) {
+  for (const TrackedFlight &r : s.rows) {
     TEST_ASSERT_TRUE(r.info_pending);
     TEST_ASSERT_TRUE(r.route_pending);
   }
@@ -72,7 +72,7 @@ static void test_cache_hits_are_used_in_phase_a(void) {
   knownAirports.insert("EPWA");
   const AirspaceSnapshot s = buildAirspaceSnapshot(sky(), cacheOnly(params(2, 3)), stubPorts(), 0);
   TEST_ASSERT_EQUAL_UINT32(0, s.fetches);  // all three answered from "cache"
-  const AircraftRow &far = s.rows[1];
+  const TrackedFlight &far = s.rows[1];
   TEST_ASSERT_FALSE(far.info_pending);
   TEST_ASSERT_EQUAL_STRING("Airline far001", far.info.airline.c_str());
   TEST_ASSERT_TRUE(far.route.found);
@@ -245,7 +245,7 @@ static void test_caches_stay_bounded_over_200_polls(void) {
     const AirspaceSnapshot a = buildAirspaceSnapshot(now, cacheOnly(full), ports, 0);
     TEST_ASSERT_EQUAL_UINT32(0, a.fetches);
     const AirspaceSnapshot b = buildAirspaceSnapshot(now, full, ports, 0);
-    for (const AircraftRow &row : b.rows) {
+    for (const TrackedFlight &row : b.rows) {
       TEST_ASSERT_FALSE(row.info_pending);
       TEST_ASSERT_FALSE(row.route_pending);
     }
@@ -314,8 +314,8 @@ static bool isCachedCall(const std::string &call) {
   return false;
 }
 
-static const AircraftRow &rowOf(const AirspaceSnapshot &s, const char *icao24) {
-  for (const AircraftRow &r : s.rows) {
+static const TrackedFlight &rowOf(const AirspaceSnapshot &s, const char *icao24) {
+  for (const TrackedFlight &r : s.rows) {
     if (r.aircraft.icao24 == icao24) return r;
   }
   TEST_FAIL_MESSAGE((std::string("no row for ") + icao24).c_str());
@@ -367,8 +367,8 @@ static void test_between_fetches_optional(void) {
                                              "ap:EPWA",   "ap:LIRF",   "ap:EGLL"};
   TEST_ASSERT_EQUAL_size_t(expected.size(), calls.size());
   for (size_t i = 0; i < expected.size(); ++i) ASSERT_STR_EQ(expected[i], calls[i]);
-  const AircraftRow &a = rowOf(s, "aaa001");
-  const AircraftRow &b = rowOf(s, "bbb002");
+  const TrackedFlight &a = rowOf(s, "aaa001");
+  const TrackedFlight &b = rowOf(s, "bbb002");
   ASSERT_STR_EQ("Airline aaa001", a.info.airline);
   ASSERT_STR_EQ("WAW", a.origin_airport.iata_code);
   ASSERT_STR_EQ("FCO", a.dest_airport.iata_code);
@@ -404,9 +404,9 @@ static void test_between_fetches_stop_ends_phase_b_with_partial_snapshot(void) {
   TEST_ASSERT_EQUAL_UINT32(2, s.fetches);
 
   // Fetched data is in, the rest is pending ("..."), not unknown ("--").
-  const AircraftRow &a = rowOf(s, "aaa001");
-  const AircraftRow &b = rowOf(s, "bbb002");
-  const AircraftRow &c = rowOf(s, "ccc003");
+  const TrackedFlight &a = rowOf(s, "aaa001");
+  const TrackedFlight &b = rowOf(s, "bbb002");
+  const TrackedFlight &c = rowOf(s, "ccc003");
   ASSERT_STR_EQ("Airline aaa001", a.info.airline);
   ASSERT_STR_EQ("Airline bbb002", b.info.airline);
   TEST_ASSERT_FALSE(a.info_pending);
@@ -496,7 +496,7 @@ static void test_between_fetches_stop_in_airport_stage_keeps_fetched_info(void) 
   TEST_ASSERT_EQUAL_UINT32(5, s.fetches);
   TEST_ASSERT_EQUAL_INT(5, hookCalls);
   for (const char *hex : {"aaa001", "bbb002"}) {
-    const AircraftRow &r = rowOf(s, hex);
+    const TrackedFlight &r = rowOf(s, hex);
     TEST_ASSERT_FALSE(r.info_pending);
     TEST_ASSERT_FALSE(r.route_pending);
     TEST_ASSERT_TRUE(r.route.found);
