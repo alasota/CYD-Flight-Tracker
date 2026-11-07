@@ -336,6 +336,24 @@ STAGE_6_NVS_KEYS = {
     "nt_pct": "UChar", "nt_wake": "UShort", "nt_poll": "Bool",
 }
 
+# Stage 6: the Config field each NVS key loads into and saves from (settings_nvs.cpp). The keys
+# kept their pre-stage-6 meaning: `lang` is the display's language, `wlang` the page's.
+STAGE_6_NVS_FIELDS = {
+    "home_lat": "home.lat", "home_lon": "home.lon", "radius_deg": "home.radius_deg",
+    "poll_s": "poll.interval_s", "os_id": "opensky.client_id",
+    "os_secret": "opensky.client_secret", "last_screen": "display.last_screen",
+    "auto_cyc": "auto_cycle.enabled", "auto_cyc_s": "auto_cycle.interval_s",
+    "near_km": "phase.near_airport_km", "climb_mps": "phase.climb_rate_threshold_mps",
+    "home_cfg": "home.configured", "lang": "display.language", "wlang": "web.language",
+    "wpass": "web.password", "updchk": "update.check_enabled",
+    "updpre": "update.show_prerelease", "updskip": "update.skipped_tag",
+    "bl_auto": "backlight.brightness_auto", "bl_fix": "backlight.brightness_fixed_pct",
+    "bl_min": "backlight.brightness_min_pct", "bl_max": "backlight.brightness_max_pct",
+    "nt_mode": "backlight.night_mode", "nt_from": "backlight.night_from_min",
+    "nt_to": "backlight.night_to_min", "nt_pct": "backlight.night_pct",
+    "nt_wake": "backlight.night_wake_s", "nt_poll": "backlight.night_pause_polling",
+}
+
 # Stage 6: (header from src/, function or struct, its settings parameters / members) -- the
 # .feature's Examples. A struct row lists "<type> <member>".
 STAGE_6_SIGNATURES = [
@@ -1238,6 +1256,32 @@ class LayoutTest(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertEqual({("get", type_), ("put", type_)}, seen[key])
 
+    # Edge case (review finding 2): the keys and types alone don't see a same-type swap
+    # (`lang` <-> `wlang`, `bl_min` <-> `bl_max`, `nt_from` <-> `nt_to`) in loadConfig() or
+    # saveConfig(), and settings_nvs.cpp has no native test. Each key loads into (`cfg.X.y =
+    # ... prefs.get...("key"`) and saves from (`prefs.put...("key", ... sanitized.X.y`) the
+    # field the table pins.
+    def test_settings_nvs_keys_load_into_and_save_from_their_field(self):
+        self.assertEqual(sorted(STAGE_6_NVS_KEYS), sorted(STAGE_6_NVS_FIELDS))
+        code = strip_comments((ROOT / "src" / "admin" / "adapters" / "settings_nvs.cpp")
+                              .read_text(encoding="utf-8", errors="replace"))
+        load = definition_body(code, "Config loadConfig()")
+        save = definition_body(code, "void saveConfig(const Config &cfg)")
+        loaded, saved = {}, {}
+        for statement in load.split(";"):
+            for key in re.findall(r'\bprefs\.get\w+\(\s*"(\w+)"', statement):
+                loaded.setdefault(key, []).extend(
+                    re.findall(r"\bcfg\.(\w+\.\w+)\s*=(?!=)", statement))
+        for statement in save.split(";"):
+            for key in re.findall(r'\bprefs\.put\w+\(\s*"(\w+)"', statement):
+                saved.setdefault(key, []).extend(re.findall(r"\bsanitized\.(\w+\.\w+)", statement))
+        self.assertEqual(sorted(STAGE_6_NVS_FIELDS), sorted(loaded), "keys loadConfig() reads")
+        self.assertEqual(sorted(STAGE_6_NVS_FIELDS), sorted(saved), "keys saveConfig() writes")
+        for key, field in STAGE_6_NVS_FIELDS.items():
+            with self.subTest(key=key):
+                self.assertEqual([field], loaded[key], f"the field loadConfig() fills from {key}")
+                self.assertEqual([field], saved[key], f"the field saveConfig() writes to {key}")
+
     # Scenario: Poza admin/ ustawienia dołączają tylko core_link i korzenie kompozycji
     # (§10 pkt 4)
     def test_only_admin_roots_and_core_link_include_settings(self):
@@ -1363,6 +1407,19 @@ def function_body(text, name):
         i += 1
     return code[m.end():i - 1]
 
+
+
+def definition_body(code, signature):
+    """The body (between its braces) of the definition that starts with `signature` (exact
+    text, e.g. "Config loadConfig()") at the start of a line of `code`; fails if there's none."""
+    m = re.search(r"(?m)^" + re.escape(signature) + r"\s*\{", code)
+    if m is None:
+        raise AssertionError(f"no definition {signature} {{")
+    depth, i = 1, m.end()
+    while i < len(code) and depth:
+        depth += {"{": 1, "}": -1}.get(code[i], 0)
+        i += 1
+    return code[m.end():i - 1]
 
 # Words that can stand before `name(` without it declaring `name`: statements, and `explicit` (a
 # constructor of the class, already declared by its `class name {` line).
