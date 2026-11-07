@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "airspace/core/aircraft_state.h"     // Aircraft
+#include "airspace/core/aircraft_state.h"     // AircraftState
 #include "airspace/core/flight_phase.h"       // Phase
 #include "enrichment/core/aircraft_lookup.h"  // AircraftInfo
 #include "enrichment/core/route_lookup.h"     // RouteInfo, AirportInfo
@@ -23,7 +23,7 @@
 // from home (annotateDistances()) and the classified flight phase
 // (classifyPhases()) once those have run.
 struct TrackedFlight {
-  Aircraft aircraft;
+  AircraftState aircraft;
   AircraftInfo info;
   RouteInfo route;
   Phase phase = Phase::NONE;
@@ -58,7 +58,7 @@ struct TrackedFlight {
 
 // Joins the aircraft states with their hexdb.io aircraft lookups (by
 // icao24) and route lookups (by callsign), producing the TrackedFlight list
-// every screen draws — the "connect Aircraft + AircraftInfo + RouteInfo"
+// every screen draws — the "connect AircraftState + AircraftInfo + RouteInfo"
 // step (CLAUDE.md "Code conventions"). A key
 // with no entry in the corresponding map (lookup still pending, or
 // poll_pipeline simply never ran it for that row) produces a
@@ -69,12 +69,13 @@ struct TrackedFlight {
 // (then sortRowsByDistance()) on the result afterward. Pure — no HTTP call
 // happens here, just the join — tested under `pio test -e native`.
 std::vector<TrackedFlight> buildEnrichedRecords(
-    const std::vector<Aircraft> &aircraft, const std::map<std::string, AircraftInfo> &infoByIcao24,
+    const std::vector<AircraftState> &aircraft,
+    const std::map<std::string, AircraftInfo> &infoByIcao24,
     const std::map<std::string, RouteInfo> &routeByCallsign);
 
 // Fills distance_km/bearing_deg/has_distance on every row in `rows` from
 // (home_lat, home_lon) via shared/geo's computeDistanceBearing(). Rows whose
-// Aircraft::has_position is false get has_distance=false (nothing to
+// AircraftState::has_position is false get has_distance=false (nothing to
 // compute) and are left at distance_km=0/bearing_deg=0. Call this once
 // before classifyPhases()/sortRowsByDistance()/drawTablePage() — all read
 // the annotated fields rather than recomputing per call.

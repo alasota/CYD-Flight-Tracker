@@ -9,7 +9,7 @@
 
 #include <string>
 
-struct Aircraft {
+struct AircraftState {
   std::string icao24;
   std::string callsign;
   float lat = 0.0f;
@@ -34,6 +34,6 @@ constexpr float kTaxiSpeedMps = 15.0f;
 // on_ground=false and no altitude / no or crawling speed — so: flagged, or
 // moving slower than kTaxiSpeedMps, or with neither altitude nor speed.
 // opensky_client's parseStatesResponse() folds this into
-// Aircraft::on_ground, so every screen (featured slot, phase, Screen 2 pick)
+// AircraftState::on_ground, so every screen (featured slot, phase, Screen 2 pick)
 // agrees. Pure — native-tested.
-bool inferOnGround(const Aircraft &ac);
+bool inferOnGround(const AircraftState &ac);

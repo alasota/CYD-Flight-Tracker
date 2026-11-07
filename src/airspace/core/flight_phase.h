@@ -5,7 +5,7 @@
 // this project's other pure-logic modules (see CLAUDE.md "Testing").
 //
 // NOTE: not wired into the live data pipeline yet — opensky_client's
-// Aircraft struct doesn't carry a vertical_rate field (OpenSky's state
+// AircraftState struct doesn't carry a vertical_rate field (OpenSky's state
 // vector has one, index 11, but parseStatesResponse() doesn't extract it
 // today), and nothing yet supplies a "distance to nearest airport" value
 // (route_lookup/airport_lookup give a country code, not coordinates).

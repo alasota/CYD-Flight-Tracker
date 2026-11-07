@@ -63,15 +63,15 @@ std::string trimTrailingSpaces(const std::string &s) {
 }
 }  // namespace
 
-std::vector<Aircraft> extractAircraftFromStates(JsonArrayConst states) {
-  std::vector<Aircraft> result;
+std::vector<AircraftState> extractAircraftFromStates(JsonArrayConst states) {
+  std::vector<AircraftState> result;
   for (JsonArrayConst state : states) {
     // Indices per OpenSky's /states/all state vector: 0 icao24, 1 callsign,
     // 5 longitude, 6 latitude, 7 baro_altitude, 8 on_ground, 9 velocity,
     // 10 true_track, 11 vertical_rate.
     if (state.size() < 12) continue;
 
-    Aircraft ac;
+    AircraftState ac;
     if (!state[0].isNull()) ac.icao24 = state[0].as<std::string>();
     if (!state[1].isNull()) ac.callsign = trimTrailingSpaces(state[1].as<std::string>());
     if (!state[5].isNull() && !state[6].isNull()) {
@@ -97,7 +97,7 @@ std::vector<Aircraft> extractAircraftFromStates(JsonArrayConst states) {
   return result;
 }
 
-std::vector<Aircraft> parseStatesResponse(const std::string &json) {
+std::vector<AircraftState> parseStatesResponse(const std::string &json) {
   if (json.size() > kMaxStatesResponseBytes) {
     return {};  // refuse to even attempt parsing an unexpectedly huge body
   }

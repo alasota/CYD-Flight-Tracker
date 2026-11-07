@@ -1,7 +1,7 @@
 // opensky_client — OpenSky Network REST API client: OAuth2 token fetch/
 // refresh, bounding-box math, /states/all polling + parsing. See docs/data-sources.md
 // "OpenSky". No TFT/drawing code here (see
-// CLAUDE.md "Code conventions") — returns a plain Aircraft list for
+// CLAUDE.md "Code conventions") — returns a plain AircraftState list for
 // whatever view module ends up consuming it.
 #pragma once
 
@@ -11,7 +11,7 @@
 
 #include <ArduinoJson.h>
 
-#include "airspace/core/aircraft_state.h"  // Aircraft — what parseStatesResponse() returns
+#include "airspace/core/aircraft_state.h"  // AircraftState — what parseStatesResponse() returns
 #include "airspace/core/home.h"            // Home — the bounding box's centre and radius
 #include "opensky/core/opensky_auth.h"   // OpenSkyAuthState — openSkyAuthStatus()
 #include "opensky/core/opensky_quota.h"  // OpenSkyQuota — openSkyQuota()
@@ -84,7 +84,7 @@ bool shouldUseOAuth(const std::string &client_id, const std::string &client_secr
 // (see docs/review-notes-2026.md 4.3).
 constexpr size_t kMaxStatesResponseBytes = 65536;  // 64 KB
 
-// Parses a /states/all JSON response body into an Aircraft list. Tolerant
+// Parses a /states/all JSON response body into an AircraftState list. Tolerant
 // of a missing/null "states" array (-> empty result), of state vectors
 // shorter than expected (-> skipped), and of null individual fields within
 // a state vector (left at the struct's defaults). Callsigns are
@@ -92,13 +92,13 @@ constexpr size_t kMaxStatesResponseBytes = 65536;  // 64 KB
 // state vector's index 8 folded through inferOnGround(); vertical_rate is
 // index 11. A body larger than kMaxStatesResponseBytes is rejected outright
 // (-> empty result) without being parsed. Pure — uses ArduinoJson but no HTTP dependency.
-std::vector<Aircraft> parseStatesResponse(const std::string &json);
+std::vector<AircraftState> parseStatesResponse(const std::string &json);
 
 // The field mapping behind parseStatesResponse(): OpenSky's "states" array (an
-// array of state vectors) -> Aircraft records, same rules as above. The device
+// array of state vectors) -> AircraftState records, same rules as above. The device
 // parses /states/all from the HTTP stream and calls this on doc["states"], so
 // the mapping lives in exactly one place. Pure.
-std::vector<Aircraft> extractAircraftFromStates(JsonArrayConst states);
+std::vector<AircraftState> extractAircraftFromStates(JsonArrayConst states);
 
 // Backoff duration after a 429, per docs/data-sources.md "Rate limits": the
 // X-Rate-Limit-Retry-After-Seconds header value if present and a valid
@@ -128,8 +128,8 @@ enum class OpenSkyPollStatus {
 
 struct OpenSkyPollResult {
   OpenSkyPollStatus status = OpenSkyPollStatus::NotDue;
-  std::vector<Aircraft> aircraft;      // meaningful only when status == Ok
-  uint32_t retry_after_s = 0;          // set when status == RateLimited
+  std::vector<AircraftState> aircraft;  // meaningful only when status == Ok
+  uint32_t retry_after_s = 0;           // set when status == RateLimited
 };
 
 // --- Hardware adapter: OAuth token fetch, /states/all HTTP call, 401 retry

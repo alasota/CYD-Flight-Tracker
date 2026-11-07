@@ -9,12 +9,13 @@ TrackedFlight &TrackedFlight::operator=(TrackedFlight &&other) noexcept = defaul
 TrackedFlight::~TrackedFlight() = default;
 
 std::vector<TrackedFlight> buildEnrichedRecords(
-    const std::vector<Aircraft> &aircraft, const std::map<std::string, AircraftInfo> &infoByIcao24,
+    const std::vector<AircraftState> &aircraft,
+    const std::map<std::string, AircraftInfo> &infoByIcao24,
     const std::map<std::string, RouteInfo> &routeByCallsign) {
   std::vector<TrackedFlight> rows;
   rows.reserve(aircraft.size());
 
-  for (const Aircraft &ac : aircraft) {
+  for (const AircraftState &ac : aircraft) {
     TrackedFlight row;
     row.aircraft = ac;
 

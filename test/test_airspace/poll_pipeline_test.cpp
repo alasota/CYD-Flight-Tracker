@@ -25,11 +25,11 @@ static constexpr float kHomeLat = 52.0f;
 static constexpr float kHomeLon = 21.0f;
 
 // near airborne, far airborne, ground right next to home, no position
-static std::vector<Aircraft> sky() {
-  std::vector<Aircraft> v;
+static std::vector<AircraftState> sky() {
+  std::vector<AircraftState> v;
   v.push_back(makeAircraft("far001", "FAR1", 52.40f, 21.0f));
   v.push_back(makeAircraft("gnd001", "GND1", 52.002f, 21.0f, groundOpts()));
-  Aircraft np = makeAircraft("nopos1", "NOP1", 0.0f, 0.0f);
+  AircraftState np = makeAircraft("nopos1", "NOP1", 0.0f, 0.0f);
   np.has_position = false;
   v.push_back(np);
   v.push_back(makeAircraft("near01", "NEAR1", 52.05f, 21.0f));
@@ -219,8 +219,8 @@ static EnrichmentPort simPorts() {
 }
 
 // Aircraft #first .. #first+count-1, spread a few km around home.
-static std::vector<Aircraft> rotatingSky(int first, int count) {
-  std::vector<Aircraft> v;
+static std::vector<AircraftState> rotatingSky(int first, int count) {
+  std::vector<AircraftState> v;
   for (int i = first; i < first + count; ++i) {
     char hex[16], cs[16];  // room for any int: gcc 13 -Wformat-truncation (CI)
     std::snprintf(hex, sizeof(hex), "a%05d", i);
@@ -241,7 +241,7 @@ static void test_caches_stay_bounded_over_200_polls(void) {
   // 30 aircraft in range, 5 of them new on every poll: ~1000 aircraft in all,
   // ten times the RAM cache.
   for (int poll = 0; poll < 200; ++poll) {
-    const std::vector<Aircraft> now = rotatingSky(poll * 5, 30);
+    const std::vector<AircraftState> now = rotatingSky(poll * 5, 30);
     const AirspaceSnapshot a = buildAirspaceSnapshot(now, cacheOnly(full), ports, 0);
     TEST_ASSERT_EQUAL_UINT32(0, a.fetches);
     const AirspaceSnapshot b = buildAirspaceSnapshot(now, full, ports, 0);
@@ -274,7 +274,7 @@ static void test_caches_stay_bounded_over_200_polls(void) {
 
 // Two airborne aircraft, nothing cached: 2 aircraft + 2 routes + 3 airports
 // (AAA1 EPWA-LIRF, BBB2 EPWA-EGLL) = 7 hexdb.io requests in phase B.
-static std::vector<Aircraft> twoNewAircraft() {
+static std::vector<AircraftState> twoNewAircraft() {
   return {makeAircraft("aaa001", "AAA1", 52.05f, 21.0f),
           makeAircraft("bbb002", "BBB2", 52.10f, 21.0f)};
 }
@@ -379,7 +379,7 @@ static void test_between_fetches_optional(void) {
 // Hak każe przerwać — faza B kończy się bez dalszych zapytań, z częściowym snapshotem
 static void test_between_fetches_stop_ends_phase_b_with_partial_snapshot(void) {
   // Two new aircraft plus one whose airframe, route and origin airport are cached.
-  std::vector<Aircraft> sky3 = twoNewAircraft();
+  std::vector<AircraftState> sky3 = twoNewAircraft();
   sky3.push_back(makeAircraft("ccc003", "CCC3", 52.20f, 21.0f));
   knownAircraft.insert("ccc003");
   knownRoutes.insert("CCC3");

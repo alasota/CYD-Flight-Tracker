@@ -132,11 +132,11 @@ static const char *kSampleStatesResponse = R"({
 })";
 
 static void test_parse_states_response_valid(void) {
-  std::vector<Aircraft> aircraft = parseStatesResponse(kSampleStatesResponse);
+  std::vector<AircraftState> aircraft = parseStatesResponse(kSampleStatesResponse);
 
   TEST_ASSERT_EQUAL_size_t(3, aircraft.size());
 
-  const Aircraft &a0 = aircraft[0];
+  const AircraftState &a0 = aircraft[0];
   TEST_ASSERT_EQUAL_STRING("3c6444", a0.icao24.c_str());
   TEST_ASSERT_EQUAL_STRING("DLH9LH", a0.callsign.c_str());  // trailing spaces trimmed
   TEST_ASSERT_TRUE(a0.has_position);
@@ -150,7 +150,7 @@ static void test_parse_states_response_valid(void) {
 
   // Null lat/lon (e.g. grounded, no position report yet) -> has_position
   // false, numeric fields left at their defaults where the source was null.
-  const Aircraft &a1 = aircraft[1];
+  const AircraftState &a1 = aircraft[1];
   TEST_ASSERT_EQUAL_STRING("a1b2c3", a1.icao24.c_str());
   TEST_ASSERT_EQUAL_STRING("UAL123", a1.callsign.c_str());
   TEST_ASSERT_FALSE(a1.has_position);
@@ -159,7 +159,7 @@ static void test_parse_states_response_valid(void) {
   TEST_ASSERT_TRUE(a1.on_ground);
   TEST_ASSERT_EQUAL_FLOAT(0.0f, a1.vertical_rate);  // null in the source -> default
 
-  const Aircraft &a2 = aircraft[2];
+  const AircraftState &a2 = aircraft[2];
   TEST_ASSERT_EQUAL_STRING("deadbe", a2.icao24.c_str());
   TEST_ASSERT_EQUAL_STRING("", a2.callsign.c_str());
   TEST_ASSERT_TRUE(a2.has_position);
@@ -183,17 +183,17 @@ static void test_extract_aircraft_from_states_matches_parse_states_response(void
 
   JsonDocument doc;
   ASSERT_STR_EQ("Ok", deserializeJson(doc, body).c_str());
-  const std::vector<Aircraft> streamed =
+  const std::vector<AircraftState> streamed =
       extractAircraftFromStates(doc["states"].as<JsonArrayConst>());
-  const std::vector<Aircraft> parsed = parseStatesResponse(body);
+  const std::vector<AircraftState> parsed = parseStatesResponse(body);
 
   TEST_ASSERT_EQUAL_size_t(2, streamed.size());
   TEST_ASSERT_EQUAL_size_t(parsed.size(), streamed.size());
   ASSERT_STR_EQ("SWR12", streamed[0].callsign);  // trailing spaces trimmed
   ASSERT_STR_EQ("LOT3TU", streamed[1].callsign);
   for (size_t i = 0; i < streamed.size(); ++i) {
-    const Aircraft &s = streamed[i];
-    const Aircraft &p = parsed[i];
+    const AircraftState &s = streamed[i];
+    const AircraftState &p = parsed[i];
     ASSERT_STR_EQ(p.icao24, s.icao24);
     ASSERT_STR_EQ(p.callsign, s.callsign);
     TEST_ASSERT_EQUAL(p.has_position, s.has_position);
@@ -221,35 +221,35 @@ static void test_parse_states_response_skips_vectors_missing_vertical_rate(void)
   // field at index 11 that this project now depends on. Previously the
   // minimum-length check was 11; it was bumped to 12 alongside adding
   // vertical_rate/on_ground extraction.
-  std::vector<Aircraft> aircraft = parseStatesResponse(
+  std::vector<AircraftState> aircraft = parseStatesResponse(
       R"({"states": [["3c6444","DLH9LH  ","Germany",0,0,6.1546,50.1210,9639.3,false,232.88,98.24]]})");
   TEST_ASSERT_TRUE(aircraft.empty());
 }
 
 static void test_parse_states_response_missing_states_key(void) {
-  std::vector<Aircraft> aircraft = parseStatesResponse(R"({"time": 1706550000})");
+  std::vector<AircraftState> aircraft = parseStatesResponse(R"({"time": 1706550000})");
   TEST_ASSERT_TRUE(aircraft.empty());
 }
 
 static void test_parse_states_response_null_states(void) {
-  std::vector<Aircraft> aircraft =
+  std::vector<AircraftState> aircraft =
       parseStatesResponse(R"({"time": 1706550000, "states": null})");
   TEST_ASSERT_TRUE(aircraft.empty());
 }
 
 static void test_parse_states_response_empty_states(void) {
-  std::vector<Aircraft> aircraft =
+  std::vector<AircraftState> aircraft =
       parseStatesResponse(R"({"time": 1706550000, "states": []})");
   TEST_ASSERT_TRUE(aircraft.empty());
 }
 
 static void test_parse_states_response_malformed_json(void) {
-  std::vector<Aircraft> aircraft = parseStatesResponse("not json at all");
+  std::vector<AircraftState> aircraft = parseStatesResponse("not json at all");
   TEST_ASSERT_TRUE(aircraft.empty());
 }
 
 static void test_parse_states_response_skips_short_state_vectors(void) {
-  std::vector<Aircraft> aircraft =
+  std::vector<AircraftState> aircraft =
       parseStatesResponse(R"({"states": [["3c6444","DLH9LH  "]]})");
   TEST_ASSERT_TRUE(aircraft.empty());
 }
@@ -259,7 +259,7 @@ static void test_parse_states_response_rejects_oversized_body(void) {
   // valid JSON, the size check must reject it before any parsing is
   // attempted (see docs/review-notes-2026.md 4.3).
   std::string oversized(kMaxStatesResponseBytes + 1, 'x');
-  std::vector<Aircraft> aircraft = parseStatesResponse(oversized);
+  std::vector<AircraftState> aircraft = parseStatesResponse(oversized);
   TEST_ASSERT_TRUE(aircraft.empty());
 }
 
@@ -333,46 +333,46 @@ static void test_url_encode_escapes_special_chars(void) {
 // sometimes reported with on_ground=false but no altitude and no/slow speed;
 // trusting the flag put a parked LOT jet in the featured slot as "0m 0km/h".
 
-static Aircraft parseOne(const char *vector) {
+static AircraftState parseOne(const char *vector) {
   std::string json = std::string(R"({"time":1,"states":[)") + vector + "]}";
-  std::vector<Aircraft> a = parseStatesResponse(json);
+  std::vector<AircraftState> a = parseStatesResponse(json);
   TEST_ASSERT_EQUAL_size_t(1, a.size());
   return a[0];
 }
 
 static void test_missing_altitude_and_speed_are_flagged(void) {
-  Aircraft a = parseOne(
+  AircraftState a = parseOne(
       R"(["48ad86","LOT4JD  ","Poland",1,1,20.9555,52.1689,null,false,null,205.31,null,null,null,"1000",false,0])");
   TEST_ASSERT_FALSE(a.has_altitude);
   TEST_ASSERT_FALSE(a.has_velocity);
 }
 
 static void test_flag_false_but_no_altitude_and_no_speed_is_on_ground(void) {
-  Aircraft a = parseOne(
+  AircraftState a = parseOne(
       R"(["48ad86","LOT4JD  ","Poland",1,1,20.9555,52.1689,null,false,null,205.31,null,null,null,"1000",false,0])");
   TEST_ASSERT_TRUE(a.on_ground);
 }
 
 static void test_taxi_speed_without_altitude_is_on_ground(void) {
-  Aircraft a = parseOne(
+  AircraftState a = parseOne(
       R"(["48ad02","LOT5PG  ","Poland",1,1,20.9727,52.1652,null,false,9.77,84.38,null,null,null,"1000",false,0])");
   TEST_ASSERT_TRUE(a.on_ground);
 }
 
 static void test_real_airborne_traffic_stays_airborne(void) {
-  Aircraft climbing = parseOne(
+  AircraftState climbing = parseOne(
       R"(["4892c4","ENT4YG  ","Poland",1,1,20.7656,52.2221,762,false,84.98,113.93,-3.58,null,876.3,"6112",false,0])");
   TEST_ASSERT_FALSE(climbing.on_ground);
   TEST_ASSERT_TRUE(climbing.has_altitude);
   TEST_ASSERT_TRUE(climbing.has_velocity);
   // No barometric altitude, but flying fast -> still airborne.
-  Aircraft geoOnly = parseOne(
+  AircraftState geoOnly = parseOne(
       R"(["4892c5","ENT7BS  ","Poland",1,1,20.9238,52.0242,null,false,145.78,248.69,11.05,null,2026.92,"1000",false,0])");
   TEST_ASSERT_FALSE(geoOnly.on_ground);
 }
 
 static void test_reported_on_ground_stays_on_ground(void) {
-  Aircraft a = parseOne(
+  AircraftState a = parseOne(
       R"(["471e60","WZZ4NA  ","Hungary",1,1,20.9472,52.1714,null,true,3.34,73.12,null,null,null,"1761",false,0])");
   TEST_ASSERT_TRUE(a.on_ground);
 }
