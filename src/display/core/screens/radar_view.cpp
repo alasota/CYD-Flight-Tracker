@@ -45,7 +45,7 @@ RadarPoint headingTickEnd(int16_t x, int16_t y, float trackDeg, int16_t len) {
   return p;
 }
 
-std::string radarSummaryStats(const AircraftRow &row, Language lang) {
+std::string radarSummaryStats(const TrackedFlight &row, Language lang) {
   // Same values as the featured panel's chips: distance (with compass point)
   // first, then altitude — or "NA ZIEMI".
   const std::vector<std::string> p = featuredPillTexts(row, lang);

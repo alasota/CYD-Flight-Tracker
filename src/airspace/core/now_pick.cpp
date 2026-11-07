@@ -1,6 +1,6 @@
 #include "airspace/core/now_pick.h"
 
-NowPick pickNowAircraft(const std::vector<AircraftRow> &rows,
+NowPick pickNowAircraft(const std::vector<TrackedFlight> &rows,
                         const std::vector<CpaPrediction> &cpas, float overheadKm) {
   NowPick pick;
   if (rows.empty()) return pick;

@@ -146,7 +146,7 @@ static void test_page_label_fits_the_type_column_header(void) {
 }
 
 static void test_distance_text(void) {
-  AircraftRow row;
+  TrackedFlight row;
   TEST_ASSERT_EQUAL_STRING("--", tableDistanceText(row).c_str());  // no position
   row.has_distance = true;
   row.distance_km = 7.6f;
@@ -191,10 +191,10 @@ static void test_page_count_non_positive_rows_per_page(void) {
 
 // ---- getPageSlice -------------------------------------------------------------
 
-static std::vector<AircraftRow> makeNumberedRows(int count) {
-  std::vector<AircraftRow> rows;
+static std::vector<TrackedFlight> makeNumberedRows(int count) {
+  std::vector<TrackedFlight> rows;
   for (int i = 0; i < count; ++i) {
-    AircraftRow row;
+    TrackedFlight row;
     row.aircraft.icao24 = std::to_string(i);
     rows.push_back(row);
   }
@@ -202,8 +202,8 @@ static std::vector<AircraftRow> makeNumberedRows(int count) {
 }
 
 static void test_page_slice_first_page(void) {
-  std::vector<AircraftRow> rows = makeNumberedRows(25);
-  std::vector<AircraftRow> slice = getPageSlice(rows, 0, 10);
+  std::vector<TrackedFlight> rows = makeNumberedRows(25);
+  std::vector<TrackedFlight> slice = getPageSlice(rows, 0, 10);
 
   TEST_ASSERT_EQUAL_size_t(10, slice.size());
   TEST_ASSERT_EQUAL_STRING("0", slice.front().aircraft.icao24.c_str());
@@ -211,8 +211,8 @@ static void test_page_slice_first_page(void) {
 }
 
 static void test_page_slice_last_partial_page(void) {
-  std::vector<AircraftRow> rows = makeNumberedRows(25);
-  std::vector<AircraftRow> slice = getPageSlice(rows, 2, 10);  // page 2 = rows 20..24
+  std::vector<TrackedFlight> rows = makeNumberedRows(25);
+  std::vector<TrackedFlight> slice = getPageSlice(rows, 2, 10);  // page 2 = rows 20..24
 
   TEST_ASSERT_EQUAL_size_t(5, slice.size());
   TEST_ASSERT_EQUAL_STRING("20", slice.front().aircraft.icao24.c_str());
@@ -220,14 +220,14 @@ static void test_page_slice_last_partial_page(void) {
 }
 
 static void test_page_slice_out_of_range_page_is_empty(void) {
-  std::vector<AircraftRow> rows = makeNumberedRows(25);
+  std::vector<TrackedFlight> rows = makeNumberedRows(25);
 
   TEST_ASSERT_TRUE(getPageSlice(rows, 3, 10).empty());   // past the last page (0,1,2)
   TEST_ASSERT_TRUE(getPageSlice(rows, -1, 10).empty());  // negative page
 }
 
 static void test_page_slice_empty_input(void) {
-  std::vector<AircraftRow> rows;
+  std::vector<TrackedFlight> rows;
   TEST_ASSERT_TRUE(getPageSlice(rows, 0, 10).empty());
 }
 

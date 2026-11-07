@@ -2,14 +2,14 @@
 #include <unity.h>
 
 #include "display/core/screens/aircraft_summary.h"
-#include "airspace/core/tracked_flight.h"  // AircraftRow
+#include "airspace/core/tracked_flight.h"  // TrackedFlight
 #include "display/core/text/fit_to_width.h"  // TextMeasure
 #include "test_support.h"
 
 namespace {
 
-static AircraftRow makeRow() {
-  AircraftRow row;
+static TrackedFlight makeRow() {
+  TrackedFlight row;
   row.aircraft.callsign = "LOT281";
   row.info.found = true;
   row.info.airline = "LOT Polish Airlines";
@@ -32,21 +32,21 @@ static AirportInfo makeAirport(const char *iata, const char *cc) {
 // ---- field helpers + fallbacks ---------------------------------------
 
 static void test_fields_full_data(void) {
-  AircraftRow row = makeRow();
+  TrackedFlight row = makeRow();
   TEST_ASSERT_EQUAL_STRING("LOT281", summaryFlight(row).c_str());
   TEST_ASSERT_EQUAL_STRING("LOT Polish Airlines", summaryAirline(row).c_str());
   TEST_ASSERT_EQUAL_STRING("B738", summaryType(row).c_str());
 }
 
 static void test_fields_fall_back_to_dashes(void) {
-  AircraftRow row;  // empty callsign, info.found == false
+  TrackedFlight row;  // empty callsign, info.found == false
   TEST_ASSERT_EQUAL_STRING("--", summaryFlight(row).c_str());
   TEST_ASSERT_EQUAL_STRING("--", summaryAirline(row).c_str());
   TEST_ASSERT_EQUAL_STRING("--", summaryType(row).c_str());
 }
 
 static void test_airline_dashes_when_lookup_found_but_string_empty(void) {
-  AircraftRow row = makeRow();
+  TrackedFlight row = makeRow();
   row.info.airline = "";
   row.aircraft.callsign = "SPKAX";  // no airline prefix to fall back on
   TEST_ASSERT_EQUAL_STRING("--", summaryAirline(row).c_str());
@@ -57,14 +57,14 @@ static void test_airline_dashes_when_lookup_found_but_string_empty(void) {
 // ---- formatSummaryRoute: the two RouteFormat variants -----------------
 
 static void test_route_with_country(void) {
-  AircraftRow row = makeRow();
+  TrackedFlight row = makeRow();
   std::string s = formatSummaryRoute(row.route, makeAirport("WAW", "PL"), makeAirport("FCO", "IT"),
                                      RouteFormat::WithCountry);
   TEST_ASSERT_EQUAL_STRING("WAW (PL) -> FCO (IT)", s.c_str());
 }
 
 static void test_route_codes_only(void) {
-  AircraftRow row = makeRow();
+  TrackedFlight row = makeRow();
   std::string s = formatSummaryRoute(row.route, makeAirport("WAW", "PL"), makeAirport("FCO", "IT"),
                                      RouteFormat::CodesOnly);
   TEST_ASSERT_EQUAL_STRING("WAW -> FCO", s.c_str());
@@ -79,7 +79,7 @@ static void test_route_not_found_is_dashes_in_both_modes(void) {
 }
 
 static void test_route_falls_back_to_icao_when_airport_unresolved(void) {
-  AircraftRow row = makeRow();
+  TrackedFlight row = makeRow();
   // origin airport resolved, destination not.
   std::string s = formatSummaryRoute(row.route, makeAirport("WAW", "PL"), AirportInfo{},
                                      RouteFormat::WithCountry);
@@ -132,7 +132,7 @@ static void test_fit_identity_never_truncates_callsign(void) {
 }
 
 static void test_fit_identity_never_exceeds_width_once_callsign_fits(void) {
-  AircraftRow row = makeRow();
+  TrackedFlight row = makeRow();
   row.info.airline = "Scandinavian Airlines System Denmark Norway Sweden";
   row.info.aircraft_type = "Embraer ERJ-190-200 LR";
   for (int px = 6; px <= 80; ++px) {
@@ -143,7 +143,7 @@ static void test_fit_identity_never_exceeds_width_once_callsign_fits(void) {
 // ---- pending ("...") vs unknown ("--") ----------------------------------------
 
 static void test_airline_and_type_show_dots_while_lookup_pending(void) {
-  AircraftRow row;
+  TrackedFlight row;
   row.aircraft.callsign = "SPKAX";  // registration-style: no airline prefix
   row.info_pending = true;          // not looked up yet (per-poll budget)
   TEST_ASSERT_EQUAL_STRING("...", summaryAirline(row).c_str());
@@ -152,7 +152,7 @@ static void test_airline_and_type_show_dots_while_lookup_pending(void) {
 
 static void test_airline_from_callsign_when_hexdb_has_nothing(void) {
   // SunExpress SXS6JZ: unknown to hexdb.io, but the callsign says who it is.
-  AircraftRow row;
+  TrackedFlight row;
   row.aircraft.callsign = "SXS6JZ";
   TEST_ASSERT_EQUAL_STRING("SunExpress", summaryAirline(row).c_str());
   row.info_pending = true;  // even before the lookup runs
@@ -160,12 +160,12 @@ static void test_airline_from_callsign_when_hexdb_has_nothing(void) {
 }
 
 static void test_hexdb_airline_wins_over_callsign_table(void) {
-  AircraftRow row = makeRow();  // hexdb: "LOT Polish Airlines"
+  TrackedFlight row = makeRow();  // hexdb: "LOT Polish Airlines"
   TEST_ASSERT_EQUAL_STRING("LOT Polish Airlines", summaryAirline(row).c_str());
 }
 
 static void test_type_prefers_friendly_name(void) {
-  AircraftRow row = makeRow();
+  TrackedFlight row = makeRow();
   row.info.aircraft_type = "737MAX 8";
   row.info.icao_type = "B38M";
   TEST_ASSERT_EQUAL_STRING("737 MAX 8", summaryType(row).c_str());
@@ -174,7 +174,7 @@ static void test_type_prefers_friendly_name(void) {
 }
 
 static void test_airline_dashes_once_lookup_confirmed_missing(void) {
-  AircraftRow row;
+  TrackedFlight row;
   row.info_pending = false;  // looked up, hexdb.io didn't know it
   TEST_ASSERT_EQUAL_STRING("--", summaryAirline(row).c_str());
 }
@@ -182,7 +182,7 @@ static void test_airline_dashes_once_lookup_confirmed_missing(void) {
 // ---- rowAirportCode: IATA everywhere -------------------------------------------
 
 static void test_airport_code_prefers_iata(void) {
-  AircraftRow row = makeRow();
+  TrackedFlight row = makeRow();
   row.origin_airport = makeAirport("WAW", "PL");
   row.dest_airport = makeAirport("FCO", "IT");
   TEST_ASSERT_EQUAL_STRING("WAW", rowAirportCode(row, /*origin=*/true).c_str());
@@ -190,20 +190,20 @@ static void test_airport_code_prefers_iata(void) {
 }
 
 static void test_airport_code_dots_while_airport_pending(void) {
-  AircraftRow row = makeRow();
+  TrackedFlight row = makeRow();
   row.origin_airport_pending = true;
   TEST_ASSERT_EQUAL_STRING("...", rowAirportCode(row, true).c_str());
 }
 
 static void test_airport_code_falls_back_to_icao_when_unknown(void) {
   // hexdb.io had no airport record — the ICAO code is still better than "--".
-  AircraftRow row = makeRow();  // route EPWA-LIRF, airports unresolved, not pending
+  TrackedFlight row = makeRow();  // route EPWA-LIRF, airports unresolved, not pending
   TEST_ASSERT_EQUAL_STRING("EPWA", rowAirportCode(row, true).c_str());
   TEST_ASSERT_EQUAL_STRING("LIRF", rowAirportCode(row, false).c_str());
 }
 
 static void test_airport_code_without_route(void) {
-  AircraftRow row;
+  TrackedFlight row;
   row.route_pending = true;
   TEST_ASSERT_EQUAL_STRING("...", rowAirportCode(row, true).c_str());
   row.route_pending = false;  // confirmed: no filed route
@@ -213,7 +213,7 @@ static void test_airport_code_without_route(void) {
 // ---- formatRowRoute ------------------------------------------------------------
 
 static void test_row_route_with_country_and_iata(void) {
-  AircraftRow row = makeRow();
+  TrackedFlight row = makeRow();
   row.origin_airport = makeAirport("WAW", "PL");
   row.dest_airport = makeAirport("FCO", "IT");
   TEST_ASSERT_EQUAL_STRING("WAW (PL) -> FCO (IT)",
@@ -222,7 +222,7 @@ static void test_row_route_with_country_and_iata(void) {
 }
 
 static void test_row_route_pending_and_unknown(void) {
-  AircraftRow row;
+  TrackedFlight row;
   row.route_pending = true;
   TEST_ASSERT_EQUAL_STRING("...", formatRowRoute(row, RouteFormat::WithCountry).c_str());
   row.route_pending = false;
@@ -230,7 +230,7 @@ static void test_row_route_pending_and_unknown(void) {
 }
 
 static void test_row_route_endpoint_pending(void) {
-  AircraftRow row = makeRow();
+  TrackedFlight row = makeRow();
   row.origin_airport = makeAirport("WAW", "PL");
   row.dest_airport_pending = true;
   TEST_ASSERT_EQUAL_STRING("WAW (PL) -> ...", formatRowRoute(row, RouteFormat::WithCountry).c_str());
@@ -238,8 +238,8 @@ static void test_row_route_endpoint_pending(void) {
 
 // ---- route with city names (detail views) -------------------------------------
 
-static AircraftRow rowWawFco() {
-  AircraftRow row = makeRow();  // route EPWA-LIRF
+static TrackedFlight rowWawFco() {
+  TrackedFlight row = makeRow();  // route EPWA-LIRF
   row.origin_airport = makeAirport("WAW", "PL");
   row.dest_airport = makeAirport("FCO", "IT");
   return row;
@@ -265,13 +265,13 @@ static void test_city_route_then_shortens_both_names(void) {
 }
 
 static void test_city_route_pending_and_unknown(void) {
-  AircraftRow row;
+  TrackedFlight row;
   row.route_pending = true;
   TEST_ASSERT_EQUAL_STRING("...", formatRowRouteCities(row, Language::PL, 100, kOnePx).c_str());
   row.route_pending = false;
   TEST_ASSERT_EQUAL_STRING("--", formatRowRouteCities(row, Language::PL, 100, kOnePx).c_str());
 
-  AircraftRow half = rowWawFco();
+  TrackedFlight half = rowWawFco();
   half.dest_airport = AirportInfo{};
   half.dest_airport_pending = true;
   TEST_ASSERT_EQUAL_STRING("Warszawa (PL) -> ...",
@@ -281,7 +281,7 @@ static void test_city_route_pending_and_unknown(void) {
 static void test_row_place_name_per_endpoint(void) {
   TEST_ASSERT_EQUAL_STRING("Warszawa", rowPlaceName(rowWawFco(), true, Language::PL).c_str());
   TEST_ASSERT_EQUAL_STRING("Rome", rowPlaceName(rowWawFco(), false, Language::EN).c_str());
-  AircraftRow none;
+  TrackedFlight none;
   TEST_ASSERT_EQUAL_STRING("--", rowPlaceName(none, true, Language::PL).c_str());
 }
 

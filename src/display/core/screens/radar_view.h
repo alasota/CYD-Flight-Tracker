@@ -6,7 +6,7 @@
 // distinguishes it from a plain radar scope, not the polar-plot math
 // (which lives in radar_geometry, reused here rather than duplicated).
 // Static plot for v1 — no sweep-line animation. Zero networking code:
-// draws from an already-enriched, already-annotated AircraftRow list
+// draws from an already-enriched, already-annotated TrackedFlight list
 // (bearing/distance come from tracked_flight's annotateDistances(), not
 // recomputed here) plus the nearest aircraft's route-endpoint AirportInfos.
 // Layout maths and texts are pure; the LovyanGFX drawing is
@@ -20,7 +20,7 @@
 #include "display/core/screens/radar_geometry.h"
 #include "enrichment/core/route_lookup.h"  // AirportInfo
 #include "airspace/core/feed_health.h"     // FeedHealth
-#include "airspace/core/tracked_flight.h"  // AircraftRow
+#include "airspace/core/tracked_flight.h"  // TrackedFlight
 #include "display/core/i18n.h"             // Language
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
@@ -66,7 +66,7 @@ RadarPoint headingTickEnd(int16_t x, int16_t y, float trackDeg, int16_t len);
 
 // Stats line under the route in the summary panel: compass + distance and
 // altitude — "S 4km  511m" — or "S 4km  NA ZIEMI" on the ground. Pure.
-std::string radarSummaryStats(const AircraftRow &row, Language lang);
+std::string radarSummaryStats(const TrackedFlight &row, Language lang);
 
 // (Airline truncation for the narrow summary panel uses lcars_theme's
 // fitToWidth(), measured in pixels — the shared helper all screens use.)

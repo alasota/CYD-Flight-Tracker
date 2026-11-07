@@ -2,7 +2,7 @@
 #include <unity.h>
 
 #include "display/core/screens/featured_panel.h"
-#include "airspace/core/tracked_flight.h"  // AircraftRow
+#include "airspace/core/tracked_flight.h"  // TrackedFlight
 
 namespace {
 
@@ -27,8 +27,8 @@ static void test_featured_panel_bottom_is_95_and_on_screen(void) {
 
 // ---- featuredPillTexts --------------------------------------------------------
 
-static AircraftRow airborneRow() {
-  AircraftRow row;
+static TrackedFlight airborneRow() {
+  TrackedFlight row;
   row.aircraft.has_position = true;
   row.aircraft.on_ground = false;
   row.aircraft.baro_altitude = 1250.4f;
@@ -50,7 +50,7 @@ static void test_pills_airborne_altitude_speed_distance(void) {
 }
 
 static void test_pills_on_ground_hide_altitude_and_speed(void) {
-  AircraftRow row = airborneRow();
+  TrackedFlight row = airborneRow();
   row.aircraft.on_ground = true;
   std::vector<std::string> pl = featuredPillTexts(row, Language::PL);
   TEST_ASSERT_EQUAL_size_t(2, pl.size());  // wide "on ground" pill + distance
@@ -60,7 +60,7 @@ static void test_pills_on_ground_hide_altitude_and_speed(void) {
 }
 
 static void test_pills_without_position_show_dashes_not_zero(void) {
-  AircraftRow row;  // no position, no distance
+  TrackedFlight row;  // no position, no distance
   std::vector<std::string> p = featuredPillTexts(row, Language::EN);
   TEST_ASSERT_EQUAL_size_t(3, p.size());
   for (const std::string &s : p) TEST_ASSERT_EQUAL_STRING("--", s.c_str());

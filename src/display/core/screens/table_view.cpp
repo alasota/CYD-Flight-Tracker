@@ -28,7 +28,7 @@ std::string tablePageLabel(int page, int pageCount) {
   return std::to_string(page + 1) + "/" + std::to_string(pageCount);
 }
 
-std::string tableDistanceText(const AircraftRow &row) {
+std::string tableDistanceText(const TrackedFlight &row) {
   if (!row.has_distance) return kUnknownText;
   char buf[12];
   std::snprintf(buf, sizeof(buf), "%.0fkm", static_cast<double>(row.distance_km));
@@ -44,9 +44,9 @@ int getPageCount(int totalRows, int rowsPerPage) {
   return (totalRows + rowsPerPage - 1) / rowsPerPage;  // ceiling division
 }
 
-std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int page,
+std::vector<TrackedFlight> getPageSlice(const std::vector<TrackedFlight> &rows, int page,
                                        int rowsPerPage) {
-  std::vector<AircraftRow> slice;
+  std::vector<TrackedFlight> slice;
   if (page < 0 || rowsPerPage <= 0) return slice;
 
   size_t start = static_cast<size_t>(page) * static_cast<size_t>(rowsPerPage);

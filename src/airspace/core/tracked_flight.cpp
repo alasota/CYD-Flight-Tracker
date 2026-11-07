@@ -2,20 +2,20 @@
 
 #include "shared/geo.h"  // computeDistanceBearing()
 
-AircraftRow::AircraftRow(const AircraftRow &other) = default;
-AircraftRow::AircraftRow(AircraftRow &&other) noexcept = default;
-AircraftRow &AircraftRow::operator=(const AircraftRow &other) = default;
-AircraftRow &AircraftRow::operator=(AircraftRow &&other) noexcept = default;
-AircraftRow::~AircraftRow() = default;
+TrackedFlight::TrackedFlight(const TrackedFlight &other) = default;
+TrackedFlight::TrackedFlight(TrackedFlight &&other) noexcept = default;
+TrackedFlight &TrackedFlight::operator=(const TrackedFlight &other) = default;
+TrackedFlight &TrackedFlight::operator=(TrackedFlight &&other) noexcept = default;
+TrackedFlight::~TrackedFlight() = default;
 
-std::vector<AircraftRow> buildEnrichedRecords(
+std::vector<TrackedFlight> buildEnrichedRecords(
     const std::vector<Aircraft> &aircraft, const std::map<std::string, AircraftInfo> &infoByIcao24,
     const std::map<std::string, RouteInfo> &routeByCallsign) {
-  std::vector<AircraftRow> rows;
+  std::vector<TrackedFlight> rows;
   rows.reserve(aircraft.size());
 
   for (const Aircraft &ac : aircraft) {
-    AircraftRow row;
+    TrackedFlight row;
     row.aircraft = ac;
 
     auto infoIt = infoByIcao24.find(ac.icao24);
@@ -38,8 +38,8 @@ std::vector<AircraftRow> buildEnrichedRecords(
   return rows;
 }
 
-void annotateDistances(std::vector<AircraftRow> &rows, float home_lat, float home_lon) {
-  for (AircraftRow &row : rows) {
+void annotateDistances(std::vector<TrackedFlight> &rows, float home_lat, float home_lon) {
+  for (TrackedFlight &row : rows) {
     if (!row.aircraft.has_position) {
       row.has_distance = false;
       row.distance_km = 0.0f;
@@ -54,9 +54,9 @@ void annotateDistances(std::vector<AircraftRow> &rows, float home_lat, float hom
   }
 }
 
-void classifyPhases(std::vector<AircraftRow> &rows, float near_airport_km,
+void classifyPhases(std::vector<TrackedFlight> &rows, float near_airport_km,
                      float climb_threshold_mps) {
-  for (AircraftRow &row : rows) {
+  for (TrackedFlight &row : rows) {
     if (!row.has_distance) {
       row.phase = Phase::NONE;  // no position -> nothing meaningful to classify
       continue;

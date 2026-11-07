@@ -25,7 +25,7 @@ uint8_t bigTextSize(CountdownDisplay::Mode mode) {
 }
 }  // namespace
 
-void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
+void drawFlightScreen(LGFX &gfx, const TrackedFlight &nearest, bool hasNearest,
                       const CpaPrediction &cpa, int16_t screenWidth, FeedHealth health) {
   const int16_t cx = static_cast<int16_t>(screenWidth / 2);
 

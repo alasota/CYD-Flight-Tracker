@@ -28,7 +28,7 @@ AirspaceSnapshot buildAirspaceSnapshot(const std::vector<Aircraft> &aircraft,
                                        uint32_t polledAtMs) {
   AirspaceSnapshot s;
   s.polledAtMs = polledAtMs;
-  std::vector<AircraftRow> &rows = s.rows;
+  std::vector<TrackedFlight> &rows = s.rows;
 
   // Rank aircraft (airborne nearest-first, then ground) so the limited per-poll
   // lookup budget is spent on the ones the user actually sees first.
@@ -38,7 +38,9 @@ AirspaceSnapshot buildAirspaceSnapshot(const std::vector<Aircraft> &aircraft,
 
   std::vector<LookupKeys> byPriority;
   byPriority.reserve(rows.size());
-  for (const AircraftRow &r : rows) byPriority.push_back({r.aircraft.icao24, r.aircraft.callsign});
+  for (const TrackedFlight &r : rows) {
+    byPriority.push_back({r.aircraft.icao24, r.aircraft.callsign});
+  }
   const LookupPlan plan =
       planLookups(byPriority, ports.aircraftKnown, ports.routeKnown, p.lookupBudget);
 
@@ -72,7 +74,7 @@ AirspaceSnapshot buildAirspaceSnapshot(const std::vector<Aircraft> &aircraft,
   // Fold the enrichment into the already-sorted rows in place — it doesn't
   // change distance, so no re-sort needed. A key the budget didn't reach
   // this cycle is *pending* ("..."), not unknown ("--").
-  for (AircraftRow &r : rows) {
+  for (TrackedFlight &r : rows) {
     auto info = infoByIcao24.find(r.aircraft.icao24);
     if (info != infoByIcao24.end()) {
       r.info = info->second;
@@ -92,7 +94,7 @@ AirspaceSnapshot buildAirspaceSnapshot(const std::vector<Aircraft> &aircraft,
   // shows IATA codes. Cache hits are free; new lookups are budgeted
   // (planLookups, airport codes in the icao24 slot), nearest rows first.
   std::vector<LookupKeys> airportKeys;
-  for (const AircraftRow &r : rows) {
+  for (const TrackedFlight &r : rows) {
     if (!r.route.found) continue;
     airportKeys.push_back({r.route.origin_icao, ""});
     airportKeys.push_back({r.route.dest_icao, ""});
@@ -106,7 +108,7 @@ AirspaceSnapshot buildAirspaceSnapshot(const std::vector<Aircraft> &aircraft,
     airportByCode[code] = ports.airport(code);
     afterLookup(cached);
   }
-  for (AircraftRow &r : rows) {
+  for (TrackedFlight &r : rows) {
     if (!r.route.found) continue;
     auto o = airportByCode.find(r.route.origin_icao);
     if (o != airportByCode.end()) r.origin_airport = o->second;

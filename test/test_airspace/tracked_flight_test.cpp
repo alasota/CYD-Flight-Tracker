@@ -30,7 +30,7 @@ static void test_build_enriched_records_found_true(void) {
   std::map<std::string, AircraftInfo> infoByIcao24 = {{"4010ee", info}};
   std::map<std::string, RouteInfo> routeByCallsign = {{"DLH9LH", route}};
 
-  std::vector<AircraftRow> rows = buildEnrichedRecords({ac}, infoByIcao24, routeByCallsign);
+  std::vector<TrackedFlight> rows = buildEnrichedRecords({ac}, infoByIcao24, routeByCallsign);
 
   TEST_ASSERT_EQUAL_size_t(1, rows.size());
   TEST_ASSERT_EQUAL_STRING("4010ee", rows[0].aircraft.icao24.c_str());
@@ -53,7 +53,7 @@ static void test_build_enriched_records_found_false_when_lookup_missing(void) {
   std::map<std::string, AircraftInfo> infoByIcao24;
   std::map<std::string, RouteInfo> routeByCallsign;
 
-  std::vector<AircraftRow> rows = buildEnrichedRecords({ac}, infoByIcao24, routeByCallsign);
+  std::vector<TrackedFlight> rows = buildEnrichedRecords({ac}, infoByIcao24, routeByCallsign);
 
   TEST_ASSERT_EQUAL_size_t(1, rows.size());
   TEST_ASSERT_FALSE(rows[0].info.found);
@@ -79,7 +79,7 @@ static void test_build_enriched_records_missing_route_renders_as_dash(void) {
   std::map<std::string, AircraftInfo> infoByIcao24 = {{"4010ee", info}};
   std::map<std::string, RouteInfo> routeByCallsign;  // empty — no route entry at all
 
-  std::vector<AircraftRow> rows = buildEnrichedRecords({ac}, infoByIcao24, routeByCallsign);
+  std::vector<TrackedFlight> rows = buildEnrichedRecords({ac}, infoByIcao24, routeByCallsign);
 
   TEST_ASSERT_EQUAL_size_t(1, rows.size());
   TEST_ASSERT_TRUE(rows[0].info.found);
@@ -99,7 +99,7 @@ static void test_build_enriched_records_found_false_from_cached_miss(void) {
   std::map<std::string, AircraftInfo> infoByIcao24 = {{"ffffff", miss}};
   std::map<std::string, RouteInfo> routeByCallsign;
 
-  std::vector<AircraftRow> rows = buildEnrichedRecords({ac}, infoByIcao24, routeByCallsign);
+  std::vector<TrackedFlight> rows = buildEnrichedRecords({ac}, infoByIcao24, routeByCallsign);
 
   TEST_ASSERT_EQUAL_size_t(1, rows.size());
   TEST_ASSERT_FALSE(rows[0].info.found);
@@ -109,7 +109,7 @@ static void test_build_enriched_records_empty_aircraft_list(void) {
   std::map<std::string, AircraftInfo> infoByIcao24 = {{"4010ee", AircraftInfo{}}};
   std::map<std::string, RouteInfo> routeByCallsign;
 
-  std::vector<AircraftRow> rows = buildEnrichedRecords({}, infoByIcao24, routeByCallsign);
+  std::vector<TrackedFlight> rows = buildEnrichedRecords({}, infoByIcao24, routeByCallsign);
 
   TEST_ASSERT_TRUE(rows.empty());
 }
@@ -117,13 +117,13 @@ static void test_build_enriched_records_empty_aircraft_list(void) {
 // ---- annotateDistances -----------------------------------------------------
 
 static void test_annotate_fills_distance_for_positioned_aircraft(void) {
-  AircraftRow row;
+  TrackedFlight row;
   row.aircraft.icao24 = "a";
   row.aircraft.lat = 1.0f;
   row.aircraft.lon = 0.0f;
   row.aircraft.has_position = true;
 
-  std::vector<AircraftRow> rows = {row};
+  std::vector<TrackedFlight> rows = {row};
   annotateDistances(rows, 0.0f, 0.0f);
 
   TEST_ASSERT_TRUE(rows[0].has_distance);
@@ -131,11 +131,11 @@ static void test_annotate_fills_distance_for_positioned_aircraft(void) {
 }
 
 static void test_annotate_leaves_no_position_aircraft_unset(void) {
-  AircraftRow row;
+  TrackedFlight row;
   row.aircraft.icao24 = "noPos";
   row.aircraft.has_position = false;
 
-  std::vector<AircraftRow> rows = {row};
+  std::vector<TrackedFlight> rows = {row};
   annotateDistances(rows, 0.0f, 0.0f);
 
   TEST_ASSERT_FALSE(rows[0].has_distance);
@@ -144,24 +144,24 @@ static void test_annotate_leaves_no_position_aircraft_unset(void) {
 // ---- classifyPhases ---------------------------------------------------------
 
 static void test_classify_phases_fills_phase_from_distance_and_vertical_rate(void) {
-  AircraftRow row;
+  TrackedFlight row;
   row.aircraft.vertical_rate = 5.0f;
   row.aircraft.on_ground = false;
   row.distance_km = 2.0f;
   row.has_distance = true;
 
-  std::vector<AircraftRow> rows = {row};
+  std::vector<TrackedFlight> rows = {row};
   classifyPhases(rows, /*near_airport_km=*/5.0f, /*climb_threshold_mps=*/3.0f);
 
   ASSERT_ENUM_EQ(Phase::TAKEOFF, rows[0].phase);
 }
 
 static void test_classify_phases_no_distance_forces_none(void) {
-  AircraftRow row;
+  TrackedFlight row;
   row.has_distance = false;  // no position -> nothing to classify
   row.aircraft.vertical_rate = 10.0f;
 
-  std::vector<AircraftRow> rows = {row};
+  std::vector<TrackedFlight> rows = {row};
   classifyPhases(rows, 5.0f, 3.0f);
 
   ASSERT_ENUM_EQ(Phase::NONE, rows[0].phase);

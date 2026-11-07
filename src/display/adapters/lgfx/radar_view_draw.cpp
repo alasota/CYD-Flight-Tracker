@@ -44,7 +44,7 @@ constexpr int16_t kClampedBlipRadius = 3;
 constexpr uint16_t kClampedBlipColor = THEME_CONTENT_MUTED;
 constexpr int16_t kHomeCrosshair = 5;
 
-void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg) {
+void drawRadar(LGFX &gfx, const std::vector<TrackedFlight> &rows, float radius_deg) {
   RadarLayout layout =
       computeRadarLayout(kRadarZoneX, kContentTop, kRadarZoneW, kContentHeight, kRadarMargin);
   if (layout.radius_px <= 0) return;
@@ -80,7 +80,7 @@ void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg
   // apron at EPWA used to turn into one big blob next to home); then
   // airborne aircraft as blips with a heading tick; the one shown in the
   // summary panel (rows.front()) gets a white ring (review #7).
-  for (const AircraftRow &row : rows) {
+  for (const TrackedFlight &row : rows) {
     if (!row.has_distance || !row.aircraft.on_ground) continue;
     const ScreenPoint p = polarToScreen(row.bearing_deg, row.distance_km, maxKm, layout.center_x,
                                         layout.center_y, layout.radius_px);
@@ -89,7 +89,7 @@ void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg
                  THEME_CONTENT_MUTED);
   }
   for (size_t i = 0; i < rows.size(); ++i) {
-    const AircraftRow &row = rows[i];
+    const TrackedFlight &row = rows[i];
     if (!row.has_distance || row.aircraft.on_ground) continue;
     const ScreenPoint p = polarToScreen(row.bearing_deg, row.distance_km, maxKm, layout.center_x,
                                         layout.center_y, layout.radius_px);
@@ -111,7 +111,7 @@ void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg
   gfx.fillCircle(layout.center_x, layout.center_y, 2, LCARS_YELLOW);
 }
 
-void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, FeedHealth health) {
+void drawSummaryPanel(LGFX &gfx, const std::vector<TrackedFlight> &rows, FeedHealth health) {
   // No frame and no divider (both dropped by request). Keep any long text
   // from spilling past the panel into the radar.
   gfx.setClipRect(static_cast<int16_t>(kSummaryX + kSummaryInset), kContentTop,
@@ -127,7 +127,7 @@ void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, FeedHealt
     return;
   }
 
-  const AircraftRow &nearest = rows.front();
+  const TrackedFlight &nearest = rows.front();
 
   gfx.setTextDatum(top_left);
 
@@ -168,7 +168,7 @@ void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, FeedHealt
 
 }  // namespace
 
-void drawRadarView(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg,
+void drawRadarView(LGFX &gfx, const std::vector<TrackedFlight> &rows, float radius_deg,
                    int16_t screenWidth, FeedHealth health) {
   (void)screenWidth;  // fixed 320px layout — parameter kept for signature symmetry
 

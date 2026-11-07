@@ -19,7 +19,7 @@ void drawCell(LGFX &gfx, const TableColumn &col, const std::string &text, int16_
   gfx.clearClipRect();
 }
 
-void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t screenWidth) {
+void drawTableRows(LGFX &gfx, const std::vector<TrackedFlight> &pageRows, int16_t screenWidth) {
   gfx.setFont(LCARS_FONT_TABLE);  // 14px: 1px under the 15px header strip
   gfx.setTextDatum(middle_left);
   const TextMeasure measure = gfxTextMeasure(gfx);
@@ -31,7 +31,7 @@ void drawTableRows(LGFX &gfx, const std::vector<AircraftRow> &pageRows, int16_t 
     gfx.fillRect(0, rowY, screenWidth, kTableRowStep, LCARS_BLACK);
 
     if (i >= static_cast<int>(pageRows.size())) continue;
-    const AircraftRow &row = pageRows[static_cast<size_t>(i)];
+    const TrackedFlight &row = pageRows[static_cast<size_t>(i)];
     int16_t textY = static_cast<int16_t>(rowY + kTableRowStep / 2);
 
     // White / sky alternating; aircraft on the ground dimmed (review #3).
@@ -85,7 +85,7 @@ void drawColumnHeader(LGFX &gfx, int16_t screenWidth, const std::string &pageLab
 
 }  // namespace
 
-void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t screenWidth,
+void drawTablePage(LGFX &gfx, const std::vector<TrackedFlight> &rows, int16_t screenWidth,
                    int page, FeedHealth health) {
   FeaturedSplit split = splitFeaturedAndRest(rows);
 
@@ -102,6 +102,6 @@ void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t scre
 
   // Exactly 5 data rows (kTableFirstRowY, kTableRowStep), over the list *without* the featured
   // aircraft; paging swaps which 5 (not scrolling).
-  std::vector<AircraftRow> pageRows = getPageSlice(split.rest, page, kTableRowsPerPage);
+  std::vector<TrackedFlight> pageRows = getPageSlice(split.rest, page, kTableRowsPerPage);
   drawTableRows(gfx, pageRows, screenWidth);
 }

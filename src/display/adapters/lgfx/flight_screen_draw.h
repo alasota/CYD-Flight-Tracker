@@ -12,7 +12,7 @@
 // Draws all three zones for a `screenWidth`-px display. `hasNearest` ==
 // false (no aircraft in range) leaves the identity panel empty and forces
 // the countdown/status into their empty state regardless of `cpa`.
-void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
+void drawFlightScreen(LGFX &gfx, const TrackedFlight &nearest, bool hasNearest,
                       const CpaPrediction &cpa, int16_t screenWidth, FeedHealth health);
 
 // Repaints only the countdown zone + status strip — the 1 Hz

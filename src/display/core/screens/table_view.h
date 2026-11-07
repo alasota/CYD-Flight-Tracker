@@ -2,7 +2,7 @@
 // "Screen 1 — Flights". Composes featured_panel (the
 // closest aircraft, spotlighted) with a paginated table of the rest. Uses
 // lcars_theme for all chrome (panels/pills/fonts/colors) — defines none of
-// its own. Zero networking code: it takes the AircraftRow list
+// its own. Zero networking code: it takes the TrackedFlight list
 // (airspace/core/tracked_flight, built by poll_pipeline) as plain data and
 // only draws. Layout and cell texts are pure; the LovyanGFX drawing is
 // display/adapters/lgfx/table_view_draw.
@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "airspace/core/feed_health.h"      // FeedHealth
-#include "airspace/core/tracked_flight.h"  // AircraftRow
+#include "airspace/core/tracked_flight.h"  // TrackedFlight
 #include "airspace/core/flight_ordering.h"  // splitFeaturedAndRest() — drawTablePage()
 #include "display/core/screens/featured_panel.h"
 #include "display/core/i18n.h"
@@ -83,7 +83,7 @@ int tableCellTextWidthPx(const TableColumn &col);
 
 // The ODL./DIST cell: distance from home, whole km ("8km"), or "--" when the
 // aircraft has no position.
-std::string tableDistanceText(const AircraftRow &row);
+std::string tableDistanceText(const TrackedFlight &row);
 
 // Page indicator for the table header: "1/3" when there is more than one
 // page (`page` is 0-based), "" otherwise. Drawn right-aligned in the TYP
@@ -100,5 +100,5 @@ int getPageCount(int totalRows, int rowsPerPage);
 // an empty subset rather than out-of-bounds access — callers should check
 // getPageCount() if they need to clamp `page` instead of just getting
 // nothing back. Pure — no TFT dependency.
-std::vector<AircraftRow> getPageSlice(const std::vector<AircraftRow> &rows, int page,
+std::vector<TrackedFlight> getPageSlice(const std::vector<TrackedFlight> &rows, int page,
                                        int rowsPerPage);

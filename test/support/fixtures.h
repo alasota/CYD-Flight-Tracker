@@ -11,7 +11,7 @@
 #include "airspace/services/poll_pipeline.h"
 #include "airspace/core/tracked_flight.h"
 
-// ---- Aircraft / AircraftRow --------------------------------------------------
+// ---- Aircraft / TrackedFlight ------------------------------------------------
 
 struct AircraftOpts {
   bool ground = false;
@@ -42,8 +42,9 @@ inline Aircraft makeAircraft(const char *hex, const char *callsign, float lat, f
 
 // A table row `km` from home (no distance without a position). Lookups,
 // route and phase are left empty — set what the test needs.
-inline AircraftRow makeRow(const char *callsign, float km, bool onGround = false, bool hasPos = true) {
-  AircraftRow r;
+inline TrackedFlight makeRow(const char *callsign, float km, bool onGround = false,
+                             bool hasPos = true) {
+  TrackedFlight r;
   r.aircraft.callsign = callsign;
   r.aircraft.on_ground = onGround;
   r.aircraft.has_position = hasPos;

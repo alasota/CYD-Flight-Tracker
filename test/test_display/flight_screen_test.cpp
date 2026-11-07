@@ -3,7 +3,7 @@
 
 #include "airspace/core/cpa_predictor.h"
 #include "display/core/screens/flight_screen.h"
-#include "airspace/core/tracked_flight.h"  // AircraftRow
+#include "airspace/core/tracked_flight.h"  // TrackedFlight
 #include "test_support.h"
 
 #include <vector>
@@ -173,8 +173,8 @@ static void test_empty_without_aircraft_says_no_flights(void) {
 
 // ---- an airborne row (Screen 2's stats line) -------------------------------
 
-static AircraftRow airborne() {
-  AircraftRow r;
+static TrackedFlight airborne() {
+  TrackedFlight r;
   r.aircraft.has_position = true;
   r.aircraft.on_ground = false;
   return r;
@@ -183,7 +183,7 @@ static AircraftRow airborne() {
 // ---- nowStatsText ---------------------------------------------------------------
 
 static void test_now_stats_airborne(void) {
-  AircraftRow r = airborne();
+  TrackedFlight r = airborne();
   r.has_distance = true;
   r.distance_km = 3.2f;
   r.aircraft.baro_altitude = 236.0f;
@@ -194,7 +194,7 @@ static void test_now_stats_airborne(void) {
 }
 
 static void test_now_stats_on_ground(void) {
-  AircraftRow r = airborne();
+  TrackedFlight r = airborne();
   r.aircraft.on_ground = true;
   r.has_distance = true;
   r.distance_km = 6.0f;

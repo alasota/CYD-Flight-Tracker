@@ -10,7 +10,7 @@
 //   - countdown zone  — giant digits, colour-coded by urgency
 //   - status strip    — a text label matching the countdown state
 //
-// Zero networking code — draws from an already-enriched AircraftRow
+// Zero networking code — draws from an already-enriched TrackedFlight
 // (airspace/core/tracked_flight), its two route-endpoint AirportInfos, and a
 // cpa_predictor::CpaPrediction. The between-polls "local ticking" of the
 // countdown is the UI's job (ui_flow's CountdownTick) — this module just renders
@@ -23,7 +23,7 @@
 #include <string>
 #include <vector>
 
-#include "airspace/core/tracked_flight.h"  // AircraftRow
+#include "airspace/core/tracked_flight.h"  // TrackedFlight
 #include "display/core/screens/aircraft_summary.h"  // RouteFormat + the identity/route formatters
 #include "airspace/core/cpa_predictor.h"     // CpaPrediction
 #include "display/core/i18n.h"              // Language, tr()
@@ -52,7 +52,7 @@ int16_t flightStatusHeightPx();     // 25  (190..215)
 
 // Screen 2's stats line under the route (after the direction arrow):
 // "S 3km  236m  266km/h", or "S 6km  NA ZIEMI" on the ground. Pure.
-std::string nowStatsText(const AircraftRow &row, Language lang);
+std::string nowStatsText(const TrackedFlight &row, Language lang);
 
 // How the countdown zone renders a given CpaPrediction.
 struct CountdownDisplay {

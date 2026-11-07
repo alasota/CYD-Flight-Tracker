@@ -17,7 +17,7 @@ constexpr int16_t kPillGap = 4;
 constexpr int16_t kArrowSize = 12;  // "where to look" arrow in the distance pill
 }  // namespace
 
-void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, int16_t screenWidth) {
+void drawFeaturedPanel(LGFX &gfx, const TrackedFlight &row, int16_t screenWidth) {
   int16_t w = static_cast<int16_t>(screenWidth - 2 * kSideMargin);
 
   // No frame (dropped by request) — just text and pills on black.

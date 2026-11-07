@@ -95,8 +95,8 @@ static void test_heading_tick_points_along_the_track(void) {
 
 // ---- summary panel stats line (review #8) ------------------------------------------
 
-static AircraftRow statsRow(bool onGround) {
-  AircraftRow r;
+static TrackedFlight statsRow(bool onGround) {
+  TrackedFlight r;
   r.has_distance = true;
   r.distance_km = 4.2f;
   r.bearing_deg = 180.0f;

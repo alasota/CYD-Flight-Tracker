@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "airspace/core/cpa_predictor.h"   // CpaPrediction
-#include "airspace/core/tracked_flight.h"  // AircraftRow
+#include "airspace/core/tracked_flight.h"  // TrackedFlight
 
 // "Will pass overhead" = the closest point of approach is within this many
 // km of home.
@@ -27,5 +27,5 @@ struct NowPick {
 // the nearest one). Without such a candidate it shows the nearest airborne
 // aircraft (rows are nearest-first) with no prediction, or row 0 if all are
 // on the ground. `cpas[i]` belongs to `rows[i]`. Pure — native-tested.
-NowPick pickNowAircraft(const std::vector<AircraftRow> &rows,
+NowPick pickNowAircraft(const std::vector<TrackedFlight> &rows,
                         const std::vector<CpaPrediction> &cpas, float overheadKm);

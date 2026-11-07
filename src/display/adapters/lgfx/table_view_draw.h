@@ -26,5 +26,5 @@
 // in the table); an out-of-range page draws no data rows. Which page is
 // current, and reacting to touch, is ui_flow's job (TablePager, routeTap()) — this only lays out
 // whichever page it's told to draw.
-void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t screenWidth,
+void drawTablePage(LGFX &gfx, const std::vector<TrackedFlight> &rows, int16_t screenWidth,
                    int page, FeedHealth health);
