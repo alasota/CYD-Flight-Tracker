@@ -176,8 +176,8 @@ static HexdbFetchResult simFetchAirport(const std::string &k) {
   return r;
 }
 
-static LookupPorts simPorts() {
-  LookupPorts p;
+static EnrichmentPort simPorts() {
+  EnrichmentPort p;
   p.aircraftKnown = [](const std::string &k) {
     return aircraftLookupIsCached(k) || simNvsAircraft.count(k) > 0;
   };
@@ -235,7 +235,7 @@ static void test_caches_stay_bounded_over_200_polls(void) {
   simNvsRoutes.clear();
   simNvsAirports.clear();
   simFetchesPerKey.clear();
-  const LookupPorts ports = simPorts();
+  const EnrichmentPort ports = simPorts();
   const PipelineParams full = params(100, 10);
 
   // 30 aircraft in range, 5 of them new on every poll: ~1000 aircraft in all,
@@ -280,8 +280,8 @@ static std::vector<Aircraft> twoNewAircraft() {
 }
 
 // stubPorts() with a route per callsign; the hook (if any) is set by the test.
-static LookupPorts hookPorts() {
-  LookupPorts p = stubPorts();
+static EnrichmentPort hookPorts() {
+  EnrichmentPort p = stubPorts();
   p.route = [](const std::string &k) {
     calls.push_back("rt:" + k);
     RouteInfo r;
@@ -324,7 +324,7 @@ static const AircraftRow &rowOf(const AirspaceSnapshot &s, const char *icao24) {
 
 // Hak jest wołany po każdym rzeczywistym zapytaniu hexdb.io
 static void test_between_fetches_called_once_per_fetch(void) {
-  LookupPorts ports = hookPorts();
+  EnrichmentPort ports = hookPorts();
   ports.betweenFetches = recordingHook();
   const AirspaceSnapshot s = buildAirspaceSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
 
@@ -346,7 +346,7 @@ static void test_between_fetches_not_called_for_cache_hits(void) {
   for (const char *k : {"aaa001", "bbb002"}) knownAircraft.insert(k);
   for (const char *k : {"AAA1", "BBB2"}) knownRoutes.insert(k);
   for (const char *k : {"EPWA", "LIRF", "EGLL"}) knownAirports.insert(k);
-  LookupPorts ports = hookPorts();
+  EnrichmentPort ports = hookPorts();
   ports.betweenFetches = recordingHook();
 
   const AirspaceSnapshot a =
@@ -360,7 +360,7 @@ static void test_between_fetches_not_called_for_cache_hits(void) {
 
 // Bez haka faza B działa jak dotąd
 static void test_between_fetches_optional(void) {
-  const LookupPorts ports = hookPorts();  // no betweenFetches
+  const EnrichmentPort ports = hookPorts();  // no betweenFetches
   const AirspaceSnapshot s = buildAirspaceSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
   TEST_ASSERT_EQUAL_UINT32(7, s.fetches);
   const std::vector<std::string> expected = {"ac:aaa001", "ac:bbb002", "rt:AAA1", "rt:BBB2",
@@ -388,7 +388,7 @@ static void test_between_fetches_stop_ends_phase_b_with_partial_snapshot(void) {
   const AirspaceSnapshot ref = buildAirspaceSnapshot(sky3, cacheOnly(params(4, 3)), hookPorts(), 0);
   calls.clear();
 
-  LookupPorts ports = hookPorts();
+  EnrichmentPort ports = hookPorts();
   ports.betweenFetches = recordingHook(/*stopAt=*/2);  // "an OTA update started"
   const AirspaceSnapshot s = buildAirspaceSnapshot(sky3, params(4, 3), ports, 0);
 
@@ -479,7 +479,7 @@ static void test_between_fetches_stops_when_update_started(void) {
 
 // "Stop" on the very first request: exactly one fetch.
 static void test_between_fetches_stop_on_first_fetch(void) {
-  LookupPorts ports = hookPorts();
+  EnrichmentPort ports = hookPorts();
   ports.betweenFetches = recordingHook(/*stopAt=*/1);
   const AirspaceSnapshot s = buildAirspaceSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
   TEST_ASSERT_EQUAL_UINT32(1, s.fetches);
@@ -490,7 +490,7 @@ static void test_between_fetches_stop_on_first_fetch(void) {
 
 // "Stop" during the airport stage keeps every aircraft / route already fetched.
 static void test_between_fetches_stop_in_airport_stage_keeps_fetched_info(void) {
-  LookupPorts ports = hookPorts();
+  EnrichmentPort ports = hookPorts();
   ports.betweenFetches = recordingHook(/*stopAt=*/5);  // after the first airport
   const AirspaceSnapshot s = buildAirspaceSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
   TEST_ASSERT_EQUAL_UINT32(5, s.fetches);
@@ -507,7 +507,7 @@ static void test_between_fetches_stop_in_airport_stage_keeps_fetched_info(void) 
 
 // Phase A (cacheOnly) never calls the hook, even with uncached keys around.
 static void test_between_fetches_not_called_in_phase_a(void) {
-  LookupPorts ports = hookPorts();
+  EnrichmentPort ports = hookPorts();
   ports.betweenFetches = recordingHook();
   const AirspaceSnapshot s =
       buildAirspaceSnapshot(twoNewAircraft(), cacheOnly(params(4, 3)), ports, 0);

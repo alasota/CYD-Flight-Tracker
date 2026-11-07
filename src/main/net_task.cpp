@@ -184,8 +184,8 @@ std::map<std::string, AircraftInfo> memoAircraft;
 std::map<std::string, RouteInfo> memoRoute;
 std::map<std::string, AirportInfo> memoAirport;
 
-LookupPorts productionPorts() {
-  LookupPorts p;
+EnrichmentPort productionPorts() {
+  EnrichmentPort p;
   // "Cached" = in RAM or persisted in NVS (lookup_store) — neither costs a
   // hexdb.io request, so neither uses up the per-poll budget.
   p.aircraftKnown = [](const std::string &k) {
@@ -275,7 +275,7 @@ void pollOpenSky() {
   memoAircraft.clear();
   memoRoute.clear();
   memoAirport.clear();
-  const LookupPorts ports = productionPorts();
+  const EnrichmentPort ports = productionPorts();
 
   // Phase A: positions now, from what is cached — no network.
   state.data = std::make_shared<const AirspaceSnapshot>(

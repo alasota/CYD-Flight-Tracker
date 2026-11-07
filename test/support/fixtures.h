@@ -63,7 +63,7 @@ inline Config makeConfig() {
   return c;
 }
 
-// ---- stub hexdb.io (poll_pipeline's LookupPorts) -------------------------------
+// ---- stub hexdb.io (poll_pipeline's EnrichmentPort) ----------------------------
 
 // `known*` keys count as cached; every fetch is recorded in `calls`
 // ("ac:<icao24>", "rt:<callsign>", "ap:<icao>"). Reset before every test.
@@ -79,8 +79,8 @@ inline StubHexdb &stubHexdb() {
 
 inline void resetStubPorts() { stubHexdb() = StubHexdb{}; }
 
-inline LookupPorts stubPorts() {
-  LookupPorts p;
+inline EnrichmentPort stubPorts() {
+  EnrichmentPort p;
   p.aircraftKnown = [](const std::string &k) { return stubHexdb().knownAircraft.count(k) > 0; };
   p.routeKnown = [](const std::string &k) { return stubHexdb().knownRoutes.count(k) > 0; };
   p.airportKnown = [](const std::string &k) { return stubHexdb().knownAirports.count(k) > 0; };

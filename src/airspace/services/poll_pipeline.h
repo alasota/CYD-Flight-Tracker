@@ -14,7 +14,7 @@
 //   B is published only when it fetched something (`fetches` > 0); otherwise
 //   it equals A and there is nothing to repaint.
 //
-// Pure: the lookups are injected (LookupPorts) — production wires in
+// Pure: the lookups are injected (EnrichmentPort) — production wires in
 // aircraft_lookup / route_lookup / lookup_store, the native tests stubs.
 #pragma once
 
@@ -30,7 +30,7 @@
 #include "airspace/core/home.h"            // Home
 #include "enrichment/core/route_lookup.h"
 
-struct LookupPorts {
+struct EnrichmentPort {
   // "Cached" = answered without a hexdb.io request (RAM or NVS).
   std::function<bool(const std::string &)> aircraftKnown;
   std::function<bool(const std::string &)> routeKnown;
@@ -57,7 +57,7 @@ struct PipelineParams {
 // (the countdown's base). `fetches` in the result counts the lookups that
 // were not cached — i.e. the hexdb.io requests this call made.
 AirspaceSnapshot buildAirspaceSnapshot(const std::vector<Aircraft> &aircraft,
-                                       const PipelineParams &p, const LookupPorts &ports,
+                                       const PipelineParams &p, const EnrichmentPort &ports,
                                        uint32_t polledAtMs);
 
 // Phase A's params: the same, with no new lookups allowed.

@@ -24,7 +24,7 @@ PipelineParams cacheOnly(PipelineParams p) {
 }
 
 AirspaceSnapshot buildAirspaceSnapshot(const std::vector<Aircraft> &aircraft,
-                                       const PipelineParams &p, const LookupPorts &ports,
+                                       const PipelineParams &p, const EnrichmentPort &ports,
                                        uint32_t polledAtMs) {
   AirspaceSnapshot s;
   s.polledAtMs = polledAtMs;
