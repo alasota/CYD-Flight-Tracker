@@ -176,7 +176,7 @@ STAGE_4_ADAPTERS = {
 _WEB = "admin/adapters/web_server.h"
 STAGE_4_HOMES = {
     "parseOpenSkyCredentialsJson": ("admin/core/settings_form.h", _WEB),
-    "OpenSkyCredentials": ("admin/core/settings_form.h", _WEB),
+    "CredentialsFile": ("admin/core/settings_form.h", _WEB),  # OpenSkyCredentials until stage 6
     "isValidFloatString": ("admin/core/settings_form.h", _WEB),
     "isValidUnsignedIntString": ("admin/core/settings_form.h", _WEB),
     "OtaObserver": ("admin/core/firmware/ota_update.h", _WEB),

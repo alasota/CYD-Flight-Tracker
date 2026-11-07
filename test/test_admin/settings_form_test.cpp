@@ -15,49 +15,49 @@
 namespace {
 
 static void test_parse_credentials_json_valid(void) {
-  OpenSkyCredentials creds =
+  CredentialsFile creds =
       parseOpenSkyCredentialsJson(R"({"clientId":"przykladowy id","clientSecret":"tajne haslo"})");
 
   TEST_ASSERT_TRUE(creds.ok);
-  TEST_ASSERT_EQUAL_STRING("przykladowy id", creds.client_id.c_str());
-  TEST_ASSERT_EQUAL_STRING("tajne haslo", creds.client_secret.c_str());
+  TEST_ASSERT_EQUAL_STRING("przykladowy id", creds.creds.client_id.c_str());
+  TEST_ASSERT_EQUAL_STRING("tajne haslo", creds.creds.client_secret.c_str());
 }
 
 static void test_parse_credentials_json_ignores_extra_fields_and_whitespace(void) {
-  OpenSkyCredentials creds = parseOpenSkyCredentialsJson(
+  CredentialsFile creds = parseOpenSkyCredentialsJson(
       "{\n  \"clientId\": \"abc123\",\n  \"clientSecret\": \"s3cr3t\",\n  \"issuedAt\": "
       "\"2026-01-01\"\n}");
 
   TEST_ASSERT_TRUE(creds.ok);
-  TEST_ASSERT_EQUAL_STRING("abc123", creds.client_id.c_str());
-  TEST_ASSERT_EQUAL_STRING("s3cr3t", creds.client_secret.c_str());
+  TEST_ASSERT_EQUAL_STRING("abc123", creds.creds.client_id.c_str());
+  TEST_ASSERT_EQUAL_STRING("s3cr3t", creds.creds.client_secret.c_str());
 }
 
 static void test_parse_credentials_json_rejects_malformed_json(void) {
-  OpenSkyCredentials creds = parseOpenSkyCredentialsJson("not json at all");
+  CredentialsFile creds = parseOpenSkyCredentialsJson("not json at all");
 
   TEST_ASSERT_FALSE(creds.ok);
-  TEST_ASSERT_TRUE(creds.client_id.empty());
-  TEST_ASSERT_TRUE(creds.client_secret.empty());
+  TEST_ASSERT_TRUE(creds.creds.client_id.empty());
+  TEST_ASSERT_TRUE(creds.creds.client_secret.empty());
 }
 
 static void test_parse_credentials_json_rejects_missing_field(void) {
-  OpenSkyCredentials missingSecret = parseOpenSkyCredentialsJson(R"({"clientId":"abc123"})");
+  CredentialsFile missingSecret = parseOpenSkyCredentialsJson(R"({"clientId":"abc123"})");
   TEST_ASSERT_FALSE(missingSecret.ok);
 
-  OpenSkyCredentials missingId = parseOpenSkyCredentialsJson(R"({"clientSecret":"s3cr3t"})");
+  CredentialsFile missingId = parseOpenSkyCredentialsJson(R"({"clientSecret":"s3cr3t"})");
   TEST_ASSERT_FALSE(missingId.ok);
 }
 
 static void test_parse_credentials_json_rejects_empty_values(void) {
-  OpenSkyCredentials creds =
+  CredentialsFile creds =
       parseOpenSkyCredentialsJson(R"({"clientId":"","clientSecret":""})");
 
   TEST_ASSERT_FALSE(creds.ok);
 }
 
 static void test_parse_credentials_json_rejects_empty_string(void) {
-  OpenSkyCredentials creds = parseOpenSkyCredentialsJson("");
+  CredentialsFile creds = parseOpenSkyCredentialsJson("");
 
   TEST_ASSERT_FALSE(creds.ok);
 }
@@ -66,7 +66,7 @@ static void test_parse_credentials_json_rejects_oversized_body(void) {
   // Padding well past kMaxCredentialsJsonBytes — the size check must
   // reject it before any parsing is attempted (docs/review-notes-2026.md 4.3).
   std::string oversized(kMaxCredentialsJsonBytes + 1, 'x');
-  OpenSkyCredentials creds = parseOpenSkyCredentialsJson(oversized);
+  CredentialsFile creds = parseOpenSkyCredentialsJson(oversized);
   TEST_ASSERT_FALSE(creds.ok);
 }
 
@@ -131,7 +131,7 @@ static void assertRejected(const std::vector<WebStr> &want, const std::vector<We
 static Config savedConfig() {
   Config c = makeConfig();
   c.home.radius_deg = 2.0f;
-  c.poll_interval_s = 60;
+  c.poll.interval_s = 60;
   c.auto_cycle_interval_s = 45;
   c.phase.near_airport_km = 12.0f;
   c.phase.climb_rate_threshold_mps = 1.0f;
@@ -139,8 +139,8 @@ static Config savedConfig() {
   c.night_wake_s = 90;
   c.night_from_min = 23 * 60;
   c.night_to_min = 6 * 60;
-  c.opensky_client_id = "old-id";
-  c.opensky_client_secret = "old-secret";
+  c.opensky.client_id = "old-id";
+  c.opensky.client_secret = "old-secret";
   c.web_password = "stare-haslo";
   return c;
 }
@@ -179,7 +179,7 @@ static void test_form_valid_submit_sets_every_field_and_home_configured(void) {
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 50.0614f, cfg.home.lat);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 19.9366f, cfg.home.lon);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.5f, cfg.home.radius_deg);
-  TEST_ASSERT_EQUAL_UINT32(30, cfg.poll_interval_s);
+  TEST_ASSERT_EQUAL_UINT32(30, cfg.poll.interval_s);
   TEST_ASSERT_TRUE(cfg.auto_cycle_enabled);
   TEST_ASSERT_EQUAL_UINT32(20, cfg.auto_cycle_interval_s);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 10.0f, cfg.phase.near_airport_km);
@@ -197,8 +197,8 @@ static void test_form_valid_submit_sets_every_field_and_home_configured(void) {
   TEST_ASSERT_TRUE(cfg.night_pause_polling);
   ASSERT_ENUM_EQ(Language::EN, cfg.language);
   ASSERT_ENUM_EQ(Language::EN, cfg.web_language);
-  ASSERT_STR_EQ("my-id", cfg.opensky_client_id);
-  ASSERT_STR_EQ("my-secret", cfg.opensky_client_secret);
+  ASSERT_STR_EQ("my-id", cfg.opensky.client_id);
+  ASSERT_STR_EQ("my-secret", cfg.opensky.client_secret);
   TEST_ASSERT_TRUE(cfg.home.configured);
   assertRejected({}, out.rejected);
   ASSERT_ENUM_EQ(WebStr::Saved, out.message);
@@ -217,7 +217,7 @@ static void test_form_rejects_malformed_number_and_keeps_old_value(void) {
       {"lon", "12.3.4", WebStr::Longitude, [](const Config &c) { return c.home.lon; }},
       {"radius", "", WebStr::Radius, [](const Config &c) { return c.home.radius_deg; }},
       {"poll_interval", "-5", WebStr::PollInterval,
-       [](const Config &c) { return static_cast<float>(c.poll_interval_s); }},
+       [](const Config &c) { return static_cast<float>(c.poll.interval_s); }},
       {"auto_cycle_interval", "10s", WebStr::AutoCycleInterval,
        [](const Config &c) { return static_cast<float>(c.auto_cycle_interval_s); }},
       {"near_airport_km", "1e", WebStr::NearAirport,
@@ -281,14 +281,14 @@ static void test_form_missing_checkbox_unchecked_missing_text_unchanged(void) {
 static void test_form_empty_secret_keeps_saved_clear_removes_both(void) {
   Config cfg = savedConfig();
   applySettingsForm(cfg, form({{"client_id", "new-id"}, {"client_secret", ""}}));
-  ASSERT_STR_EQ("new-id", cfg.opensky_client_id);
-  ASSERT_STR_EQ("old-secret", cfg.opensky_client_secret);
+  ASSERT_STR_EQ("new-id", cfg.opensky.client_id);
+  ASSERT_STR_EQ("old-secret", cfg.opensky.client_secret);
 
   applySettingsForm(cfg, form({{"client_id", "new-id"},
                                {"client_secret", "typed-secret"},
                                {"clear_credentials", "1"}}));
-  ASSERT_STR_EQ("", cfg.opensky_client_id);
-  ASSERT_STR_EQ("", cfg.opensky_client_secret);
+  ASSERT_STR_EQ("", cfg.opensky.client_id);
+  ASSERT_STR_EQ("", cfg.opensky.client_secret);
 }
 
 // Hasło panelu z formularza: komunikat i zmiana

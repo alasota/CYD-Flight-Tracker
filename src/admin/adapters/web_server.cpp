@@ -158,7 +158,7 @@ void sendPage(ConfigPageModel model, int status = 200) {
   model.nowMs = millis();
   // OpenSky login state (spec 06): the OpenSky tab's pill, warning and limit.
   // Same core as opensky_client (net_task), so no lock — like openSkyQuota().
-  model.auth = openSkyAuthStatus(model.cfg);
+  model.auth = openSkyAuthStatus(model.cfg.opensky);
   model.nowEpoch = timeSyncNowLocal();  // local time, 0 until NTP synced
 
   server.sendHeader("Cache-Control", "no-store");
@@ -391,14 +391,13 @@ void handleCredentialsUpload() {
     return;
   }
 
-  OpenSkyCredentials creds = parseOpenSkyCredentialsJson(body);
-  if (!creds.ok) {
+  const CredentialsFile file = parseOpenSkyCredentialsJson(body);
+  if (!file.ok) {
     sendConfigPage(cfg, SettingsTab::OpenSky, WebStr::UploadInvalid, true);
     return;
   }
 
-  cfg.opensky_client_id = creds.client_id;
-  cfg.opensky_client_secret = creds.client_secret;
+  cfg.opensky = file.creds;
   saveConfig(cfg);  // sanitizes internally (see config_store)
   ++saveCount;
 

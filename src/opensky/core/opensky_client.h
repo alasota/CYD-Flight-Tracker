@@ -12,8 +12,10 @@
 #include <ArduinoJson.h>
 
 #include "airspace/core/aircraft_state.h"  // Aircraft — what parseStatesResponse() returns
+#include "airspace/core/home.h"            // Home — the bounding box's centre and radius
 #include "opensky/core/opensky_auth.h"   // OpenSkyAuthState — openSkyAuthStatus()
 #include "opensky/core/opensky_quota.h"  // OpenSkyQuota — openSkyQuota()
+#include "opensky/core/opensky_settings.h"  // OpenSkyCredentials, PollSettings
 
 // ---- Pure logic (no WiFi/HTTP dependency) — testable under
 // `pio test -e native`.
@@ -133,12 +135,12 @@ struct OpenSkyPollResult {
 // --- Hardware adapter: OAuth token fetch, /states/all HTTP call, 401 retry
 // and 429 backoff, defined in opensky/adapters/opensky_http.cpp. Thin wrapper
 // around WiFiClientSecure/HTTPClient — not covered by Unity (see CLAUDE.md
-// "Testing"). No TFT/drawing code.
-struct Config;  // config_store.h — full type only needed by the .cpp
+// "Testing"). No TFT/drawing code. The settings come from the caller's
+// Config, one object each (spec 12 §7).
 
-// Fetches aircraft currently in the bounding box around the configured
-// home, using `cfg` for home/radius/credentials (no internal loadConfig()
-// — the caller owns config now, see docs/review-notes-2026.md 4.3). Ensures a fresh
+// Fetches aircraft currently in the bounding box around `home` (its
+// radius), logging in with `creds` (no internal loadConfig() — the caller
+// owns config now, see docs/review-notes-2026.md 4.3). Ensures a fresh
 // OAuth token first when credentials are set (falls back to anonymous
 // otherwise). A 401/403 with a token gets one token refresh + retry; if the
 // fresh token is rejected too, the login state goes LoginFailed and the same
@@ -146,15 +148,16 @@ struct Config;  // config_store.h — full type only needed by the .cpp
 // rejected login the login server isn't asked again for 30 min
 // (kLoginRetryMs). Reports 429/auth/transport failures distinctly rather
 // than collapsing them all to "empty".
-OpenSkyPollResult fetchAircraftStates(const Config &cfg);
+OpenSkyPollResult fetchAircraftStates(const OpenSkyCredentials &creds, const Home &home);
 
 // Non-blocking poll scheduler: call every loop() iteration with the
-// caller's cached Config. Runs at most one fetchAircraftStates() per
-// cfg.poll_interval_s (shouldPollNow()), never faster even if called more
+// caller's cached settings. Runs at most one fetchAircraftStates() per
+// poll.interval_s (shouldPollNow()), never faster even if called more
 // often — never hammer the API faster than the configured interval
 // (docs/data-sources.md "Rate limits"). Returns {NotDue} without touching
 // the network when a poll isn't due yet; otherwise returns the fetch result.
-OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const Config &cfg);
+OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const OpenSkyCredentials &creds,
+                                    const Home &home, const PollSettings &poll);
 
 // Credits left / time until the pool renews, from the headers of the last
 // /states/all answer (opensky_quota). Unknown until the first answer; while
@@ -162,10 +165,10 @@ OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const Config &cfg);
 // quotaSecondsUntilReset()). Read by the config page.
 OpenSkyQuota openSkyQuota();
 
-// Did the OpenSky login work (opensky_auth), for the credentials in `cfg` —
+// Did the OpenSky login work (opensky_auth), for `creds` —
 // so a just-saved change reads as "Account" before the next poll tries it.
 // Core 0 only, like openSkyQuota().
-OpenSkyAuthState openSkyAuthStatus(const Config &cfg);
+OpenSkyAuthState openSkyAuthStatus(const OpenSkyCredentials &creds);
 
-// msUntilNextPoll() for the adapter's own schedule and `cfg`.
-uint32_t openSkyMsUntilNextPoll(uint32_t now_ms, const Config &cfg);
+// msUntilNextPoll() for the adapter's own schedule and `poll`.
+uint32_t openSkyMsUntilNextPoll(uint32_t now_ms, const PollSettings &poll);

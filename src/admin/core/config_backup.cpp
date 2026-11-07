@@ -22,10 +22,10 @@ std::string configToBackupJson(const Config &cfg, bool includeSecrets, const cha
 
   JsonObject opensky = doc["opensky"].to<JsonObject>();
   if (includeSecrets) {
-    opensky["client_id"] = cfg.opensky_client_id;
-    opensky["client_secret"] = cfg.opensky_client_secret;
+    opensky["client_id"] = cfg.opensky.client_id;
+    opensky["client_secret"] = cfg.opensky.client_secret;
   }
-  opensky["poll_interval_s"] = cfg.poll_interval_s;
+  opensky["poll_interval_s"] = cfg.poll.interval_s;
 
   JsonObject general = doc["general"].to<JsonObject>();
   general["language"] = languageCode(cfg.language);
@@ -181,9 +181,9 @@ BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const C
   if (r.appliedFields > beforeLocation) c.home.configured = true;
 
   JsonObjectConst opensky = doc["opensky"];
-  a.text(opensky, "opensky", "client_id", c.opensky_client_id);
-  a.text(opensky, "opensky", "client_secret", c.opensky_client_secret);
-  a.count(opensky, "opensky", "poll_interval_s", c.poll_interval_s);
+  a.text(opensky, "opensky", "client_id", c.opensky.client_id);
+  a.text(opensky, "opensky", "client_secret", c.opensky.client_secret);
+  a.count(opensky, "opensky", "poll_interval_s", c.poll.interval_s);
 
   JsonObjectConst general = doc["general"];
   a.language(general, "general", "language", c.language);

@@ -11,7 +11,6 @@
 
 #include <cstdio>
 
-#include "admin/core/config_store.h"
 #include "platform/net_config.h"
 
 namespace {
@@ -45,9 +44,9 @@ void setAuth(const OpenSkyAuthState &next) {
 // One token request, with the outcome folded into `auth`. A rejected login
 // drops the cached token too, so the retry 30 min later asks for a new one
 // instead of reusing a token /states/all no longer accepts.
-TokenOutcome fetchTokenTracked(const Config &cfg) {
+TokenOutcome fetchTokenTracked(const OpenSkyCredentials &creds) {
   int code = 0;
-  const bool ok = fetchToken(cfg.opensky_client_id, cfg.opensky_client_secret, &code);
+  const bool ok = fetchToken(creds.client_id, creds.client_secret, &code);
   const TokenOutcome outcome = classifyTokenResponse(code, ok);
   if (outcome == TokenOutcome::Rejected) cachedToken.valid = false;
   setAuth(onTokenResult(auth, outcome, code, millis()));
@@ -210,7 +209,7 @@ StatesAttempt requestStatesOnce(const BoundingBox &bbox, const std::string &bear
 
 }  // namespace
 
-OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
+OpenSkyPollResult fetchAircraftStates(const OpenSkyCredentials &creds, const Home &home) {
   OpenSkyPollResult result;
   uint32_t now = millis();
 
@@ -221,8 +220,8 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
     return result;
   }
 
-  const bool haveCredentials = shouldUseOAuth(cfg.opensky_client_id, cfg.opensky_client_secret);
-  const uint32_t hash = credentialsHash(cfg.opensky_client_id, cfg.opensky_client_secret);
+  const bool haveCredentials = shouldUseOAuth(creds.client_id, creds.client_secret);
+  const uint32_t hash = credentialsHash(creds.client_id, creds.client_secret);
   if (hash != auth.credentialsHash) cachedToken.valid = false;  // a token for the old ones
   setAuth(onCredentials(auth, hash, haveCredentials));
 
@@ -230,11 +229,11 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
   // without a token this poll simply goes anonymous.
   bool tokenFetched = false;
   if (shouldTryToken(auth, now) && tokenNeedsRefresh(cachedToken, now)) {
-    fetchTokenTracked(cfg);
+    fetchTokenTracked(creds);
     tokenFetched = true;
   }
 
-  BoundingBox bbox = computeBoundingBox(cfg.home.lat, cfg.home.lon, cfg.home.radius_deg);
+  BoundingBox bbox = computeBoundingBox(home.lat, home.lon, home.radius_deg);
 
   bool bearer = planStatesRequest(auth, cachedToken.valid);
   StatesAttempt att = requestStatesOnce(bbox, bearer ? cachedToken.access_token : std::string());
@@ -249,7 +248,7 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
       // Drop the rejected token first: if the refresh doesn't yield a new
       // one (rejected or no answer), the retry goes anonymous.
       cachedToken.valid = false;
-      fetchTokenTracked(cfg);
+      fetchTokenTracked(creds);
       tokenFetched = true;
     } else if (d.step == StatesStep::RetryAnonymous) {
       cachedToken.valid = false;
@@ -320,21 +319,22 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
 
 OpenSkyQuota openSkyQuota() { return quota; }
 
-OpenSkyAuthState openSkyAuthStatus(const Config &cfg) {
-  return onCredentials(auth, credentialsHash(cfg.opensky_client_id, cfg.opensky_client_secret),
-                       shouldUseOAuth(cfg.opensky_client_id, cfg.opensky_client_secret));
+OpenSkyAuthState openSkyAuthStatus(const OpenSkyCredentials &creds) {
+  return onCredentials(auth, credentialsHash(creds.client_id, creds.client_secret),
+                       shouldUseOAuth(creds.client_id, creds.client_secret));
 }
 
-uint32_t openSkyMsUntilNextPoll(uint32_t now_ms, const Config &cfg) {
-  return msUntilNextPoll(now_ms, lastPollMs, everPolled, cfg.poll_interval_s * 1000UL);
+uint32_t openSkyMsUntilNextPoll(uint32_t now_ms, const PollSettings &poll) {
+  return msUntilNextPoll(now_ms, lastPollMs, everPolled, poll.interval_s * 1000UL);
 }
 
-OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const Config &cfg) {
-  if (!shouldPollNow(now_ms, lastPollMs, everPolled, cfg.poll_interval_s * 1000UL)) {
+OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const OpenSkyCredentials &creds,
+                                    const Home &home, const PollSettings &poll) {
+  if (!shouldPollNow(now_ms, lastPollMs, everPolled, poll.interval_s * 1000UL)) {
     return {};  // OpenSkyPollStatus::NotDue
   }
 
-  OpenSkyPollResult result = fetchAircraftStates(cfg);
+  OpenSkyPollResult result = fetchAircraftStates(creds, home);
   lastPollMs = now_ms;
   everPolled = true;
   return result;

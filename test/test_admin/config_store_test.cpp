@@ -9,12 +9,12 @@ namespace {
 static void test_default_config_has_sane_values(void) {
   Config cfg = defaultConfig();
   TEST_ASSERT_EQUAL_FLOAT(2.5f, cfg.home.radius_deg);
-  TEST_ASSERT_EQUAL_UINT32(15, cfg.poll_interval_s);
+  TEST_ASSERT_EQUAL_UINT32(15, cfg.poll.interval_s);
   TEST_ASSERT_EQUAL_INT(0, cfg.last_screen);  // Flights
   TEST_ASSERT_FALSE(cfg.auto_cycle_enabled);            // off by default
   TEST_ASSERT_EQUAL_UINT32(15, cfg.auto_cycle_interval_s);
-  TEST_ASSERT_TRUE(cfg.opensky_client_id.empty());
-  TEST_ASSERT_TRUE(cfg.opensky_client_secret.empty());
+  TEST_ASSERT_TRUE(cfg.opensky.client_id.empty());
+  TEST_ASSERT_TRUE(cfg.opensky.client_secret.empty());
   // Never-configured by default — see docs/review-notes-2026.md 1.5: (0,0) is a real
   // place, so this flag is the only way to tell "not set up yet" apart
   // from "home really is at 0,0".
@@ -86,7 +86,7 @@ static void test_sanitize_config_clamps_all_fields(void) {
   cfg.home.lat = 200.0f;
   cfg.home.lon = -500.0f;
   cfg.home.radius_deg = 0.0f;
-  cfg.poll_interval_s = 1;
+  cfg.poll.interval_s = 1;
   cfg.auto_cycle_interval_s = 0;
   cfg.phase.near_airport_km = 0.0f;
   cfg.phase.climb_rate_threshold_mps = 0.0f;
@@ -103,7 +103,7 @@ static void test_sanitize_config_clamps_all_fields(void) {
   TEST_ASSERT_EQUAL_FLOAT(90.0f, out.home.lat);
   TEST_ASSERT_EQUAL_FLOAT(-180.0f, out.home.lon);
   TEST_ASSERT_EQUAL_FLOAT(0.1f, out.home.radius_deg);
-  TEST_ASSERT_EQUAL_UINT32(5, out.poll_interval_s);
+  TEST_ASSERT_EQUAL_UINT32(5, out.poll.interval_s);
   TEST_ASSERT_EQUAL_UINT32(3, out.auto_cycle_interval_s);
   TEST_ASSERT_EQUAL_FLOAT(0.5f, out.phase.near_airport_km);
   TEST_ASSERT_EQUAL_FLOAT(0.1f, out.phase.climb_rate_threshold_mps);
@@ -121,7 +121,7 @@ static void test_sanitize_config_leaves_in_range_values_untouched(void) {
   cfg.home.lat = 51.5f;
   cfg.home.lon = -0.1f;
   cfg.home.radius_deg = 3.0f;
-  cfg.poll_interval_s = 30;
+  cfg.poll.interval_s = 30;
   cfg.auto_cycle_interval_s = 20;
   cfg.phase.near_airport_km = 20.0f;
   cfg.phase.climb_rate_threshold_mps = 2.0f;
@@ -138,7 +138,7 @@ static void test_sanitize_config_leaves_in_range_values_untouched(void) {
   TEST_ASSERT_EQUAL_FLOAT(51.5f, out.home.lat);
   TEST_ASSERT_EQUAL_FLOAT(-0.1f, out.home.lon);
   TEST_ASSERT_EQUAL_FLOAT(3.0f, out.home.radius_deg);
-  TEST_ASSERT_EQUAL_UINT32(30, out.poll_interval_s);
+  TEST_ASSERT_EQUAL_UINT32(30, out.poll.interval_s);
   TEST_ASSERT_EQUAL_UINT32(20, out.auto_cycle_interval_s);
   TEST_ASSERT_EQUAL_FLOAT(20.0f, out.phase.near_airport_km);
   TEST_ASSERT_EQUAL_FLOAT(2.0f, out.phase.climb_rate_threshold_mps);
@@ -327,9 +327,9 @@ static void test_default_config_keeps_every_stage_5_default(void) {
   TEST_ASSERT_EQUAL_FLOAT(15.0f, c.phase.near_airport_km);
   TEST_ASSERT_EQUAL_FLOAT(1.5f, c.phase.climb_rate_threshold_mps);
   // opensky, poll
-  TEST_ASSERT_TRUE(c.opensky_client_id.empty());
-  TEST_ASSERT_TRUE(c.opensky_client_secret.empty());
-  TEST_ASSERT_EQUAL_UINT32(15, c.poll_interval_s);
+  TEST_ASSERT_TRUE(c.opensky.client_id.empty());
+  TEST_ASSERT_TRUE(c.opensky.client_secret.empty());
+  TEST_ASSERT_EQUAL_UINT32(15, c.poll.interval_s);
   // display, auto_cycle
   ASSERT_ENUM_EQ(Language::PL, c.language);
   TEST_ASSERT_EQUAL_INT(0, c.last_screen);

@@ -7,8 +7,8 @@
 
 #include "display/core/backlight.h"  // nightModeFromCode(), parseClockMinutes()
 
-OpenSkyCredentials parseOpenSkyCredentialsJson(const std::string &json) {
-  OpenSkyCredentials result;
+CredentialsFile parseOpenSkyCredentialsJson(const std::string &json) {
+  CredentialsFile result;
 
   if (json.size() > kMaxCredentialsJsonBytes) {
     return result;  // refuse to even attempt parsing an unexpectedly huge body
@@ -22,9 +22,9 @@ OpenSkyCredentials parseOpenSkyCredentialsJson(const std::string &json) {
     return result;
   }
 
-  result.client_id = doc["clientId"].as<std::string>();
-  result.client_secret = doc["clientSecret"].as<std::string>();
-  result.ok = !result.client_id.empty() && !result.client_secret.empty();
+  result.creds.client_id = doc["clientId"].as<std::string>();
+  result.creds.client_secret = doc["clientSecret"].as<std::string>();
+  result.ok = !result.creds.client_id.empty() && !result.creds.client_secret.empty();
   return result;
 }
 
@@ -115,7 +115,7 @@ bool setClock(const std::string &v, uint16_t &out) {
 bool setLat(Config &c, const std::string &v) { return setFloat(v, c.home.lat); }
 bool setLon(Config &c, const std::string &v) { return setFloat(v, c.home.lon); }
 bool setRadius(Config &c, const std::string &v) { return setFloat(v, c.home.radius_deg); }
-bool setPoll(Config &c, const std::string &v) { return setUnsigned(v, c.poll_interval_s); }
+bool setPoll(Config &c, const std::string &v) { return setUnsigned(v, c.poll.interval_s); }
 bool setCycle(Config &c, const std::string &v) { return setUnsigned(v, c.auto_cycle_interval_s); }
 bool setNearKm(Config &c, const std::string &v) { return setFloat(v, c.phase.near_airport_km); }
 bool setClimb(Config &c, const std::string &v) {
@@ -197,13 +197,13 @@ SettingsFormOutcome applySettingsForm(Config &cfg, const FormArgs &args) {
     cfg.web_language = languageFromCode(args.get("web_language").c_str());
   }
 
-  if (args.has("client_id")) cfg.opensky_client_id = args.get("client_id");
+  if (args.has("client_id")) cfg.opensky.client_id = args.get("client_id");
   // The page never shows the saved secret, so an empty field means "keep it".
   const std::string secret = args.get("client_secret");
-  if (!secret.empty()) cfg.opensky_client_secret = secret;
+  if (!secret.empty()) cfg.opensky.client_secret = secret;
   if (args.has("clear_credentials")) {
-    cfg.opensky_client_id.clear();
-    cfg.opensky_client_secret.clear();
+    cfg.opensky.client_id.clear();
+    cfg.opensky.client_secret.clear();
   }
 
   // Panel password (web_auth): both fields empty = no change.
