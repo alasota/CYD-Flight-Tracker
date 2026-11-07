@@ -276,3 +276,36 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   demo needs). `main.cpp` → 249 lines, no formatting squeezed and nothing moved to another root.
   Firmware +2 208 B over the stage's start (1 346 544 → 1 348 752 B, budget +4 096), static RAM
   −8 B; on the board the UI loop's stack has more room (5 244 B free vs 4 684 on v1.11.2).
+- **Settings per context** (spec 12, stage 6, owner 2026-11-07). `Config` was 28 flat fields
+  and every module that needed one of them included `config_store.h` and took the whole struct:
+  the OpenSky and backlight adapters were layer findings for it, and a display function could
+  read the panel password. It became the aggregate of nine small objects declared in their
+  contexts (docs/architecture.md "Source layout (spec 12)"); the NVS keys and the backup JSON
+  stayed flat and byte for byte the same, pinned by a golden backup test and a key / type table
+  in the tool tests, because old backups and NVS from v1.11.x must keep loading. **Radius in
+  `Home`, not §7's `PollSettings`:** the radar ring labels, the `NetState` diff and the alerts read
+  it too, and §5 keeps `opensky` away from the display — "home and how far around it we look"
+  is airspace's (the glossary's scan area is ±radius around home). `night_pause_polling` went to
+  `BacklightSettings` (it is part of the night window and decided on core 1), `home_configured`
+  to `Home::configured`, `update_skipped_tag` to `UpdateSettings::skipped_tag`. `Config` keeps
+  its name until stage 7 so this diff is only about where fields live, not names. The name
+  `OpenSkyCredentials` went to the settings object; `settings_form`'s parsed file became
+  `CredentialsFile`. `github_http` kept a whole `Config` copy in `.bss` for one check; with
+  `UpdateSettings` instead, static RAM went down 128 B and the firmware 512 B.
+- **Settings page assets as files** (spec 12, stage 6, owner 2026-11-07). The page's CSS, script
+  and icon were ~8.2 KB of C string literals in `config_page.cpp` — hard to read, to diff and to
+  edit (every quote escaped, no syntax highlighting). They are files in `src/admin/assets/`
+  now, turned into `web_assets.h` by `tools/embed_assets.py`. **Inlined, not served as
+  `/style.css` / `/app.js`:** routes per file would change the web API (spec 12 §11), cost a
+  Digest round trip each on a single-threaded `WebServer` that runs nested inside a poll, and add
+  flash; inlined, the page is byte for byte what it was (checked against the five rendered pages
+  and the screenshots). **The generated header is checked in** (and refreshed by a `pre:` script
+  in `cyd` / `native`, its freshness tested in CI): `check_layers.py` runs in CI before any build
+  and would report an unresolved include, and IDEs / `check_comments` / a fresh clone see it.
+  The generator refuses a comment after code and a line break between two word characters
+  rather than guessing — joining lines with nothing in between is what keeps the bytes equal,
+  and a glued `return` + `x` would break the script silently.
+- **`pio run -e cyd-ota -t upload` without a password** (found in stage 6, not fixed yet): with
+  `$CYD_WEB_PASSWORD` empty, curl's `--digest` first sends an empty POST to probe for the
+  challenge; the upload route answers it with HTTP 400 and nothing is uploaded. A plain
+  `curl -F firmware=@….bin http://cyd-sky.local/update` works when the panel has no password.

@@ -9,7 +9,7 @@ Reasons and old mistakes: [history.md](history.md).
 
 Base URL `https://opensky-network.org/api`. One endpoint: `GET /states/all` with a bounding box
 (`lamin`, `lomin`, `lamax`, `lomax`, decimal degrees) centred on the home location
-(`radius_deg`, default 2.5°). Fetched with HTTP/1.0 (`useHTTP10(true)`) and parsed straight
+(`Home::radius_deg`, default 2.5°). Fetched with HTTP/1.0 (`useHTTP10(true)`) and parsed straight
 from the socket stream — see history.md "HTTP/1.0 for /states/all". TLS is not verified
 (`setInsecure()`).
 

@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **w trakcie — etap 6 z 8** (etap 5 zrobiony w v1.11.3) 2026-11-05, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etapy 6–8 do zrobienia. Jedna specyfikacja dla całej
+Status: **etap 6 z 8 zrobiony (vNEXT)** 2026-11-07, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 w vNEXT, etapy 7–8 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -222,10 +222,15 @@ własne obiekty wartości, wycinane w korzeniach kompozycji:
 
 | Kontekst | Obiekt | Pola |
 |---|---|---|
-| `airspace` | `Home`, `PhaseThresholds` | lat/lon, `near_airport_km`, `climb_rate_threshold_mps` |
-| `opensky` | `OpenSkyCredentials`, `PollSettings` | client id/secret, `radius_deg`, `poll_interval_s` |
-| `display` | `DisplaySettings`, `BacklightSettings`, `AutoCycleSettings` | język, ostatni ekran, jasność, noc, auto-cycle |
-| `admin` | `UpdateSettings`, `WebSettings` | sprawdzanie aktualizacji, pre-release, hasło, język panelu |
+| `airspace` | `Home`, `PhaseThresholds` | lat/lon, `radius_deg`, `configured`, `near_airport_km`, `climb_rate_threshold_mps` |
+| `opensky` | `OpenSkyCredentials`, `PollSettings` | client id/secret, `interval_s` |
+| `display` | `DisplaySettings`, `BacklightSettings`, `AutoCycleSettings` | język, ostatni ekran, jasność, noc (z `night_pause_polling`), auto-cycle |
+| `admin` | `UpdateSettings`, `WebSettings` | sprawdzanie aktualizacji, pre-release, pominięta wersja (`skipped_tag`), hasło, język panelu |
+
+Poprawione w etapie 6 (decyzja właściciela 2026-11-07): `radius_deg` jest w `Home`, nie w
+`PollSettings` — czytają go też pierścienie radaru, różnica `NetState` i ostrzeżenia, a ekran nie
+widzi `opensky` (§5). Trzy pola, których tabela nie nazywała, trafiły do `Home::configured`,
+`BacklightSettings::night_pause_polling` i `UpdateSettings::skipped_tag`.
 
 `Settings` składa się z tych obiektów (pola `settings.backlight.night_mode` zamiast
 `cfg.night_mode`). Klucze NVS i format kopii zapasowej **bez zmian** (testy `config_backup`
@@ -321,6 +326,24 @@ a ekran czyta z niego tylko swoje obiekty.
    Gdy `main.cpp` stanął na 327 liniach, właściciel wybrał sterownik `ServiceScreens` (czysty
    `ServiceScreenFlows` + adapter) i agregat `UiFlow` w `ui_flow` (wynik niżej).
 6. **Ustawienia per kontekst** (§7) + zasoby WWW jako pliki (`admin/assets/`, `embed_assets.py`).
+   Decyzje (plan etapu 6, właściciel 2026-11-07 — domyślne odpowiedzi na Q1–Q7):
+   - Q1: `radius_deg` w `Home` z `airspace` („dom i jak daleko wokół niego patrzymy”),
+     `PollSettings` ma tylko `interval_s` (tabela §7 poprawiona);
+   - Q2: `night_pause_polling` → `BacklightSettings` (część okna nocy, decyduje rdzeń 1),
+     `home_configured` → `Home::configured`, `update_skipped_tag` → `UpdateSettings::skipped_tag`
+     (stan urządzenia, dalej poza kopią zapasową);
+   - Q3: zasoby wstawiane w stronę (jedna odpowiedź HTML, bajt w bajt jak przedtem), nie osobne
+     trasy `/style.css` / `/app.js` (§11: API WWW bez zmian, bez dodatkowych rund Digest);
+   - Q4: wszystkie pięć plików: `style.css`, `app.js`, `favicon.svg` (§4.5) oraz `restart.js`,
+     `check_pending.js` — w C++ nie zostaje żaden JS;
+   - Q5: wygenerowany `admin/core/web_assets.h` jest w repozytorium; skrypt `pre:` w `cyd` i
+     `native` odświeża go przy kompilacji, test narzędzi w CI sprawdza, że jest aktualny;
+   - Q6: `Config` → `Settings` (i `config_store` → `settings`) dopiero w etapie 7;
+   - Q7: podział `net_task.cpp` (§10 pkt 3) i `config_page.cpp` (897 linii) — osobny PR przed
+     etapem 8, nie w tym etapie;
+   - w trakcie (decyzja orkiestratora): sparsowany plik poświadczeń w `admin/core/settings_form.h`
+     zmienił nazwę z `OpenSkyCredentials` na `CredentialsFile { ok, creds }` — tę nazwę ma teraz
+     obiekt ustawień `opensky`.
 7. **Nazwy ze słownika** (§3), po jednej zmianie nazwy na commit (`AircraftRow` →
    `TrackedFlight` itd.), automatycznie (`sed` + kompilacja), bez innych zmian w tym commicie.
 8. **Egzekwowanie.** `check_layers.py` blokuje CI; `docs/architecture.md` (konteksty, tabela
@@ -586,6 +609,82 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   reset hasła przy starcie (NIE), formularz („abc” / „x” odrzucone w tej kolejności, zmiana
   przetrwa restart). Na wersji `-dev` pytanie o aktualizację na żywo się nie pokaże
   (`installedIsDev`) — dowodem są testy natywne i demo `screen=3`.
+
+### Wynik etapu 6 (2026-11-07, wydany w vNEXT)
+
+- **§7 → obiekty.** `Config` nie ma już ani jednego płaskiego pola: to agregat dziewięciu
+  obiektów wartości, każdy w nagłówku swojego kontekstu (bez `.cpp`, wartości domyślne te same
+  co wcześniej):
+
+  | Pole `Config` | Obiekt | Nagłówek |
+  |---|---|---|
+  | `home` | `Home {lat, lon, radius_deg, configured}` | `airspace/core/home.h` (nowy) |
+  | `phase` | `PhaseThresholds {near_airport_km, climb_rate_threshold_mps}` | `airspace/core/flight_phase.h` |
+  | `opensky` | `OpenSkyCredentials {client_id, client_secret}` | `opensky/core/opensky_settings.h` (nowy) |
+  | `poll` | `PollSettings {interval_s}` | jw. |
+  | `display` | `DisplaySettings {language, last_screen}` | `display/core/display_settings.h` (nowy) |
+  | `auto_cycle` | `AutoCycleSettings {enabled, interval_s}` | jw. |
+  | `backlight` | `BacklightSettings` (jasność, noc, `night_pause_polling`) | `display/core/backlight.h` |
+  | `update` | `UpdateSettings {check_enabled, show_prerelease, skipped_tag}` | `admin/core/config_store.h` |
+  | `web` | `WebSettings {language, password}` | `admin/core/config_store.h` |
+
+  `sanitizeConfig()`, klamry, `defaultConfig()`, zapis / odczyt NVS i kopia zapasowa zostały w
+  `admin` (agregat pilnuje niezmienników); zmieniły się tylko ścieżki pól. Funkcje poza `admin/`
+  dostają tylko swoje obiekty: `fetchAircraftStates(creds, home)`, `openSkyClientPoll(now, creds,
+  home, poll)`, `openSkyAuthStatus(creds)`, `openSkyMsUntilNextPoll(now, poll)`,
+  `backlightHandleTouch()` / `backlightStatus(const BacklightSettings &)`, `backlightLoop(tft,
+  backlight, home, …)`, `PipelineParams {Home home; PhaseThresholds phase; …}`,
+  `releaseCheckBegin(const UpdateSettings &)`, `nightMinutesToday()` / `pausedMinutesPerDay(const
+  BacklightSettings &, …)`. `github_http` trzyma `UpdateSettings` zamiast całej kopii `Config` w
+  `.bss`. Ekran czyta z `NetState` tylko `home`, `display`, `auto_cycle`, `backlight` i
+  `update.skipped_tag`. `Config` nazywa się tak do etapu 7.
+- **Klucze NVS i kopia zapasowa bez zmian:** test narzędzi przypina 28 kluczy i ich typy w
+  `settings_nvs.cpp`; złoty JSON kopii (z sekretami i bez) i odtworzenie kopii sprzed etapu 6
+  (25 ustawień) w `config_backup_test.cpp`; wszystkie 28 wartości domyślnych w
+  `config_store_test.cpp`.
+- **`check_layers.py`: 14 → 12** — odpadły `opensky_http.cpp -> admin/core` i
+  `backlight_ldr.cpp -> admin/core` (oba `config_store.h`), pozostałe 12 jak przed etapem;
+  limit w teście narzędzi 12. `config_store.h` dołączają tylko `admin/`, korzenie i
+  `core_link.h` (§10 pkt 4 czytany tak: `NetState` niesie agregat).
+- **Zasoby panelu jako pliki (§4.5):** `src/admin/assets/` — `style.css`, `app.js`,
+  `restart.js`, `check_pending.js`, `favicon.svg` (= `site/favicon.svg`, test pilnuje). Generator
+  `tools/embed_assets.py` (skrypt `pre:` w `cyd` i `native`, też z wiersza poleceń, `--check`)
+  tworzy `src/admin/core/web_assets.h` (w repozytorium, zapis tylko przy różnicy): usuwa
+  komentarze w osobnych liniach, przycina i skleja linie; błąd z `plik:linia`, gdy sklejenie
+  złączyłoby dwa tokeny albo gdy komentarz stoi za kodem. `config_page.cpp` nie ma już literałów
+  CSS / JS / SVG: 1 053 → 897 linii. Pięć stron z `SCREENSHOT_OUT` jest **bajt w bajt** takich
+  samych jak przed etapem, PNG z `tools/screenshots.py` też; `web_i18n` bez zmian.
+- **Testy:** wszystkie 6 grup zielone: admin **257** (3 pominięte), airspace 71, display 408,
+  enrichment 80, opensky 74, platform **84** = **974** (było 967); `RUN_TEST(` = 974.
+  `check_bdd.py` 0 problemów (268 scenariuszy), `check_comments.py --strict` czysto,
+  `rewrite_includes.py --check` = 0, `embed_assets.py --check` = 0; testy narzędzi zielone
+  (`test_check_layers.py` 79, nowy `test_embed_assets.py` 17, w CI w `firmware.yml`).
+- **Firmware** (czyste kompilacje, ta sama długość napisu wersji): **1 348 224 B (−512 wobec
+  1 348 736 na starcie etapu, budżet ± 1 024)**, Flash used 1 341 641, **RAM 61 908 B (−128)** —
+  `github_http` bez kopii `Config`. Po krokach: 2 −48 (RAM +8: `Home` pakuje `configured` za
+  trzema `float`) · 3 +16 · 4 −240 · 5 −256 (RAM −136) · 6 ±0 · 7 +16 · 8 ±0.
+- **Odstępstwa od planu:** wszystkie pięć plików zasobów powstało w kroku 7 (krok 8 tylko
+  przełączył `config_page.cpp` na JS z plików); `CredentialsFile` zamiast `OpenSkyCredentials` w
+  `settings_form.h` (zmiana nazwy w teście narzędzi `STAGE_4_HOMES` i w przykładzie scenariusza
+  etapu 4; asercje te same); `main.cpp` przełącza język ekranu po `e.languageChanged` z
+  `diffNetState()` (to samo porównanie, bez nowej linii — plik ma 249). Test „teksty skryptu z
+  `web_i18n`” czyta „żaden tekst `T` nie występuje w JS” jako: nie ma go w literałach napisów ani
+  jako prozy (`day` / `night` to też nazwy właściwości w skrypcie).
+- **`@manual` (płytka, 2026-11-07):** obraz `25225c4` (`v1.11.3-9-g25225c4`) wgrany przez WiFi
+  zwykłym `curl -F firmware=@… /update` (200, 1 348 444 B w 13,8 s); po 105 s działa, bez
+  wycofania. `/backup.json` przed i po: te same 25 kluczy, różni się tylko `firmware`.
+  `/perf.json` po 105 s: przerwa pętli UI maks. 96 ms, p99 20 ms, 0 wolnych przejść; wolny stos
+  UI 5 244 B, net 9 888 B (etap 5: 9 692); sterta 148 208 B, największy blok 65 524 B.
+  `/light.json`: noc, 10 %, polling włączony, czas zsynchronizowany. `GET /` 200, 19 919 B.
+  Ekran i panel wyglądają tak samo, więc zrzutów nie odświeżano.
+  **Znalezione po drodze (nie poprawione w tym etapie):** `pio run -e cyd-ota -t upload` z pustym
+  `$CYD_WEB_PASSWORD` kończy się HTTP 400 bez wysłania bajtu — `curl --digest` sonduje pustym
+  POST-em, a trasa wysyłania odpowiada na niego 400. Przy pierwszej próbie płytka raz się
+  zrestartowała (ten sam obraz, przyczyna nieznana, bez logu szeregowego).
+  **Zostaje dla właściciela:** dotyk, zmiana zasięgu → pierścienie RADARU, język ekranu PL ↔ EN,
+  auto-cycle, ostatni ekran po restarcie, „Sprawdź teraz” (TLS, blok ≥ 50 KB), panel w
+  przeglądarce (zakładki, kredyty na żywo, linia „Teraz”, pasek postępu OTA, przeładowanie po
+  restarcie), zapis → restart → ta sama kopia zapasowa.
 
 ## 9. Testy
 

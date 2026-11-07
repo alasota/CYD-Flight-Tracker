@@ -14,8 +14,9 @@ Spec: `spec/planned/12-code-reorganization-ddd.md` (§2 layer names, §4 context
 table, §8 stages). Stage 1 moved the files with `git mv`, **unsplit and unrenamed**; stage 2
 renamed the layer folders; stage 3 moved misplaced types into their contexts; stage 4 split
 every `#ifdef ARDUINO` half out into `adapters/`; stage 5 moved the UI's state machines out of
-`main.cpp` into `display/services/` and the form logic of `POST /save` into `settings_form`.
-Stages 6–8 add settings per context, rename to the glossary and make the layer check block CI.
+`main.cpp` into `display/services/` and the form logic of `POST /save` into `settings_form`;
+stage 6 split `Config` into per-context settings objects and moved the settings page's CSS / JS /
+icon into files. Stages 7–8 rename to the glossary and make the layer check block CI.
 
 - **Folders:** `src/<context>/<layer>/` — contexts `airspace` (the sky model: aircraft state,
   tracked flights, their order, the NOW pick, feed health, flight phase, CPA; the poll pipeline),
@@ -86,8 +87,8 @@ Stages 6–8 add settings per context, rename to the glossary and make the layer
   identity block → theme), so no step added a `display/core -> display/adapters` include. Also:
   `extractAircraftFromStates()` is public in `opensky_client.h` (`opensky_http` calls it; one new
   test), `OtaObserver` moved from the web server's header to `ota_update.h`, `config_portal`'s
-  pure functions went to `admin/core/settings_form` (`OpenSkyCredentials`,
-  `parseOpenSkyCredentialsJson()`, `isValidFloatString()`, `isValidUnsignedIntString()`), then
+  pure functions went to `admin/core/settings_form` (the parsed credentials file, since stage 6
+  `CredentialsFile`, `parseOpenSkyCredentialsJson()`, `isValidFloatString()`, `isValidUnsignedIntString()`), then
   `config_portal` was renamed `web_server` (`MOVES_STAGE_4`; the `configPortal*()` functions keep
   their names until stage 7), `time_sync`'s formatters (`formatDate()`, `formatTime()`,
   `minuteOf()`) went to `shared/clock`, `main/net_task` lost its whole-file guard, and
@@ -134,6 +135,44 @@ Stages 6–8 add settings per context, rename to the glossary and make the layer
   `test_main_cpp_keeps_no_flow_state`, `test_stage_5_flows_left_main_cpp`,
   `test_web_server_save_route_has_no_form_logic`, `test_stage_5_services_have_their_tests`,
   `test_stage_5_moved_tests_follow_their_code`.
+- **Stage 6** (settings per context, spec 12 §7, and the page assets as files, §4.5; owner
+  2026-11-07: the plan's defaults). `Config` (`admin/core/config_store.h`) has no flat field left;
+  it is the aggregate of nine value objects, each declared in its context, header-only, with the
+  old defaults as member initializers (⚠️ gnu++11 on `cyd`: not aggregates there — assign
+  members, never `X{…}`):
+
+  | `Config::` | Type | Header |
+  |---|---|---|
+  | `home` | `Home {lat, lon, radius_deg, configured}` | `airspace/core/home.h` |
+  | `phase` | `PhaseThresholds {near_airport_km, climb_rate_threshold_mps}` | `airspace/core/flight_phase.h` |
+  | `opensky` | `OpenSkyCredentials {client_id, client_secret}` | `opensky/core/opensky_settings.h` |
+  | `poll` | `PollSettings {interval_s}` | `opensky/core/opensky_settings.h` |
+  | `display` | `DisplaySettings {language, last_screen}` | `display/core/display_settings.h` |
+  | `auto_cycle` | `AutoCycleSettings {enabled, interval_s}` | `display/core/display_settings.h` |
+  | `backlight` | `BacklightSettings {brightness_*, night_*, night_pause_polling}` | `display/core/backlight.h` |
+  | `update` | `UpdateSettings {check_enabled, show_prerelease, skipped_tag}` | `admin/core/config_store.h` |
+  | `web` | `WebSettings {language, password}` | `admin/core/config_store.h` |
+
+  The radius is in `Home` (not §7's `PollSettings`): the radar rings, the `NetState` diff and the
+  alerts read it too, and the display never sees `opensky` (docs/history.md "Tooling and docs").
+  `sanitizeConfig()`, the clamps, `defaultConfig()`, `loadConfig()` / `saveConfig()` and the
+  backup stay in `admin`; the NVS keys and the backup JSON are flat and unchanged. Code outside
+  `admin/` takes only its objects: `fetchAircraftStates(creds, home)`,
+  `openSkyClientPoll(now, creds, home, poll)`, `openSkyAuthStatus(creds)`,
+  `openSkyMsUntilNextPoll(now, poll)`, `backlightHandleTouch()` / `backlightStatus(const
+  BacklightSettings &)`, `backlightLoop(tft, backlight, home, fullBright)`, `PipelineParams {Home
+  home; PhaseThresholds phase; …}`, `releaseCheckBegin(const UpdateSettings &)`,
+  `nightMinutesToday()` / `pausedMinutesPerDay(const BacklightSettings &, …)`. `backlight.h` and
+  `opensky_client.h` include `home.h` (core → `airspace/core` is allowed), so their adapters get
+  `Home` without a new finding; `config_store.h` is included only by `admin/`, the roots and
+  `core_link.h`. `settings_form.h`'s parsed credentials file is `CredentialsFile {ok, creds}`.
+  The name `Config` stays until stage 7. `LayoutTest` keeps it so:
+  `test_config_is_built_from_context_objects`, `test_settings_nvs_keys_and_types_unchanged` (28
+  keys, their `Preferences` types), `test_only_admin_roots_and_core_link_include_settings`,
+  `test_config_type_named_only_in_admin_roots_and_core_link`,
+  `test_context_functions_take_their_settings_objects`,
+  `test_display_reads_only_its_settings_from_net_state`. Page assets: `src/admin/assets/` +
+  `tools/embed_assets.py` → `admin/core/web_assets.h` (see "Settings page").
 - **Includes** are full paths from `src/` (`#include "display/core/i18n.h"`), in `src/` and
   `test/` alike; `-I src` is in `env:cyd` and `env:native` (`cyd-ota`, `native-asan` inherit).
   `test/support/` headers and test-local headers (`github_fixtures.h`) stay short.
@@ -182,9 +221,11 @@ Stages 6–8 add settings per context, rename to the glossary and make the layer
   `tracked_flight.h -> enrichment/core` × 2, `poll_pipeline.h -> platform` (`core_link.h`),
   `place_names.h` / `opensky_quota.h -> display/core` (`Language`). `tools/test_check_layers.py`'s
   `LayoutTest.test_layer_findings_do_not_exceed_the_stage_limit` fails above
-  `LAYER_FINDINGS_LIMIT = 14`; each stage that lowers the count lowers the limit with it (51 → 47
-  → 14), so progress can't slip back unnoticed. **Still 14 after stage 5** — the same list (the
-  new modules include only what §5 allows).
+  `LAYER_FINDINGS_LIMIT = 12`; each stage that lowers the count lowers the limit with it (51 → 47
+  → 14 → 12), so progress can't slip back unnoticed. **Still 14 after stage 5** — the same list (the
+  new modules include only what §5 allows). **12 after stage 6**: `opensky_http.cpp` and
+  `backlight_ldr.cpp -> admin/core` (`config_store.h`) are gone — they take their settings
+  objects now (`LayoutTest.test_stage_6_removes_the_settings_findings_of_adapters`).
   A short include (resolving only from the file's own folder) and a file outside any context are
   findings too; `LayoutTest` keeps the tree free of them, of old `domain/` / `app/` paths in code,
   build files and tools, and keeps the `RUN_TEST(` count ≥ 874.
@@ -211,7 +252,8 @@ two cores"; this is how it works.
   `wifi_manager`, `time_sync` (NTP), `web_server` (WebServer + mDNS), `opensky_client`,
   the hexdb.io lookups with their caches, `poll_pipeline`, `release_check`, both OTA paths,
   marking the image valid. It owns the in-memory `Config` and reloads it after a settings save
-  (`configPortalSaveCount()`). Each pass ends with `vTaskDelay(kNetIdleSleepMs = 5)`.
+  (`configPortalSaveCount()`); it hands each module only its settings objects (`PipelineParams`
+  gets `home` + `phase`, OpenSky `opensky` + `home` + `poll`, the release check `update`). Each pass ends with `vTaskDelay(kNetIdleSleepMs = 5)`.
 - **Core 1 — `loop()` in `main.cpp`** (Arduino loopTask, default 8 KB stack): `tft`, touch,
   `screen_nav`, redraw, `backlight`, the update question, service screens. `main.cpp` only wires:
   the decisions are in `display/services` (`UiFlow`, `ServiceScreenFlows`, `UiPerfMeter`), the
@@ -235,6 +277,9 @@ two cores"; this is how it works.
      unlocking (tested). Rows live in a `DataSnapshot` shared between consecutive NetStates, so
      a health / update / OTA change never copies them. `net_task` publishes only when
      `netStateDiffers()`; the UI turns a new one into redraw events with `diffNetState()`.
+     The settings ride along as one `shared_ptr<const Config> cfg` (a new one per save, no
+     per-object copies); the UI reads only `home`, `display`, `auto_cycle`, `backlight` and
+     `update.skipped_tag` from it (`LayoutTest.test_display_reads_only_its_settings_from_net_state`).
   2. `NetCommand` UI → net: a FreeRTOS queue of 8 POD commands (`None` by default,
      `InstallTag` = YES on the update question, `SkipTag` = NO); never blocks. A command the
      full queue refuses waits in a one-slot `PendingCommand` (`submitCommand()`, a newer one
@@ -314,7 +359,7 @@ two cores"; this is how it works.
   `rejectedFieldsText(rejected, web_language)` after `WebStr::SavedWithInvalid` ("Zapisano, ale te
   pola były błędne …"). The clamped five are clamped even when not sent; a missing checkbox =
   unchecked, a missing text field = unchanged, an empty `client_secret` keeps the saved one; a
-  refused password is listed under `passwordProblem()`'s label. Sets `home_configured`.
+  refused password is listed under `passwordProblem()`'s label. Sets `home.configured`.
 - **Five tabs:** **Location** (lat/lon, radius + credits per request), **OpenSky client**
   (account pill, client id/secret, credentials-file upload, poll interval + credits per day vs.
   the limit), **General** (display + web-panel language, display brightness / night mode,
@@ -325,7 +370,28 @@ two cores"; this is how it works.
 - **Look:** dark (`#17181c`), muted greys, thin borders, the display's peach `#ff9966` as the
   only accent (active tab, buttons, focus) with dark text on it. Alerts `--alert:#ff3333`,
   `--warn:#ff8000`.
-- **Page language** (`Config::web_language`, NVS `wlang`, default PL), independent of the
+- **Assets as files** (spec 12 §4.5): the page's CSS, script and icon are
+  `src/admin/assets/` — `style.css`, `app.js` (tabs, live credits, the "Now" line, upload
+  progress), `restart.js` (reload once the board is back after an update), `check_pending.js`
+  (while "Check now" waits) and `favicon.svg` (the same file as `site/favicon.svg`, a test keeps
+  them equal). `tools/embed_assets.py` turns them into `src/admin/core/web_assets.h`
+  (`kWebStyleCss`, `kWebAppJs`, `kWebRestartJs`, `kWebCheckPendingJs`, `kWebFaviconUri`; one C
+  literal per source line), which only `config_page.cpp` includes. The page stays **one inlined
+  HTML response** — `<link rel="icon" href="data:…">`, `<style>` + CSS, `<script>` + the
+  `T={…}` texts from `webTr()` + the JS — byte for byte what the hand-written literals were, no
+  routes per asset (docs/history.md "Tooling and docs"). The header is checked in and regenerated
+  by a `pre:` script in `env:cyd` and `env:native` (written only when its content differs).
+  **To change the look or the script:** edit the asset file and build (`pio run` or
+  `pio test -e native`), or run `python tools/embed_assets.py`; commit the asset and the header
+  together (`--check` exits 1 on a stale header, `RepoTest` fails in CI). Generator rules (an
+  error naming `file:line`, nothing written): comments only on their own line (`/* … */` in CSS,
+  also over several lines; `//` in JS) — a comment after code is refused; every line is trimmed
+  and the lines are joined with **nothing** in between, so a line ending in a letter / digit /
+  `_` / `$` / quote can't be followed by one starting with one (`return` + `x`, `margin:0` +
+  `auto` would glue) — end the line with `;`, `{`, `,` or keep the tokens on one line. No regex
+  or template literal that needs a newline. Text strings belong in `web_i18n`, not in the JS.
+  The SVG becomes `data:image/svg+xml,` + the markup with `"` → `'`, `#` → `%23`.
+- **Page language** (`Config::web.language`, NVS `wlang`, default PL), independent of the
   display's: PL/EN switch in the header — two small `<form method="post" action="/lang">`
   (hidden `l` + `tab`), and a select on the General tab. Strings: the `web_i18n` X-macro table
   (`WEB_I18N_STRINGS`, `webTr()`); they go into HTML/JS raw, so `web_i18n_test.cpp` forbids
@@ -345,7 +411,9 @@ Spec: `spec/done/01-ota-updates.md`. Released in v1.1.0.
 
 - **Upload:** `POST /update[?size=N]` (multipart field `firmware`) — the Firmware tab (XHR with
   a progress bar; a plain form post works too) or `pio run -e cyd-ota -t upload`
-  (`curl --digest`, password from `$CYD_WEB_PASSWORD`). The file is the CI's
+  (`curl --digest`, password from `$CYD_WEB_PASSWORD`; ⚠️ with an empty password it fails with
+  HTTP 400 and uploads nothing — use `curl -F firmware=@<file> http://cyd-sky.local/update`,
+  docs/history.md "Tooling and docs"). The file is the CI's
   `cyd-sky-tracker-<version>.bin` (app only). `OtaSession` checks the header before anything
   reaches `Update`, and calls `Update.end()` (which switches the boot slot) only when the file
   carried the **firmware marker** `CYDSKY-FW1|board=<FW_BOARD>|v=<FW_VERSION>` (`version.cpp`,
@@ -373,7 +441,7 @@ Spec: `spec/done/01-ota-updates.md`. Released in v1.1.0.
   restarted (`shouldRestartForRollback()`), so the bootloader goes back to the previous slot.
   OpenSky trouble never rolls back. Verified with an image that `abort()`s after 8 s and one
   whose UI loop hangs after 8 s: both came back on the previous slot.
-- **Password:** `Config::web_password` (NVS `wpass`), optional (default none);
+- **Password:** `Config::web.password` (NVS `wpass`), optional (default none);
   `validateWebPassword()` accepts 8–64 printable ASCII characters, `""` = no password.
   When set, every
   route calls `authorize()` first: HTTP Digest (`WebServer::authenticate`, realm
@@ -419,7 +487,7 @@ Spec: `spec/done/02-github-release-check.md`.
 - **Check:** `GET api.github.com/repos/<FW_UPDATE_REPO>/releases/latest` 2 min after boot, then
   daily (`If-None-Match` ETag → a 304 doesn't count against GitHub's 60/h). Only between OpenSky
   polls and with heap to spare (`canStartNetworkTask()`: WiFi, clock synced, ≥ 5 s to the next
-  poll, ≥ 50 KB free block). Setting `update_check_enabled` (NVS `updchk`, default on) only
+  poll, ≥ 50 KB free block). Setting `update.check_enabled` (NVS `updchk`, default on) only
   *checks*; installing always needs a YES. A failed connect is retried once.
 - **TLS is verified here** (unlike OpenSky / hexdb.io): `src/admin/adapters/github_ca.h` holds
   the *root* CAs (Sectigo E46/R46 + USERTrust ECC/RSA for github.com / api.github.com, ISRG
@@ -436,7 +504,7 @@ Spec: `spec/done/02-github-release-check.md`.
 - **Display question:** `shouldShowUpdatePrompt()` — only `Available` (a release newer than a
   plain release build), once per boot, not for a development build, not over the NOW countdown,
   not under a finger, not while the screen is dark or the alert screen is open (`PromptGate`).
-  YES installs (`NetCommand::InstallTag`); NO stores `update_skipped_tag` (NVS `updskip`, not
+  YES installs (`NetCommand::InstallTag`); NO stores `update.skipped_tag` (NVS `updskip`, not
   in backups); 30 s = later (next boot). Screenshot: `/screenshot.bmp?screen=3` (demo data,
   `updateDemoState()`).
 - **Settings page** (Firmware tab, first card): installed / latest / status / checked time,
@@ -558,6 +626,10 @@ green dot, red "!").
   `firmwareVersion()` returns it, `"dev"` when not injected (native tests). Shown only in
   the settings page footer, not on the display. The script also writes
   `.pio/build/cyd/cyd-sky-tracker-<version>.bin` (copy of firmware.bin) and `version.txt`.
+- **Second pre-script:** `tools/embed_assets.py` (`pre:` in `env:cyd` after `pio_version.py`,
+  and in `env:native`; `cyd-ota` / `native-asan` inherit) regenerates `src/admin/core/web_assets.h`
+  from `src/admin/assets/` when it differs (see "Settings page"); a broken asset stops the build
+  with `file:line`.
 - **Partitions:** `min_spiffs.csv` — two 1.875 MB OTA slots, NVS at the same offset as before.
   The firmware (~1.35 MB) must stay under one slot; the efont subset (CLAUDE.md "Language") and
   the build without exceptions help it fit.
@@ -575,7 +647,8 @@ green dot, red "!").
     only, before the tests — "Source layout"), `pio test -e native`, `pio test -e native-asan`,
     the Python tool tests (`tools/test_check_bdd.py`, `test_release_plan.py`,
     `test_build_site.py`, `test_check_comments.py`, `test_check_layers.py`,
-    `test_rewrite_includes.py`, `test_subset_efont.py`), the BDD check (`tools/check_bdd.py`),
+    `test_rewrite_includes.py`, `test_subset_efont.py`, `test_embed_assets.py` — its `RepoTest`
+    fails on a stale `web_assets.h`), the BDD check (`tools/check_bdd.py`),
     the comment check (`tools/check_comments.py`, warnings only),
     builds, uploads artifact `cyd-sky-tracker-<version>` with `cyd-sky-tracker-<version>.bin`
     (app, OTA or 0x10000), `…-full.bin` (merged image, 0x0), `bootloader.bin`,

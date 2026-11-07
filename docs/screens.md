@@ -211,7 +211,8 @@ empty-state text ("BRAK LOTU").
   tap logs `[touch] raw=(x,y) -> screen=(x,y) nav=<action>` — use it to re-tune if taps near an
   edge feel off (corners not measured yet). LovyanGFX's `calibrateTouch()` exists if a proper
   4-corner calibration is ever wanted.
-- **Persistence:** the screen index is saved as `last_screen` (0/1/2) and restored on boot.
+- **Persistence:** the screen index is saved as `display.last_screen` (NVS `last_screen`, 0/1/2)
+  and restored on boot.
   Whether a change is written depends on its cause (`ScreenChangeCause`,
   `shouldPersistScreenChange()`, applied by `ui_flow`'s `ScreenChangeTracker`): `Touch` always,
   `AutoCycle` at most every 10 min (`kScreenPersistMinIntervalMs`), `Screenshot` never (a `/screenshot.bmp?screen=N` switch is
@@ -221,8 +222,8 @@ empty-state text ("BRAK LOTU").
 
 ## Auto screen cycling
 
-Off by default. Settings (General tab): `auto_cycle_enabled` (default false),
-`auto_cycle_interval_s` (default 15).
+Off by default. Settings (General tab): `auto_cycle.enabled` (default false),
+`auto_cycle.interval_s` (default 15).
 
 - A `millis()` timer counts from the last screen change; at the interval the UI advances with
   the same `nextScreen()` as manual navigation and restarts the timer. The gate is the pure
