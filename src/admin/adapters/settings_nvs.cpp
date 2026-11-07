@@ -1,8 +1,8 @@
-// settings_nvs — the Preferences (NVS) half of config_store: loads every
+// settings_nvs — the Preferences (NVS) half of the settings module: loads every
 // setting through sanitizeSettings() and saves them back, plus the single-key
 // writes (last screen, update choices). Hardware adapter, not covered by Unity
 // (CLAUDE.md "Testing").
-#include "admin/core/config_store.h"
+#include "admin/core/settings.h"
 
 #include <Preferences.h>
 

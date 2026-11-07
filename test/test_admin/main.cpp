@@ -6,7 +6,7 @@
 void run_config_page_tests();
 void run_settings_form_tests();
 void run_config_backup_tests();
-void run_config_store_tests();
+void run_settings_tests();
 void run_web_auth_tests();
 void run_web_i18n_tests();
 void run_ota_update_tests();
@@ -31,7 +31,7 @@ int main(int, char **) {
   if (RUN_MODULE(config_page)) run_config_page_tests();
   if (RUN_MODULE(settings_form)) run_settings_form_tests();
   if (RUN_MODULE(config_backup)) run_config_backup_tests();
-  if (RUN_MODULE(config_store)) run_config_store_tests();
+  if (RUN_MODULE(settings)) run_settings_tests();
   if (RUN_MODULE(web_auth)) run_web_auth_tests();
   if (RUN_MODULE(web_i18n)) run_web_i18n_tests();
   if (RUN_MODULE(ota_update)) run_ota_update_tests();

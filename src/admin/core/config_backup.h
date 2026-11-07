@@ -14,7 +14,7 @@
 //
 // Restoring is forgiving: a missing key keeps the current value (so a file
 // saved without credentials doesn't wipe them), a key with the wrong type is
-// skipped and reported. Range checks are config_store's sanitizeSettings() job.
+// skipped and reported. Range checks are sanitizeSettings()'s job.
 //
 // Pure — ArduinoJson only, no WebServer/NVS — tested under `pio test -e native`.
 #pragma once
@@ -23,7 +23,7 @@
 #include <string>
 #include <vector>
 
-#include "admin/core/config_store.h"  // Settings
+#include "admin/core/settings.h"  // Settings
 
 constexpr const char *kBackupFormat = "cyd-sky-tracker-config";
 constexpr int kBackupFormatVersion = 1;

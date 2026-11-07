@@ -1,9 +1,9 @@
 // home — where the device stands and how far around it the sky is watched:
-// airspace's settings object (spec 12 §7). Settings (admin/core/config_store.h)
+// airspace's settings object (spec 12 §7). Settings (admin/core/settings.h)
 // holds one as `home`; the pipeline, the OpenSky bounding box, the radar
 // rings and the sun times read only this.
 //
-// Header-only, no logic: the clamps live in config_store (the aggregate keeps
+// Header-only, no logic: the clamps live in sanitizeSettings() (the aggregate keeps
 // its invariants). ⚠️ env:cyd is gnu++11 — with these default member
 // initializers the struct isn't an aggregate there: assign members, never
 // `Home{…}`.

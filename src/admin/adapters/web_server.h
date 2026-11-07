@@ -2,7 +2,7 @@
 // OpenSky client_id/client_secret/auto-cycle settings, reachable via mDNS
 // at cyd-sky.local (see
 // CLAUDE.md "Code conventions"). Submissions are persisted through
-// config_store.
+// the settings module.
 #pragma once
 
 #include <cstddef>
@@ -14,7 +14,7 @@
 // --- Hardware adapter: serves the local config web page at cyd-sky.local
 // (mDNS) with a form for lat/lon/radius/poll interval/auto-cycle/OpenSky
 // credentials (and the rest of the Settings objects),
-// read/persisted via config_store. The radius field's credit cost updates
+// read/persisted via the settings module. The radius field's credit cost updates
 // live in the browser (client-side JS mirroring scan_area's openSkyCreditCost())
 // as the user types, no round trip needed. A second form lets the user
 // upload OpenSky's credentials JSON file directly instead of copy-pasting

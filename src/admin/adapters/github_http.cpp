@@ -10,7 +10,7 @@
 #include <WiFiClientSecure.h>
 
 #include "admin/adapters/github_ca.h"
-#include "admin/core/config_store.h"
+#include "admin/core/settings.h"
 #include "admin/core/firmware/version.h"
 #include "platform/net_config.h"
 #include "platform/time_sync.h"

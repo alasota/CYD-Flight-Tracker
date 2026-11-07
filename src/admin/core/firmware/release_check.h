@@ -230,7 +230,7 @@ UpdateState updateDemoState(bool withPrerelease);
 
 // ---- Device side (defined in admin/adapters/github_http.cpp) ---------------
 
-struct UpdateSettings;  // config_store.h
+struct UpdateSettings;  // settings.h
 
 // Takes the update settings (call again after they change).
 void releaseCheckBegin(const UpdateSettings &update);

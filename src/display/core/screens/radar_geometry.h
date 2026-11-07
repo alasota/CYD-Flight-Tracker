@@ -39,7 +39,7 @@ struct ScreenPoint {
 // center); distance_km == 0 lands exactly at the center (home). A
 // distance_km beyond max_distance_km is clamped to the edge — see
 // ScreenPoint::clamped — rather than drawn outside the canvas. A
-// non-positive max_distance_km (shouldn't happen given config_store's
+// non-positive max_distance_km (shouldn't happen given sanitizeSettings()'s
 // radius clamp, but handled defensively) collapses everything to the
 // center rather than dividing by zero.
 ScreenPoint polarToScreen(float bearing_deg, float distance_km, float max_distance_km,

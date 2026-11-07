@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Move src/ files to their spec 12 folders and give every #include a full path from src/
-(spec 12, stages 1, 2 and 4).
+(spec 12, stages 1, 2, 4 and 7).
 
   python tools/rewrite_includes.py [--move] [--check] [--root DIR]
 
@@ -18,9 +18,10 @@ Two src/ headers with the same file name make the short form ambiguous: the scri
 both paths and writes nothing; so does a renamed header's old file name that another live header
 still has. One move table per stage (MOVES_STAGE_1: flat src/ into <context>/<layer>/;
 MOVES_STAGE_2: layers renamed to core / services, roots into main/; MOVES_STAGE_4: config_portal
-renamed web_server), kept side by side so final_path() can follow a file from stage 0 to today.
-A later stage that moves files adds its table to STAGES. Stage 4 also moved two headers from
-include/ by hand (git mv); the default rewrite fixed their includes.
+renamed web_server; MOVES_STAGE_7: config_store renamed settings), kept side by side so
+final_path() can follow a file from stage 0 to today. A later stage that moves files adds its
+table to STAGES. Stage 4 also moved two headers from include/ by hand (git mv); the default
+rewrite fixed their includes.
 """
 
 import argparse
@@ -112,7 +113,13 @@ MOVES_STAGE_4 = {
     "admin/adapters/config_portal.cpp": "admin/adapters/web_server.cpp",
 }
 
-STAGES = (MOVES_STAGE_1, MOVES_STAGE_2, MOVES_STAGE_4)
+# Stage 7 renames the settings module after the glossary's Settings (spec 12 section 3).
+MOVES_STAGE_7 = {
+    "admin/core/config_store.h": "admin/core/settings.h",
+    "admin/core/config_store.cpp": "admin/core/settings.cpp",
+}
+
+STAGES = (MOVES_STAGE_1, MOVES_STAGE_2, MOVES_STAGE_4, MOVES_STAGE_7)
 MOVES = STAGES[-1]  # what --move applies: the newest stage
 
 

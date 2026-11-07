@@ -20,7 +20,7 @@ enum class Phase {
 };
 
 // The two thresholds below as settings (spec 12 §7; Settings holds one as
-// `phase`, clamped by config_store). near_airport_km is really "near HOME"
+// `phase`, clamped by sanitizeSettings()). near_airport_km is really "near HOME"
 // (this project has no airport coordinate database). Defaults match
 // docs/screens.md "Flight phase": ~15 km, and ~1.5 m/s for the climb/descent
 // cutoff. gnu++11 on env:cyd: assign members, never `PhaseThresholds{…}`.

@@ -13,7 +13,7 @@
 #include <memory>
 
 #include "admin/adapters/web_server.h"
-#include "admin/core/config_store.h"
+#include "admin/core/settings.h"
 #include "admin/core/firmware/ota_update.h"
 #include "admin/core/firmware/version.h"
 #include "display/adapters/backlight_ldr.h"

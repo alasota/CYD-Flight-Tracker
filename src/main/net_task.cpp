@@ -8,7 +8,7 @@
 
 #include "enrichment/core/aircraft_lookup.h"
 #include "admin/adapters/web_server.h"
-#include "admin/core/config_store.h"
+#include "admin/core/settings.h"
 #include "platform/core_link.h"
 #include "admin/core/device_alerts.h"
 #include "enrichment/adapters/hexdb_http.h"

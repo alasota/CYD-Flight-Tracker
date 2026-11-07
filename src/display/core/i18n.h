@@ -1,5 +1,5 @@
 // i18n — on-screen text in Polish or English, selected at runtime from the
-// config page (stored in NVS by config_store). See CLAUDE.md "Language".
+// config page (stored in NVS by the settings module). See CLAUDE.md "Language".
 //
 // How it's built (the usual pattern for small Arduino/ESP32 firmware, no
 // gettext / no filesystem):

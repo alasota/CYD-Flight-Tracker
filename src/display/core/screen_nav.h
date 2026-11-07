@@ -14,7 +14,7 @@
 #include "display/core/screens/status_bar.h"   // HeaderZones — the "!" badge's position
 #include "display/core/touch_input.h"  // Rect, hitTest
 
-// Screen order (also the persisted `last_screen` value in config_store):
+// Screen order (also the persisted `last_screen` value in Settings):
 // Flights -> Flight -> Radar -> wraps back to Flights.
 constexpr int kScreenCount = 3;
 constexpr int kScreenFlights = 0;
@@ -33,7 +33,7 @@ int prevScreen(int current);
 
 // Stateful current-screen tracker — the "current index + nextScreen()/
 // prevScreen()" docs/screens.md's "Screen navigation" describes. main.cpp keeps
-// one, seeds it from config_store's persisted last_screen at boot, and
+// one, seeds it from the persisted last_screen setting at boot, and
 // re-persists current() when a change calls for it (ui_flow's ScreenChangeTracker). Header-only:
 // it's just wrapScreen() bookkeeping, still exercised under
 // `pio test -e native`.
