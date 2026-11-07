@@ -20,9 +20,9 @@ RedrawEvents diffNetState(const NetState *prev, const NetState &next) {
 
   if (prev->alerts.displaySeverity() != next.alerts.displaySeverity()) e.alertsChanged = true;
 
-  if (prev->cfg != next.cfg && prev->cfg != nullptr && next.cfg != nullptr) {
-    const Settings &a = *prev->cfg;
-    const Settings &b = *next.cfg;
+  if (prev->settings != next.settings && prev->settings != nullptr && next.settings != nullptr) {
+    const Settings &a = *prev->settings;
+    const Settings &b = *next.settings;
     if (a.display.language != b.display.language) e.languageChanged = true;
     if (a.home.configured != b.home.configured) e.firstDraw = true;
     // Radar rings are labelled from the radius; distances from home.
@@ -45,8 +45,8 @@ bool alertDetailsDiffer(const AlertDetails &a, const AlertDetails &b) {
 }  // namespace
 
 bool netStateDiffers(const NetState &a, const NetState &b) {
-  return a.data != b.data || a.cfg != b.cfg || a.cfgSeq != b.cfgSeq || a.health != b.health ||
-         a.wifi != b.wifi || a.restartPending != b.restartPending ||
+  return a.data != b.data || a.settings != b.settings || a.settingsSeq != b.settingsSeq ||
+         a.health != b.health || a.wifi != b.wifi || a.restartPending != b.restartPending ||
          a.update.status != b.update.status || a.update.installed != b.update.installed ||
          a.update.latestTag != b.update.latestTag ||
          a.update.installPending != b.update.installPending || a.ota.seq != b.ota.seq ||

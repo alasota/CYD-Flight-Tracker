@@ -173,7 +173,7 @@ static void test_update_prompt_gate_from_net_state(void) {
   cfg.update.skipped_tag = "v1.2.9";
   NetState s;
   s.data = data;
-  s.cfg = std::make_shared<const Settings>(cfg);
+  s.settings = std::make_shared<const Settings>(cfg);
   s.update.status = UpdateStatus::Available;
   s.update.latestTag = kTag;
   s.update.installed = "v1.2.0";

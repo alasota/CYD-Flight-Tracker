@@ -334,14 +334,14 @@ static NetState polledState(uint32_t polledAt) {
   cfg.home.radius_deg = 1.5f;
   NetState s;
   s.data = data;
-  s.cfg = std::make_shared<const Settings>(cfg);
+  s.settings = std::make_shared<const Settings>(cfg);
   return s;
 }
 
 // -- edge case: before the first poll there are no rows and no CPA; after it, the CPA ages
 static void test_net_rows_and_cpa_before_and_after_first_poll(void) {
   NetState empty;
-  empty.cfg = std::make_shared<const Settings>(makeSettings());
+  empty.settings = std::make_shared<const Settings>(makeSettings());
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(netRows(empty).size()));
   TEST_ASSERT_FALSE(netCpaAt(empty, 5000).found);
 
@@ -373,7 +373,7 @@ static void test_make_ui_view_reads_the_snapshot(void) {
   TEST_ASSERT_TRUE(v.homeConfigured);
 
   NetState first;  // setup()'s first snapshot: the settings only
-  first.cfg = std::make_shared<const Settings>(defaultSettings());
+  first.settings = std::make_shared<const Settings>(defaultSettings());
   const UiView w = makeUiView(first, kScreenFlights, 0, FeedHealth::Ok, 100, 0, false);
   TEST_ASSERT_FALSE(w.hasData);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(w.rows->size()));
@@ -408,10 +408,10 @@ static void test_tap_context_of_view_has_pages_and_header(void) {
 // -- edge case: the auto-cycle input takes the settings and the CPA at that moment
 static void test_auto_cycle_input_from_settings_and_cpa(void) {
   NetState s = polledState(1000);
-  Settings cfg = *s.cfg;
+  Settings cfg = *s.settings;
   cfg.auto_cycle.enabled = true;
   cfg.auto_cycle.interval_s = 25;
-  s.cfg = std::make_shared<const Settings>(cfg);
+  s.settings = std::make_shared<const Settings>(cfg);
   const AutoCycleInput in = autoCycleInputAt(s, kScreenFlight, true, 7000, 11000);
   TEST_ASSERT_TRUE(in.enabled);
   TEST_ASSERT_TRUE(in.homeConfigured);
@@ -452,7 +452,7 @@ static void test_ui_flow_takes_net_events_but_not_their_health(void) {
 static void test_ui_flow_health_silence_logged_once(void) {
   UiFlow ui;
   NetState empty;
-  empty.cfg = std::make_shared<const Settings>(makeSettings());
+  empty.settings = std::make_shared<const Settings>(makeSettings());
   const uint32_t now = 1000 + kNetStallLimitMs + 1;
   TEST_ASSERT_TRUE(ui.updateHealth(empty, now, 1000));
   ASSERT_ENUM_EQ(FeedHealth::NetworkError, ui.shownHealth);
@@ -517,10 +517,10 @@ static void test_ui_flow_page_tap_redraws_only_when_moved(void) {
 // -- a normal pass's clocks: the countdown second, the minute, auto-cycle when due
 static void test_ui_flow_tick_countdown_minute_and_auto_cycle(void) {
   NetState s = polledState(1000);
-  Settings cfg = *s.cfg;
+  Settings cfg = *s.settings;
   cfg.auto_cycle.enabled = true;
   cfg.auto_cycle.interval_s = 15;
-  s.cfg = std::make_shared<const Settings>(cfg);
+  s.settings = std::make_shared<const Settings>(cfg);
   UiFlow ui;
   ui.screenChanges.begin(kScreenRadar, 1000);
   TEST_ASSERT_FALSE(ui.tick(s, kScreenRadar, 2000, -1, false));

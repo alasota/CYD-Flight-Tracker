@@ -28,12 +28,12 @@ UiView makeUiView(const NetState &s, int screen, int page, FeedHealth shownHealt
   v.hasData = s.data != nullptr;
   v.nowRowIndex = v.hasData ? s.data->nowRowIndex : -1;
   v.cpa = netCpaAt(s, nowMs);
-  v.radiusDeg = s.cfg != nullptr ? s.cfg->home.radius_deg : 0.0f;
+  v.radiusDeg = s.settings != nullptr ? s.settings->home.radius_deg : 0.0f;
   v.health = shownHealth;
   v.alertBadge = s.alerts.displaySeverity();
   v.local = local;
   v.synced = synced;
-  v.homeConfigured = s.cfg != nullptr && s.cfg->home.configured;
+  v.homeConfigured = s.settings != nullptr && s.settings->home.configured;
   return v;
 }
 
@@ -175,15 +175,15 @@ bool shouldAutoCycleNow(const AutoCycleInput &in) {
 AutoCycleInput autoCycleInputAt(const NetState &s, int currentScreen, bool screenOff,
                                 uint32_t elapsedMs, uint32_t nowMs) {
   AutoCycleInput in;
-  in.enabled = s.cfg->auto_cycle.enabled;
-  in.homeConfigured = s.cfg->home.configured;
+  in.enabled = s.settings->auto_cycle.enabled;
+  in.homeConfigured = s.settings->home.configured;
   in.screenOff = screenOff;
   in.currentScreen = currentScreen;
   const CpaPrediction cpa = netCpaAt(s, nowMs);
   in.cpaFound = cpa.found;
   in.tCpaSeconds = cpa.t_cpa_seconds;
   in.elapsedMs = elapsedMs;
-  in.intervalS = s.cfg->auto_cycle.interval_s;
+  in.intervalS = s.settings->auto_cycle.interval_s;
   return in;
 }
 

@@ -54,8 +54,8 @@ void refreshAlerts() {
 }
 
 void refreshSummary() {
-  state.cfg = cfg;
-  state.cfgSeq = cfgSeq;
+  state.settings = cfg;
+  state.settingsSeq = cfgSeq;
   state.wifi = wifiManagerStatus();
   state.restartPending = webServerRestartPending();
   const UpdateState &u = releaseUpdateState();
@@ -413,7 +413,7 @@ void netTask(void *) {
 void netTaskStart(std::shared_ptr<const Settings> bootCfg, bool pendingVerify) {
   cfg = std::move(bootCfg);
   appPendingVerify = pendingVerify;
-  state.cfg = cfg;
+  state.settings = cfg;
   xTaskCreatePinnedToCore(netTask, "net", kNetTaskStackBytes, nullptr, kNetTaskPriority, nullptr,
                           kNetTaskCore);
 }

@@ -56,7 +56,7 @@ static UiPerfMeter perfMeter;
 // runs (ota_update::shouldMarkAppValid(), including "this UI loop is alive").
 extern "C" bool verifyRollbackLater() { return true; }
 
-static const Settings &cfg() { return *net->cfg; }
+static const Settings &cfg() { return *net->settings; }
 
 static UiView view() {
   return makeUiView(*net, nav.current(), ui.pager.page(), ui.shownHealth, millis(),
@@ -80,7 +80,7 @@ static void takeNetState() {
   std::shared_ptr<const NetState> next;
   if (core_link::netState.takeIfNewer(netSeen, next)) {
     const RedrawEvents e = diffNetState(net.get(), *next);
-    if (e.languageChanged) i18nSetLanguage(next->cfg->display.language);
+    if (e.languageChanged) i18nSetLanguage(next->settings->display.language);
     net = std::move(next);
     ui.takeNetEvents(e, *net);
   }
@@ -208,7 +208,7 @@ void setup() {
   // screen right away, before WiFi is even up.
   auto cfgPtr = std::make_shared<const Settings>(bootCfg);
   auto first = std::make_shared<NetState>();
-  first->cfg = cfgPtr;
+  first->settings = cfgPtr;
   net = first;
 
   ScreenshotSource shotSrc;
