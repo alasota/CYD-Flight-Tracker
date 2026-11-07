@@ -28,6 +28,7 @@ import configparser
 import importlib
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -177,6 +178,40 @@ class EmbedTextTest(ToolTestCase):
         self.assertEmbedError(lambda t: t.embed_text, "a{b:c} /* note */\n", "css",
                               "style.css", where="style.css:1")
 
+    # Edge case: CSS lines are joined with nothing in between, so a line break inside a selector
+    # (`.card` + `.alert` -> `.card.alert`) or a value (`calc(1px` + `+ 2px)`) would change or
+    # break the rule without gluing two words. Every kept CSS line but the last ends a rule
+    # piece: `;`, `{`, `}` or `,`.
+    def test_css_line_not_ending_a_rule_piece_is_an_error(self):
+        bad = [
+            ("/* cards */\n.card\n.alert{color:red}\n", "style.css:2"),
+            ("a{width:calc(1px\n+ 2px)}\n", "style.css:1"),
+            ("a{b:c}\n#id\n[x]{d:e}\n", "style.css:2"),
+            ("a:hover\n/* note */\n:focus{b:c}\n", "style.css:1"),
+            # harmless when joined, but the rule stays simple: end the declaration with `;`
+            ("a{\n  b:c\n}\n", "style.css:2"),
+        ]
+        for text, where in bad:
+            with self.subTest(text=text):
+                self.assertEmbedError(lambda t: t.embed_text, text, "css", "style.css",
+                                      where=where)
+        ok = "a,\nb{\n  c:d;\n  e:f;\n}\n/* last */\n.g{h:i}"
+        self.assertEqual("a,b{c:d;e:f;}.g{h:i}", self.tool().embed_text(ok, "css", "style.css"))
+
+    # Edge case: a file saved with a UTF-8 BOM (some Windows editors add one) gives the same
+    # header as without -- otherwise U+FEFF lands in the icon's data URI or in front of the
+    # first CSS rule, and the icon / the rule is lost without an error.
+    def test_utf8_bom_is_dropped(self):
+        tool = self.tool()
+        overrides = {"style.css": ":root{--a:#000}\nbody{margin:0}\n"}
+        with tempfile.TemporaryDirectory() as plain, tempfile.TemporaryDirectory() as bom:
+            write_assets(plain, overrides)
+            write_assets(bom, {n: "﻿" + t
+                               for n, t in {**MINIMAL_ASSETS, **overrides}.items()})
+            header = tool.generate_header(Path(bom) / "assets")
+            self.assertEqual(tool.generate_header(Path(plain) / "assets"), header)
+            self.assertNotIn("﻿", header)
+
 
 class EmbedSvgTest(ToolTestCase):
     # Scenario: Ikona SVG staje się adresem data: z apostrofami i %23 zamiast #
@@ -294,6 +329,31 @@ class RepoTest(ToolTestCase):
                       "the generated-file banner")
         for name in ASSET_NAMES:
             self.assertRegex(actual, r"\bstatic const char " + name + r"\[\] =")
+
+    # Edge case: the joined JS parses. The glue check catches word + word only; a missing `;`
+    # after a function expression (`}` + `x.onerror=...`) or `a=b` + `++c` is a SyntaxError
+    # that native tests and the HTML comparison never run. Each asset is checked on its own,
+    # wrapped in a function (the page puts it after `var T={...};`). Skipped without node
+    # (GitHub's runners have it).
+    @unittest.skipUnless(shutil.which("node"), "node not on PATH")
+    def test_joined_js_assets_parse(self):
+        tool = self.tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            broken = Path(tmp) / "broken.js"
+            broken.write_text("function f(){var x={};x.a=function(){}x.b=1;}\n",
+                              encoding="utf-8")
+            r = subprocess.run(["node", "--check", str(broken)], capture_output=True, text=True)
+            self.assertNotEqual(0, r.returncode, "node --check accepted a SyntaxError")
+            for name in ("app.js", "restart.js", "check_pending.js"):
+                with self.subTest(asset=name):
+                    text = (ASSETS / name).read_bytes().decode("utf-8-sig")
+                    joined = tool.embed_text(text, "js", name)
+                    out = Path(tmp) / name
+                    out.write_text("function page(){var T={};" + joined + "\n}\n",
+                                   encoding="utf-8")
+                    r = subprocess.run(["node", "--check", str(out)], capture_output=True,
+                                       text=True)
+                    self.assertEqual(0, r.returncode, f"{name} joined: {r.stderr}")
 
     # Scenario: Kompilacja firmware'u i testów natywnych odświeża nagłówek, a CI sprawdza go
     # testem narzędzi

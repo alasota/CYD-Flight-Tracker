@@ -11,11 +11,16 @@ them and checked in (only config_page.cpp includes it, so each asset is in the f
 
 CSS / JS: full-line comments are dropped (`/* ... */` in CSS, also over several lines; `// ...`
 in JS), every line is trimmed, empty lines are dropped and the rest is joined with nothing in
-between -- so the page is byte for byte what the hand-written literals were. Two rules keep that
+between -- so the page is byte for byte what the hand-written literals were. Three rules keep that
 honest, both an error naming file:line, with nothing written:
   - a line that ends in a letter / digit / `_` / `$` / quote while the next starts with one
     (joining would glue two tokens: `return` + `x`, `margin:0` + `auto`);
+  - CSS only: a line (all but the last) that doesn't end in `;`, `{`, `}` or `,` (a selector
+    or a value split over two lines: `.card` + `.alert` -> `.card.alert`);
   - a comment after code on the same line (not supported; put it on its own line).
+JS is checked no further here: tools/test_embed_assets.py runs `node --check` on the joined
+scripts (CI has node; skipped where it's missing), which catches a `}` + `x.onerror=...` join.
+Files are read as UTF-8 with an optional BOM (dropped).
 SVG: `data:image/svg+xml,` + the markup without whitespace between tags, `"` -> `'` and
 `#` -> `%23` (the URI sits in a double-quoted href).
 The header has one C string literal per source line; only `"` and `\\` are escaped, UTF-8
@@ -56,6 +61,11 @@ BANNER = """\
 
 # A character that would join the token next to it: `return`+`x`, `0`+`auto`, `'a'`+`'b'`.
 _WORD = re.compile(r"[A-Za-z0-9_$'\"]")
+
+# What a CSS line (all but the last) may end in: the end of a declaration / block, the start of
+# a block or a selector list's comma. Anything else would join a selector or a value with the
+# next line (`.card` + `.alert` -> `.card.alert`, `calc(1px` + `+ 2px)`).
+_CSS_ENDS = ";{},"
 
 
 class EmbedError(Exception):
@@ -120,6 +130,10 @@ def _pieces(text, kind, name):
     """The kept lines of a CSS / JS text, checked that joining them glues no two tokens."""
     lines = _code_lines(text, kind, name)
     for (number, line), (_, following) in zip(lines, lines[1:]):
+        if kind == "css" and line[-1] not in _CSS_ENDS:
+            raise EmbedError(f"{name}:{number}: a CSS line must end in ; {{ }} or , -- joined "
+                             f"with nothing in between, '{line[-12:]}' + '{following[:12]}' "
+                             "would change the rule")
         if _WORD.match(line[-1]) and _WORD.match(following[0]):
             raise EmbedError(f"{name}:{number}: joining this line with the next would glue "
                              f"'{line[-12:]}' to '{following[:12]}'; end or start the line "
@@ -164,7 +178,8 @@ def generate_header(assets_dir):
         path = assets_dir / file_name
         if not path.is_file():
             raise EmbedError(f"{file_name}: missing (expected {path})")
-        text = path.read_bytes().decode("utf-8")
+        # utf-8-sig: a BOM from a Windows editor would land in the icon URI / the first rule
+        text = path.read_bytes().decode("utf-8-sig")
         pieces = _svg_pieces(text) if kind == "svg" else _pieces(text, kind, file_name)
         parts.append(f"\n// {file_name}\nstatic const char {c_name}[] =")
         if not pieces:

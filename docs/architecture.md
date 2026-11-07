@@ -383,14 +383,22 @@ two cores"; this is how it works.
   by a `pre:` script in `env:cyd` and `env:native` (written only when its content differs).
   **To change the look or the script:** edit the asset file and build (`pio run` or
   `pio test -e native`), or run `python tools/embed_assets.py`; commit the asset and the header
-  together (`--check` exits 1 on a stale header, `RepoTest` fails in CI). Generator rules (an
-  error naming `file:line`, nothing written): comments only on their own line (`/* … */` in CSS,
-  also over several lines; `//` in JS) — a comment after code is refused; every line is trimmed
-  and the lines are joined with **nothing** in between, so a line ending in a letter / digit /
-  `_` / `$` / quote can't be followed by one starting with one (`return` + `x`, `margin:0` +
-  `auto` would glue) — end the line with `;`, `{`, `,` or keep the tokens on one line. No regex
-  or template literal that needs a newline. Text strings belong in `web_i18n`, not in the JS.
-  The SVG becomes `data:image/svg+xml,` + the markup with `"` → `'`, `#` → `%23`.
+  together (`--check` exits 1 on a stale header, `RepoTest` fails in CI). Files are read as
+  UTF-8, a BOM is dropped. Every line is trimmed and the lines are joined with **nothing** in
+  between. What the generator refuses (an error naming `file:line`, nothing written):
+  - a comment after code — comments only on their own line (`/* … */` in CSS, also over several
+    lines; `//` in JS);
+  - a line ending in a letter / digit / `_` / `$` / quote followed by one starting with one
+    (`return` + `x`, `margin:0` + `auto` would glue);
+  - in CSS, any line but the last that doesn't end in `;`, `{`, `}` or `,` — so a selector or a
+    value is never split (`.card` + `.alert` would become `.card.alert`), and the last
+    declaration of a block split over lines ends with `;` too.
+
+  Other JS joins (`}` + `x.onerror=…` without a `;`, `a=b` + `++c`) aren't refused by the
+  generator; `test_embed_assets.py` runs `node --check` on each joined script (skipped when
+  `node` isn't on PATH; CI has it). So: end every JS statement with `;`, no regex or template
+  literal that needs a newline. Text strings belong in `web_i18n`, not in the JS. The SVG
+  becomes `data:image/svg+xml,` + the markup with `"` → `'`, `#` → `%23`.
 - **Page language** (`Config::web.language`, NVS `wlang`, default PL), independent of the
   display's: PL/EN switch in the header — two small `<form method="post" action="/lang">`
   (hidden `l` + `tab`), and a select on the General tab. Strings: the `web_i18n` X-macro table
