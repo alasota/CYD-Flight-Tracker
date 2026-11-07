@@ -112,34 +112,34 @@ bool setClock(const std::string &v, uint16_t &out) {
 // functions, not lambdas: the firmware builds as C++11, where a lambda's
 // conversion to a function pointer isn't constexpr and the table below would
 // be initialized at boot, in RAM.
-bool setLat(Config &c, const std::string &v) { return setFloat(v, c.home.lat); }
-bool setLon(Config &c, const std::string &v) { return setFloat(v, c.home.lon); }
-bool setRadius(Config &c, const std::string &v) { return setFloat(v, c.home.radius_deg); }
-bool setPoll(Config &c, const std::string &v) { return setUnsigned(v, c.poll.interval_s); }
-bool setCycle(Config &c, const std::string &v) { return setUnsigned(v, c.auto_cycle.interval_s); }
-bool setNearKm(Config &c, const std::string &v) { return setFloat(v, c.phase.near_airport_km); }
-bool setClimb(Config &c, const std::string &v) {
+bool setLat(Settings &c, const std::string &v) { return setFloat(v, c.home.lat); }
+bool setLon(Settings &c, const std::string &v) { return setFloat(v, c.home.lon); }
+bool setRadius(Settings &c, const std::string &v) { return setFloat(v, c.home.radius_deg); }
+bool setPoll(Settings &c, const std::string &v) { return setUnsigned(v, c.poll.interval_s); }
+bool setCycle(Settings &c, const std::string &v) { return setUnsigned(v, c.auto_cycle.interval_s); }
+bool setNearKm(Settings &c, const std::string &v) { return setFloat(v, c.phase.near_airport_km); }
+bool setClimb(Settings &c, const std::string &v) {
   return setFloat(v, c.phase.climb_rate_threshold_mps);
 }
-bool setBlMin(Config &c, const std::string &v) {
+bool setBlMin(Settings &c, const std::string &v) {
   return setClamped(v, c.backlight.brightness_min_pct, clampBrightnessPct);
 }
-bool setBlMax(Config &c, const std::string &v) {
+bool setBlMax(Settings &c, const std::string &v) {
   return setClamped(v, c.backlight.brightness_max_pct, clampBrightnessPct);
 }
-bool setBlFixed(Config &c, const std::string &v) {
+bool setBlFixed(Settings &c, const std::string &v) {
   return setClamped(v, c.backlight.brightness_fixed_pct, clampBrightnessPct);
 }
-bool setNightPct(Config &c, const std::string &v) {
+bool setNightPct(Settings &c, const std::string &v) {
   return setClamped(v, c.backlight.night_pct, clampNightPct);
 }
-bool setNightWake(Config &c, const std::string &v) {
+bool setNightWake(Settings &c, const std::string &v) {
   return setClamped(v, c.backlight.night_wake_s, clampNightWakeS);
 }
-bool setNightFrom(Config &c, const std::string &v) {
+bool setNightFrom(Settings &c, const std::string &v) {
   return setClock(v, c.backlight.night_from_min);
 }
-bool setNightTo(Config &c, const std::string &v) { return setClock(v, c.backlight.night_to_min); }
+bool setNightTo(Settings &c, const std::string &v) { return setClock(v, c.backlight.night_to_min); }
 
 // The fields a value that doesn't parse is rejected for — it keeps its old
 // value (docs/review-notes-2026.md 1.6). In the form's order, which is the
@@ -147,7 +147,7 @@ bool setNightTo(Config &c, const std::string &v) { return setClock(v, c.backligh
 struct FormField {
   const char *name;
   WebStr label;
-  bool (*apply)(Config &cfg, const std::string &value);
+  bool (*apply)(Settings &cfg, const std::string &value);
 };
 
 const FormField kNumberFields[] = {
@@ -169,7 +169,7 @@ const FormField kNumberFields[] = {
 
 }  // namespace
 
-SettingsFormOutcome applySettingsForm(Config &cfg, const FormArgs &args) {
+SettingsFormOutcome applySettingsForm(Settings &cfg, const FormArgs &args) {
   SettingsFormOutcome out;
 
   for (const FormField &f : kNumberFields) {

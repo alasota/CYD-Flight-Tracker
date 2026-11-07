@@ -49,7 +49,7 @@ WebStr settingsTabLabel(SettingsTab tab) {
   }
 }
 
-bool hasOpenSkyCredentials(const Config &cfg) {
+bool hasOpenSkyCredentials(const Settings &cfg) {
   return !cfg.opensky.client_id.empty() && !cfg.opensky.client_secret.empty();
 }
 
@@ -387,7 +387,7 @@ void updateCard(Writer &w, const ConfigPageModel &m, const std::string &installe
 // sensor / backlight do right now (spec/03 §4.4). The script hides the
 // fields of the modes not chosen (#blauto / #blfix / #ntsch / #ntopt).
 void displayCard(Writer &w, const ConfigPageModel &m, Language lang) {
-  const Config &c = m.cfg;
+  const Settings &c = m.cfg;
   const BacklightStatus &l = m.light;
   w.raw("<div class=\"card\" id=\"display\"><h2>");
   w.t(WebStr::SectionDisplay);
@@ -534,7 +534,7 @@ void installForm(Writer &w, const char *id, const std::string &tag) {
 }  // namespace
 
 void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
-  const Config &c = m.cfg;
+  const Settings &c = m.cfg;
   const Language lang = c.web.language;
   Writer w(emit, lang);
   const std::string installed = m.installedVersion.empty() ? firmwareVersion() : m.installedVersion;

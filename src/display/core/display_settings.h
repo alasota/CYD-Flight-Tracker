@@ -1,5 +1,5 @@
 // display_settings — the display's settings objects (spec 12 §7): its
-// language, the screen it restores on boot, and auto screen cycling. Config
+// language, the screen it restores on boot, and auto screen cycling. Settings
 // (admin/core/config_store.h) holds them as `display` and `auto_cycle`; the
 // UI reads them from NetState (backlight's own object is in backlight.h).
 //

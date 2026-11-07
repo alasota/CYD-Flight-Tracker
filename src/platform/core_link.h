@@ -27,7 +27,7 @@
 #include <utility>
 #include <vector>
 
-#include "admin/core/config_store.h"   // Config
+#include "admin/core/config_store.h"   // Settings
 #include "airspace/core/cpa_predictor.h"  // CpaPrediction
 #include "admin/core/device_alerts.h"  // AlertSet, AlertDetails
 #include "display/core/redraw_policy.h"  // RedrawEvents
@@ -159,7 +159,7 @@ struct UpdateSummary {
 
 struct NetState {
   std::shared_ptr<const AirspaceSnapshot> data;  // nullptr until the first good poll
-  std::shared_ptr<const Config> cfg;         // always set
+  std::shared_ptr<const Settings> cfg;       // always set
   uint32_t cfgSeq = 0;                       // bumped when the config is reloaded
   FeedHealth health = FeedHealth::Ok;
   WifiStatus wifi = WifiStatus::Connecting;

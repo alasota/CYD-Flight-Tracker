@@ -10,8 +10,8 @@
 
 namespace {
 
-Config sample() {
-  Config c = makeConfig();  // Warsaw, home_configured
+Settings sample() {
+  Settings c = makeConfig();  // Warsaw, home_configured
   c.home.radius_deg = 1.5f;
   c.poll.interval_s = 30;
   c.opensky.client_id = "my-client";
@@ -29,14 +29,14 @@ Config sample() {
 }
 
 static void test_round_trip_restores_every_setting(void) {
-  const Config original = sample();
+  const Settings original = sample();
   const std::string json = configToBackupJson(original, true, "v1.2.3");
   BackupRestoreResult r = restoreConfigFromBackupJson(json, defaultConfig());
 
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(r.invalidFields.size()));
   TEST_ASSERT_EQUAL_INT(24, r.appliedFields);  // 14 + the display group (10)
-  const Config &c = r.config;
+  const Settings &c = r.config;
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, original.home.lat, c.home.lat);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, original.home.lon, c.home.lon);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.5f, c.home.radius_deg);
@@ -62,7 +62,7 @@ static void test_update_settings_in_the_general_group(void) {
   assertJsonBool(doc, "general.update_show_prerelease", true);
   ASSERT_NOT_CONTAINS(json, "v1.4.0");
   // An older backup without the keys keeps the current values.
-  Config current = defaultConfig();
+  Settings current = defaultConfig();
   current.update.check_enabled = false;
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"general\":{}}", current);
@@ -95,7 +95,7 @@ static void test_backup_without_secrets_keeps_the_devices_credentials(void) {
   assertJsonInt(doc, "opensky.poll_interval_s", 30);
   ASSERT_NOT_CONTAINS(json, "s3cr");  // nowhere else either
 
-  Config device = defaultConfig();
+  Settings device = defaultConfig();
   device.opensky.client_id = "device-id";
   device.opensky.client_secret = "device-secret";
   BackupRestoreResult r = restoreConfigFromBackupJson(json, device);
@@ -106,7 +106,7 @@ static void test_backup_without_secrets_keeps_the_devices_credentials(void) {
 }
 
 static void test_missing_keys_keep_current_values(void) {
-  Config current = sample();
+  Settings current = sample();
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,"
       "\"general\":{\"auto_cycle\":false}}",
@@ -119,7 +119,7 @@ static void test_missing_keys_keep_current_values(void) {
 }
 
 static void test_wrong_types_are_skipped_and_reported(void) {
-  Config current = sample();
+  Settings current = sample();
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,"
       "\"location\":{\"lat\":\"north\",\"lon\":20.5},"
@@ -140,7 +140,7 @@ static void test_wrong_types_are_skipped_and_reported(void) {
 }
 
 static void test_restoring_location_marks_home_configured(void) {
-  Config fresh = defaultConfig();
+  Settings fresh = defaultConfig();
   TEST_ASSERT_FALSE(fresh.home.configured);
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"location\":{\"lat\":50.0,\"lon\":19.9}}", fresh);
@@ -152,7 +152,7 @@ static void test_restoring_location_marks_home_configured(void) {
 }
 
 static void test_rejects_files_that_are_not_backups(void) {
-  const Config current = sample();
+  const Settings current = sample();
   ASSERT_ENUM_EQ(BackupRestoreStatus::NotJson, restoreConfigFromBackupJson("", current).status);
   ASSERT_ENUM_EQ(BackupRestoreStatus::NotJson, restoreConfigFromBackupJson("not json", current).status);
   ASSERT_ENUM_EQ(BackupRestoreStatus::NotJson, restoreConfigFromBackupJson("[1,2]", current).status);
@@ -173,7 +173,7 @@ static void test_rejects_oversized_files(void) {
 }
 
 static void test_panel_password_travels_only_with_secrets(void) {
-  Config c = sample();
+  Settings c = sample();
   c.web.password = "hunter22";
   assertJsonString(parseJson(configToBackupJson(c, true, "v1")), "security.web_password", "hunter22");
   ASSERT_NOT_CONTAINS(configToBackupJson(c, false, "v1"), "hunter22");
@@ -187,7 +187,7 @@ static void test_panel_password_travels_only_with_secrets(void) {
 }
 
 static void test_restore_without_password_keeps_the_devices(void) {
-  Config device = defaultConfig();
+  Settings device = defaultConfig();
   device.web.password = "device-pass";
   BackupRestoreResult r = restoreConfigFromBackupJson(configToBackupJson(sample(), false, "v1"),
                                                       device);
@@ -195,7 +195,7 @@ static void test_restore_without_password_keeps_the_devices(void) {
 }
 
 static void test_invalid_password_in_backup_is_reported_and_skipped(void) {
-  Config device = defaultConfig();
+  Settings device = defaultConfig();
   device.web.password = "device-pass";
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"security\":{\"web_password\":\"short\"}}",
@@ -208,7 +208,7 @@ static void test_invalid_password_in_backup_is_reported_and_skipped(void) {
 }
 
 static void test_display_group_round_trip(void) {
-  Config c = defaultConfig();
+  Settings c = defaultConfig();
   c.backlight.brightness_auto = false;
   c.backlight.brightness_fixed_pct = 42;
   c.backlight.brightness_min_pct = 15;
@@ -245,7 +245,7 @@ static void test_display_group_round_trip(void) {
 
 static void test_display_group_bad_values_and_old_backups(void) {
   // Without the group (a backup from before spec/03): current values kept.
-  Config current = defaultConfig();
+  Settings current = defaultConfig();
   current.backlight.night_pct = 33;
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"general\":{}}", current);
@@ -268,12 +268,12 @@ static void test_display_group_bad_values_and_old_backups(void) {
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
 }
 
-// ---- Spec 12 stage 6: the backup must not change when Config is rebuilt from context objects --
+// ---- Spec 12 stage 6: the backup must not change when Settings is rebuilt from context objects --
 
 // A non-default value in every setting that goes into a backup (25 of them), plus what never
 // does: the skipped release (device state) and the last screen.
-Config everyFieldChanged() {
-  Config c = makeConfig();  // Warsaw, home_configured
+Settings everyFieldChanged() {
+  Settings c = makeConfig();  // Warsaw, home_configured
   c.home.radius_deg = 1.5f;
   c.poll.interval_s = 30;
   c.opensky.client_id = "my-client";
@@ -396,7 +396,7 @@ std::string crlf(const char *text) {
 
 // Scenario: Kopia zapasowa ma bajt w bajt ten sam JSON co przed etapem
 static void test_backup_json_is_the_same_as_before_stage_6(void) {
-  const Config c = everyFieldChanged();
+  const Settings c = everyFieldChanged();
   const std::string withSecrets = configToBackupJson(c, true, "v1.11.3");
   const std::string withoutSecrets = configToBackupJson(c, false, "v1.11.3");
   ASSERT_STR_EQ(crlf(kV1113BackupWithSecrets), withSecrets);
@@ -407,13 +407,13 @@ static void test_backup_json_is_the_same_as_before_stage_6(void) {
 // Scenario: Kopia zapasowa zrobiona przed etapem 6 odtwarza każde ustawienie
 static void test_restore_of_a_stage_5_backup_fills_every_setting(void) {
   // The page language starts as EN, so the backup's "pl" has to be applied, not left over.
-  Config base = defaultConfig();
+  Settings base = defaultConfig();
   base.web.language = Language::EN;
   const BackupRestoreResult r = restoreConfigFromBackupJson(crlf(kV1113BackupWithSecrets), base);
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(r.invalidFields.size()));
   TEST_ASSERT_EQUAL_INT(25, r.appliedFields);
-  const Config &c = r.config;
+  const Settings &c = r.config;
   // location
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 52.2297f, c.home.lat);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 21.0122f, c.home.lon);

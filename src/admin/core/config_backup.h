@@ -23,7 +23,7 @@
 #include <string>
 #include <vector>
 
-#include "admin/core/config_store.h"  // Config
+#include "admin/core/config_store.h"  // Settings
 
 constexpr const char *kBackupFormat = "cyd-sky-tracker-config";
 constexpr int kBackupFormatVersion = 1;
@@ -33,7 +33,8 @@ constexpr size_t kMaxBackupJsonBytes = 4096;
 // The backup file for `cfg`. Without `includeSecrets` the "opensky" group
 // has no client_id / client_secret and there is no "security" group
 // (restoring it then keeps the device's).
-std::string configToBackupJson(const Config &cfg, bool includeSecrets, const char *firmwareVersion);
+std::string configToBackupJson(const Settings &cfg, bool includeSecrets,
+                               const char *firmwareVersion);
 
 enum class BackupRestoreStatus {
   Ok,           // config holds the restored settings (maybe with skipped fields)
@@ -43,11 +44,11 @@ enum class BackupRestoreStatus {
 
 struct BackupRestoreResult {
   BackupRestoreStatus status = BackupRestoreStatus::NotJson;
-  Config config;                           // `current` with the file's values applied
+  Settings config;                         // `current` with the file's values applied
   int appliedFields = 0;                   // how many settings the file set
   std::vector<std::string> invalidFields;  // e.g. "location.lat" — wrong type, skipped
 };
 
 // Applies a backup file onto `current`. Marks the home location as configured
 // when the file sets it (same as saving the Location tab).
-BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const Config &current);
+BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const Settings &current);

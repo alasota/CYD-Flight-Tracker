@@ -1,5 +1,5 @@
 // opensky_settings — OpenSky's settings objects (spec 12 §7): the account it
-// logs in with and how often it is asked. Config (admin/core/config_store.h)
+// logs in with and how often it is asked. Settings (admin/core/config_store.h)
 // holds them as `opensky` and `poll`; opensky_client's adapter reads only
 // these (plus airspace's Home for the bounding box).
 //

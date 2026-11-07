@@ -19,7 +19,7 @@ enum class Phase {
   OVERFLIGHT,  // airborne, not near an airport (or near one but level)
 };
 
-// The two thresholds below as settings (spec 12 §7; Config holds one as
+// The two thresholds below as settings (spec 12 §7; Settings holds one as
 // `phase`, clamped by config_store). near_airport_km is really "near HOME"
 // (this project has no airport coordinate database). Defaults match
 // docs/screens.md "Flight phase": ~15 km, and ~1.5 m/s for the climb/descent

@@ -30,7 +30,7 @@ int clampLastScreen(int raw) {
   return raw;
 }
 
-Config defaultConfig() { return Config{}; }
+Settings defaultConfig() { return Settings{}; }
 
 float clampRadiusDeg(float radius_deg) {
   return std::min(std::max(radius_deg, kMinRadiusDeg), kMaxRadiusDeg);
@@ -65,8 +65,8 @@ uint16_t clampNightWakeS(int seconds) {
   return static_cast<uint16_t>(std::min(std::max(seconds, 10), 600));
 }
 
-Config sanitizeConfig(const Config &cfg) {
-  Config out = cfg;
+Settings sanitizeConfig(const Settings &cfg) {
+  Settings out = cfg;
   out.home.lat = clampLat(out.home.lat);
   out.home.lon = clampLon(out.home.lon);
   out.home.radius_deg = clampRadiusDeg(out.home.radius_deg);

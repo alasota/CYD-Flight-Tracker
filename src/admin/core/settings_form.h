@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "admin/core/config_store.h"  // Config
+#include "admin/core/config_store.h"  // Settings
 #include "admin/core/web_auth.h"      // PasswordChange
 #include "admin/core/web_i18n.h"      // WebStr, Language
 
@@ -66,13 +66,13 @@ struct SettingsFormOutcome {
   WebStr message = WebStr::Saved;   // Saved / PasswordChanged / PasswordCleared / SavedWithInvalid
 };
 
-// Applies one settings-form submit to `cfg` in place (no second Config on
+// Applies one settings-form submit to `cfg` in place (no second Settings on
 // core 0's stack): numbers that don't parse are rejected and keep their old
 // value (docs/review-notes-2026.md 1.6), percent fields are clamped, a missing
 // checkbox means unchecked, a missing text field means unchanged, an empty
 // OpenSky secret keeps the saved one; sets home.configured
 // (docs/review-notes-2026.md 1.5). The caller saves it.
-SettingsFormOutcome applySettingsForm(Config &cfg, const FormArgs &args);
+SettingsFormOutcome applySettingsForm(Settings &cfg, const FormArgs &args);
 
 // The label a refused password (Mismatch / Invalid) is listed under among the
 // rejected fields.

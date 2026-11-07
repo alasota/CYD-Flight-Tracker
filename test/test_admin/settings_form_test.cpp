@@ -128,8 +128,8 @@ static void assertRejected(const std::vector<WebStr> &want, const std::vector<We
 }
 
 // Saved settings that differ from every value the forms below send.
-static Config savedConfig() {
-  Config c = makeConfig();
+static Settings savedConfig() {
+  Settings c = makeConfig();
   c.home.radius_deg = 2.0f;
   c.poll.interval_s = 60;
   c.auto_cycle.interval_s = 45;
@@ -147,7 +147,7 @@ static Config savedConfig() {
 
 // Poprawny formularz ustawia wszystkie pola i oznacza dom jako ustawiony
 static void test_form_valid_submit_sets_every_field_and_home_configured(void) {
-  Config cfg = defaultConfig();
+  Settings cfg = defaultConfig();
   TEST_ASSERT_FALSE(cfg.home.configured);
   const FormArgs args = form({{"lat", "50.0614"},
                               {"lon", "19.9366"},
@@ -210,31 +210,31 @@ static void test_form_rejects_malformed_number_and_keeps_old_value(void) {
     const char *field;
     const char *value;
     WebStr label;
-    std::function<float(const Config &)> get;
+    std::function<float(const Settings &)> get;
   };
   const Example examples[] = {
-      {"lat", "abc", WebStr::Latitude, [](const Config &c) { return c.home.lat; }},
-      {"lon", "12.3.4", WebStr::Longitude, [](const Config &c) { return c.home.lon; }},
-      {"radius", "", WebStr::Radius, [](const Config &c) { return c.home.radius_deg; }},
+      {"lat", "abc", WebStr::Latitude, [](const Settings &c) { return c.home.lat; }},
+      {"lon", "12.3.4", WebStr::Longitude, [](const Settings &c) { return c.home.lon; }},
+      {"radius", "", WebStr::Radius, [](const Settings &c) { return c.home.radius_deg; }},
       {"poll_interval", "-5", WebStr::PollInterval,
-       [](const Config &c) { return static_cast<float>(c.poll.interval_s); }},
+       [](const Settings &c) { return static_cast<float>(c.poll.interval_s); }},
       {"auto_cycle_interval", "10s", WebStr::AutoCycleInterval,
-       [](const Config &c) { return static_cast<float>(c.auto_cycle.interval_s); }},
+       [](const Settings &c) { return static_cast<float>(c.auto_cycle.interval_s); }},
       {"near_airport_km", "1e", WebStr::NearAirport,
-       [](const Config &c) { return c.phase.near_airport_km; }},
+       [](const Settings &c) { return c.phase.near_airport_km; }},
       {"climb_rate_mps", "x", WebStr::ClimbRate,
-       [](const Config &c) { return c.phase.climb_rate_threshold_mps; }},
+       [](const Settings &c) { return c.phase.climb_rate_threshold_mps; }},
       {"bl_min", "12345", WebStr::BrightnessMin,
-       [](const Config &c) { return static_cast<float>(c.backlight.brightness_min_pct); }},
+       [](const Settings &c) { return static_cast<float>(c.backlight.brightness_min_pct); }},
       {"night_wake_s", "3.5", WebStr::NightWake,
-       [](const Config &c) { return static_cast<float>(c.backlight.night_wake_s); }},
+       [](const Settings &c) { return static_cast<float>(c.backlight.night_wake_s); }},
       {"night_from", "25:00", WebStr::NightFrom,
-       [](const Config &c) { return static_cast<float>(c.backlight.night_from_min); }},
+       [](const Settings &c) { return static_cast<float>(c.backlight.night_from_min); }},
   };
   for (const Example &e : examples) {
     const std::string what = std::string(e.field) + "=\"" + e.value + "\"";
-    const Config before = savedConfig();
-    Config cfg = before;
+    const Settings before = savedConfig();
+    Settings cfg = before;
     const SettingsFormOutcome out = applySettingsForm(cfg, form({{e.field, e.value}}));
     TEST_ASSERT_FLOAT_WITHIN_MESSAGE(1e-6f, e.get(before), e.get(cfg), what.c_str());
     TEST_ASSERT_EQUAL_STRING_MESSAGE(labels({e.label}).c_str(), labels(out.rejected).c_str(),
@@ -246,7 +246,7 @@ static void test_form_rejects_malformed_number_and_keeps_old_value(void) {
 
 // Kilka błędnych pól jest wymienionych w kolejności formularza, w języku panelu
 static void test_form_rejected_labels_in_form_order_in_panel_language(void) {
-  Config cfg = savedConfig();
+  Settings cfg = savedConfig();
   // Sent in another order: the list follows the form (latitude, longitude, ..., password).
   const SettingsFormOutcome out = applySettingsForm(
       cfg, form({{"new_password", "nowe-haslo-1"},
@@ -263,7 +263,7 @@ static void test_form_rejected_labels_in_form_order_in_panel_language(void) {
 
 // Brak pola wyboru znaczy „odznaczone”, a brak pola tekstowego „bez zmian”
 static void test_form_missing_checkbox_unchecked_missing_text_unchanged(void) {
-  Config cfg = savedConfig();
+  Settings cfg = savedConfig();
   cfg.auto_cycle.enabled = true;
   cfg.update.check_enabled = true;
   cfg.backlight.night_pause_polling = true;
@@ -279,7 +279,7 @@ static void test_form_missing_checkbox_unchecked_missing_text_unchanged(void) {
 
 // Puste pole sekretu OpenSky zachowuje zapisany sekret, a „wyczyść” usuwa id i sekret
 static void test_form_empty_secret_keeps_saved_clear_removes_both(void) {
-  Config cfg = savedConfig();
+  Settings cfg = savedConfig();
   applySettingsForm(cfg, form({{"client_id", "new-id"}, {"client_secret", ""}}));
   ASSERT_STR_EQ("new-id", cfg.opensky.client_id);
   ASSERT_STR_EQ("old-secret", cfg.opensky.client_secret);
@@ -311,7 +311,7 @@ static void test_form_password_outcomes_and_messages(void) {
   for (const Example &e : examples) {
     const std::string what = std::string("new_password=\"") + e.pw + "\", new_password2=\"" +
                              e.repeat + "\", clear_password " + (e.clear ? "yes" : "no");
-    Config cfg = savedConfig();
+    Settings cfg = savedConfig();
     FormArgs args = form({{"new_password", e.pw}, {"new_password2", e.repeat}});
     if (e.clear) args.add("clear_password", "1");
     const SettingsFormOutcome out = applySettingsForm(cfg, args);
@@ -331,7 +331,7 @@ static void test_form_password_outcomes_and_messages(void) {
 
 // Liczby jasności i nocy poza zakresem są przycinane, a nie odrzucane
 static void test_form_brightness_out_of_range_is_clamped(void) {
-  Config cfg = savedConfig();
+  Settings cfg = savedConfig();
   const SettingsFormOutcome out = applySettingsForm(
       cfg,
       form({{"bl_max", "150"}, {"bl_min", "0"}, {"night_pct", "101"}, {"night_wake_s", "5"}}));
@@ -348,7 +348,7 @@ static void test_form_args_first_value_wins(void) {
   args.add("lat", "52.1");
   args.add("lat", "abc");
   ASSERT_STR_EQ("52.1", args.get("lat"));
-  Config cfg = savedConfig();
+  Settings cfg = savedConfig();
   const SettingsFormOutcome out = applySettingsForm(cfg, args);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 52.1f, cfg.home.lat);
   assertRejected({}, out.rejected);
@@ -366,7 +366,7 @@ static void test_form_args_absent_value_is_empty_string(void) {
 
 // -- edge case: a language code the page doesn't know falls back to the default
 static void test_form_unknown_language_code_falls_back_to_default(void) {
-  Config cfg = savedConfig();
+  Settings cfg = savedConfig();
   cfg.display.language = Language::EN;
   cfg.web.language = Language::EN;
   applySettingsForm(cfg, form({{"language", "xx"}, {"web_language", "de"}}));
@@ -379,7 +379,7 @@ static void test_form_unknown_language_code_falls_back_to_default(void) {
 
 // -- edge case: brightness_mode "fixed" turns the sensor off, any other value on, none keeps it
 static void test_form_brightness_mode_fixed_only_on_fixed(void) {
-  Config cfg = savedConfig();
+  Settings cfg = savedConfig();
   cfg.backlight.brightness_auto = true;
   applySettingsForm(cfg, form({{"brightness_mode", "fixed"}}));
   TEST_ASSERT_FALSE(cfg.backlight.brightness_auto);
@@ -394,7 +394,7 @@ static void test_form_brightness_mode_fixed_only_on_fixed(void) {
 
 // -- edge case: an unknown night mode code keeps the saved mode, without a rejected field
 static void test_form_night_mode_unknown_code_keeps_mode(void) {
-  Config cfg = savedConfig();
+  Settings cfg = savedConfig();
   cfg.backlight.night_mode = NightMode::Sun;
   const SettingsFormOutcome out = applySettingsForm(cfg, form({{"night_mode", "always"}}));
   ASSERT_ENUM_EQ(NightMode::Sun, cfg.backlight.night_mode);

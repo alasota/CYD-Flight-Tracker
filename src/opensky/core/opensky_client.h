@@ -136,7 +136,7 @@ struct OpenSkyPollResult {
 // and 429 backoff, defined in opensky/adapters/opensky_http.cpp. Thin wrapper
 // around WiFiClientSecure/HTTPClient — not covered by Unity (see CLAUDE.md
 // "Testing"). No TFT/drawing code. The settings come from the caller's
-// Config, one object each (spec 12 §7).
+// Settings, one object each (spec 12 §7).
 
 // Fetches aircraft currently in the bounding box around `home` (its
 // radius), logging in with `creds` (no internal loadConfig() — the caller

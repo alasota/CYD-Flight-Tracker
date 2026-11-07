@@ -1,5 +1,5 @@
 // home — where the device stands and how far around it the sky is watched:
-// airspace's settings object (spec 12 §7). Config (admin/core/config_store.h)
+// airspace's settings object (spec 12 §7). Settings (admin/core/config_store.h)
 // holds one as `home`; the pipeline, the OpenSky bounding box, the radar
 // rings and the sun times read only this.
 //

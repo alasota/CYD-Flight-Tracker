@@ -1,5 +1,5 @@
 // config_store — Preferences/NVS-backed persistence for all user-configurable
-// settings: `Config`, the aggregate of the contexts' settings objects (home,
+// settings: `Settings`, the aggregate of the contexts' settings objects (home,
 // flight phases, OpenSky account and poll interval, display, auto-cycle,
 // backlight, update check, settings page). See CLAUDE.md "Code conventions".
 //
@@ -65,7 +65,7 @@ struct WebSettings {
 // and the same as before the split. ⚠️ gnu++11 on env:cyd: none of these
 // structs is an aggregate there (default member initializers) — assign
 // members, never `{…}`-initialize them.
-struct Config {
+struct Settings {
   Home home;                    // position, scan radius, configured (airspace)
   PhaseThresholds phase;        // flight_phase thresholds (airspace)
   OpenSkyCredentials opensky;   // OAuth2 client id / secret (opensky)
@@ -78,13 +78,13 @@ struct Config {
 };
 
 // Hardcoded fallback values used before anything has ever been saved to NVS.
-Config defaultConfig();
+Settings defaultConfig();
 
 // Clamps a caller-supplied config to safe ranges (lat/lon to valid degrees,
 // radius floor/ceiling, a minimum poll interval so the firmware can't be
 // configured to hammer the OpenSky API faster than docs/data-sources.md
 // "Rate limits" allows). Pure — no NVS access — so it's covered by native tests.
-Config sanitizeConfig(const Config &cfg);
+Settings sanitizeConfig(const Settings &cfg);
 
 float clampRadiusDeg(float radius_deg);
 uint32_t clampPollIntervalS(uint32_t poll_interval_s);
@@ -107,8 +107,8 @@ uint16_t clampNightWakeS(int seconds);
 // --- Hardware adapter: reads/writes ESP32 NVS via the Preferences library.
 // Thin wrapper around a hardware/SDK API — see CLAUDE.md "Testing" — not
 // covered by Unity. Both always sanitize before returning/persisting.
-Config loadConfig();
-void saveConfig(const Config &cfg);
+Settings loadConfig();
+void saveConfig(const Settings &cfg);
 
 // Persists just the last-active screen index (0/1/2), clamped via
 // clampLastScreen(). A targeted single-key write for the frequently-

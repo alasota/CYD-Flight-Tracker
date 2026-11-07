@@ -70,7 +70,7 @@ const char *nightModeCode(NightMode m);  // "off" / "schedule" / "sun"
 // "off" / "schedule" / "sun" -> mode; false for anything else.
 bool nightModeFromCode(const std::string &code, NightMode *out);
 
-// The backlight's settings object (spec 12 §7; Config holds one as `backlight`,
+// The backlight's settings object (spec 12 §7; Settings holds one as `backlight`,
 // clamped by config_store). brightness_auto: from the light sensor between min
 // and max (NVS `bl_auto`, `bl_min`, `bl_max`), else fixed (`bl_fix`); percent,
 // 5..100. night_mode Off / by the clock (night_from..night_to, minutes after

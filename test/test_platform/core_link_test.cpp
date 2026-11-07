@@ -129,7 +129,7 @@ static void test_guarded_copy(void) {
 
 static NetState baseState() {
   NetState s;
-  auto cfg = std::make_shared<Config>();
+  auto cfg = std::make_shared<Settings>();
   cfg->home.configured = true;
   s.cfg = cfg;
   auto d = std::make_shared<AirspaceSnapshot>();
@@ -193,7 +193,7 @@ static void test_diff_health_on_empty_screen_repaints_content(void) {
 static void test_diff_language_change(void) {
   const NetState a = baseState();
   NetState b = a;
-  auto cfg = std::make_shared<Config>(*a.cfg);
+  auto cfg = std::make_shared<Settings>(*a.cfg);
   cfg->display.language = a.cfg->display.language == Language::PL ? Language::EN : Language::PL;
   b.cfg = cfg;
   TEST_ASSERT_TRUE(diffNetState(&a, b).languageChanged);
@@ -201,11 +201,11 @@ static void test_diff_language_change(void) {
 
 static void test_diff_home_configured_is_first_draw(void) {
   NetState a = baseState();
-  auto unset = std::make_shared<Config>(*a.cfg);
+  auto unset = std::make_shared<Settings>(*a.cfg);
   unset->home.configured = false;
   a.cfg = unset;
   NetState b = a;
-  auto set = std::make_shared<Config>(*a.cfg);
+  auto set = std::make_shared<Settings>(*a.cfg);
   set->home.configured = true;
   b.cfg = set;
   TEST_ASSERT_TRUE(diffNetState(&a, b).firstDraw);
@@ -214,13 +214,13 @@ static void test_diff_home_configured_is_first_draw(void) {
 static void test_diff_radius_or_home_moves_content(void) {
   const NetState a = baseState();
   NetState b = a;
-  auto cfg = std::make_shared<Config>(*a.cfg);
+  auto cfg = std::make_shared<Settings>(*a.cfg);
   cfg->home.radius_deg = a.cfg->home.radius_deg + 1.0f;
   b.cfg = cfg;
   TEST_ASSERT_TRUE(diffNetState(&a, b).newPoll);
 
   NetState c = a;
-  auto moved = std::make_shared<Config>(*a.cfg);
+  auto moved = std::make_shared<Settings>(*a.cfg);
   moved->home.lat += 0.5f;
   c.cfg = moved;
   TEST_ASSERT_TRUE(diffNetState(&a, c).newPoll);
@@ -229,7 +229,7 @@ static void test_diff_radius_or_home_moves_content(void) {
 static void test_diff_unrelated_config_change_is_nothing(void) {
   const NetState a = baseState();
   NetState b = a;
-  auto cfg = std::make_shared<Config>(*a.cfg);
+  auto cfg = std::make_shared<Settings>(*a.cfg);
   cfg->poll.interval_s = a.cfg->poll.interval_s + 10;
   b.cfg = cfg;
   TEST_ASSERT_FALSE(any(diffNetState(&a, b)));
@@ -242,19 +242,21 @@ static void test_diff_backlight_or_web_change_is_nothing(void) {
   const NetState a = baseState();
   const struct {
     const char *what;
-    void (*change)(Config &);
+    void (*change)(Settings &);
   } changes[] = {
-      {"backlight.brightness_fixed_pct", [](Config &c) { c.backlight.brightness_fixed_pct = 42; }},
-      {"backlight.night_mode", [](Config &c) { c.backlight.night_mode = NightMode::Off; }},
-      {"backlight.night_pause_polling", [](Config &c) { c.backlight.night_pause_polling = true; }},
-      {"web.language", [](Config &c) { c.web.language = Language::EN; }},
-      {"web.password", [](Config &c) { c.web.password = "hunter22"; }},
-      {"update.check_enabled", [](Config &c) { c.update.check_enabled = false; }},
-      {"update.skipped_tag", [](Config &c) { c.update.skipped_tag = "v1.4.0"; }},
+      {"backlight.brightness_fixed_pct",
+       [](Settings &c) { c.backlight.brightness_fixed_pct = 42; }},
+      {"backlight.night_mode", [](Settings &c) { c.backlight.night_mode = NightMode::Off; }},
+      {"backlight.night_pause_polling",
+       [](Settings &c) { c.backlight.night_pause_polling = true; }},
+      {"web.language", [](Settings &c) { c.web.language = Language::EN; }},
+      {"web.password", [](Settings &c) { c.web.password = "hunter22"; }},
+      {"update.check_enabled", [](Settings &c) { c.update.check_enabled = false; }},
+      {"update.skipped_tag", [](Settings &c) { c.update.skipped_tag = "v1.4.0"; }},
   };
   for (const auto &ch : changes) {
     NetState b = a;
-    auto cfg = std::make_shared<Config>(*a.cfg);
+    auto cfg = std::make_shared<Settings>(*a.cfg);
     ch.change(*cfg);
     b.cfg = cfg;
     TEST_ASSERT_FALSE_MESSAGE(any(diffNetState(&a, b)), ch.what);

@@ -183,14 +183,14 @@ void sendPage(ConfigPageModel model, int status = 200) {
   server.sendContent("");  // 0-length chunk closes the chunked response
 }
 
-void sendConfigPage(const Config &cfg, SettingsTab tab) {
+void sendConfigPage(const Settings &cfg, SettingsTab tab) {
   ConfigPageModel model;
   model.cfg = cfg;
   model.tab = tab;
   sendPage(model);
 }
 
-void sendConfigPage(const Config &cfg, SettingsTab tab, WebStr message, bool isError,
+void sendConfigPage(const Settings &cfg, SettingsTab tab, WebStr message, bool isError,
                     const std::string &detail = std::string()) {
   ConfigPageModel model;
   model.cfg = cfg;
@@ -213,7 +213,7 @@ void handleRoot() {
 // the web panel's language only and redirects back to the same tab.
 void handleLang() {
   if (!requireSameOrigin() || !authorize()) return;
-  Config cfg = loadConfig();
+  Settings cfg = loadConfig();
   cfg.web.language = languageFromCode(server.arg("l").c_str());
   saveConfig(cfg);
   server.sendHeader("Location", String("/?tab=") + settingsTabId(requestedTab()));
@@ -233,7 +233,7 @@ void handleSave() {
   if (!requireSameOrigin() || !authorize()) return;
   FormArgs args;
   for (int i = 0; i < server.args(); ++i) args.add(server.argName(i).c_str(), server.arg(i).c_str());
-  Config cfg = loadConfig();
+  Settings cfg = loadConfig();
   const SettingsFormOutcome out = applySettingsForm(cfg, args);
   saveConfig(cfg);  // sanitizes internally (see config_store)
   ++saveCount;
@@ -243,7 +243,7 @@ void handleSave() {
     Serial.println(webPassword.empty() ? "[auth] web password removed" : "[auth] web password changed");
   }
 
-  const Config saved = loadConfig();
+  const Settings saved = loadConfig();
   const SettingsTab tab = requestedTab();
   if (!out.rejected.empty()) {
     sendConfigPage(saved, tab, WebStr::SavedWithInvalid, true,
@@ -385,7 +385,7 @@ void handleCredentialsUpload() {
   if (!requireSameOrigin() || !authorize()) return;
   bool tooLarge = false;
   const std::string body = takeUpload(&tooLarge);
-  Config cfg = loadConfig();
+  Settings cfg = loadConfig();
 
   if (tooLarge) {
     sendConfigPage(cfg, SettingsTab::OpenSky, WebStr::UploadTooLarge, true);
@@ -402,7 +402,7 @@ void handleCredentialsUpload() {
   saveConfig(cfg);  // sanitizes internally (see config_store)
   ++saveCount;
 
-  Config saved = loadConfig();
+  Settings saved = loadConfig();
   sendConfigPage(saved, SettingsTab::OpenSky, WebStr::UploadOk, false);
 }
 
@@ -423,7 +423,7 @@ void handleRestore() {
   if (!requireSameOrigin() || !authorize()) return;
   bool tooLarge = false;
   const std::string body = takeUpload(&tooLarge);
-  Config cfg = loadConfig();
+  Settings cfg = loadConfig();
 
   if (tooLarge) {
     sendConfigPage(cfg, SettingsTab::Backup, WebStr::UploadTooLarge, true);
@@ -439,7 +439,7 @@ void handleRestore() {
   ++saveCount;           // net_task reloads: language, home location, ...
   refreshPassword();     // a backup with secrets carries the panel password
 
-  Config saved = loadConfig();  // its web.language may just have changed
+  Settings saved = loadConfig();  // its web.language may just have changed
   if (r.invalidFields.empty()) {
     sendConfigPage(saved, SettingsTab::Backup, WebStr::RestoreOk, false);
   } else {

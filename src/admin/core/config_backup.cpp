@@ -9,7 +9,8 @@
 #include "display/core/backlight.h"  // nightModeCode() / parseClockMinutes()
 #include "admin/core/web_auth.h"   // validateWebPassword()
 
-std::string configToBackupJson(const Config &cfg, bool includeSecrets, const char *firmwareVersion) {
+std::string configToBackupJson(const Settings &cfg, bool includeSecrets,
+                               const char *firmwareVersion) {
   JsonDocument doc;
   doc["format"] = kBackupFormat;
   doc["format_version"] = kBackupFormatVersion;
@@ -154,7 +155,7 @@ class Applier {
 
 }  // namespace
 
-BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const Config &current) {
+BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const Settings &current) {
   BackupRestoreResult r;
   r.config = current;
   if (json.size() > kMaxBackupJsonBytes) return r;  // NotJson
@@ -171,7 +172,7 @@ BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const C
   r.status = BackupRestoreStatus::Ok;
 
   Applier a(r);
-  Config &c = r.config;
+  Settings &c = r.config;
 
   JsonObjectConst location = doc["location"];
   const int beforeLocation = r.appliedFields;
