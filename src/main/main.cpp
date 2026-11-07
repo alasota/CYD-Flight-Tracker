@@ -219,7 +219,7 @@ void setup() {
   shotSrc.requestBand = screenshotPanelRequestBand;
   shotSrc.waitBand = screenshotPanelWaitBand;
   shotSrc.end = screenshotPanelEnd;
-  configPortalSetScreenshotSource(shotSrc);
+  webServerSetScreenshotSource(shotSrc);
 
   core_link::begin(xTaskGetCurrentTaskHandle());
   core_link::uiBeatMs.store(millis());

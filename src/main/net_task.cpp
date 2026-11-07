@@ -57,7 +57,7 @@ void refreshSummary() {
   state.cfg = cfg;
   state.cfgSeq = cfgSeq;
   state.wifi = wifiManagerStatus();
-  state.restartPending = configPortalRestartPending();
+  state.restartPending = webServerRestartPending();
   const UpdateState &u = releaseUpdateState();
   state.update.status = u.status;
   state.update.installed = u.installed;
@@ -122,7 +122,7 @@ CheckGate updateGate() {
   g.enabled = cfg->update.check_enabled;
   g.wifi = wifiManagerStatus() == WifiStatus::Connected;
   g.timeSynced = isTimeSynced();
-  g.otaBusy = otaFlashSession().inProgress() || configPortalRestartPending();
+  g.otaBusy = otaFlashSession().inProgress() || webServerRestartPending();
   g.msUntilNextPoll = openSkyMsUntilNextPoll(millis(), cfg->poll);
   g.maxFreeBlock = ESP.getMaxAllocHeap();
   return g;
@@ -134,7 +134,7 @@ void markAppValidWhenStable() {
   if (!appPendingVerify) return;
   const WifiStatus ws = wifiManagerStatus();
   const bool reachable =
-      (ws == WifiStatus::Connected && configPortalIsActive()) || ws == WifiStatus::PortalActive;
+      (ws == WifiStatus::Connected && webServerIsActive()) || ws == WifiStatus::PortalActive;
   const bool uiAlive =
       !heartbeatStale(millis(), core_link::uiBeatMs.load(), kUiAliveLimitMs);
   if (shouldRestartForRollback(appPendingVerify, millis(), uiAlive)) {
@@ -219,8 +219,8 @@ EnrichmentPort productionPorts() {
   // A settings save only reaches `cfg` after the poll (seenSaveCount).
   p.betweenFetches = [] {
     static bool inBetweenFetches = false;
-    return serveBetweenFetches(inBetweenFetches, configPortalLoop, [] {
-      return configPortalRestartPending() || otaFlashSession().inProgress();
+    return serveBetweenFetches(inBetweenFetches, webServerLoop, [] {
+      return webServerRestartPending() || otaFlashSession().inProgress();
     });
   };
   return p;
@@ -364,18 +364,18 @@ void netTask(void *) {
   timeSyncBegin();     // NTP (Europe/Warsaw); the header shows --:-- until it lands
   // mDNS + the config WebServer, non-blocking. In the portal-fallback case
   // cyd-sky.local won't resolve until the device joins a real network.
-  configPortalBegin();
-  seenSaveCount = configPortalSaveCount();
+  webServerBegin();
+  seenSaveCount = webServerSaveCount();
 
   OtaObserver otaObs;
   otaObs.onStart = otaOnStart;
   otaObs.onProgress = otaOnProgress;
   otaObs.onEnd = otaOnEnd;
-  configPortalSetOtaObserver(otaObs);
+  webServerSetOtaObserver(otaObs);
   otaObs.onStart = githubOtaOnStart;
   releaseSetOtaObserver(otaObs);
   releaseCheckBegin(cfg->update);
-  configPortalSetPerfSource(perfJsonNow);
+  webServerSetPerfSource(perfJsonNow);
   publishIfChanged();
 
   for (;;) {
@@ -383,9 +383,9 @@ void netTask(void *) {
     core_link::netBeatMs.store(t0);
 
     wifiManagerLoop();
-    configPortalLoop();
+    webServerLoop();
 
-    if (configPortalRestartPending()) {
+    if (webServerRestartPending()) {
       // A good firmware upload: the board restarts in a moment — off the network.
       publishIfChanged();
       vTaskDelay(pdMS_TO_TICKS(kNetIdleSleepMs));
@@ -394,8 +394,8 @@ void netTask(void *) {
     markAppValidWhenStable();
 
     // Settings saved on the config page: reload them now (language etc.).
-    if (configPortalSaveCount() != seenSaveCount) {
-      seenSaveCount = configPortalSaveCount();
+    if (webServerSaveCount() != seenSaveCount) {
+      seenSaveCount = webServerSaveCount();
       reloadConfig();
     }
     handleCommands();

@@ -31,13 +31,13 @@ namespace {
 
 WebServer server(80);
 bool active = false;
-uint32_t saveCount = 0;  // see configPortalSaveCount()
-ScreenshotSource screenshotSource;  // see configPortalSetScreenshotSource()
-OtaObserver otaObserver;            // see configPortalSetOtaObserver()
+uint32_t saveCount = 0;  // see webServerSaveCount()
+ScreenshotSource screenshotSource;  // see webServerSetScreenshotSource()
+OtaObserver otaObserver;            // see webServerSetOtaObserver()
 
 // ---- Panel password (web_auth). A copy of the settings' web.password, refreshed
 // whenever this module saves the settings (the only writer besides the
-// boot-time touchscreen reset, which runs before configPortalBegin()).
+// boot-time touchscreen reset, which runs before webServerBegin()).
 std::string webPassword;
 AuthThrottle authThrottle;
 
@@ -61,7 +61,7 @@ bool credentialsOk() {
 }
 
 // Where a state-changing request came from (spec 10 §2.1): Origin, else
-// Referer, against Host. Headers collected in configPortalBegin().
+// Referer, against Host. Headers collected in webServerBegin().
 OriginCheck requestOrigin() {
   return checkRequestOrigin(server.header("Origin").c_str(), server.header("Referer").c_str(),
                             server.header("Host").c_str());
@@ -132,7 +132,7 @@ bool authorize() {
 }
 
 // ---- Firmware update (POST /update): the shared flash session (ota_update).
-OtaSession *ota = nullptr;  // set in configPortalBegin()
+OtaSession *ota = nullptr;  // set in webServerBegin()
 bool otaAuthorized = false;
 size_t otaLastNotified = 0;
 bool restartPending = false;
@@ -600,7 +600,7 @@ void handleUpdatePrerelease() {
 
 }  // namespace
 
-void configPortalBegin() {
+void webServerBegin() {
   if (active) return;
 
   MDNS.begin("cyd-sky");  // -> cyd-sky.local
@@ -635,7 +635,7 @@ void configPortalBegin() {
   active = true;
 }
 
-void configPortalLoop() {
+void webServerLoop() {
   if (!active) return;
   server.handleClient();
   if (restartPending && millis() - restartAtMs >= kRestartDelayMs) {
@@ -645,15 +645,15 @@ void configPortalLoop() {
   }
 }
 
-bool configPortalIsActive() { return active; }
+bool webServerIsActive() { return active; }
 
-uint32_t configPortalSaveCount() { return saveCount; }
+uint32_t webServerSaveCount() { return saveCount; }
 
-void configPortalSetScreenshotSource(const ScreenshotSource &source) { screenshotSource = source; }
+void webServerSetScreenshotSource(const ScreenshotSource &source) { screenshotSource = source; }
 
-void configPortalSetOtaObserver(const OtaObserver &observer) { otaObserver = observer; }
+void webServerSetOtaObserver(const OtaObserver &observer) { otaObserver = observer; }
 
 
-void configPortalSetPerfSource(PerfJsonSource source) { perfSource = source; }
+void webServerSetPerfSource(PerfJsonSource source) { perfSource = source; }
 
-bool configPortalRestartPending() { return restartPending; }
+bool webServerRestartPending() { return restartPending; }

@@ -26,21 +26,21 @@
 // Call once WiFi is connected (e.g. the first loop() iteration where
 // wifiManagerStatus() == WifiStatus::Connected) — mDNS/WebServer need an
 // active station interface.
-void configPortalBegin();
+void webServerBegin();
 
 // Services pending HTTP requests. Safe to call every loop() iteration
-// regardless of whether configPortalBegin() has run yet (no-op until it
+// regardless of whether webServerBegin() has run yet (no-op until it
 // has) — non-blocking, per CLAUDE.md's millis()-based timing rule.
-void configPortalLoop();
+void webServerLoop();
 
-// True once configPortalBegin() has run.
-bool configPortalIsActive();
+// True once webServerBegin() has run.
+bool webServerIsActive();
 
 // Incremented every time the settings are saved (settings form or
 // credentials upload). net_task compares it against the value it last saw
 // to reload the config straight away — e.g. so a language change shows up
 // on screen immediately rather than at the next OpenSky poll.
-uint32_t configPortalSaveCount();
+uint32_t webServerSaveCount();
 
 // Where GET /screenshot.bmp gets its pixels — supplied by the UI, so this
 // module stays free of display code. The display belongs to the UI core
@@ -65,19 +65,19 @@ struct ScreenshotSource {
   bool (*waitBand)(uint32_t timeoutMs) = nullptr;
   void (*end)() = nullptr;
 };
-void configPortalSetScreenshotSource(const ScreenshotSource &source);
+void webServerSetScreenshotSource(const ScreenshotSource &source);
 
 // POST /update (firmware over WiFi, ota_update) reports through this
-// OtaObserver; its callbacks run inside configPortalLoop() (the upload is
+// OtaObserver; its callbacks run inside webServerLoop() (the upload is
 // handled there in one go).
-void configPortalSetOtaObserver(const OtaObserver &observer);
+void webServerSetOtaObserver(const OtaObserver &observer);
 
 // True between a successful update and the restart it triggers — net_task
 // stays off the network meanwhile, and the UI keeps the OTA service screen
 // up (it sees this as NetState::restartPending).
-bool configPortalRestartPending();
+bool webServerRestartPending();
 
 
 // GET /perf.json — perf_stats' JSON, supplied by net_task (503 until set).
 using PerfJsonSource = std::string (*)();
-void configPortalSetPerfSource(PerfJsonSource source);
+void webServerSetPerfSource(PerfJsonSource source);
