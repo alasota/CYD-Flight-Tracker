@@ -1,6 +1,6 @@
 // config_backup — the settings as a JSON file, for the config page's Backup
-// tab: "download a backup" (configToBackupJson) and "restore from a backup"
-// (restoreConfigFromBackupJson). Grouped like the page's tabs:
+// tab: "download a backup" (settingsToBackupJson) and "restore from a backup"
+// (restoreSettingsFromBackupJson). Grouped like the page's tabs:
 //
 //   {
 //     "format": "cyd-sky-tracker-config", "format_version": 1, "firmware": "v1.0.1",
@@ -14,7 +14,7 @@
 //
 // Restoring is forgiving: a missing key keeps the current value (so a file
 // saved without credentials doesn't wipe them), a key with the wrong type is
-// skipped and reported. Range checks are config_store's sanitizeConfig() job.
+// skipped and reported. Range checks are config_store's sanitizeSettings() job.
 //
 // Pure — ArduinoJson only, no WebServer/NVS — tested under `pio test -e native`.
 #pragma once
@@ -33,8 +33,8 @@ constexpr size_t kMaxBackupJsonBytes = 4096;
 // The backup file for `cfg`. Without `includeSecrets` the "opensky" group
 // has no client_id / client_secret and there is no "security" group
 // (restoring it then keeps the device's).
-std::string configToBackupJson(const Settings &cfg, bool includeSecrets,
-                               const char *firmwareVersion);
+std::string settingsToBackupJson(const Settings &cfg, bool includeSecrets,
+                                 const char *firmwareVersion);
 
 enum class BackupRestoreStatus {
   Ok,           // config holds the restored settings (maybe with skipped fields)
@@ -51,4 +51,4 @@ struct BackupRestoreResult {
 
 // Applies a backup file onto `current`. Marks the home location as configured
 // when the file sets it (same as saving the Location tab).
-BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const Settings &current);
+BackupRestoreResult restoreSettingsFromBackupJson(const std::string &json, const Settings &current);

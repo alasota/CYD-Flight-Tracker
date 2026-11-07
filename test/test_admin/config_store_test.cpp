@@ -7,7 +7,7 @@
 namespace {
 
 static void test_default_config_has_sane_values(void) {
-  Settings cfg = defaultConfig();
+  Settings cfg = defaultSettings();
   TEST_ASSERT_EQUAL_FLOAT(2.5f, cfg.home.radius_deg);
   TEST_ASSERT_EQUAL_UINT32(15, cfg.poll.interval_s);
   TEST_ASSERT_EQUAL_INT(0, cfg.display.last_screen);  // Flights
@@ -42,14 +42,14 @@ static void test_sanitize_config_clamps_flight_phase_thresholds(void) {
   Settings cfg;
   cfg.phase.near_airport_km = -1.0f;
   cfg.phase.climb_rate_threshold_mps = 0.0f;
-  Settings out = sanitizeConfig(cfg);
+  Settings out = sanitizeSettings(cfg);
   TEST_ASSERT_EQUAL_FLOAT(0.5f, out.phase.near_airport_km);
   TEST_ASSERT_EQUAL_FLOAT(0.1f, out.phase.climb_rate_threshold_mps);
 
   Settings ok;
   ok.phase.near_airport_km = 20.0f;
   ok.phase.climb_rate_threshold_mps = 2.0f;
-  Settings outOk = sanitizeConfig(ok);
+  Settings outOk = sanitizeSettings(ok);
   TEST_ASSERT_EQUAL_FLOAT(20.0f, outOk.phase.near_airport_km);
   TEST_ASSERT_EQUAL_FLOAT(2.0f, outOk.phase.climb_rate_threshold_mps);
 }
@@ -57,11 +57,11 @@ static void test_sanitize_config_clamps_flight_phase_thresholds(void) {
 static void test_sanitize_config_preserves_home_configured_flag(void) {
   Settings configured;
   configured.home.configured = true;
-  TEST_ASSERT_TRUE(sanitizeConfig(configured).home.configured);
+  TEST_ASSERT_TRUE(sanitizeSettings(configured).home.configured);
 
   Settings unconfigured;
   unconfigured.home.configured = false;
-  TEST_ASSERT_FALSE(sanitizeConfig(unconfigured).home.configured);
+  TEST_ASSERT_FALSE(sanitizeSettings(unconfigured).home.configured);
 }
 
 static void test_clamp_radius_floors_and_ceils(void) {
@@ -78,7 +78,7 @@ static void test_clamp_poll_interval_enforces_minimum(void) {
   TEST_ASSERT_EQUAL_UINT32(3600, clampPollIntervalS(3600));
 }
 
-// Scenario: sanitizeConfig() przycina te same pola do tych samych granic, teraz w obiektach
+// Scenario: sanitizeSettings() przycina te same pola do tych samych granic, teraz w obiektach
 // kontekstów (an out-of-range value in every object: home, poll, auto-cycle, phase, backlight,
 // display, web).
 static void test_sanitize_config_clamps_all_fields(void) {
@@ -98,7 +98,7 @@ static void test_sanitize_config_clamps_all_fields(void) {
   cfg.display.language = static_cast<Language>(9);
   cfg.web.language = static_cast<Language>(9);
 
-  Settings out = sanitizeConfig(cfg);
+  Settings out = sanitizeSettings(cfg);
 
   TEST_ASSERT_EQUAL_FLOAT(90.0f, out.home.lat);
   TEST_ASSERT_EQUAL_FLOAT(-180.0f, out.home.lon);
@@ -133,7 +133,7 @@ static void test_sanitize_config_leaves_in_range_values_untouched(void) {
   cfg.display.language = Language::EN;
   cfg.web.language = Language::EN;
 
-  Settings out = sanitizeConfig(cfg);
+  Settings out = sanitizeSettings(cfg);
 
   TEST_ASSERT_EQUAL_FLOAT(51.5f, out.home.lat);
   TEST_ASSERT_EQUAL_FLOAT(-0.1f, out.home.lon);
@@ -166,11 +166,11 @@ static void test_clamp_last_screen_falls_back_to_flights(void) {
 static void test_sanitize_config_clamps_last_screen(void) {
   Settings cfg;
   cfg.display.last_screen = 9;
-  TEST_ASSERT_EQUAL_INT(0, sanitizeConfig(cfg).display.last_screen);
+  TEST_ASSERT_EQUAL_INT(0, sanitizeSettings(cfg).display.last_screen);
 
   Settings ok;
   ok.display.last_screen = 2;
-  TEST_ASSERT_EQUAL_INT(2, sanitizeConfig(ok).display.last_screen);
+  TEST_ASSERT_EQUAL_INT(2, sanitizeSettings(ok).display.last_screen);
 }
 
 static void test_clamp_auto_cycle_interval_enforces_minimum(void) {
@@ -187,33 +187,33 @@ static void test_clamp_auto_cycle_interval_enforces_minimum(void) {
 static void test_sanitize_config_clamps_auto_cycle_interval(void) {
   Settings cfg;
   cfg.auto_cycle.interval_s = 0;
-  TEST_ASSERT_EQUAL_UINT32(3, sanitizeConfig(cfg).auto_cycle.interval_s);
+  TEST_ASSERT_EQUAL_UINT32(3, sanitizeSettings(cfg).auto_cycle.interval_s);
 
   Settings ok;
   ok.auto_cycle.interval_s = 30;
-  TEST_ASSERT_EQUAL_UINT32(30, sanitizeConfig(ok).auto_cycle.interval_s);
+  TEST_ASSERT_EQUAL_UINT32(30, sanitizeSettings(ok).auto_cycle.interval_s);
 }
 
 static void test_sanitize_config_preserves_auto_cycle_enabled(void) {
   Settings on;
   on.auto_cycle.enabled = true;
-  TEST_ASSERT_TRUE(sanitizeConfig(on).auto_cycle.enabled);
+  TEST_ASSERT_TRUE(sanitizeSettings(on).auto_cycle.enabled);
 
   Settings off;
   off.auto_cycle.enabled = false;
-  TEST_ASSERT_FALSE(sanitizeConfig(off).auto_cycle.enabled);
+  TEST_ASSERT_FALSE(sanitizeSettings(off).auto_cycle.enabled);
 }
 
 static void test_default_language_is_polish(void) {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::PL),
-                        static_cast<int>(defaultConfig().display.language));
+                        static_cast<int>(defaultSettings().display.language));
 }
 
 static void test_sanitize_config_preserves_valid_language(void) {
   Settings en;
   en.display.language = Language::EN;
   TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::EN),
-                        static_cast<int>(sanitizeConfig(en).display.language));
+                        static_cast<int>(sanitizeSettings(en).display.language));
 }
 
 static void test_sanitize_config_resets_invalid_language(void) {
@@ -221,58 +221,58 @@ static void test_sanitize_config_resets_invalid_language(void) {
   Settings bad;
   bad.display.language = static_cast<Language>(7);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(kDefaultLanguage),
-                        static_cast<int>(sanitizeConfig(bad).display.language));
+                        static_cast<int>(sanitizeSettings(bad).display.language));
 }
 
 static void test_web_language_is_independent_and_sanitized(void) {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::PL),
-                        static_cast<int>(defaultConfig().web.language));
+                        static_cast<int>(defaultSettings().web.language));
   Settings c;
   c.display.language = Language::PL;
   c.web.language = Language::EN;
-  Settings s = sanitizeConfig(c);
+  Settings s = sanitizeSettings(c);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::PL), static_cast<int>(s.display.language));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::EN), static_cast<int>(s.web.language));
   c.web.language = static_cast<Language>(9);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(kDefaultLanguage),
-                        static_cast<int>(sanitizeConfig(c).web.language));
+                        static_cast<int>(sanitizeSettings(c).web.language));
 }
 
 static void test_web_password_defaults_to_none_and_invalid_ones_are_dropped(void) {
-  TEST_ASSERT_TRUE(defaultConfig().web.password.empty());
-  Settings c = defaultConfig();
+  TEST_ASSERT_TRUE(defaultSettings().web.password.empty());
+  Settings c = defaultSettings();
   c.web.password = "hunter22";
-  TEST_ASSERT_EQUAL_STRING("hunter22", sanitizeConfig(c).web.password.c_str());
+  TEST_ASSERT_EQUAL_STRING("hunter22", sanitizeSettings(c).web.password.c_str());
   c.web.password = "short";
-  TEST_ASSERT_TRUE(sanitizeConfig(c).web.password.empty());
+  TEST_ASSERT_TRUE(sanitizeSettings(c).web.password.empty());
   c.web.password = "zaÅ¼Ã³Åcgesl";
-  TEST_ASSERT_TRUE(sanitizeConfig(c).web.password.empty());
+  TEST_ASSERT_TRUE(sanitizeSettings(c).web.password.empty());
 }
 
 static void test_update_settings_defaults_and_sanitizing(void) {
-  const Settings d = defaultConfig();
+  const Settings d = defaultSettings();
   TEST_ASSERT_TRUE(d.update.check_enabled);    // checks by default, never installs by itself
   TEST_ASSERT_FALSE(d.update.show_prerelease);  // development versions only on request
   TEST_ASSERT_TRUE(d.update.skipped_tag.empty());
 
-  Settings c = defaultConfig();
+  Settings c = defaultSettings();
   c.update.check_enabled = false;
   c.update.show_prerelease = true;
   c.update.skipped_tag = "v1.4.0";
-  Settings s = sanitizeConfig(c);
+  Settings s = sanitizeSettings(c);
   TEST_ASSERT_FALSE(s.update.check_enabled);
   TEST_ASSERT_TRUE(s.update.show_prerelease);
   TEST_ASSERT_EQUAL_STRING("v1.4.0", s.update.skipped_tag.c_str());
   for (const char *bad : {"garbage", "v1.4", "v1.4.0-3-gabc1234", "<script>"}) {
     c.update.skipped_tag = bad;
-    TEST_ASSERT_TRUE_MESSAGE(sanitizeConfig(c).update.skipped_tag.empty(), bad);
+    TEST_ASSERT_TRUE_MESSAGE(sanitizeSettings(c).update.skipped_tag.empty(), bad);
   }
 }
 
 // ---- Brightness / night mode (spec/03) ----------------------------------------
 
 static void test_display_defaults(void) {
-  const Settings c = defaultConfig();
+  const Settings c = defaultSettings();
   TEST_ASSERT_TRUE(c.backlight.brightness_auto);
   TEST_ASSERT_EQUAL_UINT8(10, c.backlight.brightness_min_pct);
   TEST_ASSERT_EQUAL_UINT8(100, c.backlight.brightness_max_pct);
@@ -285,7 +285,7 @@ static void test_display_defaults(void) {
 }
 
 static void test_sanitize_display_settings(void) {
-  Settings c = defaultConfig();
+  Settings c = defaultSettings();
   c.backlight.brightness_fixed_pct = 0;
   c.backlight.brightness_min_pct = 90;
   c.backlight.brightness_max_pct = 200;
@@ -293,7 +293,7 @@ static void test_sanitize_display_settings(void) {
   c.backlight.night_from_min = 5000;
   c.backlight.night_pct = 150;
   c.backlight.night_wake_s = 3;
-  Settings s = sanitizeConfig(c);
+  Settings s = sanitizeSettings(c);
   TEST_ASSERT_EQUAL_UINT8(5, s.backlight.brightness_fixed_pct);
   TEST_ASSERT_EQUAL_UINT8(90, s.backlight.brightness_min_pct);
   TEST_ASSERT_EQUAL_UINT8(100, s.backlight.brightness_max_pct);
@@ -302,12 +302,12 @@ static void test_sanitize_display_settings(void) {
   TEST_ASSERT_EQUAL_UINT8(100, s.backlight.night_pct);
   TEST_ASSERT_EQUAL_UINT16(10, s.backlight.night_wake_s);
 
-  c = defaultConfig();
+  c = defaultSettings();
   c.backlight.brightness_min_pct = 80;  // min > max: swapped
   c.backlight.brightness_max_pct = 30;
   c.backlight.night_pct = 0;            // 0 = off is allowed at night
   c.backlight.night_wake_s = 9999;
-  s = sanitizeConfig(c);
+  s = sanitizeSettings(c);
   TEST_ASSERT_EQUAL_UINT8(30, s.backlight.brightness_min_pct);
   TEST_ASSERT_EQUAL_UINT8(80, s.backlight.brightness_max_pct);
   TEST_ASSERT_EQUAL_UINT8(0, s.backlight.night_pct);
@@ -317,7 +317,7 @@ static void test_sanitize_display_settings(void) {
 // Scenario: Wartości domyślne ustawień są te same co przed etapem — every field of every
 // object against its v1.11.3 default.
 static void test_default_config_keeps_every_stage_5_default(void) {
-  const Settings c = defaultConfig();
+  const Settings c = defaultSettings();
   // home
   TEST_ASSERT_EQUAL_FLOAT(0.0f, c.home.lat);
   TEST_ASSERT_EQUAL_FLOAT(0.0f, c.home.lon);

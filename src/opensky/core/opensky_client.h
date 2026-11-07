@@ -139,7 +139,7 @@ struct OpenSkyPollResult {
 // Settings, one object each (spec 12 §7).
 
 // Fetches aircraft currently in the bounding box around `home` (its
-// radius), logging in with `creds` (no internal loadConfig() — the caller
+// radius), logging in with `creds` (no internal loadSettings() — the caller
 // owns config now, see docs/review-notes-2026.md 4.3). Ensures a fresh
 // OAuth token first when credentials are set (falls back to anonymous
 // otherwise). A 401/403 with a token gets one token refresh + retry; if the

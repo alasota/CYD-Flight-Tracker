@@ -5,7 +5,7 @@
 //
 // Split in two per CLAUDE.md "Testing": the struct + pure validation/default
 // helpers below have no hardware dependency and run under `pio test -e
-// native`; loadConfig()/saveConfig() are the thin Preferences adapter
+// native`; loadSettings()/saveSettings() are the thin Preferences adapter
 // admin/adapters/settings_nvs, compiled only for the device.
 #pragma once
 
@@ -40,7 +40,7 @@ int clampLastScreen(int raw);
 // (pre-releases; NVS `updpre`). skipped_tag: the release NO was tapped for on
 // the display, which then isn't asked about again (NVS `updskip`; not in
 // backups — device state, not a setting); one that isn't a vX.Y.Z tag is
-// dropped by sanitizeConfig().
+// dropped by sanitizeSettings().
 struct UpdateSettings {
   bool check_enabled = true;
   bool show_prerelease = false;
@@ -55,7 +55,7 @@ struct WebSettings {
   // Optional password of the config web page (web_auth; HTTP Digest, login
   // "admin"). Empty = no password. NVS key `wpass`, plain text — Digest needs
   // the password itself. One that fails validateWebPassword() is dropped by
-  // sanitizeConfig().
+  // sanitizeSettings().
   std::string password;
 };
 
@@ -78,13 +78,13 @@ struct Settings {
 };
 
 // Hardcoded fallback values used before anything has ever been saved to NVS.
-Settings defaultConfig();
+Settings defaultSettings();
 
 // Clamps a caller-supplied config to safe ranges (lat/lon to valid degrees,
 // radius floor/ceiling, a minimum poll interval so the firmware can't be
 // configured to hammer the OpenSky API faster than docs/data-sources.md
 // "Rate limits" allows). Pure — no NVS access — so it's covered by native tests.
-Settings sanitizeConfig(const Settings &cfg);
+Settings sanitizeSettings(const Settings &cfg);
 
 float clampRadiusDeg(float radius_deg);
 uint32_t clampPollIntervalS(uint32_t poll_interval_s);
@@ -98,7 +98,7 @@ float clampClimbRateThresholdMps(float climb_rate_threshold_mps);
 
 // Brightness / night clamps (spec/03 §5.5): day brightness 5..100 %, night
 // 0..100 % (0 = off), a time of day 0..1439 min, the wake time 10..600 s.
-// sanitizeConfig() also swaps min / max when min > max.
+// sanitizeSettings() also swaps min / max when min > max.
 uint8_t clampBrightnessPct(int pct);
 uint8_t clampNightPct(int pct);
 uint16_t clampClockMinutes(int minutes);
@@ -107,14 +107,14 @@ uint16_t clampNightWakeS(int seconds);
 // --- Hardware adapter: reads/writes ESP32 NVS via the Preferences library.
 // Thin wrapper around a hardware/SDK API — see CLAUDE.md "Testing" — not
 // covered by Unity. Both always sanitize before returning/persisting.
-Settings loadConfig();
-void saveConfig(const Settings &cfg);
+Settings loadSettings();
+void saveSettings(const Settings &cfg);
 
 // Persists just the last-active screen index (0/1/2), clamped via
 // clampLastScreen(). A targeted single-key write for the frequently-
 // changing nav state — a screen change (especially under auto-cycle,
 // which fires every few seconds) shouldn't rewrite lat/lon/credentials/
-// every other setting the way saveConfig() does.
+// every other setting the way saveSettings() does.
 void saveLastScreen(int screen);
 
 // Single-key writes for release_check's state (same reason as above).

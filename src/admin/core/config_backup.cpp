@@ -9,8 +9,8 @@
 #include "display/core/backlight.h"  // nightModeCode() / parseClockMinutes()
 #include "admin/core/web_auth.h"   // validateWebPassword()
 
-std::string configToBackupJson(const Settings &cfg, bool includeSecrets,
-                               const char *firmwareVersion) {
+std::string settingsToBackupJson(const Settings &cfg, bool includeSecrets,
+                                 const char *firmwareVersion) {
   JsonDocument doc;
   doc["format"] = kBackupFormat;
   doc["format_version"] = kBackupFormatVersion;
@@ -104,7 +104,7 @@ class Applier {
   }
 
   // A small whole number (percent, seconds), capped at what T holds — the
-  // real range checks are sanitizeConfig()'s.
+  // real range checks are sanitizeSettings()'s.
   template <typename T>
   void small(JsonObjectConst group, const char *groupName, const char *key, T &out) {
     uint32_t v = out;
@@ -155,7 +155,8 @@ class Applier {
 
 }  // namespace
 
-BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const Settings &current) {
+BackupRestoreResult restoreSettingsFromBackupJson(const std::string &json,
+                                                  const Settings &current) {
   BackupRestoreResult r;
   r.config = current;
   if (json.size() > kMaxBackupJsonBytes) return r;  // NotJson

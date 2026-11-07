@@ -35,7 +35,7 @@ CredentialsFile parseOpenSkyCredentialsJson(const std::string &json);
 // True if `s` parses entirely as a valid (base-10) floating point number —
 // no trailing garbage, not empty (leading whitespace is tolerated, same as
 // strtof()). Used by the config form to reject malformed lat/lon/radius
-// input instead of silently treating it as 0, which sanitizeConfig would
+// input instead of silently treating it as 0, which sanitizeSettings would
 // then just clamp up to a "valid-looking" value with no feedback to the
 // user — see docs/review-notes-2026.md 1.6. Pure — tested under
 // `pio test -e native`.

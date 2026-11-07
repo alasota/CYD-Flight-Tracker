@@ -129,7 +129,7 @@ static void assertRejected(const std::vector<WebStr> &want, const std::vector<We
 
 // Saved settings that differ from every value the forms below send.
 static Settings savedConfig() {
-  Settings c = makeConfig();
+  Settings c = makeSettings();
   c.home.radius_deg = 2.0f;
   c.poll.interval_s = 60;
   c.auto_cycle.interval_s = 45;
@@ -147,7 +147,7 @@ static Settings savedConfig() {
 
 // Poprawny formularz ustawia wszystkie pola i oznacza dom jako ustawiony
 static void test_form_valid_submit_sets_every_field_and_home_configured(void) {
-  Settings cfg = defaultConfig();
+  Settings cfg = defaultSettings();
   TEST_ASSERT_FALSE(cfg.home.configured);
   const FormArgs args = form({{"lat", "50.0614"},
                               {"lon", "19.9366"},

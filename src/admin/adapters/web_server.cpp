@@ -41,7 +41,7 @@ OtaObserver otaObserver;            // see webServerSetOtaObserver()
 std::string webPassword;
 AuthThrottle authThrottle;
 
-void refreshPassword() { webPassword = loadConfig().web.password; }
+void refreshPassword() { webPassword = loadSettings().web.password; }
 
 bool sentCredentials() { return server.header("Authorization").length() > 0; }
 
@@ -206,16 +206,16 @@ SettingsTab requestedTab() { return settingsTabFromArg(server.arg("tab").c_str()
 
 void handleRoot() {
   if (!authorize()) return;
-  sendConfigPage(loadConfig(), requestedTab());
+  sendConfigPage(loadSettings(), requestedTab());
 }
 
 // POST /lang (l=pl|en, tab=...) — the PL/EN switch in the page header: saves
 // the web panel's language only and redirects back to the same tab.
 void handleLang() {
   if (!requireSameOrigin() || !authorize()) return;
-  Settings cfg = loadConfig();
+  Settings cfg = loadSettings();
   cfg.web.language = languageFromCode(server.arg("l").c_str());
-  saveConfig(cfg);
+  saveSettings(cfg);
   server.sendHeader("Location", String("/?tab=") + settingsTabId(requestedTab()));
   server.send(303, "text/plain", "");
 }
@@ -233,9 +233,9 @@ void handleSave() {
   if (!requireSameOrigin() || !authorize()) return;
   FormArgs args;
   for (int i = 0; i < server.args(); ++i) args.add(server.argName(i).c_str(), server.arg(i).c_str());
-  Settings cfg = loadConfig();
+  Settings cfg = loadSettings();
   const SettingsFormOutcome out = applySettingsForm(cfg, args);
-  saveConfig(cfg);  // sanitizes internally (see config_store)
+  saveSettings(cfg);  // sanitizes internally (see config_store)
   ++saveCount;
   refreshPassword();
   if (out.password.outcome == PasswordChange::Outcome::Set ||
@@ -243,7 +243,7 @@ void handleSave() {
     Serial.println(webPassword.empty() ? "[auth] web password removed" : "[auth] web password changed");
   }
 
-  const Settings saved = loadConfig();
+  const Settings saved = loadSettings();
   const SettingsTab tab = requestedTab();
   if (!out.rejected.empty()) {
     sendConfigPage(saved, tab, WebStr::SavedWithInvalid, true,
@@ -329,7 +329,7 @@ void handlePerf() {
 void handleLight() {
   if (!authorize()) return;
   server.sendHeader("Cache-Control", "no-store");
-  const BacklightStatus light = backlightStatus(loadConfig().backlight);
+  const BacklightStatus light = backlightStatus(loadSettings().backlight);
   server.send(200, "application/json", lightStatusJson(light).c_str());
 }
 
@@ -385,7 +385,7 @@ void handleCredentialsUpload() {
   if (!requireSameOrigin() || !authorize()) return;
   bool tooLarge = false;
   const std::string body = takeUpload(&tooLarge);
-  Settings cfg = loadConfig();
+  Settings cfg = loadSettings();
 
   if (tooLarge) {
     sendConfigPage(cfg, SettingsTab::OpenSky, WebStr::UploadTooLarge, true);
@@ -399,10 +399,10 @@ void handleCredentialsUpload() {
   }
 
   cfg.opensky = file.creds;
-  saveConfig(cfg);  // sanitizes internally (see config_store)
+  saveSettings(cfg);  // sanitizes internally (see config_store)
   ++saveCount;
 
-  Settings saved = loadConfig();
+  Settings saved = loadSettings();
   sendConfigPage(saved, SettingsTab::OpenSky, WebStr::UploadOk, false);
 }
 
@@ -411,7 +411,7 @@ void handleCredentialsUpload() {
 void handleBackupDownload() {
   if (!authorize()) return;
   const std::string json =
-      configToBackupJson(loadConfig(), server.arg("secrets") == "1", firmwareVersion());
+      settingsToBackupJson(loadSettings(), server.arg("secrets") == "1", firmwareVersion());
   server.sendHeader("Content-Disposition", "attachment; filename=\"cyd-sky-tracker-config.json\"");
   server.sendHeader("Cache-Control", "no-store");
   server.send(200, "application/json", json.c_str());
@@ -423,23 +423,23 @@ void handleRestore() {
   if (!requireSameOrigin() || !authorize()) return;
   bool tooLarge = false;
   const std::string body = takeUpload(&tooLarge);
-  Settings cfg = loadConfig();
+  Settings cfg = loadSettings();
 
   if (tooLarge) {
     sendConfigPage(cfg, SettingsTab::Backup, WebStr::UploadTooLarge, true);
     return;
   }
-  BackupRestoreResult r = restoreConfigFromBackupJson(body, cfg);
+  BackupRestoreResult r = restoreSettingsFromBackupJson(body, cfg);
   if (r.status != BackupRestoreStatus::Ok) {
     sendConfigPage(cfg, SettingsTab::Backup, WebStr::RestoreNotBackup, true);
     return;
   }
 
-  saveConfig(r.config);  // sanitizes internally (see config_store)
-  ++saveCount;           // net_task reloads: language, home location, ...
-  refreshPassword();     // a backup with secrets carries the panel password
+  saveSettings(r.config);  // sanitizes internally (see config_store)
+  ++saveCount;             // net_task reloads: language, home location, ...
+  refreshPassword();       // a backup with secrets carries the panel password
 
-  Settings saved = loadConfig();  // its web.language may just have changed
+  Settings saved = loadSettings();  // its web.language may just have changed
   if (r.invalidFields.empty()) {
     sendConfigPage(saved, SettingsTab::Backup, WebStr::RestoreOk, false);
   } else {
@@ -520,7 +520,7 @@ void handleUpdateDone() {
   if (started && otaObserver.onEnd != nullptr) otaObserver.onEnd(r == OtaResult::Ok);
 
   ConfigPageModel model;
-  model.cfg = loadConfig();
+  model.cfg = loadSettings();
   model.tab = SettingsTab::Firmware;
   model.hasMessage = true;
   model.message = otaResultMessage(r);
@@ -544,7 +544,7 @@ void handleUpdateDone() {
 void requestCheckAndAnswer() {
   if (releaseCheckRequest() == ManualCheckAsk::TooSoon) {
     ConfigPageModel model;
-    model.cfg = loadConfig();
+    model.cfg = loadSettings();
     model.tab = SettingsTab::Firmware;
     model.hasMessage = true;
     model.message = WebStr::UpdCheckTooSoon;
@@ -568,7 +568,7 @@ void handleUpdateInstall() {
   const std::string tag = server.arg("tag").c_str();
   if (!releaseInstallRequest(tag)) {
     ConfigPageModel model;
-    model.cfg = loadConfig();
+    model.cfg = loadSettings();
     model.tab = SettingsTab::Firmware;
     model.hasMessage = true;
     model.message = WebStr::UpdInstallRefused;
@@ -578,7 +578,7 @@ void handleUpdateInstall() {
   }
   Serial.printf("[update] install %s asked for on the config page\n", tag.c_str());
   ConfigPageModel model;
-  model.cfg = loadConfig();
+  model.cfg = loadSettings();
   model.tab = SettingsTab::Firmware;
   model.hasMessage = true;
   model.message = WebStr::UpdDownloading;
@@ -594,7 +594,7 @@ void handleUpdatePrerelease() {
   const bool on = server.arg("on") == "1";
   saveUpdateShowPrerelease(on);
   ++saveCount;  // net_task reloads the config (and the UI gets it via NetState)
-  releaseCheckBegin(loadConfig().update);
+  releaseCheckBegin(loadSettings().update);
   requestCheckAndAnswer();
 }
 
