@@ -8,7 +8,7 @@
 // Health of the OpenSky data feed, surfaced as a short header tag so a
 // silent failure (persistent 401, exhausted rate-limit credits, a dead
 // network) isn't invisible — the aircraft list on screen may be stale
-// (net_task keeps the last good DataSnapshot rather than blanking it). See
+// (net_task keeps the last good AirspaceSnapshot rather than blanking it). See
 // docs/review-notes-2026.md 1.2/1.3/1.4.
 enum class FeedHealth {
   Ok,            // last poll succeeded

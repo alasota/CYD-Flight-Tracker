@@ -165,7 +165,7 @@ static void test_prompt_no_answer_tap_outside_buttons_keeps_waiting(void) {
 
 // -- edge case: the gate from net_task's state: release answer, settings, the CPA at that moment
 static void test_update_prompt_gate_from_net_state(void) {
-  auto data = std::make_shared<DataSnapshot>();
+  auto data = std::make_shared<AirspaceSnapshot>();
   data->cpa.found = true;
   data->cpa.t_cpa_seconds = 50.0f;
   data->polledAtMs = 1000;
