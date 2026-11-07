@@ -28,26 +28,26 @@ std::string configToBackupJson(const Config &cfg, bool includeSecrets, const cha
   opensky["poll_interval_s"] = cfg.poll.interval_s;
 
   JsonObject general = doc["general"].to<JsonObject>();
-  general["language"] = languageCode(cfg.language);
+  general["language"] = languageCode(cfg.display.language);
   general["web_language"] = languageCode(cfg.web_language);
-  general["auto_cycle"] = cfg.auto_cycle_enabled;
-  general["auto_cycle_interval_s"] = cfg.auto_cycle_interval_s;
+  general["auto_cycle"] = cfg.auto_cycle.enabled;
+  general["auto_cycle_interval_s"] = cfg.auto_cycle.interval_s;
   general["near_airport_km"] = cfg.phase.near_airport_km;
   general["climb_rate_mps"] = cfg.phase.climb_rate_threshold_mps;
   general["update_check"] = cfg.update_check_enabled;
   general["update_show_prerelease"] = cfg.update_show_prerelease;
 
   JsonObject display = doc["display"].to<JsonObject>();
-  display["brightness_auto"] = cfg.brightness_auto;
-  display["brightness_fixed"] = cfg.brightness_fixed_pct;
-  display["brightness_min"] = cfg.brightness_min_pct;
-  display["brightness_max"] = cfg.brightness_max_pct;
-  display["night_mode"] = nightModeCode(cfg.night_mode);
-  display["night_from"] = formatClockMinutes(cfg.night_from_min);
-  display["night_to"] = formatClockMinutes(cfg.night_to_min);
-  display["night_brightness"] = cfg.night_pct;
-  display["night_wake_s"] = cfg.night_wake_s;
-  display["night_pause_polling"] = cfg.night_pause_polling;
+  display["brightness_auto"] = cfg.backlight.brightness_auto;
+  display["brightness_fixed"] = cfg.backlight.brightness_fixed_pct;
+  display["brightness_min"] = cfg.backlight.brightness_min_pct;
+  display["brightness_max"] = cfg.backlight.brightness_max_pct;
+  display["night_mode"] = nightModeCode(cfg.backlight.night_mode);
+  display["night_from"] = formatClockMinutes(cfg.backlight.night_from_min);
+  display["night_to"] = formatClockMinutes(cfg.backlight.night_to_min);
+  display["night_brightness"] = cfg.backlight.night_pct;
+  display["night_wake_s"] = cfg.backlight.night_wake_s;
+  display["night_pause_polling"] = cfg.backlight.night_pause_polling;
 
   // The panel password is a secret too: only with includeSecrets, and only
   // when one is set.
@@ -186,26 +186,26 @@ BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const C
   a.count(opensky, "opensky", "poll_interval_s", c.poll.interval_s);
 
   JsonObjectConst general = doc["general"];
-  a.language(general, "general", "language", c.language);
+  a.language(general, "general", "language", c.display.language);
   a.language(general, "general", "web_language", c.web_language);
-  a.flag(general, "general", "auto_cycle", c.auto_cycle_enabled);
-  a.count(general, "general", "auto_cycle_interval_s", c.auto_cycle_interval_s);
+  a.flag(general, "general", "auto_cycle", c.auto_cycle.enabled);
+  a.count(general, "general", "auto_cycle_interval_s", c.auto_cycle.interval_s);
   a.number(general, "general", "near_airport_km", c.phase.near_airport_km);
   a.number(general, "general", "climb_rate_mps", c.phase.climb_rate_threshold_mps);
   a.flag(general, "general", "update_check", c.update_check_enabled);
   a.flag(general, "general", "update_show_prerelease", c.update_show_prerelease);
 
   JsonObjectConst display = doc["display"];
-  a.flag(display, "display", "brightness_auto", c.brightness_auto);
-  a.small(display, "display", "brightness_fixed", c.brightness_fixed_pct);
-  a.small(display, "display", "brightness_min", c.brightness_min_pct);
-  a.small(display, "display", "brightness_max", c.brightness_max_pct);
-  a.nightMode(display, "display", "night_mode", c.night_mode);
-  a.clock(display, "display", "night_from", c.night_from_min);
-  a.clock(display, "display", "night_to", c.night_to_min);
-  a.small(display, "display", "night_brightness", c.night_pct);
-  a.small(display, "display", "night_wake_s", c.night_wake_s);
-  a.flag(display, "display", "night_pause_polling", c.night_pause_polling);
+  a.flag(display, "display", "brightness_auto", c.backlight.brightness_auto);
+  a.small(display, "display", "brightness_fixed", c.backlight.brightness_fixed_pct);
+  a.small(display, "display", "brightness_min", c.backlight.brightness_min_pct);
+  a.small(display, "display", "brightness_max", c.backlight.brightness_max_pct);
+  a.nightMode(display, "display", "night_mode", c.backlight.night_mode);
+  a.clock(display, "display", "night_from", c.backlight.night_from_min);
+  a.clock(display, "display", "night_to", c.backlight.night_to_min);
+  a.small(display, "display", "night_brightness", c.backlight.night_pct);
+  a.small(display, "display", "night_wake_s", c.backlight.night_wake_s);
+  a.flag(display, "display", "night_pause_polling", c.backlight.night_pause_polling);
 
   JsonObjectConst security = doc["security"];
   std::string password = c.web_password;

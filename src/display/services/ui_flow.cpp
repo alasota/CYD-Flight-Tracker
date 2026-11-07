@@ -175,7 +175,7 @@ bool shouldAutoCycleNow(const AutoCycleInput &in) {
 AutoCycleInput autoCycleInputAt(const NetState &s, int currentScreen, bool screenOff,
                                 uint32_t elapsedMs, uint32_t nowMs) {
   AutoCycleInput in;
-  in.enabled = s.cfg->auto_cycle_enabled;
+  in.enabled = s.cfg->auto_cycle.enabled;
   in.homeConfigured = s.cfg->home.configured;
   in.screenOff = screenOff;
   in.currentScreen = currentScreen;
@@ -183,7 +183,7 @@ AutoCycleInput autoCycleInputAt(const NetState &s, int currentScreen, bool scree
   in.cpaFound = cpa.found;
   in.tCpaSeconds = cpa.t_cpa_seconds;
   in.elapsedMs = elapsedMs;
-  in.intervalS = s.cfg->auto_cycle_interval_s;
+  in.intervalS = s.cfg->auto_cycle.interval_s;
   return in;
 }
 

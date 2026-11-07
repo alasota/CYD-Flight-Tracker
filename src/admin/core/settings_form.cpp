@@ -116,28 +116,30 @@ bool setLat(Config &c, const std::string &v) { return setFloat(v, c.home.lat); }
 bool setLon(Config &c, const std::string &v) { return setFloat(v, c.home.lon); }
 bool setRadius(Config &c, const std::string &v) { return setFloat(v, c.home.radius_deg); }
 bool setPoll(Config &c, const std::string &v) { return setUnsigned(v, c.poll.interval_s); }
-bool setCycle(Config &c, const std::string &v) { return setUnsigned(v, c.auto_cycle_interval_s); }
+bool setCycle(Config &c, const std::string &v) { return setUnsigned(v, c.auto_cycle.interval_s); }
 bool setNearKm(Config &c, const std::string &v) { return setFloat(v, c.phase.near_airport_km); }
 bool setClimb(Config &c, const std::string &v) {
   return setFloat(v, c.phase.climb_rate_threshold_mps);
 }
 bool setBlMin(Config &c, const std::string &v) {
-  return setClamped(v, c.brightness_min_pct, clampBrightnessPct);
+  return setClamped(v, c.backlight.brightness_min_pct, clampBrightnessPct);
 }
 bool setBlMax(Config &c, const std::string &v) {
-  return setClamped(v, c.brightness_max_pct, clampBrightnessPct);
+  return setClamped(v, c.backlight.brightness_max_pct, clampBrightnessPct);
 }
 bool setBlFixed(Config &c, const std::string &v) {
-  return setClamped(v, c.brightness_fixed_pct, clampBrightnessPct);
+  return setClamped(v, c.backlight.brightness_fixed_pct, clampBrightnessPct);
 }
 bool setNightPct(Config &c, const std::string &v) {
-  return setClamped(v, c.night_pct, clampNightPct);
+  return setClamped(v, c.backlight.night_pct, clampNightPct);
 }
 bool setNightWake(Config &c, const std::string &v) {
-  return setClamped(v, c.night_wake_s, clampNightWakeS);
+  return setClamped(v, c.backlight.night_wake_s, clampNightWakeS);
 }
-bool setNightFrom(Config &c, const std::string &v) { return setClock(v, c.night_from_min); }
-bool setNightTo(Config &c, const std::string &v) { return setClock(v, c.night_to_min); }
+bool setNightFrom(Config &c, const std::string &v) {
+  return setClock(v, c.backlight.night_from_min);
+}
+bool setNightTo(Config &c, const std::string &v) { return setClock(v, c.backlight.night_to_min); }
 
 // The fields a value that doesn't parse is rejected for — it keeps its old
 // value (docs/review-notes-2026.md 1.6). In the form's order, which is the
@@ -174,25 +176,27 @@ SettingsFormOutcome applySettingsForm(Config &cfg, const FormArgs &args) {
     if (args.has(f.name) && !f.apply(cfg, args.get(f.name))) out.rejected.push_back(f.label);
   }
   // A field that wasn't sent is clamped all the same (the saved value).
-  cfg.brightness_min_pct = clampBrightnessPct(cfg.brightness_min_pct);
-  cfg.brightness_max_pct = clampBrightnessPct(cfg.brightness_max_pct);
-  cfg.brightness_fixed_pct = clampBrightnessPct(cfg.brightness_fixed_pct);
-  cfg.night_pct = clampNightPct(cfg.night_pct);
-  cfg.night_wake_s = clampNightWakeS(cfg.night_wake_s);
+  cfg.backlight.brightness_min_pct = clampBrightnessPct(cfg.backlight.brightness_min_pct);
+  cfg.backlight.brightness_max_pct = clampBrightnessPct(cfg.backlight.brightness_max_pct);
+  cfg.backlight.brightness_fixed_pct = clampBrightnessPct(cfg.backlight.brightness_fixed_pct);
+  cfg.backlight.night_pct = clampNightPct(cfg.backlight.night_pct);
+  cfg.backlight.night_wake_s = clampNightWakeS(cfg.backlight.night_wake_s);
 
   // Checkboxes: the browser sends one only when it's ticked. POST /save is
   // always a full settings-form submit, so a missing one means "unchecked".
-  cfg.auto_cycle_enabled = args.has("auto_cycle");
+  cfg.auto_cycle.enabled = args.has("auto_cycle");
   cfg.update_check_enabled = args.has("update_check");
-  cfg.night_pause_polling = args.has("night_pause");
+  cfg.backlight.night_pause_polling = args.has("night_pause");
 
-  if (args.has("brightness_mode")) cfg.brightness_auto = args.get("brightness_mode") != "fixed";
+  if (args.has("brightness_mode")) {
+    cfg.backlight.brightness_auto = args.get("brightness_mode") != "fixed";
+  }
   NightMode mode;
   if (args.has("night_mode") && nightModeFromCode(args.get("night_mode"), &mode)) {
-    cfg.night_mode = mode;
+    cfg.backlight.night_mode = mode;
   }
   // An unknown code falls back to the default language.
-  if (args.has("language")) cfg.language = languageFromCode(args.get("language").c_str());
+  if (args.has("language")) cfg.display.language = languageFromCode(args.get("language").c_str());
   if (args.has("web_language")) {
     cfg.web_language = languageFromCode(args.get("web_language").c_str());
   }

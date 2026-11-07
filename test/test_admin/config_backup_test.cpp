@@ -16,10 +16,10 @@ Config sample() {
   c.poll.interval_s = 30;
   c.opensky.client_id = "my-client";
   c.opensky.client_secret = "s3cr\"et";  // a quote: must survive JSON escaping
-  c.language = Language::EN;
+  c.display.language = Language::EN;
   c.web_language = Language::PL;
-  c.auto_cycle_enabled = true;
-  c.auto_cycle_interval_s = 20;
+  c.auto_cycle.enabled = true;
+  c.auto_cycle.interval_s = 20;
   c.phase.near_airport_km = 12.5f;
   c.phase.climb_rate_threshold_mps = 2.0f;
   c.update_check_enabled = false;
@@ -43,10 +43,10 @@ static void test_round_trip_restores_every_setting(void) {
   TEST_ASSERT_EQUAL_UINT32(30u, c.poll.interval_s);
   TEST_ASSERT_EQUAL_STRING("my-client", c.opensky.client_id.c_str());
   TEST_ASSERT_EQUAL_STRING("s3cr\"et", c.opensky.client_secret.c_str());
-  ASSERT_ENUM_EQ(Language::EN, c.language);
+  ASSERT_ENUM_EQ(Language::EN, c.display.language);
   ASSERT_ENUM_EQ(Language::PL, c.web_language);
-  TEST_ASSERT_TRUE(c.auto_cycle_enabled);
-  TEST_ASSERT_EQUAL_UINT32(20u, c.auto_cycle_interval_s);
+  TEST_ASSERT_TRUE(c.auto_cycle.enabled);
+  TEST_ASSERT_EQUAL_UINT32(20u, c.auto_cycle.interval_s);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 12.5f, c.phase.near_airport_km);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.0f, c.phase.climb_rate_threshold_mps);
   TEST_ASSERT_TRUE(c.home.configured);
@@ -113,7 +113,7 @@ static void test_missing_keys_keep_current_values(void) {
       current);
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_EQUAL_INT(1, r.appliedFields);
-  TEST_ASSERT_FALSE(r.config.auto_cycle_enabled);
+  TEST_ASSERT_FALSE(r.config.auto_cycle.enabled);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, current.home.lat, r.config.home.lat);
   TEST_ASSERT_EQUAL_STRING("my-client", r.config.opensky.client_id.c_str());
 }
@@ -131,7 +131,7 @@ static void test_wrong_types_are_skipped_and_reported(void) {
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 20.5f, r.config.home.lon);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, current.home.lat, r.config.home.lat);  // kept
   TEST_ASSERT_EQUAL_UINT32(30u, r.config.poll.interval_s);                // kept
-  ASSERT_ENUM_EQ(Language::EN, r.config.language);                    // kept
+  ASSERT_ENUM_EQ(Language::EN, r.config.display.language);                    // kept
   TEST_ASSERT_EQUAL_INT(4, static_cast<int>(r.invalidFields.size()));
   TEST_ASSERT_EQUAL_STRING("location.lat", r.invalidFields[0].c_str());
   TEST_ASSERT_EQUAL_STRING("opensky.poll_interval_s", r.invalidFields[1].c_str());
@@ -209,16 +209,16 @@ static void test_invalid_password_in_backup_is_reported_and_skipped(void) {
 
 static void test_display_group_round_trip(void) {
   Config c = defaultConfig();
-  c.brightness_auto = false;
-  c.brightness_fixed_pct = 42;
-  c.brightness_min_pct = 15;
-  c.brightness_max_pct = 90;
-  c.night_mode = NightMode::Schedule;
-  c.night_from_min = 22 * 60 + 15;
-  c.night_to_min = 7 * 60;
-  c.night_pct = 0;
-  c.night_wake_s = 120;
-  c.night_pause_polling = true;
+  c.backlight.brightness_auto = false;
+  c.backlight.brightness_fixed_pct = 42;
+  c.backlight.brightness_min_pct = 15;
+  c.backlight.brightness_max_pct = 90;
+  c.backlight.night_mode = NightMode::Schedule;
+  c.backlight.night_from_min = 22 * 60 + 15;
+  c.backlight.night_to_min = 7 * 60;
+  c.backlight.night_pct = 0;
+  c.backlight.night_wake_s = 120;
+  c.backlight.night_pause_polling = true;
   const std::string json = configToBackupJson(c, false, "v1");
   const JsonDocument doc = parseJson(json);
   assertJsonBool(doc, "display.brightness_auto", false);
@@ -231,26 +231,26 @@ static void test_display_group_round_trip(void) {
   BackupRestoreResult r = restoreConfigFromBackupJson(json, defaultConfig());
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_TRUE(r.invalidFields.empty());
-  TEST_ASSERT_FALSE(r.config.brightness_auto);
-  TEST_ASSERT_EQUAL_UINT8(42, r.config.brightness_fixed_pct);
-  TEST_ASSERT_EQUAL_UINT8(15, r.config.brightness_min_pct);
-  TEST_ASSERT_EQUAL_UINT8(90, r.config.brightness_max_pct);
-  ASSERT_ENUM_EQ(NightMode::Schedule, r.config.night_mode);
-  TEST_ASSERT_EQUAL_UINT16(22 * 60 + 15, r.config.night_from_min);
-  TEST_ASSERT_EQUAL_UINT16(7 * 60, r.config.night_to_min);
-  TEST_ASSERT_EQUAL_UINT8(0, r.config.night_pct);
-  TEST_ASSERT_EQUAL_UINT16(120, r.config.night_wake_s);
-  TEST_ASSERT_TRUE(r.config.night_pause_polling);
+  TEST_ASSERT_FALSE(r.config.backlight.brightness_auto);
+  TEST_ASSERT_EQUAL_UINT8(42, r.config.backlight.brightness_fixed_pct);
+  TEST_ASSERT_EQUAL_UINT8(15, r.config.backlight.brightness_min_pct);
+  TEST_ASSERT_EQUAL_UINT8(90, r.config.backlight.brightness_max_pct);
+  ASSERT_ENUM_EQ(NightMode::Schedule, r.config.backlight.night_mode);
+  TEST_ASSERT_EQUAL_UINT16(22 * 60 + 15, r.config.backlight.night_from_min);
+  TEST_ASSERT_EQUAL_UINT16(7 * 60, r.config.backlight.night_to_min);
+  TEST_ASSERT_EQUAL_UINT8(0, r.config.backlight.night_pct);
+  TEST_ASSERT_EQUAL_UINT16(120, r.config.backlight.night_wake_s);
+  TEST_ASSERT_TRUE(r.config.backlight.night_pause_polling);
 }
 
 static void test_display_group_bad_values_and_old_backups(void) {
   // Without the group (a backup from before spec/03): current values kept.
   Config current = defaultConfig();
-  current.night_pct = 33;
+  current.backlight.night_pct = 33;
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"general\":{}}", current);
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
-  TEST_ASSERT_EQUAL_UINT8(33, r.config.night_pct);
+  TEST_ASSERT_EQUAL_UINT8(33, r.config.backlight.night_pct);
   // Wrong values are skipped and listed; a huge number is capped (sanitizeConfig clamps it).
   r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"display\":{"
@@ -259,8 +259,8 @@ static void test_display_group_bad_values_and_old_backups(void) {
       current);
   TEST_ASSERT_EQUAL_INT(3, static_cast<int>(r.invalidFields.size()));
   TEST_ASSERT_EQUAL_STRING("display.night_mode", r.invalidFields[0].c_str());
-  TEST_ASSERT_EQUAL_UINT8(255, r.config.brightness_max_pct);
-  TEST_ASSERT_EQUAL_UINT8(33, r.config.night_pct);
+  TEST_ASSERT_EQUAL_UINT8(255, r.config.backlight.brightness_max_pct);
+  TEST_ASSERT_EQUAL_UINT8(33, r.config.backlight.night_pct);
   // An unknown group (a backup from a newer firmware) doesn't reject the file.
   r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"future\":{\"x\":1}}",
@@ -278,27 +278,27 @@ Config everyFieldChanged() {
   c.poll.interval_s = 30;
   c.opensky.client_id = "my-client";
   c.opensky.client_secret = "s3cr\"et";
-  c.language = Language::EN;
+  c.display.language = Language::EN;
   c.web_language = Language::EN;
-  c.auto_cycle_enabled = true;
-  c.auto_cycle_interval_s = 20;
+  c.auto_cycle.enabled = true;
+  c.auto_cycle.interval_s = 20;
   c.phase.near_airport_km = 12.5f;
   c.phase.climb_rate_threshold_mps = 2.25f;
   c.update_check_enabled = false;
   c.update_show_prerelease = true;
-  c.brightness_auto = false;
-  c.brightness_fixed_pct = 42;
-  c.brightness_min_pct = 15;
-  c.brightness_max_pct = 90;
-  c.night_mode = NightMode::Schedule;
-  c.night_from_min = 22 * 60 + 15;
-  c.night_to_min = 7 * 60;
-  c.night_pct = 5;
-  c.night_wake_s = 120;
-  c.night_pause_polling = true;
+  c.backlight.brightness_auto = false;
+  c.backlight.brightness_fixed_pct = 42;
+  c.backlight.brightness_min_pct = 15;
+  c.backlight.brightness_max_pct = 90;
+  c.backlight.night_mode = NightMode::Schedule;
+  c.backlight.night_from_min = 22 * 60 + 15;
+  c.backlight.night_to_min = 7 * 60;
+  c.backlight.night_pct = 5;
+  c.backlight.night_wake_s = 120;
+  c.backlight.night_pause_polling = true;
   c.web_password = "hunter22";
   c.update_skipped_tag = "v1.4.0";  // device state: never in a backup
-  c.last_screen = 2;                // nav state: never in a backup
+  c.display.last_screen = 2;                // nav state: never in a backup
   return c;
 }
 
@@ -422,37 +422,37 @@ static void test_restore_of_a_stage_5_backup_fills_every_setting(void) {
   ASSERT_STR_EQ("s3cr\"et", c.opensky.client_secret);
   TEST_ASSERT_EQUAL_UINT32(30u, c.poll.interval_s);
   // general
-  ASSERT_ENUM_EQ(Language::EN, c.language);
+  ASSERT_ENUM_EQ(Language::EN, c.display.language);
   ASSERT_ENUM_EQ(Language::EN, c.web_language);
-  TEST_ASSERT_TRUE(c.auto_cycle_enabled);
-  TEST_ASSERT_EQUAL_UINT32(20u, c.auto_cycle_interval_s);
+  TEST_ASSERT_TRUE(c.auto_cycle.enabled);
+  TEST_ASSERT_EQUAL_UINT32(20u, c.auto_cycle.interval_s);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 12.5f, c.phase.near_airport_km);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.25f, c.phase.climb_rate_threshold_mps);
   TEST_ASSERT_FALSE(c.update_check_enabled);
   TEST_ASSERT_TRUE(c.update_show_prerelease);
   // display
-  TEST_ASSERT_FALSE(c.brightness_auto);
-  TEST_ASSERT_EQUAL_UINT8(42, c.brightness_fixed_pct);
-  TEST_ASSERT_EQUAL_UINT8(15, c.brightness_min_pct);
-  TEST_ASSERT_EQUAL_UINT8(90, c.brightness_max_pct);
-  ASSERT_ENUM_EQ(NightMode::Schedule, c.night_mode);
-  TEST_ASSERT_EQUAL_UINT16(22 * 60 + 15, c.night_from_min);
-  TEST_ASSERT_EQUAL_UINT16(7 * 60, c.night_to_min);
-  TEST_ASSERT_EQUAL_UINT8(5, c.night_pct);
-  TEST_ASSERT_EQUAL_UINT16(120, c.night_wake_s);
-  TEST_ASSERT_TRUE(c.night_pause_polling);
+  TEST_ASSERT_FALSE(c.backlight.brightness_auto);
+  TEST_ASSERT_EQUAL_UINT8(42, c.backlight.brightness_fixed_pct);
+  TEST_ASSERT_EQUAL_UINT8(15, c.backlight.brightness_min_pct);
+  TEST_ASSERT_EQUAL_UINT8(90, c.backlight.brightness_max_pct);
+  ASSERT_ENUM_EQ(NightMode::Schedule, c.backlight.night_mode);
+  TEST_ASSERT_EQUAL_UINT16(22 * 60 + 15, c.backlight.night_from_min);
+  TEST_ASSERT_EQUAL_UINT16(7 * 60, c.backlight.night_to_min);
+  TEST_ASSERT_EQUAL_UINT8(5, c.backlight.night_pct);
+  TEST_ASSERT_EQUAL_UINT16(120, c.backlight.night_wake_s);
+  TEST_ASSERT_TRUE(c.backlight.night_pause_polling);
   // security
   ASSERT_STR_EQ("hunter22", c.web_password);
   // Not in a backup: left as they were.
   TEST_ASSERT_TRUE(c.update_skipped_tag.empty());
-  TEST_ASSERT_EQUAL_INT(0, c.last_screen);
+  TEST_ASSERT_EQUAL_INT(0, c.display.last_screen);
 
   // The two languages land in their own objects (both are "en" above, so swap one).
   std::string json = crlf(kV1113BackupWithSecrets);
   const std::string displayEn = "\"language\": \"en\"";  // not "web_language": its '"' differs
   json.replace(json.find(displayEn), displayEn.size(), "\"language\": \"pl\"");
   const BackupRestoreResult r2 = restoreConfigFromBackupJson(json, defaultConfig());
-  ASSERT_ENUM_EQ(Language::PL, r2.config.language);
+  ASSERT_ENUM_EQ(Language::PL, r2.config.display.language);
   ASSERT_ENUM_EQ(Language::EN, r2.config.web_language);
 }
 

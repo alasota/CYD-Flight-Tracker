@@ -194,7 +194,7 @@ static void test_diff_language_change(void) {
   const NetState a = baseState();
   NetState b = a;
   auto cfg = std::make_shared<Config>(*a.cfg);
-  cfg->language = a.cfg->language == Language::PL ? Language::EN : Language::PL;
+  cfg->display.language = a.cfg->display.language == Language::PL ? Language::EN : Language::PL;
   b.cfg = cfg;
   TEST_ASSERT_TRUE(diffNetState(&a, b).languageChanged);
 }
@@ -244,9 +244,9 @@ static void test_diff_backlight_or_web_change_is_nothing(void) {
     const char *what;
     void (*change)(Config &);
   } changes[] = {
-      {"backlight.brightness_fixed_pct", [](Config &c) { c.brightness_fixed_pct = 42; }},
-      {"backlight.night_mode", [](Config &c) { c.night_mode = NightMode::Off; }},
-      {"backlight.night_pause_polling", [](Config &c) { c.night_pause_polling = true; }},
+      {"backlight.brightness_fixed_pct", [](Config &c) { c.backlight.brightness_fixed_pct = 42; }},
+      {"backlight.night_mode", [](Config &c) { c.backlight.night_mode = NightMode::Off; }},
+      {"backlight.night_pause_polling", [](Config &c) { c.backlight.night_pause_polling = true; }},
       {"web.language", [](Config &c) { c.web_language = Language::EN; }},
       {"web.password", [](Config &c) { c.web_password = "hunter22"; }},
       {"update.check_enabled", [](Config &c) { c.update_check_enabled = false; }},

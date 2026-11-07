@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <ctime>
 
-#include "admin/core/config_store.h"
 #include "platform/core_link.h"  // Guarded<T>
 #include "platform/time_sync.h"
 
@@ -39,8 +38,8 @@ bool sunKnown = false;
 int sunDayKey = -1;
 float sunLat = 0.0f, sunLon = 0.0f;
 
-void refreshSun(const Config &cfg) {
-  if (!isTimeSynced() || !cfg.home.configured) {
+void refreshSun(const Home &home) {
+  if (!isTimeSynced() || !home.configured) {
     sunKnown = false;
     return;
   }
@@ -49,15 +48,15 @@ void refreshSun(const Config &cfg) {
   std::tm t;
   gmtime_r(&local, &t);  // local wall-clock fields (timeSyncNowLocal() is pre-shifted)
   const int dayKey = (t.tm_year + 1900) * 400 + t.tm_yday;
-  if (sunKnown && dayKey == sunDayKey && cfg.home.lat == sunLat && cfg.home.lon == sunLon) return;
+  if (sunKnown && dayKey == sunDayKey && home.lat == sunLat && home.lon == sunLon) return;
   const int offsetMin = static_cast<int>((local - utc) / 60);
   sunLocal = shiftSunTimes(
-      computeSunTimes(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, cfg.home.lat, cfg.home.lon),
+      computeSunTimes(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, home.lat, home.lon),
       offsetMin);
   sunKnown = true;
   sunDayKey = dayKey;
-  sunLat = cfg.home.lat;
-  sunLon = cfg.home.lon;
+  sunLat = home.lat;
+  sunLon = home.lon;
   if (sunLocal.kind == SunTimes::Kind::Normal) {
     Serial.printf("[light] sun today: sunrise %s, sunset %s\n",
                   formatClockMinutes(sunLocal.sunrise_min).c_str(),
@@ -72,8 +71,9 @@ int nowLocalMinutes() {
   return t.tm_hour * 60 + t.tm_min;
 }
 
-NightWindow windowFor(const Config &cfg) {
-  return nightWindowFor(cfg.night_mode, cfg.night_from_min, cfg.night_to_min, sunLocal, sunKnown);
+NightWindow windowFor(const BacklightSettings &settings) {
+  return nightWindowFor(settings.night_mode, settings.night_from_min, settings.night_to_min,
+                        sunLocal, sunKnown);
 }
 
 }  // namespace
@@ -90,23 +90,24 @@ void backlightFullNow(LGFX &tft) {
   tft.setBrightness(pwmNow);
 }
 
-void backlightLoop(LGFX &tft, const Config &cfg, bool serviceScreen) {
+void backlightLoop(LGFX &tft, const BacklightSettings &settings, const Home &home,
+                   bool serviceScreen) {
   const uint32_t now = millis();
   if (now - lastSampleMs >= kLightSampleMs) {
     lastSampleMs = now;
     filter.add(static_cast<uint16_t>(analogRead(kLightPin)));
   }
-  refreshSun(cfg);
+  refreshSun(home);
 
   BacklightInputs in;
   in.time_synced = isTimeSynced();
   in.now_local_min = in.time_synced ? nowLocalMinutes() : 0;
-  in.night = windowFor(cfg);
-  in.auto_mode = cfg.brightness_auto;
-  in.fixed_pct = cfg.brightness_fixed_pct;
-  in.min_pct = cfg.brightness_min_pct;
-  in.max_pct = cfg.brightness_max_pct;
-  in.night_pct = cfg.night_pct;
+  in.night = windowFor(settings);
+  in.auto_mode = settings.brightness_auto;
+  in.fixed_pct = settings.brightness_fixed_pct;
+  in.min_pct = settings.brightness_min_pct;
+  in.max_pct = settings.brightness_max_pct;
+  in.night_pct = settings.night_pct;
   in.light_ready = filter.ready();
   in.light_avg = filter.average();
   in.now_ms = now;
@@ -131,7 +132,7 @@ void backlightLoop(LGFX &tft, const Config &cfg, bool serviceScreen) {
   if (decision.night != loggedNight) {
     loggedNight = decision.night;
     Serial.printf("[light] %s (%s): %u%%%s\n", decision.night ? "night" : "day",
-                  nightModeCode(cfg.night_mode), static_cast<unsigned>(decision.target_pct),
+                  nightModeCode(settings.night_mode), static_cast<unsigned>(decision.target_pct),
                   decision.screen_off ? ", backlight off" : "");
   }
   SharedLight snap;
@@ -158,18 +159,18 @@ void backlightLoop(LGFX &tft, const Config &cfg, bool serviceScreen) {
 
 const BacklightDecision &backlightDecision() { return decision; }
 
-bool backlightHandleTouch(const Config &cfg) {
-  const bool swallowed = onTouchWake(decision, millis(), cfg.night_wake_s, &wokenUntilMs);
+bool backlightHandleTouch(const BacklightSettings &settings) {
+  const bool swallowed = onTouchWake(decision, millis(), settings.night_wake_s, &wokenUntilMs);
   if (decision.night) {
     Serial.printf("[light] touch at night: awake for %u s%s\n",
-                  static_cast<unsigned>(cfg.night_wake_s), swallowed ? " (screen lit)" : "");
+                  static_cast<unsigned>(settings.night_wake_s), swallowed ? " (screen lit)" : "");
   }
   return swallowed;
 }
 
-BacklightStatus backlightStatus(const Config &cfg) {
+BacklightStatus backlightStatus(const BacklightSettings &settings) {
   const SharedLight snap = shared.get();
   BacklightStatus s = snap.status;
-  s.polling = shouldPollOpenSky(snap.decision, cfg.night_pause_polling);
+  s.polling = shouldPollOpenSky(snap.decision, settings.night_pause_polling);
   return s;
 }

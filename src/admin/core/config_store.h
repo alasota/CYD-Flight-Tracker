@@ -13,7 +13,8 @@
 
 #include "airspace/core/flight_phase.h"  // PhaseThresholds
 #include "airspace/core/home.h"          // Home
-#include "display/core/backlight.h"      // NightMode
+#include "display/core/backlight.h"      // BacklightSettings, NightMode
+#include "display/core/display_settings.h"  // DisplaySettings, AutoCycleSettings
 #include "display/core/i18n.h"           // Language
 #include "opensky/core/opensky_settings.h"  // OpenSkyCredentials, PollSettings
 
@@ -35,22 +36,10 @@ struct Config {
   Home home;  // home position, scan radius, configured flag (airspace)
   PollSettings poll;            // seconds between /states/all requests (opensky)
   OpenSkyCredentials opensky;   // OAuth2 client id / secret (opensky)
-  // Which of the three screens was showing at last power-down (0/1/2),
-  // restored on boot — replaces the old two-screen `last_view` boolean now
-  // that there are three screens (see docs/screens.md "Screen navigation").
-  int last_screen = 0;
-  // Auto screen cycling (docs/screens.md "Auto screen cycling"). Off by default;
-  // when enabled, the active screen advances every auto_cycle_interval_s
-  // seconds (the Screen 2 "imminent overhead" deferral lives in
-  // screen_nav::shouldDeferAutoSwitch()). Both are user-configurable via
-  // web_server.
-  bool auto_cycle_enabled = false;
-  uint32_t auto_cycle_interval_s = 15;
   PhaseThresholds phase;  // flight_phase thresholds (airspace)
-  // On-screen language (CLAUDE.md "Language"), chosen on the config page.
-  // Stored in NVS as its numeric index; an out-of-range stored value is
-  // reset to kDefaultLanguage by sanitizeConfig().
-  Language language = kDefaultLanguage;
+  DisplaySettings display;         // display language, last screen (display)
+  AutoCycleSettings auto_cycle;    // auto screen cycling (display)
+  BacklightSettings backlight;     // brightness, night mode (display)
   // Language of the config web page itself (web_i18n), independent of the
   // display's. NVS key `wlang`, same index/clamping as `language`.
   Language web_language = kDefaultLanguage;
@@ -70,24 +59,6 @@ struct Config {
   bool update_check_enabled = true;
   bool update_show_prerelease = false;
   std::string update_skipped_tag;
-  // Screen brightness and night mode (backlight, spec/done/03-brightness-night-mode.md).
-  // brightness_auto: from the light sensor between min and max (NVS `bl_auto`,
-  // `bl_min`, `bl_max`), else fixed (`bl_fix`); percent, 5..100.
-  // night_mode Off / by the clock (night_from..night_to, minutes after local
-  // midnight; `nt_from`, `nt_to`) / sunset to sunrise (`nt_mode`); at night
-  // the brightness is night_pct (0 = backlight off; `nt_pct`). A touch at
-  // night wakes the screen / the polling for night_wake_s (`nt_wake`).
-  // night_pause_polling: no OpenSky requests at night outside that (`nt_poll`).
-  bool brightness_auto = true;
-  uint8_t brightness_fixed_pct = 80;
-  uint8_t brightness_min_pct = 10;
-  uint8_t brightness_max_pct = 100;
-  NightMode night_mode = kDefaultNightMode;
-  uint16_t night_from_min = 23 * 60;
-  uint16_t night_to_min = 6 * 60 + 30;
-  uint8_t night_pct = 10;
-  uint16_t night_wake_s = 60;
-  bool night_pause_polling = false;
 };
 
 // Hardcoded fallback values used before anything has ever been saved to NVS.

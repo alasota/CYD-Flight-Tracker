@@ -80,7 +80,7 @@ static void takeNetState() {
   std::shared_ptr<const NetState> next;
   if (core_link::netState.takeIfNewer(netSeen, next)) {
     const RedrawEvents e = diffNetState(net.get(), *next);
-    if (next->cfg->language != net->cfg->language) i18nSetLanguage(next->cfg->language);
+    if (e.languageChanged) i18nSetLanguage(next->cfg->display.language);
     net = std::move(next);
     ui.takeNetEvents(e, *net);
   }
@@ -143,7 +143,7 @@ static void screensPass() {
   const TouchPoint touch = touchInputRead(tft);
   if (ui.touch.tap(touch.pressed)) {
     touchLogTap(tft, touch);
-    if (backlightHandleTouch(cfg())) {
+    if (backlightHandleTouch(cfg().backlight)) {
       ui.screenChanges.restartAutoCycle(millis());  // it only woke a dark screen
     } else {
       onTap(touch.x, touch.y);
@@ -185,7 +185,7 @@ void setup() {
   tft.fillScreen(LCARS_BLACK);
 
   Config bootCfg = loadConfig();
-  i18nSetLanguage(bootCfg.language);  // before anything is drawn
+  i18nSetLanguage(bootCfg.display.language);  // before anything is drawn
   Serial.printf("[ota] %s\n", firmwareMarker());
   const bool appPendingVerify = otaFlashRunningPendingVerify();
 
@@ -201,7 +201,7 @@ void setup() {
     bootCfg = loadConfig();
     Serial.println("[auth] web password cleared from the touchscreen");
   });
-  nav.set(bootCfg.last_screen);  // restore the last-active screen
+  nav.set(bootCfg.display.last_screen);  // restore the last-active screen
   ui.screenChanges.begin(nav.current(), millis());
 
   // The first snapshot: the settings, no data yet — the chrome and "--" go on
@@ -239,10 +239,10 @@ void loop() {
   services.retryCommand();
   takeNetState();
 
-  // Backlight: sensor, night mode, ramps. Service screens get full brightness.
-  backlightLoop(tft, cfg(), services.holdsBacklight(net->ota, net->restartPending));
+  const bool fullBright = services.holdsBacklight(net->ota, net->restartPending);  // service screens
+  backlightLoop(tft, cfg().backlight, cfg().home, fullBright);  // sensor, night mode, ramps
   core_link::pollingAllowed.store(
-      shouldPollOpenSky(backlightDecision(), cfg().night_pause_polling));
+      shouldPollOpenSky(backlightDecision(), cfg().backlight.night_pause_polling));
 
   if (!serviceScreensPass()) screensPass();
   sleepUntilNextDeadline();

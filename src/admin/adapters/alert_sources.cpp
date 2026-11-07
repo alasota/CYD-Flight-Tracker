@@ -15,7 +15,7 @@ AlertInputs deviceAlertInputs(const Config &cfg) {
   in.quota = openSkyQuota();
   in.radiusDeg = cfg.home.radius_deg;
   in.pollIntervalS = cfg.poll.interval_s;
-  in.pausedMinutesPerDay = pausedMinutesPerDay(cfg, backlightStatus(cfg));
+  in.pausedMinutesPerDay = pausedMinutesPerDay(cfg.backlight, backlightStatus(cfg.backlight));
   in.dailyLimit = openSkyDailyLimit(in.auth);
   in.estimatedDailyCredits =
       openSkyDailyCredits(in.radiusDeg, in.pollIntervalS, in.pausedMinutesPerDay);

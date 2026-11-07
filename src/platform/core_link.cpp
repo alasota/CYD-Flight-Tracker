@@ -23,7 +23,7 @@ RedrawEvents diffNetState(const NetState *prev, const NetState &next) {
   if (prev->cfg != next.cfg && prev->cfg != nullptr && next.cfg != nullptr) {
     const Config &a = *prev->cfg;
     const Config &b = *next.cfg;
-    if (a.language != b.language) e.languageChanged = true;
+    if (a.display.language != b.display.language) e.languageChanged = true;
     if (a.home.configured != b.home.configured) e.firstDraw = true;
     // Radar rings are labelled from the radius; distances from home.
     const Home &ha = a.home;
