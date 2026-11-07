@@ -279,7 +279,7 @@ Config everyFieldChanged() {
   c.opensky.client_id = "my-client";
   c.opensky.client_secret = "s3cr\"et";
   c.display.language = Language::EN;
-  c.web.language = Language::EN;
+  c.web.language = Language::PL;  // differs from the display's: a key swap shows
   c.auto_cycle.enabled = true;
   c.auto_cycle.interval_s = 20;
   c.phase.near_airport_km = 12.5f;
@@ -322,7 +322,7 @@ const char kV1113BackupWithSecrets[] = R"({
   },
   "general": {
     "language": "en",
-    "web_language": "en",
+    "web_language": "pl",
     "auto_cycle": true,
     "auto_cycle_interval_s": 20,
     "near_airport_km": 12.5,
@@ -361,7 +361,7 @@ const char kV1113BackupWithoutSecrets[] = R"({
   },
   "general": {
     "language": "en",
-    "web_language": "en",
+    "web_language": "pl",
     "auto_cycle": true,
     "auto_cycle_interval_s": 20,
     "near_airport_km": 12.5,
@@ -406,8 +406,10 @@ static void test_backup_json_is_the_same_as_before_stage_6(void) {
 
 // Scenario: Kopia zapasowa zrobiona przed etapem 6 odtwarza każde ustawienie
 static void test_restore_of_a_stage_5_backup_fills_every_setting(void) {
-  const BackupRestoreResult r = restoreConfigFromBackupJson(crlf(kV1113BackupWithSecrets),
-                                                            defaultConfig());
+  // The page language starts as EN, so the backup's "pl" has to be applied, not left over.
+  Config base = defaultConfig();
+  base.web.language = Language::EN;
+  const BackupRestoreResult r = restoreConfigFromBackupJson(crlf(kV1113BackupWithSecrets), base);
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(r.invalidFields.size()));
   TEST_ASSERT_EQUAL_INT(25, r.appliedFields);
@@ -423,7 +425,7 @@ static void test_restore_of_a_stage_5_backup_fills_every_setting(void) {
   TEST_ASSERT_EQUAL_UINT32(30u, c.poll.interval_s);
   // general
   ASSERT_ENUM_EQ(Language::EN, c.display.language);
-  ASSERT_ENUM_EQ(Language::EN, c.web.language);
+  ASSERT_ENUM_EQ(Language::PL, c.web.language);
   TEST_ASSERT_TRUE(c.auto_cycle.enabled);
   TEST_ASSERT_EQUAL_UINT32(20u, c.auto_cycle.interval_s);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 12.5f, c.phase.near_airport_km);
@@ -447,10 +449,12 @@ static void test_restore_of_a_stage_5_backup_fills_every_setting(void) {
   TEST_ASSERT_TRUE(c.update.skipped_tag.empty());
   TEST_ASSERT_EQUAL_INT(0, c.display.last_screen);
 
-  // The two languages land in their own objects (both are "en" above, so swap one).
+  // The other way round (display "pl", page "en") lands in the other objects too.
   std::string json = crlf(kV1113BackupWithSecrets);
   const std::string displayEn = "\"language\": \"en\"";  // not "web_language": its '"' differs
   json.replace(json.find(displayEn), displayEn.size(), "\"language\": \"pl\"");
+  const std::string webPl = "\"web_language\": \"pl\"";
+  json.replace(json.find(webPl), webPl.size(), "\"web_language\": \"en\"");
   const BackupRestoreResult r2 = restoreConfigFromBackupJson(json, defaultConfig());
   ASSERT_ENUM_EQ(Language::PL, r2.config.display.language);
   ASSERT_ENUM_EQ(Language::EN, r2.config.web.language);
