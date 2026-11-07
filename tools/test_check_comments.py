@@ -1,7 +1,9 @@
 """Tests for tools/check_comments.py:  python tools/test_check_comments.py
 
 The unit tests feed the pure functions {relpath: text} dicts; RepoTest runs them on this
-repository and pins the state spec 11 leaves behind (blocking in CI).
+repository and pins the state spec 11 leaves behind (blocking in CI). Spec 12 stage 7 adds the
+glossary renames: `RENAMED_SYMBOLS` {old: new} and `find_renamed_symbols(files)`, which reports an
+old compound name in code or in a comment, but not inside "quoted text".
 """
 
 import contextlib
@@ -81,6 +83,77 @@ class RemovedSymbolsTest(unittest.TestCase):
         self.assertEqual(set(), missing)
 
 
+# ---- spec 12 stage 7: renamed glossary names ---------------------------------------------------
+
+# The compound names stage 7 renames (spec 12 section 3); the plain words Aircraft and Config
+# are guarded by tools/test_rename_symbols.py on code tokens only.
+STAGE_7_RENAMED = {
+    "BoundingBox": "ScanArea", "computeBoundingBox": "computeScanArea",
+    "OpenSkyHealth": "FeedHealth",
+    "DataSnapshot": "AirspaceSnapshot", "buildDataSnapshot": "buildAirspaceSnapshot",
+    "LookupPorts": "EnrichmentPort",
+    "AircraftRow": "TrackedFlight",
+    **{"configPortal" + s: "webServer" + s for s in (
+        "Begin", "Loop", "IsActive", "SaveCount", "SetScreenshotSource", "SetOtaObserver",
+        "SetPerfSource", "RestartPending")},
+    "defaultConfig": "defaultSettings", "sanitizeConfig": "sanitizeSettings",
+    "loadConfig": "loadSettings", "saveConfig": "saveSettings", "reloadConfig": "reloadSettings",
+    "configToBackupJson": "settingsToBackupJson",
+    "restoreConfigFromBackupJson": "restoreSettingsFromBackupJson",
+    "makeConfig": "makeSettings",
+}
+
+
+class RenamedSymbolsTest(unittest.TestCase):
+    def find(self, files):
+        fn = getattr(check_comments, "find_renamed_symbols", None)
+        self.assertIsNotNone(fn, "check_comments.py has no find_renamed_symbols()")
+        return fn(files)
+
+    # Scenario: Dawna nazwa złożona, która wraca do kodu albo komentarza, jest zgłaszana
+    def test_old_glossary_name_is_reported_with_its_new_name(self):
+        files = {"src/airspace/core/x.h": "// one AircraftRow per aircraft\n"
+                                          "DataSnapshot snap;\n"}
+        found = self.find(files)
+        self.assertEqual([("src/airspace/core/x.h", 1), ("src/airspace/core/x.h", 2)],
+                         [(f.path, f.line) for f in found], show(found))
+        self.assertEqual("AircraftRow was renamed TrackedFlight in spec 12 stage 7",
+                         found[0].message)
+        self.assertEqual("DataSnapshot was renamed AirspaceSnapshot in spec 12 stage 7",
+                         found[1].message)
+        self.assertIn("src/airspace/core/x.h:1", check_comments.format_finding(found[0]))
+
+    # Edge case: quoted text (a doc heading in a comment, a string in code), longer names,
+    # the new names, plain words and WiFiManager's configPortal names are not reported.
+    def test_quoted_text_longer_names_and_library_names_are_not_reported(self):
+        files = {"src/a.cpp": '// docs/history.md "AircraftRow and DataSnapshot"\n'
+                              'const char *k = "OpenSkyHealth";\n'
+                              "TrackedFlight row; AirspaceSnapshot s; FeedHealth h;\n"
+                              "AircraftRowsCount n; my_loadConfig(); loadConfigX();\n"
+                              "Aircraft a; Config c; // Aircraft past the budget\n"
+                              "wm.setConfigPortalBlocking(false); wm.getConfigPortalActive();\n"
+                              "static void test_sanitize_config_clamps_all_fields() {}\n"}
+        found = self.find(files)
+        self.assertEqual([], found, show(found))
+
+    # Edge case: the table holds every compound name, and not the plain words.
+    def test_renamed_symbols_table(self):
+        table = getattr(check_comments, "RENAMED_SYMBOLS", None)
+        self.assertIsNotNone(table, "check_comments.py has no RENAMED_SYMBOLS")
+        self.assertEqual(STAGE_7_RENAMED, dict(table))
+        self.assertNotIn("Aircraft", table)
+        self.assertNotIn("Config", table)
+
+    # Edge case: the CLI reports them too, so --strict fails on one.
+    def test_cli_reports_a_renamed_symbol(self):
+        with tempfile.TemporaryDirectory() as d:
+            write_tree(d, {**CLEAN_TREE, "src/b.cpp": "int x;\nAircraftRow r;\n"})
+            code, out = run_cli(["--strict", "--root", d])
+        self.assertIn("src/b.cpp:2", out)
+        self.assertIn("AircraftRow was renamed TrackedFlight", out)
+        self.assertNotEqual(0, code, out)
+
+
 # ---- §2 main.cpp in net-module comments ------------------------------------------------------
 
 class MainCppCommentsTest(unittest.TestCase):
@@ -144,7 +217,10 @@ class MainCppCommentsTest(unittest.TestCase):
                      "settings_nvs", "github_http", "ota_flash", "alert_sources"):
             with self.subTest(stem=stem):
                 self.assertIn(stem, check_comments.NET_MODULES)
-        for stem in ("config_portal", "main", "redraw_policy", "status_bar", "table_view"):
+        # Spec 12 stage 7: config_store's new name.
+        self.assertIn("settings", check_comments.NET_MODULES)
+        for stem in ("config_portal", "config_store", "main", "redraw_policy", "status_bar",
+                     "table_view"):
             with self.subTest(stem=stem):
                 self.assertNotIn(stem, check_comments.NET_MODULES)
 
@@ -282,6 +358,14 @@ class RepoTest(unittest.TestCase):
     def test_removed_symbols_absent_from_src_and_test(self):
         self.assertIn("drawElbowFrame", check_comments.REMOVED_SYMBOLS)
         found = check_comments.find_removed_symbols(self.source_files(("src", "test")))
+        self.assertEqual([], found, show(found))
+
+    # Scenario: Dawna nazwa złożona, która wraca do kodu albo komentarza, jest zgłaszana
+    def test_renamed_symbols_absent_from_src_and_test(self):
+        fn = getattr(check_comments, "find_renamed_symbols", None)
+        self.assertIsNotNone(fn, "check_comments.py has no find_renamed_symbols()")
+        self.assertIn("AircraftRow", getattr(check_comments, "RENAMED_SYMBOLS", {}))
+        found = fn(self.source_files(("src", "test")))
         self.assertEqual([], found, show(found))
 
     # Scenario: Żaden komentarz w module rdzenia sieciowego nie przypisuje pracy main.cpp

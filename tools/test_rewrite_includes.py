@@ -1,8 +1,8 @@
 """Tests for tools/rewrite_includes.py:  python tools/test_rewrite_includes.py
 
 RewriteTest feeds the pure functions strings and runs the CLI on temporary trees (never on this
-repository); MoveTableTest pins the stage-1, stage-2 and stage-4 move tables (spec 12 plan)
-against src/.
+repository); MoveTableTest pins the stage-1, stage-2, stage-4 and stage-7 move tables (spec 12
+plan) against src/.
 """
 
 import posixpath
@@ -29,6 +29,11 @@ STAGE_2_FILE_COUNT = 80
 STAGE_4_RENAMES = {
     "admin/adapters/config_portal.h": "admin/adapters/web_server.h",
     "admin/adapters/config_portal.cpp": "admin/adapters/web_server.cpp",
+}
+# Stage 7 renames the settings module after the glossary (spec 12 section 3): Config is Settings.
+STAGE_7_RENAMES = {
+    "admin/core/config_store.h": "admin/core/settings.h",
+    "admin/core/config_store.cpp": "admin/core/settings.cpp",
 }
 # A stage-1 path in a layer folder stage 2 renames: <ctx>/domain/, <ctx>/app/ or the root app/.
 _OLD_LAYER_RE = re.compile(r"^(?:(airspace|enrichment|opensky|display|admin)/(domain|app)/|app/)")
@@ -127,13 +132,15 @@ class MoveTableTest(unittest.TestCase):
         self.assertEqual([], bad)
 
     def test_no_two_files_share_a_destination_and_none_is_renamed(self):
-        # Stages 1 and 2 only move files; stage 4 renames exactly config_portal -> web_server.
+        # Stages 1 and 2 only move files; stage 4 renames exactly config_portal -> web_server,
+        # stage 7 exactly config_store -> settings.
         self.assertEqual(STAGE_0_FILE_COUNT, len(ri.MOVES_STAGE_1))
-        self.assertEqual(3, len(ri.STAGES), "STAGES = the stage 1, 2 and 4 tables")
+        self.assertEqual(4, len(ri.STAGES), "STAGES = the stage 1, 2, 4 and 7 tables")
         self.assertIs(ri.MOVES_STAGE_1, ri.STAGES[0])
         self.assertIs(ri.MOVES_STAGE_2, ri.STAGES[1])
         self.assertIs(getattr(ri, "MOVES_STAGE_4", None), ri.STAGES[2])
-        expected_renames = {1: {}, 2: {}, 3: STAGE_4_RENAMES}
+        self.assertIs(getattr(ri, "MOVES_STAGE_7", None), ri.STAGES[3])
+        expected_renames = {1: {}, 2: {}, 3: STAGE_4_RENAMES, 4: STAGE_7_RENAMES}
         for stage, table in enumerate(ri.STAGES, 1):
             with self.subTest(table=stage):
                 self.assertEqual(len(table), len(set(table.values())))
@@ -168,8 +175,7 @@ class MoveTableTest(unittest.TestCase):
     def test_stage_4_renames_config_portal_to_web_server(self):
         table = getattr(ri, "MOVES_STAGE_4", None)
         self.assertIsNotNone(table, "rewrite_includes.py has no MOVES_STAGE_4")
-        self.assertIs(table, ri.STAGES[-1], "MOVES_STAGE_4 is the last table in STAGES")
-        self.assertIs(table, ri.MOVES)
+        self.assertIs(table, ri.STAGES[2], "MOVES_STAGE_4 is the third table in STAGES")
         self.assertEqual(STAGE_4_RENAMES, table)
         rows = [("config_portal.h", "admin/adapters/web_server.h"),
                 ("config_portal.cpp", "admin/adapters/web_server.cpp")]
@@ -181,6 +187,25 @@ class MoveTableTest(unittest.TestCase):
                                  f"src/admin/adapters/{old}")
         # hexdb_http keeps its name: section 4.2 calls it hexdb_http too.
         self.assertEqual("enrichment/adapters/hexdb_http.h", ri.final_path("hexdb_http.h"))
+
+    # Scenario: Moduł ustawień nazywa się settings, a jego testy settings_test.cpp
+    def test_stage_7_renames_config_store_to_settings(self):
+        table = getattr(ri, "MOVES_STAGE_7", None)
+        self.assertIsNotNone(table, "rewrite_includes.py has no MOVES_STAGE_7")
+        self.assertIs(table, ri.STAGES[-1], "MOVES_STAGE_7 is the last table in STAGES")
+        self.assertIs(table, ri.MOVES)
+        self.assertEqual(STAGE_7_RENAMES, table)
+        rows = [("config_store.h", "admin/core/settings.h"),
+                ("config_store.cpp", "admin/core/settings.cpp")]
+        for old, new in rows:
+            with self.subTest(file=old):
+                self.assertEqual(new, ri.final_path(old))
+                self.assertTrue((ROOT / "src" / new).is_file(), f"src/{new}")
+                self.assertFalse((ROOT / "src/admin/core" / old).exists(),
+                                 f"src/admin/core/{old}")
+        # The stage-4 rename and the other settings modules keep their final paths.
+        self.assertEqual("admin/adapters/web_server.h", ri.final_path("config_portal.h"))
+        self.assertEqual("admin/core/config_backup.h", ri.final_path("config_backup.h"))
 
     # Scenario Outline: Etap 2 zmienia tylko nazwę katalogu warstwy, nie plik
     def test_stage_2_renames_the_layer_folder(self):
@@ -260,13 +285,13 @@ class MoveCliTest(unittest.TestCase):
 
     def test_move_applies_the_stage_4_rename(self):
         with tempfile.TemporaryDirectory() as tmp:
+            # In-process with the stage-4 table: --move itself applies the newest table.
             git_tree(tmp, {"src/admin/adapters/config_portal.h": "#pragma once\n",
                            "src/admin/adapters/config_portal.cpp":
                                '#include "admin/adapters/config_portal.h"\n',
                            "src/admin/adapters/github_ca.h": "#pragma once\n"})
-            code, out = run_cli(tmp, "--move")
-            self.assertEqual(0, code, out)
-            self.assertIn("moved 2 file(s)", out)
+            with mock.patch.object(ri, "MOVES", ri.MOVES_STAGE_4):
+                self.assertEqual(2, ri.move_files(Path(tmp)))
             adapters = Path(tmp) / "src/admin/adapters"
             self.assertTrue((adapters / "web_server.h").is_file())
             self.assertTrue((adapters / "web_server.cpp").is_file())
@@ -275,6 +300,32 @@ class MoveCliTest(unittest.TestCase):
             staged = staged_names(tmp)
             self.assertIn("src/admin/adapters/web_server.h", staged)
             self.assertIn("src/admin/adapters/web_server.cpp", staged)
+            with mock.patch.object(ri, "MOVES", ri.MOVES_STAGE_4):
+                self.assertEqual(0, ri.move_files(Path(tmp)))
+
+    # Edge case: --move applies the newest table, stage 7's config_store -> settings; the
+    # default rewrite then fixes the include, and a second --move moves nothing.
+    def test_move_applies_the_stage_7_rename(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            git_tree(tmp, {"src/admin/core/config_store.h": "#pragma once\n",
+                           "src/admin/core/config_store.cpp":
+                               '#include "admin/core/config_store.h"\n',
+                           "src/admin/core/config_backup.h": "#pragma once\n"})
+            code, out = run_cli(tmp, "--move")
+            self.assertEqual(0, code, out)
+            self.assertIn("moved 2 file(s)", out)
+            core = Path(tmp) / "src/admin/core"
+            self.assertTrue((core / "settings.h").is_file())
+            self.assertTrue((core / "settings.cpp").is_file())
+            self.assertFalse((core / "config_store.h").exists())
+            self.assertTrue((core / "config_backup.h").is_file())
+            staged = staged_names(tmp)
+            self.assertIn("src/admin/core/settings.h", staged)
+            self.assertIn("src/admin/core/settings.cpp", staged)
+            code, out = run_cli(tmp)
+            self.assertEqual(0, code, out)
+            self.assertEqual(b'#include "admin/core/settings.h"\n',
+                             (core / "settings.cpp").read_bytes())
             code, out = run_cli(tmp, "--move")
             self.assertEqual(0, code, out)
             self.assertIn("moved 0 file(s)", out)

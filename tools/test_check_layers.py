@@ -32,9 +32,10 @@ RUN_TEST_BASELINE = 874
 # number with it, so a new finding can't hide under the old limit.
 LAYER_FINDINGS_LIMIT = 12
 
-# Stage 3 (spec 12 section 8 item 3): symbol -> (new header, old header), both from src/.
+# Stage 3 (spec 12 section 8 item 3): symbol -> (new header, old header), both from src/. The
+# types carry their stage-7 glossary names (AircraftRow, OpenSkyHealth, Aircraft before).
 STAGE_3_HOMES = {
-    "AircraftRow": ("airspace/core/tracked_flight.h", "display/core/screens/table_view.h"),
+    "TrackedFlight": ("airspace/core/tracked_flight.h", "display/core/screens/table_view.h"),
     "buildEnrichedRecords": ("airspace/core/tracked_flight.h",
                              "display/core/screens/table_view.h"),
     "annotateDistances": ("airspace/core/tracked_flight.h", "display/core/screens/table_view.h"),
@@ -46,8 +47,8 @@ STAGE_3_HOMES = {
     "splitFeaturedAndRest": ("airspace/core/flight_ordering.h",
                              "display/core/screens/table_view.h"),
     "pickNowAircraft": ("airspace/core/now_pick.h", "display/core/screens/flight_screen.h"),
-    "OpenSkyHealth": ("airspace/core/feed_health.h", "display/core/screens/status_bar.h"),
-    "Aircraft": ("airspace/core/aircraft_state.h", "opensky/core/opensky_client.h"),
+    "FeedHealth": ("airspace/core/feed_health.h", "display/core/screens/status_bar.h"),
+    "AircraftState": ("airspace/core/aircraft_state.h", "opensky/core/opensky_client.h"),
     "inferOnGround": ("airspace/core/aircraft_state.h", "opensky/core/opensky_client.h"),
     "computeDistanceBearing": ("shared/geo.h", "display/core/screens/table_view.h"),
     "compassPoint": ("shared/geo.h", "display/core/theme/lcars_theme.h"),
@@ -168,7 +169,7 @@ STAGE_4_ADAPTERS = {
     "otaFlashSession": ("admin/adapters/ota_flash.cpp", "admin/core/firmware/ota_update.cpp"),
     "releaseCheckLoop": ("admin/adapters/github_http.cpp",
                          "admin/core/firmware/release_check.cpp"),
-    "loadConfig": ("admin/adapters/settings_nvs.cpp", "admin/core/config_store.cpp"),
+    "loadSettings": ("admin/adapters/settings_nvs.cpp", "admin/core/settings.cpp"),
     "deviceAlertInputs": ("admin/adapters/alert_sources.cpp", "admin/core/device_alerts.cpp"),
 }
 
@@ -299,8 +300,9 @@ STAGE_5_MOVED_TESTS = {
     "test_header_fields": (_SHOT_TESTS, _BRIDGE_TESTS),
 }
 
-# Stage 6 (spec 12 section 7, plan "§7 -> objects"): Config field -> (its object type, the
-# header from src/ that declares it, the object's fields). Nothing else is left in Config.
+# Stage 6 (spec 12 section 7, plan "§7 -> objects"): Settings field -> (its object type,
+# the header from src/ that declares it, the object's fields). Nothing else is left in Settings
+# (Config until stage 7, in config_store.h).
 STAGE_6_SETTINGS = {
     "home": ("Home", "airspace/core/home.h", ["lat", "lon", "radius_deg", "configured"]),
     "phase": ("PhaseThresholds", "airspace/core/flight_phase.h",
@@ -316,13 +318,13 @@ STAGE_6_SETTINGS = {
                   ["brightness_auto", "brightness_fixed_pct", "brightness_min_pct",
                    "brightness_max_pct", "night_mode", "night_from_min", "night_to_min",
                    "night_pct", "night_wake_s", "night_pause_polling"]),
-    "update": ("UpdateSettings", "admin/core/config_store.h",
+    "update": ("UpdateSettings", "admin/core/settings.h",
                ["check_enabled", "show_prerelease", "skipped_tag"]),
-    "web": ("WebSettings", "admin/core/config_store.h", ["language", "password"]),
+    "web": ("WebSettings", "admin/core/settings.h", ["language", "password"]),
 }
 
 # Every type a settings parameter can have: the aggregate and its objects.
-SETTINGS_TYPES = {"Config"} | {t for t, _, _ in STAGE_6_SETTINGS.values()}
+SETTINGS_TYPES = {"Settings"} | {t for t, _, _ in STAGE_6_SETTINGS.values()}
 
 # Stage 6: the 28 NVS keys of v1.11.3 and the Preferences type each is read and written with
 # (namespace "cydsky"); `isKey()` doesn't count.
@@ -336,7 +338,7 @@ STAGE_6_NVS_KEYS = {
     "nt_pct": "UChar", "nt_wake": "UShort", "nt_poll": "Bool",
 }
 
-# Stage 6: the Config field each NVS key loads into and saves from (settings_nvs.cpp). The keys
+# Stage 6: the Settings field each NVS key loads into and saves from (settings_nvs.cpp). The keys
 # kept their pre-stage-6 meaning: `lang` is the display's language, `wlang` the page's.
 STAGE_6_NVS_FIELDS = {
     "home_lat": "home.lat", "home_lon": "home.lon", "radius_deg": "home.radius_deg",
@@ -372,7 +374,7 @@ STAGE_6_SIGNATURES = [
     ("admin/core/config_page.h", "pausedMinutesPerDay", ["const BacklightSettings &"]),
 ]
 
-# Stage 6: the settings objects the display may read from NetState (cfg->X / cfg().X), and the
+# Stage 6: the settings objects the display may read from NetState (settings->X / cfg().X), and the
 # only field of `update` it needs (the update question's skipped release).
 STAGE_6_DISPLAY_SETTINGS = {"home", "display", "auto_cycle", "backlight", "update"}
 STAGE_6_DISPLAY_UPDATE_FIELDS = {"skipped_tag"}
@@ -380,6 +382,10 @@ STAGE_6_DISPLAY_UPDATE_FIELDS = {"skipped_tag"}
 # Stage 6: adapters that read settings through config_store.h before; afterwards no layer
 # finding at all comes from them.
 STAGE_6_GONE_FINDINGS = ["opensky/adapters/opensky_http.cpp", "display/adapters/backlight_ldr.cpp"]
+
+# Stage 7 (spec 12 section 3, the glossary): the web server's functions, after webServer.
+WEB_SERVER_FUNCTIONS = ["Begin", "Loop", "IsActive", "SaveCount", "SetScreenshotSource",
+                        "SetOtaObserver", "SetPerfSource", "RestartPending"]
 
 # Old layer folder names in a path: <ctx>/domain, <ctx>/app, src/app/, the -<app/> filter.
 OLD_LAYER_PATH_RE = re.compile(r"\b(airspace|enrichment|opensky|display|admin)/(domain|app)\b"
@@ -1222,16 +1228,17 @@ class LayoutTest(unittest.TestCase):
                 self.assertEqual(1, run_test_calls(sources[new], name),
                                  f"RUN_TEST({name}) in test/{new}")
 
-    # Scenario Outline: Config składa się z obiektów wartości kontekstów, a każdy obiekt leży
+    # Scenario Outline: Settings składa się z obiektów wartości kontekstów, a każdy obiekt leży
     # w swoim kontekście
     def test_config_is_built_from_context_objects(self):
-        store = (ROOT / "src" / "admin" / "core" / "config_store.h").read_text(
-            encoding="utf-8", errors="replace")
-        members = struct_members(store, "Config")
-        self.assertIsNotNone(members, "no struct Config { ... } in src/admin/core/config_store.h")
+        path = ROOT / "src" / "admin" / "core" / "settings.h"
+        self.assertTrue(path.is_file(), "src/admin/core/settings.h")
+        store = path.read_text(encoding="utf-8", errors="replace")
+        members = struct_members(store, "Settings")
+        self.assertIsNotNone(members, "no struct Settings { ... } in src/admin/core/settings.h")
         self.assertEqual({field: t for field, (t, _, _) in STAGE_6_SETTINGS.items()},
-                         {name: t for t, name in members}, "the fields of Config")
-        self.assertEqual(len(STAGE_6_SETTINGS), len(members), f"Config's fields: {members}")
+                         {name: t for t, name in members}, "the fields of Settings")
+        self.assertEqual(len(STAGE_6_SETTINGS), len(members), f"Settings' fields: {members}")
         headers = {p: t for p, t in repo_sources("src").items() if p.endswith((".h", ".hpp"))}
         for field, (type_, header, fields) in STAGE_6_SETTINGS.items():
             with self.subTest(field=field, type=type_):
@@ -1257,16 +1264,16 @@ class LayoutTest(unittest.TestCase):
                 self.assertEqual({("get", type_), ("put", type_)}, seen[key])
 
     # Edge case (review finding 2): the keys and types alone don't see a same-type swap
-    # (`lang` <-> `wlang`, `bl_min` <-> `bl_max`, `nt_from` <-> `nt_to`) in loadConfig() or
-    # saveConfig(), and settings_nvs.cpp has no native test. Each key loads into (`cfg.X.y =
+    # (`lang` <-> `wlang`, `bl_min` <-> `bl_max`, `nt_from` <-> `nt_to`) in loadSettings() or
+    # saveSettings(), and settings_nvs.cpp has no native test. Each key loads into (`cfg.X.y =
     # ... prefs.get...("key"`) and saves from (`prefs.put...("key", ... sanitized.X.y`) the
     # field the table pins.
     def test_settings_nvs_keys_load_into_and_save_from_their_field(self):
         self.assertEqual(sorted(STAGE_6_NVS_KEYS), sorted(STAGE_6_NVS_FIELDS))
         code = strip_comments((ROOT / "src" / "admin" / "adapters" / "settings_nvs.cpp")
                               .read_text(encoding="utf-8", errors="replace"))
-        load = definition_body(code, "Config loadConfig()")
-        save = definition_body(code, "void saveConfig(const Config &cfg)")
+        load = definition_body(code, "Settings loadSettings()")
+        save = definition_body(code, "void saveSettings(const Settings &cfg)")
         loaded, saved = {}, {}
         for statement in load.split(";"):
             for key in re.findall(r'\bprefs\.get\w+\(\s*"(\w+)"', statement):
@@ -1275,35 +1282,35 @@ class LayoutTest(unittest.TestCase):
         for statement in save.split(";"):
             for key in re.findall(r'\bprefs\.put\w+\(\s*"(\w+)"', statement):
                 saved.setdefault(key, []).extend(re.findall(r"\bsanitized\.(\w+\.\w+)", statement))
-        self.assertEqual(sorted(STAGE_6_NVS_FIELDS), sorted(loaded), "keys loadConfig() reads")
-        self.assertEqual(sorted(STAGE_6_NVS_FIELDS), sorted(saved), "keys saveConfig() writes")
+        self.assertEqual(sorted(STAGE_6_NVS_FIELDS), sorted(loaded), "keys loadSettings() reads")
+        self.assertEqual(sorted(STAGE_6_NVS_FIELDS), sorted(saved), "keys saveSettings() writes")
         for key, field in STAGE_6_NVS_FIELDS.items():
             with self.subTest(key=key):
-                self.assertEqual([field], loaded[key], f"the field loadConfig() fills from {key}")
-                self.assertEqual([field], saved[key], f"the field saveConfig() writes to {key}")
+                self.assertEqual([field], loaded[key], f"the field loadSettings() fills from {key}")
+                self.assertEqual([field], saved[key], f"the field saveSettings() writes to {key}")
 
     # Scenario: Poza admin/ ustawienia dołączają tylko core_link i korzenie kompozycji
     # (§10 pkt 4)
     def test_only_admin_roots_and_core_link_include_settings(self):
         includers = sorted(p for p, t in repo_sources("src").items()
-                           if "admin/core/config_store.h"
+                           if "admin/core/settings.h"
                            in [i.name for i in check_layers.find_includes(t) if not i.angle])
-        self.assertGreater(len(includers), 3, f"includers of config_store.h: {includers}")
+        self.assertGreater(len(includers), 3, f"includers of settings.h: {includers}")
         outside = [p for p in includers if not p.startswith(("src/admin/", "src/main/"))
                    and p != "src/platform/core_link.h"]
-        self.assertEqual([], outside, "config_store.h included outside admin/, the roots and "
+        self.assertEqual([], outside, "settings.h included outside admin/, the roots and "
                                       "core_link.h")
         self.assertIn("src/platform/core_link.h", includers)
 
-    # Scenario: Moduły innych kontekstów nie znają typu Config, nawet z deklaracji zapowiadającej
+    # Scenario: Moduły innych kontekstów nie znają typu Settings, nawet z deklaracji zapowiadającej
     def test_config_type_named_only_in_admin_roots_and_core_link(self):
         files = repo_sources("src/airspace", "src/enrichment", "src/opensky", "src/display",
                              "src/shared")
         self.assertGreater(len(files), 50)
         hits = [f"{p}:{code.count(chr(10), 0, m.start()) + 1}"
                 for p, t in files.items() for code in [strip_comments(t)]
-                for m in re.finditer(r"\bConfig\b", code)]
-        self.assertEqual([], hits, f"{len(hits)} use(s) of Config outside admin/, the roots and "
+                for m in re.finditer(r"\bSettings\b", code)]
+        self.assertEqual([], hits, f"{len(hits)} use(s) of Settings outside admin/, the roots and "
                          "core_link:\n" + "\n".join(hits))
 
     # Scenario Outline: Funkcje innych kontekstów dostają tylko swoje obiekty ustawień
@@ -1332,15 +1339,15 @@ class LayoutTest(unittest.TestCase):
         reads = []
         for p, t in repo_sources("src/display").items():
             code = strip_comments(t)
-            for m in re.finditer(r"\bcfg(?:\s*\(\s*\))?\s*->\s*(\w+)(?:\s*\.\s*(\w+))?"
+            for m in re.finditer(r"\bsettings(?:\s*\(\s*\))?\s*->\s*(\w+)(?:\s*\.\s*(\w+))?"
                                  r"|\bcfg\s*\(\s*\)\s*\.\s*(\w+)(?:\s*\.\s*(\w+))?", code):
                 obj, field = m.group(1) or m.group(3), m.group(2) or m.group(4)
                 reads.append((f"{p}:{code.count(chr(10), 0, m.start()) + 1}", obj, field))
-        self.assertGreaterEqual(len(reads), 4, "found too few cfg-> reads in src/display/")
-        wrong = [f"{where}: cfg->{obj}" for where, obj, _ in reads
+        self.assertGreaterEqual(len(reads), 4, "found too few settings-> reads in src/display/")
+        wrong = [f"{where}: settings->{obj}" for where, obj, _ in reads
                  if obj not in STAGE_6_DISPLAY_SETTINGS]
         self.assertEqual([], wrong, "the display reads settings that aren't its own")
-        update = [f"{where}: cfg->update.{field}" for where, obj, field in reads
+        update = [f"{where}: settings->update.{field}" for where, obj, field in reads
                   if obj == "update" and field not in STAGE_6_DISPLAY_UPDATE_FIELDS]
         self.assertEqual([], update, "the display reads update settings beyond the skipped tag")
 
@@ -1354,6 +1361,63 @@ class LayoutTest(unittest.TestCase):
                 self.assertTrue((ROOT / "src" / path).is_file(), f"src/{path}")
                 hits = [f for f in findings if f.path == f"src/{path}"]
                 self.assertEqual([], hits, show(hits, limit=len(hits)))
+
+    # Scenario: Moduł ustawień nazywa się settings, a jego testy settings_test.cpp
+    def test_settings_module_is_admin_core_settings(self):
+        for name in ("settings.h", "settings.cpp"):
+            self.assertTrue((ROOT / "src" / "admin" / "core" / name).is_file(),
+                            f"src/admin/core/{name}")
+        sources = repo_sources("src", "test")
+        self.assertGreater(len(sources), 100)
+        left = [p for p in sources if "config_store" in Path(p).name]
+        self.assertEqual([], left, "files still named config_store")
+        includes = [f"{p}:{i.line}: {i.name}" for p, t in sources.items()
+                    for i in check_layers.find_includes(t) if "config_store" in i.name]
+        self.assertEqual([], includes, "includes that still name config_store")
+        tests = ROOT / "test" / "test_admin" / "settings_test.cpp"
+        self.assertTrue(tests.is_file(), "test/test_admin/settings_test.cpp")
+        self.assertRegex(strip_comments(tests.read_text(encoding="utf-8", errors="replace")),
+                         r"\bvoid\s+run_settings_tests\s*\(\s*\)\s*\{")
+        main = strip_comments((ROOT / "test" / "test_admin" / "main.cpp").read_text(
+            encoding="utf-8", errors="replace"))
+        self.assertRegex(main, r"\bRUN_MODULE\(\s*settings\s*\)\s*\)\s*run_settings_tests\(\)")
+        self.assertNotRegex(main, r"\bconfig_store\b")
+        proc = subprocess.run([sys.executable, str(TOOL.parent / "rewrite_includes.py"),
+                               "--root", str(ROOT), "--check"], capture_output=True)
+        self.assertEqual(0, proc.returncode,
+                         (proc.stdout + proc.stderr).decode("utf-8", "replace"))
+
+    # Scenario: NetState niesie ustawienia pod nazwą settings
+    def test_net_state_carries_settings(self):
+        text = (ROOT / "src" / "platform" / "core_link.h").read_text(encoding="utf-8",
+                                                                   errors="replace")
+        members = struct_members(text, "NetState")
+        self.assertIsNotNone(members, "no struct NetState { ... } in src/platform/core_link.h")
+        self.assertIn(("std::shared_ptr<const Settings>", "settings"), members)
+        self.assertIn(("uint32_t", "settingsSeq"), members)
+        names = [name for _, name in members]
+        self.assertNotIn("cfg", names)
+        self.assertNotIn("cfgSeq", names)
+
+    # Scenario: Funkcje serwera WWW nazywają się jak jego moduł
+    def test_web_server_functions_are_named_after_the_module(self):
+        header = strip_comments((ROOT / "src" / "admin" / "adapters" / "web_server.h").read_text(
+            encoding="utf-8", errors="replace"))
+        # Functions declared at file scope (column 0); struct members are indented.
+        declared = re.findall(r"(?m)^(?!using\b|struct\b|class\b|enum\b|#)"
+                              r"(?:[A-Za-z_][\w:<>]*[\s*&]+)+([A-Za-z_]\w*)\s*\(", header)
+        self.assertGreaterEqual(len(declared), 8, f"functions in web_server.h: {declared}")
+        self.assertEqual([], [n for n in declared if not n.startswith("webServer")],
+                         "web_server.h functions not named webServer...")
+        self.assertCountEqual(["webServer" + s for s in WEB_SERVER_FUNCTIONS], declared)
+        hits = [f"{p}:{code.count(chr(10), 0, m.start()) + 1}: {m.group(0)}"
+                for p, t in repo_sources("src").items() for code in [strip_comments(t)]
+                for m in re.finditer(r"\bconfigPortal[A-Z]\w*", code)]
+        self.assertEqual([], hits, "configPortal...() left in src/")
+        wifi = strip_comments((ROOT / "src" / "platform" / "wifi_manager.cpp").read_text(
+            encoding="utf-8", errors="replace"))
+        self.assertRegex(wifi, r"\.setConfigPortalBlocking\s*\(",
+                         "wifi_manager.cpp no longer calls WiFiManager's setConfigPortalBlocking()")
 
 
 def strip_comments(text):
@@ -1573,7 +1637,7 @@ def parameter_types(text, symbol):
 
 
 def is_settings_type(type_text):
-    """True when a parameter / member type names Config or one of its stage-6 objects."""
+    """True when a parameter / member type names Settings or one of its stage-6 objects."""
     return bool(set(re.findall(r"[A-Za-z_]\w*", type_text)) & SETTINGS_TYPES)
 
 
@@ -1653,7 +1717,7 @@ class DeclarationMatchTest(unittest.TestCase):
                            "const PollSettings &"]], parameter_types(decl, "openSkyClientPoll"))
         self.assertEqual([["LGFX &", "const BacklightSettings &", "bool"]],
                          parameter_types(decl, "backlightLoop"))
-        self.assertTrue(is_settings_type("const Config &"))
+        self.assertTrue(is_settings_type("const Settings &"))
         self.assertFalse(is_settings_type("const ConfigPageModel &"))
 
     def test_lovyangfx_names_in_code_but_not_comments_or_include_names(self):
