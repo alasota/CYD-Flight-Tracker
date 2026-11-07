@@ -8,9 +8,9 @@
 // aircraft's closest point of approach and Screen 2's pick.
 //
 // Two phases, so positions don't wait for hexdb.io:
-//   phase A = buildDataSnapshot(..., budgets 0): no network at all — only what
+//   phase A = buildAirspaceSnapshot(..., budgets 0): no network at all — only what
 //             is cached (RAM or NVS); the rest is *_pending ("...").
-//   phase B = buildDataSnapshot(..., full budgets): also the new lookups.
+//   phase B = buildAirspaceSnapshot(..., full budgets): also the new lookups.
 //   B is published only when it fetched something (`fetches` > 0); otherwise
 //   it equals A and there is nothing to repaint.
 //
@@ -24,7 +24,7 @@
 #include <vector>
 
 #include "enrichment/core/aircraft_lookup.h"
-#include "platform/core_link.h"  // DataSnapshot
+#include "platform/core_link.h"  // AirspaceSnapshot
 #include "airspace/core/aircraft_state.h"  // Aircraft
 #include "airspace/core/flight_phase.h"    // PhaseThresholds
 #include "airspace/core/home.h"            // Home
@@ -56,8 +56,9 @@ struct PipelineParams {
 // One snapshot from `aircraft`. `polledAtMs` = when /states/all answered
 // (the countdown's base). `fetches` in the result counts the lookups that
 // were not cached — i.e. the hexdb.io requests this call made.
-DataSnapshot buildDataSnapshot(const std::vector<Aircraft> &aircraft, const PipelineParams &p,
-                               const LookupPorts &ports, uint32_t polledAtMs);
+AirspaceSnapshot buildAirspaceSnapshot(const std::vector<Aircraft> &aircraft,
+                                       const PipelineParams &p, const LookupPorts &ports,
+                                       uint32_t polledAtMs);
 
 // Phase A's params: the same, with no new lookups allowed.
 PipelineParams cacheOnly(PipelineParams p);

@@ -23,9 +23,10 @@ PipelineParams cacheOnly(PipelineParams p) {
   return p;
 }
 
-DataSnapshot buildDataSnapshot(const std::vector<Aircraft> &aircraft, const PipelineParams &p,
-                               const LookupPorts &ports, uint32_t polledAtMs) {
-  DataSnapshot s;
+AirspaceSnapshot buildAirspaceSnapshot(const std::vector<Aircraft> &aircraft,
+                                       const PipelineParams &p, const LookupPorts &ports,
+                                       uint32_t polledAtMs) {
+  AirspaceSnapshot s;
   s.polledAtMs = polledAtMs;
   std::vector<AircraftRow> &rows = s.rows;
 

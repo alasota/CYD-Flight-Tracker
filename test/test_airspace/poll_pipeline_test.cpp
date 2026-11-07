@@ -1,4 +1,4 @@
-// poll_pipeline: one /states/all answer -> DataSnapshot, betweenFetches hook. CLAUDE.md "Concurrency — two cores", spec/04, spec 09.
+// poll_pipeline: one /states/all answer -> AirspaceSnapshot, betweenFetches hook. CLAUDE.md "Concurrency — two cores", spec/04, spec 09.
 #include <unity.h>
 
 #include <cstdio>
@@ -46,7 +46,7 @@ static PipelineParams params(int budget, int airportBudget) {
 }
 
 static void test_rows_ordered_airborne_ground_no_position(void) {
-  const DataSnapshot s = buildDataSnapshot(sky(), params(0, 0), stubPorts(), 1234);
+  const AirspaceSnapshot s = buildAirspaceSnapshot(sky(), params(0, 0), stubPorts(), 1234);
   TEST_ASSERT_EQUAL_size_t(4, s.rows.size());
   TEST_ASSERT_EQUAL_STRING("near01", s.rows[0].aircraft.icao24.c_str());
   TEST_ASSERT_EQUAL_STRING("far001", s.rows[1].aircraft.icao24.c_str());
@@ -56,8 +56,8 @@ static void test_rows_ordered_airborne_ground_no_position(void) {
 }
 
 static void test_cache_only_makes_no_requests_and_marks_pending(void) {
-  const DataSnapshot s =
-      buildDataSnapshot(sky(), cacheOnly(params(2, 3)), stubPorts(), 0);
+  const AirspaceSnapshot s =
+      buildAirspaceSnapshot(sky(), cacheOnly(params(2, 3)), stubPorts(), 0);
   TEST_ASSERT_EQUAL_size_t(0, calls.size());
   TEST_ASSERT_EQUAL_UINT32(0, s.fetches);
   for (const AircraftRow &r : s.rows) {
@@ -70,7 +70,7 @@ static void test_cache_hits_are_used_in_phase_a(void) {
   knownAircraft.insert("far001");
   knownRoutes.insert("FAR1");
   knownAirports.insert("EPWA");
-  const DataSnapshot s = buildDataSnapshot(sky(), cacheOnly(params(2, 3)), stubPorts(), 0);
+  const AirspaceSnapshot s = buildAirspaceSnapshot(sky(), cacheOnly(params(2, 3)), stubPorts(), 0);
   TEST_ASSERT_EQUAL_UINT32(0, s.fetches);  // all three answered from "cache"
   const AircraftRow &far = s.rows[1];
   TEST_ASSERT_FALSE(far.info_pending);
@@ -83,7 +83,7 @@ static void test_cache_hits_are_used_in_phase_a(void) {
 }
 
 static void test_budget_goes_to_the_nearest_first(void) {
-  const DataSnapshot s = buildDataSnapshot(sky(), params(2, 0), stubPorts(), 0);
+  const AirspaceSnapshot s = buildAirspaceSnapshot(sky(), params(2, 0), stubPorts(), 0);
   // Budget 2 shared: near01's aircraft + route.
   TEST_ASSERT_EQUAL_UINT32(2, s.fetches);
   TEST_ASSERT_EQUAL_STRING("ac:near01", calls[0].c_str());
@@ -97,7 +97,7 @@ static void test_budget_goes_to_the_nearest_first(void) {
 }
 
 static void test_airports_of_new_routes_in_the_same_pass(void) {
-  const DataSnapshot s = buildDataSnapshot(sky(), params(2, 3), stubPorts(), 0);
+  const AirspaceSnapshot s = buildAirspaceSnapshot(sky(), params(2, 3), stubPorts(), 0);
   TEST_ASSERT_EQUAL_UINT32(4, s.fetches);  // aircraft, route, two airports
   TEST_ASSERT_EQUAL_STRING("WAW", s.rows[0].origin_airport.iata_code.c_str());
   TEST_ASSERT_EQUAL_STRING("FCO", s.rows[0].dest_airport.iata_code.c_str());
@@ -109,8 +109,8 @@ static void test_phase_b_without_new_keys_equals_phase_a(void) {
   for (const char *k : {"NEAR1", "FAR1", "GND1", "NOP1"}) knownRoutes.insert(k);
   knownAirports.insert("EPWA");
   knownAirports.insert("LIRF");
-  const DataSnapshot a = buildDataSnapshot(sky(), cacheOnly(params(2, 3)), stubPorts(), 0);
-  const DataSnapshot b = buildDataSnapshot(sky(), params(2, 3), stubPorts(), 0);
+  const AirspaceSnapshot a = buildAirspaceSnapshot(sky(), cacheOnly(params(2, 3)), stubPorts(), 0);
+  const AirspaceSnapshot b = buildAirspaceSnapshot(sky(), params(2, 3), stubPorts(), 0);
   TEST_ASSERT_EQUAL_UINT32(0, b.fetches);  // nothing new -> B isn't published
   TEST_ASSERT_EQUAL_size_t(a.rows.size(), b.rows.size());
   for (size_t i = 0; i < a.rows.size(); ++i) {
@@ -121,7 +121,7 @@ static void test_phase_b_without_new_keys_equals_phase_a(void) {
 
 static void test_now_pick_points_at_the_sorted_row(void) {
   // near01 is 5.5 km north, flying south straight over home.
-  const DataSnapshot s = buildDataSnapshot(sky(), params(0, 0), stubPorts(), 0);
+  const AirspaceSnapshot s = buildAirspaceSnapshot(sky(), params(0, 0), stubPorts(), 0);
   TEST_ASSERT_EQUAL_INT(0, s.nowRowIndex);
   TEST_ASSERT_TRUE(s.cpa.found);
   TEST_ASSERT_TRUE(s.cpa.t_cpa_seconds > 0.0f);
@@ -130,12 +130,12 @@ static void test_now_pick_points_at_the_sorted_row(void) {
 }
 
 static void test_ground_row_gets_no_phase(void) {
-  const DataSnapshot s = buildDataSnapshot(sky(), params(0, 0), stubPorts(), 0);
+  const AirspaceSnapshot s = buildAirspaceSnapshot(sky(), params(0, 0), stubPorts(), 0);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(Phase::NONE), static_cast<int>(s.rows[2].phase));
 }
 
 static void test_empty_sky(void) {
-  const DataSnapshot s = buildDataSnapshot({}, params(2, 3), stubPorts(), 99);
+  const AirspaceSnapshot s = buildAirspaceSnapshot({}, params(2, 3), stubPorts(), 99);
   TEST_ASSERT_EQUAL_size_t(0, s.rows.size());
   TEST_ASSERT_EQUAL_INT(-1, s.nowRowIndex);
   TEST_ASSERT_FALSE(s.cpa.found);
@@ -242,9 +242,9 @@ static void test_caches_stay_bounded_over_200_polls(void) {
   // ten times the RAM cache.
   for (int poll = 0; poll < 200; ++poll) {
     const std::vector<Aircraft> now = rotatingSky(poll * 5, 30);
-    const DataSnapshot a = buildDataSnapshot(now, cacheOnly(full), ports, 0);
+    const AirspaceSnapshot a = buildAirspaceSnapshot(now, cacheOnly(full), ports, 0);
     TEST_ASSERT_EQUAL_UINT32(0, a.fetches);
-    const DataSnapshot b = buildDataSnapshot(now, full, ports, 0);
+    const AirspaceSnapshot b = buildAirspaceSnapshot(now, full, ports, 0);
     for (const AircraftRow &row : b.rows) {
       TEST_ASSERT_FALSE(row.info_pending);
       TEST_ASSERT_FALSE(row.route_pending);
@@ -258,7 +258,7 @@ static void test_caches_stay_bounded_over_200_polls(void) {
 
   // The first 30 come back long after falling out of RAM: from "NVS", free.
   TEST_ASSERT_FALSE(aircraftLookupIsCached("a00000"));
-  const DataSnapshot back = buildDataSnapshot(rotatingSky(0, 30), full, ports, 0);
+  const AirspaceSnapshot back = buildAirspaceSnapshot(rotatingSky(0, 30), full, ports, 0);
   TEST_ASSERT_EQUAL_UINT32(0, back.fetches);
   TEST_ASSERT_FALSE(back.rows.front().info_pending);
 
@@ -314,7 +314,7 @@ static bool isCachedCall(const std::string &call) {
   return false;
 }
 
-static const AircraftRow &rowOf(const DataSnapshot &s, const char *icao24) {
+static const AircraftRow &rowOf(const AirspaceSnapshot &s, const char *icao24) {
   for (const AircraftRow &r : s.rows) {
     if (r.aircraft.icao24 == icao24) return r;
   }
@@ -326,7 +326,7 @@ static const AircraftRow &rowOf(const DataSnapshot &s, const char *icao24) {
 static void test_between_fetches_called_once_per_fetch(void) {
   LookupPorts ports = hookPorts();
   ports.betweenFetches = recordingHook();
-  const DataSnapshot s = buildDataSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
+  const AirspaceSnapshot s = buildAirspaceSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
 
   TEST_ASSERT_EQUAL_UINT32(7, s.fetches);
   TEST_ASSERT_EQUAL_INT(7, hookCalls);
@@ -349,8 +349,9 @@ static void test_between_fetches_not_called_for_cache_hits(void) {
   LookupPorts ports = hookPorts();
   ports.betweenFetches = recordingHook();
 
-  const DataSnapshot a = buildDataSnapshot(twoNewAircraft(), cacheOnly(params(4, 3)), ports, 0);
-  const DataSnapshot b = buildDataSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
+  const AirspaceSnapshot a =
+      buildAirspaceSnapshot(twoNewAircraft(), cacheOnly(params(4, 3)), ports, 0);
+  const AirspaceSnapshot b = buildAirspaceSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
   TEST_ASSERT_EQUAL_UINT32(0, a.fetches);
   TEST_ASSERT_EQUAL_UINT32(0, b.fetches);
   TEST_ASSERT_EQUAL_INT(0, hookCalls);
@@ -360,7 +361,7 @@ static void test_between_fetches_not_called_for_cache_hits(void) {
 // Bez haka faza B działa jak dotąd
 static void test_between_fetches_optional(void) {
   const LookupPorts ports = hookPorts();  // no betweenFetches
-  const DataSnapshot s = buildDataSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
+  const AirspaceSnapshot s = buildAirspaceSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
   TEST_ASSERT_EQUAL_UINT32(7, s.fetches);
   const std::vector<std::string> expected = {"ac:aaa001", "ac:bbb002", "rt:AAA1", "rt:BBB2",
                                              "ap:EPWA",   "ap:LIRF",   "ap:EGLL"};
@@ -384,12 +385,12 @@ static void test_between_fetches_stop_ends_phase_b_with_partial_snapshot(void) {
   knownRoutes.insert("CCC3");
   knownAirports.insert("EPWA");
 
-  const DataSnapshot ref = buildDataSnapshot(sky3, cacheOnly(params(4, 3)), hookPorts(), 0);
+  const AirspaceSnapshot ref = buildAirspaceSnapshot(sky3, cacheOnly(params(4, 3)), hookPorts(), 0);
   calls.clear();
 
   LookupPorts ports = hookPorts();
   ports.betweenFetches = recordingHook(/*stopAt=*/2);  // "an OTA update started"
-  const DataSnapshot s = buildDataSnapshot(sky3, params(4, 3), ports, 0);
+  const AirspaceSnapshot s = buildAirspaceSnapshot(sky3, params(4, 3), ports, 0);
 
   // No hexdb.io request after the hook said stop (cached keys may still resolve).
   size_t lastHook = 0;
@@ -480,7 +481,7 @@ static void test_between_fetches_stops_when_update_started(void) {
 static void test_between_fetches_stop_on_first_fetch(void) {
   LookupPorts ports = hookPorts();
   ports.betweenFetches = recordingHook(/*stopAt=*/1);
-  const DataSnapshot s = buildDataSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
+  const AirspaceSnapshot s = buildAirspaceSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
   TEST_ASSERT_EQUAL_UINT32(1, s.fetches);
   TEST_ASSERT_EQUAL_size_t(2, calls.size());
   ASSERT_STR_EQ("hook", calls[1]);
@@ -491,7 +492,7 @@ static void test_between_fetches_stop_on_first_fetch(void) {
 static void test_between_fetches_stop_in_airport_stage_keeps_fetched_info(void) {
   LookupPorts ports = hookPorts();
   ports.betweenFetches = recordingHook(/*stopAt=*/5);  // after the first airport
-  const DataSnapshot s = buildDataSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
+  const AirspaceSnapshot s = buildAirspaceSnapshot(twoNewAircraft(), params(4, 3), ports, 0);
   TEST_ASSERT_EQUAL_UINT32(5, s.fetches);
   TEST_ASSERT_EQUAL_INT(5, hookCalls);
   for (const char *hex : {"aaa001", "bbb002"}) {
@@ -508,7 +509,8 @@ static void test_between_fetches_stop_in_airport_stage_keeps_fetched_info(void) 
 static void test_between_fetches_not_called_in_phase_a(void) {
   LookupPorts ports = hookPorts();
   ports.betweenFetches = recordingHook();
-  const DataSnapshot s = buildDataSnapshot(twoNewAircraft(), cacheOnly(params(4, 3)), ports, 0);
+  const AirspaceSnapshot s =
+      buildAirspaceSnapshot(twoNewAircraft(), cacheOnly(params(4, 3)), ports, 0);
   TEST_ASSERT_EQUAL_UINT32(0, s.fetches);
   TEST_ASSERT_EQUAL_INT(0, hookCalls);
 }

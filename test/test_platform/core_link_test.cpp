@@ -132,7 +132,7 @@ static NetState baseState() {
   auto cfg = std::make_shared<Config>();
   cfg->home.configured = true;
   s.cfg = cfg;
-  auto d = std::make_shared<DataSnapshot>();
+  auto d = std::make_shared<AirspaceSnapshot>();
   d->rows.resize(2);
   s.data = d;
   return s;
@@ -159,7 +159,7 @@ static void test_diff_identical_is_nothing(void) {
 static void test_diff_new_data_is_new_poll(void) {
   const NetState a = baseState();
   NetState b = a;
-  b.data = std::make_shared<DataSnapshot>(*a.data);  // same content, new poll
+  b.data = std::make_shared<AirspaceSnapshot>(*a.data);  // same content, new poll
   const RedrawEvents e = diffNetState(&a, b);
   TEST_ASSERT_TRUE(e.newPoll);
   TEST_ASSERT_FALSE(e.healthChanged);
@@ -184,7 +184,7 @@ static void test_diff_health_on_empty_screen_repaints_content(void) {
   TEST_ASSERT_TRUE(e.newPoll);
 
   NetState c = baseState();
-  c.data = std::make_shared<DataSnapshot>();  // polled, nothing in range
+  c.data = std::make_shared<AirspaceSnapshot>();  // polled, nothing in range
   NetState d = c;
   d.health = FeedHealth::NetworkError;
   TEST_ASSERT_TRUE(diffNetState(&c, d).newPoll);
@@ -268,7 +268,7 @@ static void test_differs(void) {
   b.health = FeedHealth::AuthError;
   TEST_ASSERT_TRUE(netStateDiffers(a, b));
   b = a;
-  b.data = std::make_shared<DataSnapshot>();
+  b.data = std::make_shared<AirspaceSnapshot>();
   TEST_ASSERT_TRUE(netStateDiffers(a, b));
   b = a;
   b.update.latestTag = "v9.9.9";

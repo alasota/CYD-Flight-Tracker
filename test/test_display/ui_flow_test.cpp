@@ -324,7 +324,7 @@ static void test_shown_health_network_error_after_silence_marks_empty_screen(voi
 
 // A snapshot after a poll: three rows, the second one NOW, its CPA 40 s ahead at `polledAt`.
 static NetState polledState(uint32_t polledAt) {
-  auto data = std::make_shared<DataSnapshot>();
+  auto data = std::make_shared<AirspaceSnapshot>();
   data->rows = {makeRow("LOT1", 3.0f), makeRow("LOT2", 5.0f), makeRow("LOT3", 9.0f)};
   data->nowRowIndex = 1;
   data->cpa.found = true;
@@ -386,7 +386,7 @@ static void test_make_ui_view_reads_the_snapshot(void) {
 // -- edge case: a tap's context comes from the view: the pages of its rows, the header with its "!"
 static void test_tap_context_of_view_has_pages_and_header(void) {
   NetState s = polledState(1000);
-  auto data = std::make_shared<DataSnapshot>(*s.data);
+  auto data = std::make_shared<AirspaceSnapshot>(*s.data);
   for (int i = 0; i < tableRowsPerPage(); ++i) data->rows.push_back(makeRow("LOT9", 20.0f + i));
   s.data = data;
   s.alerts.set(AlertId::OpenSkyLoginFailed);

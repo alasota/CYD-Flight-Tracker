@@ -260,7 +260,7 @@ void pollOpenSky() {
                 cfg->home.configured ? 1 : 0, static_cast<unsigned>(ESP.getFreeHeap()));
 
   // Only a clean poll updates the aircraft list — a failure keeps the last
-  // good data on screen (same DataSnapshot pointer) rather than blanking it.
+  // good data on screen (same AirspaceSnapshot pointer) rather than blanking it.
   if (poll.status != OpenSkyPollStatus::Ok || !cfg->home.configured) {
     publishIfChanged();
     return;
@@ -278,19 +278,19 @@ void pollOpenSky() {
   const LookupPorts ports = productionPorts();
 
   // Phase A: positions now, from what is cached — no network.
-  state.data = std::make_shared<const DataSnapshot>(
-      buildDataSnapshot(poll.aircraft, cacheOnly(p), ports, polledAt));
+  state.data = std::make_shared<const AirspaceSnapshot>(
+      buildAirspaceSnapshot(poll.aircraft, cacheOnly(p), ports, polledAt));
   publishIfChanged();
 
   // Phase B: the new hexdb.io lookups; published only if it fetched anything
   // (also when a firmware update stopped it halfway — the board restarts anyway).
   const uint32_t t0 = millis();
-  DataSnapshot b = buildDataSnapshot(poll.aircraft, p, ports, polledAt);
+  AirspaceSnapshot b = buildAirspaceSnapshot(poll.aircraft, p, ports, polledAt);
   hexdbSessionEnd();
   if (b.fetches > 0) {
     Serial.printf("[main] phase B: %u hexdb.io lookups in %u ms\n",
                   static_cast<unsigned>(b.fetches), static_cast<unsigned>(millis() - t0));
-    state.data = std::make_shared<const DataSnapshot>(std::move(b));
+    state.data = std::make_shared<const AirspaceSnapshot>(std::move(b));
     publishIfChanged();
   }
   memoAircraft.clear();

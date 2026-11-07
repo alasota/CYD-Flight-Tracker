@@ -6,7 +6,7 @@
 // nothing but:
 //   1. NetState (net -> UI): an immutable snapshot behind a shared_ptr in a
 //      "latest wins" LatestBox — publishing swaps one pointer, aircraft rows
-//      are never copied (a new NetState shares the previous DataSnapshot).
+//      are never copied (a new NetState shares the previous AirspaceSnapshot).
 //   2. NetCommand (UI -> net): small POD commands in a FreeRTOS queue
 //      (install / skip a version, refresh).
 //   3. A few 32-bit atomics and Guarded<T> copies of small POD structs
@@ -129,7 +129,7 @@ class Guarded {
 // ---- Net -> UI snapshot -----------------------------------------------------
 
 // One poll's processed data (poll_pipeline). Immutable once published.
-struct DataSnapshot {
+struct AirspaceSnapshot {
   std::vector<AircraftRow> rows;  // sorted, enriched, phases classified
   int nowRowIndex = -1;           // pickNowAircraft(), -1 = none
   CpaPrediction cpa;              // for nowRowIndex, as of polledAtMs
@@ -158,7 +158,7 @@ struct UpdateSummary {
 };
 
 struct NetState {
-  std::shared_ptr<const DataSnapshot> data;  // nullptr until the first good poll
+  std::shared_ptr<const AirspaceSnapshot> data;  // nullptr until the first good poll
   std::shared_ptr<const Config> cfg;         // always set
   uint32_t cfgSeq = 0;                       // bumped when the config is reloaded
   FeedHealth health = FeedHealth::Ok;
@@ -178,7 +178,7 @@ struct NetState {
 bool netStateDiffers(const NetState &a, const NetState &b);
 
 // What changed between two snapshots, as redraw events. `prev` == nullptr =
-// the first snapshot. Rows are compared by pointer (a new DataSnapshot = a
+// the first snapshot. Rows are compared by pointer (a new AirspaceSnapshot = a
 // new poll); health, language, home location and radius by value; alerts
 // by the header badge they show (displaySeverity()).
 RedrawEvents diffNetState(const NetState *prev, const NetState &next);

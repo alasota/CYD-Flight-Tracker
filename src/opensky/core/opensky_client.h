@@ -115,7 +115,7 @@ std::string urlEncode(const std::string &value);
 
 // Outcome of one poll attempt. The distinction between "polled OK, nothing
 // in range" and "poll failed" matters: net_task keeps the last good
-// DataSnapshot on a failure instead of blanking the screen, and surfaces
+// AirspaceSnapshot on a failure instead of blanking the screen, and surfaces
 // a header tag — see docs/review-notes-2026.md 1.2/1.3/1.4.
 enum class OpenSkyPollStatus {
   NotDue,        // interval hasn't elapsed — `aircraft` is empty, ignore it
