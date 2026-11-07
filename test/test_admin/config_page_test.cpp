@@ -30,8 +30,8 @@ std::string render(const ConfigPageModel &m) {
 ConfigPageModel baseModel() {
   ConfigPageModel m;
   m.cfg = defaultConfig();
-  m.cfg.home_lat = 52.2297f;
-  m.cfg.home_lon = 21.0122f;
+  m.cfg.home.lat = 52.2297f;
+  m.cfg.home.lon = 21.0122f;
   return m;
 }
 
@@ -105,7 +105,7 @@ static void test_light_state_text(void) {
 static void test_display_card(void) {
   ConfigPageModel m = baseModel();
   m.cfg.web_language = Language::EN;
-  m.cfg.home_configured = true;
+  m.cfg.home.configured = true;
   std::string h = render(m);
   // Defaults: automatic brightness, sunset to sunrise, no pause.
   ASSERT_CONTAINS(h, "<option value=\"auto\" selected>automatic (light sensor)");
@@ -145,7 +145,7 @@ static void test_display_card(void) {
   ASSERT_CONTAINS(h, "data-night=\"480\">≈ <b>3840</b>");
 
   m.cfg.night_mode = NightMode::Off;
-  m.cfg.home_configured = false;
+  m.cfg.home.configured = false;
   h = render(m);
   ASSERT_CONTAINS(h, "<div id=\"ntopt\" hidden>");
   ASSERT_CONTAINS(h, "Set the location to work out sunrise and sunset.");
@@ -587,7 +587,7 @@ static ConfigPageModel displayDemoModel(SettingsTab tab) {
   m.tab = tab;
   m.cfg.web_language = Language::PL;
   m.cfg.web_password = "demo-password";
-  m.cfg.home_configured = true;
+  m.cfg.home.configured = true;
   m.cfg.opensky_client_id = "demo-client";
   m.cfg.opensky_client_secret = "demo-secret";
   m.cfg.night_pause_polling = true;

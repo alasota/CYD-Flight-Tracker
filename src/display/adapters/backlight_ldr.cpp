@@ -40,7 +40,7 @@ int sunDayKey = -1;
 float sunLat = 0.0f, sunLon = 0.0f;
 
 void refreshSun(const Config &cfg) {
-  if (!isTimeSynced() || !cfg.home_configured) {
+  if (!isTimeSynced() || !cfg.home.configured) {
     sunKnown = false;
     return;
   }
@@ -49,15 +49,15 @@ void refreshSun(const Config &cfg) {
   std::tm t;
   gmtime_r(&local, &t);  // local wall-clock fields (timeSyncNowLocal() is pre-shifted)
   const int dayKey = (t.tm_year + 1900) * 400 + t.tm_yday;
-  if (sunKnown && dayKey == sunDayKey && cfg.home_lat == sunLat && cfg.home_lon == sunLon) return;
+  if (sunKnown && dayKey == sunDayKey && cfg.home.lat == sunLat && cfg.home.lon == sunLon) return;
   const int offsetMin = static_cast<int>((local - utc) / 60);
   sunLocal = shiftSunTimes(
-      computeSunTimes(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, cfg.home_lat, cfg.home_lon),
+      computeSunTimes(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, cfg.home.lat, cfg.home.lon),
       offsetMin);
   sunKnown = true;
   sunDayKey = dayKey;
-  sunLat = cfg.home_lat;
-  sunLon = cfg.home_lon;
+  sunLat = cfg.home.lat;
+  sunLon = cfg.home.lon;
   if (sunLocal.kind == SunTimes::Kind::Normal) {
     Serial.printf("[light] sun today: sunrise %s, sunset %s\n",
                   formatClockMinutes(sunLocal.sunrise_min).c_str(),

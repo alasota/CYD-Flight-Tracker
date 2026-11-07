@@ -17,18 +17,19 @@ Config loadConfig() {
   prefs.begin(kNamespace, /*readOnly=*/true);
 
   Config cfg = defaultConfig();
-  cfg.home_lat = prefs.getFloat("home_lat", cfg.home_lat);
-  cfg.home_lon = prefs.getFloat("home_lon", cfg.home_lon);
-  cfg.radius_deg = prefs.getFloat("radius_deg", cfg.radius_deg);
+  cfg.home.lat = prefs.getFloat("home_lat", cfg.home.lat);
+  cfg.home.lon = prefs.getFloat("home_lon", cfg.home.lon);
+  cfg.home.radius_deg = prefs.getFloat("radius_deg", cfg.home.radius_deg);
   cfg.poll_interval_s = prefs.getUInt("poll_s", cfg.poll_interval_s);
   cfg.opensky_client_id = prefs.getString("os_id", "").c_str();
   cfg.opensky_client_secret = prefs.getString("os_secret", "").c_str();
   cfg.last_screen = clampLastScreen(prefs.getInt("last_screen", cfg.last_screen));
   cfg.auto_cycle_enabled = prefs.getBool("auto_cyc", cfg.auto_cycle_enabled);
   cfg.auto_cycle_interval_s = prefs.getUInt("auto_cyc_s", cfg.auto_cycle_interval_s);
-  cfg.near_airport_km = prefs.getFloat("near_km", cfg.near_airport_km);
-  cfg.climb_rate_threshold_mps = prefs.getFloat("climb_mps", cfg.climb_rate_threshold_mps);
-  cfg.home_configured = prefs.getBool("home_cfg", cfg.home_configured);
+  cfg.phase.near_airport_km = prefs.getFloat("near_km", cfg.phase.near_airport_km);
+  cfg.phase.climb_rate_threshold_mps =
+      prefs.getFloat("climb_mps", cfg.phase.climb_rate_threshold_mps);
+  cfg.home.configured = prefs.getBool("home_cfg", cfg.home.configured);
   cfg.language = clampLanguage(prefs.getUChar("lang", static_cast<uint8_t>(cfg.language)));
   cfg.web_language =
       clampLanguage(prefs.getUChar("wlang", static_cast<uint8_t>(cfg.web_language)));
@@ -58,18 +59,18 @@ void saveConfig(const Config &cfg) {
   Preferences prefs;
   prefs.begin(kNamespace, /*readOnly=*/false);
 
-  prefs.putFloat("home_lat", sanitized.home_lat);
-  prefs.putFloat("home_lon", sanitized.home_lon);
-  prefs.putFloat("radius_deg", sanitized.radius_deg);
+  prefs.putFloat("home_lat", sanitized.home.lat);
+  prefs.putFloat("home_lon", sanitized.home.lon);
+  prefs.putFloat("radius_deg", sanitized.home.radius_deg);
   prefs.putUInt("poll_s", sanitized.poll_interval_s);
   prefs.putString("os_id", sanitized.opensky_client_id.c_str());
   prefs.putString("os_secret", sanitized.opensky_client_secret.c_str());
   prefs.putInt("last_screen", sanitized.last_screen);
   prefs.putBool("auto_cyc", sanitized.auto_cycle_enabled);
   prefs.putUInt("auto_cyc_s", sanitized.auto_cycle_interval_s);
-  prefs.putFloat("near_km", sanitized.near_airport_km);
-  prefs.putFloat("climb_mps", sanitized.climb_rate_threshold_mps);
-  prefs.putBool("home_cfg", sanitized.home_configured);
+  prefs.putFloat("near_km", sanitized.phase.near_airport_km);
+  prefs.putFloat("climb_mps", sanitized.phase.climb_rate_threshold_mps);
+  prefs.putBool("home_cfg", sanitized.home.configured);
   prefs.putUChar("lang", static_cast<uint8_t>(sanitized.language));
   prefs.putUChar("wlang", static_cast<uint8_t>(sanitized.web_language));
   prefs.putString("wpass", sanitized.web_password.c_str());

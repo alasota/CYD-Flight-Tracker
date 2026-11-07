@@ -626,7 +626,7 @@ void displayCard(Writer &w, const ConfigPageModel &m, Language lang) {
   w.raw("</b> % \xC2\xB7 <span id=\"ls\">");
   w.esc(lightStateText(l, lang));
   w.raw("</span><br>");
-  if (!c.home_configured) {
+  if (!c.home.configured) {
     w.t(WebStr::SunNeedsLocation);
   } else if (!l.sun_known) {
     w.t(WebStr::SunNeedsClock);
@@ -767,19 +767,19 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.t(WebStr::LocationIntro);
   w.raw("</p><div class=\"row\">");
   w.field("lat", WebStr::Latitude, "name=\"lat\" inputmode=\"decimal\" autocomplete=\"off\"",
-          fmt("%.5f", c.home_lat));
+          fmt("%.5f", c.home.lat));
   w.field("lon", WebStr::Longitude, "name=\"lon\" inputmode=\"decimal\" autocomplete=\"off\"",
-          fmt("%.5f", c.home_lon));
+          fmt("%.5f", c.home.lon));
   w.raw("</div><div class=\"hint\" style=\"margin-bottom:18px\">");
   w.t(WebStr::LatLonHint);
   w.raw("</div>");
   const WebStr radiusHint = WebStr::RadiusHint;
   w.field("radius", WebStr::Radius, "name=\"radius\" inputmode=\"decimal\" autocomplete=\"off\"",
-          fmt("%.2f", c.radius_deg), &radiusHint);
+          fmt("%.2f", c.home.radius_deg), &radiusHint);
   w.raw("<div class=\"stat\">");
   w.t(WebStr::CreditsPerRequest);
   w.raw(": <b id=\"cost\">");
-  w.uint(static_cast<uint32_t>(openSkyCreditCost(c.radius_deg)));
+  w.uint(static_cast<uint32_t>(openSkyCreditCost(c.home.radius_deg)));
   w.raw("</b></div></div></section>");
 
   // ---- OpenSky client
@@ -854,7 +854,7 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.field("poll", WebStr::PollInterval, "type=\"number\" name=\"poll_interval\" min=\"5\"",
           fmtU(c.poll_interval_s));
   const uint32_t daily =
-      openSkyDailyCredits(c.radius_deg, c.poll_interval_s, pausedMinutesPerDay(c, m.light));
+      openSkyDailyCredits(c.home.radius_deg, c.poll_interval_s, pausedMinutesPerDay(c, m.light));
   const uint32_t limit = openSkyDailyLimit(auth);
   w.raw(loginFailed ? "<div class=\"stat\" id=\"daily\" data-lf=\"1\" data-night=\""
                     : "<div class=\"stat\" id=\"daily\" data-night=\"");
@@ -911,9 +911,9 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   const WebStr nearHint = WebStr::NearAirportHint;
   const WebStr climbHint = WebStr::ClimbRateHint;
   w.field("near", WebStr::NearAirport, "name=\"near_airport_km\" inputmode=\"decimal\"",
-          fmt("%.1f", c.near_airport_km), &nearHint);
+          fmt("%.1f", c.phase.near_airport_km), &nearHint);
   w.field("climb", WebStr::ClimbRate, "name=\"climb_rate_mps\" inputmode=\"decimal\"",
-          fmt("%.1f", c.climb_rate_threshold_mps), &climbHint);
+          fmt("%.1f", c.phase.climb_rate_threshold_mps), &climbHint);
   w.raw("</div>");
 
   // Panel password: the fields are never pre-filled; both empty = no change.

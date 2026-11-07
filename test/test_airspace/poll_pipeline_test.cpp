@@ -38,8 +38,8 @@ static std::vector<Aircraft> sky() {
 
 static PipelineParams params(int budget, int airportBudget) {
   PipelineParams p;
-  p.homeLat = kHomeLat;
-  p.homeLon = kHomeLon;
+  p.home.lat = kHomeLat;
+  p.home.lon = kHomeLon;
   p.lookupBudget = budget;
   p.airportBudget = airportBudget;
   return p;

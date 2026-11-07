@@ -12,7 +12,7 @@ namespace {
 
 Config sample() {
   Config c = makeConfig();  // Warsaw, home_configured
-  c.radius_deg = 1.5f;
+  c.home.radius_deg = 1.5f;
   c.poll_interval_s = 30;
   c.opensky_client_id = "my-client";
   c.opensky_client_secret = "s3cr\"et";  // a quote: must survive JSON escaping
@@ -20,8 +20,8 @@ Config sample() {
   c.web_language = Language::PL;
   c.auto_cycle_enabled = true;
   c.auto_cycle_interval_s = 20;
-  c.near_airport_km = 12.5f;
-  c.climb_rate_threshold_mps = 2.0f;
+  c.phase.near_airport_km = 12.5f;
+  c.phase.climb_rate_threshold_mps = 2.0f;
   c.update_check_enabled = false;
   c.update_show_prerelease = true;
   c.update_skipped_tag = "v1.4.0";  // device state: never in a backup
@@ -37,9 +37,9 @@ static void test_round_trip_restores_every_setting(void) {
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(r.invalidFields.size()));
   TEST_ASSERT_EQUAL_INT(24, r.appliedFields);  // 14 + the display group (10)
   const Config &c = r.config;
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, original.home_lat, c.home_lat);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, original.home_lon, c.home_lon);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.5f, c.radius_deg);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, original.home.lat, c.home.lat);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, original.home.lon, c.home.lon);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.5f, c.home.radius_deg);
   TEST_ASSERT_EQUAL_UINT32(30u, c.poll_interval_s);
   TEST_ASSERT_EQUAL_STRING("my-client", c.opensky_client_id.c_str());
   TEST_ASSERT_EQUAL_STRING("s3cr\"et", c.opensky_client_secret.c_str());
@@ -47,9 +47,9 @@ static void test_round_trip_restores_every_setting(void) {
   ASSERT_ENUM_EQ(Language::PL, c.web_language);
   TEST_ASSERT_TRUE(c.auto_cycle_enabled);
   TEST_ASSERT_EQUAL_UINT32(20u, c.auto_cycle_interval_s);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 12.5f, c.near_airport_km);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.0f, c.climb_rate_threshold_mps);
-  TEST_ASSERT_TRUE(c.home_configured);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 12.5f, c.phase.near_airport_km);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.0f, c.phase.climb_rate_threshold_mps);
+  TEST_ASSERT_TRUE(c.home.configured);
   TEST_ASSERT_FALSE(c.update_check_enabled);
   TEST_ASSERT_TRUE(c.update_show_prerelease);
   TEST_ASSERT_TRUE(c.update_skipped_tag.empty());
@@ -114,7 +114,7 @@ static void test_missing_keys_keep_current_values(void) {
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_EQUAL_INT(1, r.appliedFields);
   TEST_ASSERT_FALSE(r.config.auto_cycle_enabled);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, current.home_lat, r.config.home_lat);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, current.home.lat, r.config.home.lat);
   TEST_ASSERT_EQUAL_STRING("my-client", r.config.opensky_client_id.c_str());
 }
 
@@ -128,8 +128,8 @@ static void test_wrong_types_are_skipped_and_reported(void) {
       current);
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
   TEST_ASSERT_EQUAL_INT(1, r.appliedFields);  // only location.lon
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 20.5f, r.config.home_lon);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, current.home_lat, r.config.home_lat);  // kept
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 20.5f, r.config.home.lon);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, current.home.lat, r.config.home.lat);  // kept
   TEST_ASSERT_EQUAL_UINT32(30u, r.config.poll_interval_s);                // kept
   ASSERT_ENUM_EQ(Language::EN, r.config.language);                    // kept
   TEST_ASSERT_EQUAL_INT(4, static_cast<int>(r.invalidFields.size()));
@@ -141,14 +141,14 @@ static void test_wrong_types_are_skipped_and_reported(void) {
 
 static void test_restoring_location_marks_home_configured(void) {
   Config fresh = defaultConfig();
-  TEST_ASSERT_FALSE(fresh.home_configured);
+  TEST_ASSERT_FALSE(fresh.home.configured);
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"location\":{\"lat\":50.0,\"lon\":19.9}}", fresh);
-  TEST_ASSERT_TRUE(r.config.home_configured);
+  TEST_ASSERT_TRUE(r.config.home.configured);
 
   r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"general\":{\"auto_cycle\":true}}", fresh);
-  TEST_ASSERT_FALSE(r.config.home_configured);
+  TEST_ASSERT_FALSE(r.config.home.configured);
 }
 
 static void test_rejects_files_that_are_not_backups(void) {
@@ -274,7 +274,7 @@ static void test_display_group_bad_values_and_old_backups(void) {
 // does: the skipped release (device state) and the last screen.
 Config everyFieldChanged() {
   Config c = makeConfig();  // Warsaw, home_configured
-  c.radius_deg = 1.5f;
+  c.home.radius_deg = 1.5f;
   c.poll_interval_s = 30;
   c.opensky_client_id = "my-client";
   c.opensky_client_secret = "s3cr\"et";
@@ -282,8 +282,8 @@ Config everyFieldChanged() {
   c.web_language = Language::EN;
   c.auto_cycle_enabled = true;
   c.auto_cycle_interval_s = 20;
-  c.near_airport_km = 12.5f;
-  c.climb_rate_threshold_mps = 2.25f;
+  c.phase.near_airport_km = 12.5f;
+  c.phase.climb_rate_threshold_mps = 2.25f;
   c.update_check_enabled = false;
   c.update_show_prerelease = true;
   c.brightness_auto = false;
@@ -413,10 +413,10 @@ static void test_restore_of_a_stage_5_backup_fills_every_setting(void) {
   TEST_ASSERT_EQUAL_INT(25, r.appliedFields);
   const Config &c = r.config;
   // location
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 52.2297f, c.home_lat);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 21.0122f, c.home_lon);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.5f, c.radius_deg);
-  TEST_ASSERT_TRUE(c.home_configured);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 52.2297f, c.home.lat);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 21.0122f, c.home.lon);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.5f, c.home.radius_deg);
+  TEST_ASSERT_TRUE(c.home.configured);
   // opensky
   ASSERT_STR_EQ("my-client", c.opensky_client_id);
   ASSERT_STR_EQ("s3cr\"et", c.opensky_client_secret);
@@ -426,8 +426,8 @@ static void test_restore_of_a_stage_5_backup_fills_every_setting(void) {
   ASSERT_ENUM_EQ(Language::EN, c.web_language);
   TEST_ASSERT_TRUE(c.auto_cycle_enabled);
   TEST_ASSERT_EQUAL_UINT32(20u, c.auto_cycle_interval_s);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 12.5f, c.near_airport_km);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.25f, c.climb_rate_threshold_mps);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 12.5f, c.phase.near_airport_km);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.25f, c.phase.climb_rate_threshold_mps);
   TEST_ASSERT_FALSE(c.update_check_enabled);
   TEST_ASSERT_TRUE(c.update_show_prerelease);
   // display

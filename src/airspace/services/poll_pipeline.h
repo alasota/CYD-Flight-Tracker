@@ -26,6 +26,8 @@
 #include "enrichment/core/aircraft_lookup.h"
 #include "platform/core_link.h"  // DataSnapshot
 #include "airspace/core/aircraft_state.h"  // Aircraft
+#include "airspace/core/flight_phase.h"    // PhaseThresholds
+#include "airspace/core/home.h"            // Home
 #include "enrichment/core/route_lookup.h"
 
 struct LookupPorts {
@@ -45,10 +47,8 @@ struct LookupPorts {
 };
 
 struct PipelineParams {
-  float homeLat = 0.0f;
-  float homeLon = 0.0f;
-  float nearAirportKm = 15.0f;
-  float climbRateMps = 1.5f;
+  Home home;              // distances, CPA
+  PhaseThresholds phase;  // flight phases
   int lookupBudget = 0;   // new airline/type + route lookups (shared)
   int airportBudget = 0;  // new airport lookups
 };

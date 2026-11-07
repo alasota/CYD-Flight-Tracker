@@ -331,7 +331,7 @@ static NetState polledState(uint32_t polledAt) {
   data->cpa.t_cpa_seconds = 40.0f;
   data->polledAtMs = polledAt;
   Config cfg = makeConfig();
-  cfg.radius_deg = 1.5f;
+  cfg.home.radius_deg = 1.5f;
   NetState s;
   s.data = data;
   s.cfg = std::make_shared<const Config>(cfg);

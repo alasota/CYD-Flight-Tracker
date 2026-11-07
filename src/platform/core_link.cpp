@@ -24,9 +24,11 @@ RedrawEvents diffNetState(const NetState *prev, const NetState &next) {
     const Config &a = *prev->cfg;
     const Config &b = *next.cfg;
     if (a.language != b.language) e.languageChanged = true;
-    if (a.home_configured != b.home_configured) e.firstDraw = true;
+    if (a.home.configured != b.home.configured) e.firstDraw = true;
     // Radar rings are labelled from the radius; distances from home.
-    if (a.radius_deg != b.radius_deg || a.home_lat != b.home_lat || a.home_lon != b.home_lon) {
+    const Home &ha = a.home;
+    const Home &hb = b.home;
+    if (ha.radius_deg != hb.radius_deg || ha.lat != hb.lat || ha.lon != hb.lon) {
       e.newPoll = true;
     }
   }
