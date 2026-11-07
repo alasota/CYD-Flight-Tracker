@@ -8,12 +8,12 @@
 
 namespace {
 
-// ---- computeBoundingBox ----------------------------------------------
+// ---- computeScanArea -------------------------------------------------
 
 static void test_bbox_default_radius_matches_config_portal_1_credit_tier(void) {
   // radius 2.5 deg is config_store's/web_server's default, sitting
   // exactly at the 1-credit tier boundary (bbox area = 25 sq deg there).
-  BoundingBox bbox = computeBoundingBox(51.5f, -0.1f, 2.5f);
+  ScanArea bbox = computeScanArea(51.5f, -0.1f, 2.5f);
 
   TEST_ASSERT_EQUAL_FLOAT(49.0f, bbox.lamin);
   TEST_ASSERT_EQUAL_FLOAT(54.0f, bbox.lamax);
@@ -25,7 +25,7 @@ static void test_bbox_radius_past_1_credit_tier(void) {
   // radius 5.0 deg crosses web_server's 1-credit threshold (bbox area
   // there is 100 sq deg -> its 2-credit tier) — bbox math itself doesn't
   // care about credits, but the box should scale accordingly.
-  BoundingBox bbox = computeBoundingBox(0.0f, 0.0f, 5.0f);
+  ScanArea bbox = computeScanArea(0.0f, 0.0f, 5.0f);
 
   TEST_ASSERT_EQUAL_FLOAT(-5.0f, bbox.lamin);
   TEST_ASSERT_EQUAL_FLOAT(5.0f, bbox.lamax);
@@ -34,14 +34,14 @@ static void test_bbox_radius_past_1_credit_tier(void) {
 }
 
 static void test_bbox_clamps_near_north_pole(void) {
-  BoundingBox bbox = computeBoundingBox(89.0f, 10.0f, 5.0f);
+  ScanArea bbox = computeScanArea(89.0f, 10.0f, 5.0f);
 
   TEST_ASSERT_EQUAL_FLOAT(84.0f, bbox.lamin);
   TEST_ASSERT_EQUAL_FLOAT(90.0f, bbox.lamax);  // clamped, not 94
 }
 
 static void test_bbox_clamps_near_antimeridian(void) {
-  BoundingBox bbox = computeBoundingBox(0.0f, 179.0f, 5.0f);
+  ScanArea bbox = computeScanArea(0.0f, 179.0f, 5.0f);
 
   TEST_ASSERT_EQUAL_FLOAT(174.0f, bbox.lomin);
   TEST_ASSERT_EQUAL_FLOAT(180.0f, bbox.lomax);  // clamped, not 184

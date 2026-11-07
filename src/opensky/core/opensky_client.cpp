@@ -10,8 +10,8 @@ namespace {
 float clampf(float v, float lo, float hi) { return std::min(std::max(v, lo), hi); }
 }  // namespace
 
-BoundingBox computeBoundingBox(float lat, float lon, float radius_deg) {
-  BoundingBox bbox;
+ScanArea computeScanArea(float lat, float lon, float radius_deg) {
+  ScanArea bbox;
   bbox.lamin = clampf(lat - radius_deg, -90.0f, 90.0f);
   bbox.lamax = clampf(lat + radius_deg, -90.0f, 90.0f);
   bbox.lomin = clampf(lon - radius_deg, -180.0f, 180.0f);
