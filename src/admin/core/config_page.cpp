@@ -172,67 +172,6 @@ std::string htmlEscape(const std::string &in) {
 
 namespace {
 
-// Tab switching, the language-toggle links following the current tab, and
-// the live credit readouts (mirroring openSkyCreditCost() /
-// openSkyDailyCredits() / openSkyDailyLimit() above). In LoginFailed (#daily
-// carries data-lf) the limit stays 400 until the credentials are edited.
-const char kScript[] =
-    "function $(i){return document.getElementById(i)}"
-    "function show(t){"
-    "document.querySelectorAll('section[data-tab]').forEach(function(s){s.hidden=s.dataset.tab!=t});"
-    "document.querySelectorAll('.tabs button').forEach(function(b){b.classList.toggle('on',b.dataset.t==t)});"
-    "$('tab').value=t;$('save').hidden=t=='backup'||t=='firmware';"
-    "document.querySelectorAll('.lang input[name=tab]').forEach(function(i){i.value=t})}"
-    "document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){show(b.dataset.t)}});"
-    "function cost(r){var a=4*r*r;return a<=25?1:a<=100?2:a<=400?3:4}"
-    "function calc(){"
-    "var c=cost(parseFloat($('radius').value)||0),p=Math.max(parseInt($('poll').value)||0,1),"
-    "n=parseInt($('daily').dataset.night)||0,"
-    "d=Math.ceil((86400-($('ntp').checked&&$('ntm').value!='off'?n*60:0))/p)*c,"
-    "lf=$('daily').dataset.lf&&$('cid').value==$('cid').defaultValue&&!$('cs').value,"
-    "l=!lf&&$('cid').value&&($('cs').value||$('cs').dataset.saved)?4000:400;"
-    "$('cost').textContent=c;$('ntsv').textContent=Math.ceil(n*60/p);"
-    "$('daily').innerHTML='≈ <b>'+d+'</b> '+T.day+' · '+T.lim+' '+l+"
-    "(d>l?'<div class=warn>'+T.over+'</div>':'')}"
-    "['radius','poll','cid','cs'].forEach(function(i){$(i).addEventListener('input',calc)});"
-    // Screen card: show only the fields of the chosen modes; the "Now" line
-    // follows the board (GET /light.json) while the General tab is open.
-    "function disp(){var a=$('blm').value=='auto',n=$('ntm').value;"
-    "$('blauto').hidden=!a;$('blfix').hidden=a;$('ntsch').hidden=n!='schedule';$('ntopt').hidden=n=='off'}"
-    "$('blm').onchange=disp;$('ntm').onchange=function(){disp();calc()};$('ntp').onchange=calc;disp();"
-    "setInterval(function(){if($('tab').value!='general')return;"
-    "fetch('/light.json',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){"
-    "$('lr').textContent=j.raw;$('la').textContent=j.avg;$('lp').textContent=j.pct;"
-    "$('ls').textContent=(!j.synced?T.lns:j.screen_off?T.loff:j.woken?T.lwk:j.night?T.lnt:T.lday)+"
-    "(j.polling?'':' · '+T.lpz)}).catch(function(){})},2000);"
-    "function pw(){var i=$('cs');i.type=i.type=='password'?'text':'password'}"
-    // Firmware upload with a progress bar (a plain form post works too, just
-    // without one). The answer page replaces this one.
-    "$('fw').onsubmit=function(e){var i=$('fwf').files[0];if(!i)return;e.preventDefault();"
-    "if(/-full/i.test(i.name)){$('fws').textContent=T.full;return}"
-    "var x=new XMLHttpRequest(),d=new FormData();d.append('firmware',i);"
-    "x.open('POST','/update?size='+i.size);"
-    "x.upload.onprogress=function(v){if(!v.lengthComputable)return;var p=Math.round(v.loaded*100/v.total);"
-    "$('fwp').hidden=false;$('fwp').value=p;$('fws').textContent=T.up+' '+p+'%'};"
-    "x.onload=function(){document.open();document.write(x.responseText);document.close()};"
-    "x.onerror=function(){window.upl=0;$('fwb').disabled=false;$('fws').textContent=T.fail};"
-    "window.upl=1;$('fwb').disabled=true;$('fws').textContent=T.up+'…';x.send(d)};"
-    "show($('tab').value);calc();";
-
-// After a successful update: wait for the board to come back, then reload.
-const char kRestartScript[] =
-    "setTimeout(function p(){fetch('/',{cache:'no-store'}).then(function(r){"
-    "if(r.ok||r.status==401)location.href='/?tab=firmware';else setTimeout(p,2000)})"
-    ".catch(function(){setTimeout(p,2000)})},5000);";
-
-// While "check now" waits for its turn (after the poll): reload until it ran
-// (or expired, kUpdateManualCheckExpiryMs) — unless the user went to another tab
-// or started a firmware upload meanwhile (window.upl, set by the upload script):
-// leaving the page would abort the upload XHR.
-const char kCheckPendingScript[] =
-    "setTimeout(function(){if($('tab').value=='firmware'&&!window.upl)"
-    "location.href='/?tab=firmware'},3000);";
-
 class Writer {
  public:
   Writer(const HtmlSink &emit, Language lang) : emit_(emit), lang_(lang) {}
@@ -949,8 +888,10 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.raw("\",lpz:\"");
   w.t(WebStr::LightPollingPaused);
   w.raw("\"};");
-  w.raw(kScript);
-  if (m.restarting) w.raw(kRestartScript);
-  else if (m.updateCheckPending) w.raw(kCheckPendingScript);
+  // app.js; after an update, restart.js reloads once the board is back;
+  // while "check now" waits, check_pending.js (kUpdateManualCheckExpiryMs).
+  w.raw(kWebAppJs);
+  if (m.restarting) w.raw(kWebRestartJs);
+  else if (m.updateCheckPending) w.raw(kWebCheckPendingJs);
   w.raw("</script></body></html>");
 }
