@@ -16,7 +16,7 @@
 #include <ctime>
 #include <vector>
 
-#include "airspace/core/feed_health.h"     // OpenSkyHealth
+#include "airspace/core/feed_health.h"     // FeedHealth
 #include "airspace/core/tracked_flight.h"  // AircraftRow
 #include "display/core/i18n.h"             // Language
 #include "display/core/redraw_policy.h"    // RedrawEvents
@@ -44,14 +44,14 @@ struct UiView {
   int nowRowIndex = -1;   // the NOW aircraft in rows, -1 = none
   CpaPrediction cpa;      // netCpaAt()
   float radiusDeg = 0.0f;
-  OpenSkyHealth health = OpenSkyHealth::Ok;  // the one the header shows
+  FeedHealth health = FeedHealth::Ok;  // the one the header shows
   AlertSeverity alertBadge = AlertSeverity::None;
   std::time_t local = 0;  // timeSyncNowLocal()
   bool synced = false;
   bool homeConfigured = false;
 };
 
-UiView makeUiView(const NetState &s, int screen, int page, OpenSkyHealth shownHealth,
+UiView makeUiView(const NetState &s, int screen, int page, FeedHealth shownHealth,
                   uint32_t nowMs, std::time_t local, bool synced);
 
 // ---- Taps ---------------------------------------------------------------------
@@ -182,7 +182,7 @@ AutoCycleInput autoCycleInputAt(const NetState &s, int currentScreen, bool scree
 // ---- The health the header shows ------------------------------------------------
 
 struct ShownHealthStep {
-  OpenSkyHealth shown = OpenSkyHealth::Ok;
+  FeedHealth shown = FeedHealth::Ok;
   bool healthChanged = false;  // the header must be redrawn
   bool newPoll = false;        // the empty content says why it is empty
   bool stalled = false;        // net_task silent for kNetStallLimitMs (log it)
@@ -191,7 +191,7 @@ struct ShownHealthStep {
 // net_task's health, or NetworkError once its heartbeat (`netBeatMs`) is older
 // than kNetStallLimitMs. A change sets healthChanged, and newPoll too when
 // the list is empty.
-ShownHealthStep shownHealthStep(OpenSkyHealth shownNow, OpenSkyHealth netHealth, uint32_t nowMs,
+ShownHealthStep shownHealthStep(FeedHealth shownNow, FeedHealth netHealth, uint32_t nowMs,
                                 uint32_t netBeatMs, bool rowsEmpty);
 
 // ---- Touch edges ----------------------------------------------------------------
@@ -216,7 +216,7 @@ class TouchEdge {
 class UiFlow {
  public:
   RedrawEvents pending;
-  OpenSkyHealth shownHealth = OpenSkyHealth::Ok;
+  FeedHealth shownHealth = FeedHealth::Ok;
   TablePager pager;
   ScreenChangeTracker screenChanges;
   MinuteWatch minuteWatch;

@@ -219,16 +219,16 @@ static void test_status_explains_an_empty_feed(void) {
   // No aircraft because the credits ran out -> say so, not "no flights".
   TEST_ASSERT_EQUAL_STRING(
       "LIMIT OPENSKY WYCZERPANY",
-      computeCountdownDisplay(CpaPrediction{}, Language::PL, false, OpenSkyHealth::RateLimited)
+      computeCountdownDisplay(CpaPrediction{}, Language::PL, false, FeedHealth::RateLimited)
           .statusLabel.c_str());
   TEST_ASSERT_EQUAL_STRING(
       "OPENSKY UNREACHABLE",
-      computeCountdownDisplay(CpaPrediction{}, Language::EN, false, OpenSkyHealth::NetworkError)
+      computeCountdownDisplay(CpaPrediction{}, Language::EN, false, FeedHealth::NetworkError)
           .statusLabel.c_str());
   // Stale aircraft still on screen: the usual "not passing overhead".
   TEST_ASSERT_EQUAL_STRING(
       "NOT PASSING OVERHEAD",
-      computeCountdownDisplay(CpaPrediction{}, Language::EN, true, OpenSkyHealth::RateLimited)
+      computeCountdownDisplay(CpaPrediction{}, Language::EN, true, FeedHealth::RateLimited)
           .statusLabel.c_str());
   // Default health = Ok keeps the old behaviour.
   TEST_ASSERT_EQUAL_STRING("NO FLIGHTS IN RANGE",

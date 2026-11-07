@@ -13,7 +13,7 @@
 // false (no aircraft in range) leaves the identity panel empty and forces
 // the countdown/status into their empty state regardless of `cpa`.
 void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
-                      const CpaPrediction &cpa, int16_t screenWidth, OpenSkyHealth health);
+                      const CpaPrediction &cpa, int16_t screenWidth, FeedHealth health);
 
 // Repaints only the countdown zone + status strip — the 1 Hz
 // tick path (CLAUDE.md "Redraw policy"), leaving the identity panel,
@@ -22,7 +22,7 @@ void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
 // sprite can't be allocated (low heap) it falls back to drawing straight
 // to `gfx`. drawFlightScreen() calls this for its lower two zones.
 void drawFlightCountdown(LGFX &gfx, bool hasNearest, const CpaPrediction &cpa,
-                         int16_t screenWidth, OpenSkyHealth health);
+                         int16_t screenWidth, FeedHealth health);
 
 // Allocates the countdown sprite now (setup(), before WiFi / net_task) so it
 // doesn't later split the largest free heap block. Safe to call again.

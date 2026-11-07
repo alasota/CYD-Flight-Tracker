@@ -62,7 +62,7 @@ void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, int16_t screenWidth) {
   }
 }
 
-void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth, OpenSkyHealth health) {
+void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth, FeedHealth health) {
   gfx.setFont(LCARS_FONT_BODY);
   gfx.setTextDatum(middle_center);
   gfx.setTextColor(THEME_CONTENT_SECONDARY, LCARS_BLACK);

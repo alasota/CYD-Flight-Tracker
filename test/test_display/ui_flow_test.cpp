@@ -301,21 +301,21 @@ static void test_shown_health_network_error_after_silence_marks_empty_screen(voi
   const uint32_t beat = 1000;
   const uint32_t now = beat + kNetStallLimitMs + 1;  // 60 001 ms of silence
 
-  ShownHealthStep empty = shownHealthStep(OpenSkyHealth::Ok, OpenSkyHealth::Ok, now, beat, true);
-  ASSERT_ENUM_EQ(OpenSkyHealth::NetworkError, empty.shown);
+  ShownHealthStep empty = shownHealthStep(FeedHealth::Ok, FeedHealth::Ok, now, beat, true);
+  ASSERT_ENUM_EQ(FeedHealth::NetworkError, empty.shown);
   TEST_ASSERT_TRUE(empty.healthChanged);
   TEST_ASSERT_TRUE(empty.newPoll);
   TEST_ASSERT_TRUE(empty.stalled);
 
-  ShownHealthStep full = shownHealthStep(OpenSkyHealth::Ok, OpenSkyHealth::Ok, now, beat, false);
-  ASSERT_ENUM_EQ(OpenSkyHealth::NetworkError, full.shown);
+  ShownHealthStep full = shownHealthStep(FeedHealth::Ok, FeedHealth::Ok, now, beat, false);
+  ASSERT_ENUM_EQ(FeedHealth::NetworkError, full.shown);
   TEST_ASSERT_TRUE(full.healthChanged);
   TEST_ASSERT_FALSE(full.newPoll);
 
   // Exactly 60 s is not silence yet; the same health again changes nothing.
   ShownHealthStep fresh =
-      shownHealthStep(OpenSkyHealth::Ok, OpenSkyHealth::Ok, beat + kNetStallLimitMs, beat, true);
-  ASSERT_ENUM_EQ(OpenSkyHealth::Ok, fresh.shown);
+      shownHealthStep(FeedHealth::Ok, FeedHealth::Ok, beat + kNetStallLimitMs, beat, true);
+  ASSERT_ENUM_EQ(FeedHealth::Ok, fresh.shown);
   TEST_ASSERT_FALSE(fresh.healthChanged);
   TEST_ASSERT_FALSE(fresh.newPoll);
 }
@@ -357,7 +357,7 @@ static void test_make_ui_view_reads_the_snapshot(void) {
   NetState s = polledState(1000);
   s.alerts.set(AlertId::OpenSkyLoginFailed);
   const UiView v =
-      makeUiView(s, kScreenRadar, 2, OpenSkyHealth::NetworkError, 21000, 1760770000, true);
+      makeUiView(s, kScreenRadar, 2, FeedHealth::NetworkError, 21000, 1760770000, true);
   TEST_ASSERT_EQUAL_INT(kScreenRadar, v.screen);
   TEST_ASSERT_EQUAL_INT(2, v.page);
   TEST_ASSERT_EQUAL_PTR(&s.data->rows, v.rows);
@@ -365,7 +365,7 @@ static void test_make_ui_view_reads_the_snapshot(void) {
   TEST_ASSERT_EQUAL_INT(1, v.nowRowIndex);
   TEST_ASSERT_FLOAT_WITHIN(0.01f, 20.0f, v.cpa.t_cpa_seconds);
   TEST_ASSERT_FLOAT_WITHIN(1e-6f, 1.5f, v.radiusDeg);
-  ASSERT_ENUM_EQ(OpenSkyHealth::NetworkError, v.health);
+  ASSERT_ENUM_EQ(FeedHealth::NetworkError, v.health);
   ASSERT_ENUM_EQ(s.alerts.displaySeverity(), v.alertBadge);
   ASSERT_ENUM_NE(AlertSeverity::None, v.alertBadge);
   TEST_ASSERT_EQUAL_INT64(1760770000, static_cast<int64_t>(v.local));
@@ -374,7 +374,7 @@ static void test_make_ui_view_reads_the_snapshot(void) {
 
   NetState first;  // setup()'s first snapshot: the settings only
   first.cfg = std::make_shared<const Config>(defaultConfig());
-  const UiView w = makeUiView(first, kScreenFlights, 0, OpenSkyHealth::Ok, 100, 0, false);
+  const UiView w = makeUiView(first, kScreenFlights, 0, FeedHealth::Ok, 100, 0, false);
   TEST_ASSERT_FALSE(w.hasData);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(w.rows->size()));
   TEST_ASSERT_EQUAL_INT(-1, w.nowRowIndex);
@@ -390,7 +390,7 @@ static void test_tap_context_of_view_has_pages_and_header(void) {
   for (int i = 0; i < tableRowsPerPage(); ++i) data->rows.push_back(makeRow("LOT9", 20.0f + i));
   s.data = data;
   s.alerts.set(AlertId::OpenSkyLoginFailed);
-  const UiView v = makeUiView(s, kScreenFlights, 1, OpenSkyHealth::Ok, 1000, 0, false);
+  const UiView v = makeUiView(s, kScreenFlights, 1, FeedHealth::Ok, 1000, 0, false);
   const TapContext c = tapContextOf(v, kW, kH, Language::EN);
   TEST_ASSERT_EQUAL_INT(kScreenFlights, c.currentScreen);
   TEST_ASSERT_EQUAL_INT(1, c.page);
@@ -455,14 +455,14 @@ static void test_ui_flow_health_silence_logged_once(void) {
   empty.cfg = std::make_shared<const Config>(makeConfig());
   const uint32_t now = 1000 + kNetStallLimitMs + 1;
   TEST_ASSERT_TRUE(ui.updateHealth(empty, now, 1000));
-  ASSERT_ENUM_EQ(OpenSkyHealth::NetworkError, ui.shownHealth);
+  ASSERT_ENUM_EQ(FeedHealth::NetworkError, ui.shownHealth);
   TEST_ASSERT_TRUE(ui.pending.healthChanged);
   TEST_ASSERT_TRUE(ui.pending.newPoll);
   ui.pending = RedrawEvents{};
   TEST_ASSERT_FALSE(ui.updateHealth(empty, now + 20, 1000));  // still silent: no change
   TEST_ASSERT_FALSE(ui.pending.healthChanged);
   TEST_ASSERT_FALSE(ui.updateHealth(empty, now + 40, now + 30));  // back: Ok, not "silent"
-  ASSERT_ENUM_EQ(OpenSkyHealth::Ok, ui.shownHealth);
+  ASSERT_ENUM_EQ(FeedHealth::Ok, ui.shownHealth);
   TEST_ASSERT_TRUE(ui.pending.healthChanged);
 }
 

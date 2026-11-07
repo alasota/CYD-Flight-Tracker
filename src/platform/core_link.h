@@ -32,7 +32,7 @@
 #include "admin/core/device_alerts.h"  // AlertSet, AlertDetails
 #include "display/core/redraw_policy.h"  // RedrawEvents
 #include "admin/core/firmware/release_check.h"  // UpdateStatus
-#include "airspace/core/feed_health.h"  // OpenSkyHealth
+#include "airspace/core/feed_health.h"  // FeedHealth
 #include "airspace/core/tracked_flight.h"  // AircraftRow
 #include "platform/wifi_manager.h"   // WifiStatus
 
@@ -161,7 +161,7 @@ struct NetState {
   std::shared_ptr<const DataSnapshot> data;  // nullptr until the first good poll
   std::shared_ptr<const Config> cfg;         // always set
   uint32_t cfgSeq = 0;                       // bumped when the config is reloaded
-  OpenSkyHealth health = OpenSkyHealth::Ok;
+  FeedHealth health = FeedHealth::Ok;
   WifiStatus wifi = WifiStatus::Connecting;
   bool restartPending = false;  // a good upload: the board restarts in a moment
   UpdateSummary update;

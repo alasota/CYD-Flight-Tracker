@@ -168,7 +168,7 @@ static void test_diff_new_data_is_new_poll(void) {
 static void test_diff_health_with_rows_is_header_only(void) {
   const NetState a = baseState();
   NetState b = a;
-  b.health = OpenSkyHealth::RateLimited;
+  b.health = FeedHealth::RateLimited;
   const RedrawEvents e = diffNetState(&a, b);
   TEST_ASSERT_TRUE(e.healthChanged);
   TEST_ASSERT_FALSE(e.newPoll);
@@ -178,7 +178,7 @@ static void test_diff_health_on_empty_screen_repaints_content(void) {
   NetState a = baseState();
   a.data = nullptr;  // no data yet: the empty-state text depends on health
   NetState b = a;
-  b.health = OpenSkyHealth::AuthError;
+  b.health = FeedHealth::AuthError;
   const RedrawEvents e = diffNetState(&a, b);
   TEST_ASSERT_TRUE(e.healthChanged);
   TEST_ASSERT_TRUE(e.newPoll);
@@ -186,7 +186,7 @@ static void test_diff_health_on_empty_screen_repaints_content(void) {
   NetState c = baseState();
   c.data = std::make_shared<DataSnapshot>();  // polled, nothing in range
   NetState d = c;
-  d.health = OpenSkyHealth::NetworkError;
+  d.health = FeedHealth::NetworkError;
   TEST_ASSERT_TRUE(diffNetState(&c, d).newPoll);
 }
 
@@ -265,7 +265,7 @@ static void test_differs(void) {
   const NetState a = baseState();
   NetState b = a;
   TEST_ASSERT_FALSE(netStateDiffers(a, b));
-  b.health = OpenSkyHealth::AuthError;
+  b.health = FeedHealth::AuthError;
   TEST_ASSERT_TRUE(netStateDiffers(a, b));
   b = a;
   b.data = std::make_shared<DataSnapshot>();

@@ -29,7 +29,7 @@
 #include "display/core/i18n.h"              // Language, tr()
 #include "display/core/theme/lcars_theme.h"       // palette constants (pure section)
 #include "enrichment/core/route_lookup.h"      // AirportInfo
-#include "display/core/screens/status_bar.h"        // OpenSkyHealth, emptyStateText()
+#include "display/core/screens/status_bar.h"        // FeedHealth, emptyStateText()
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.
@@ -82,4 +82,4 @@ struct CountdownDisplay {
 // colour don't.
 CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang,
                                          bool anyAircraft,
-                                         OpenSkyHealth health = OpenSkyHealth::Ok);
+                                         FeedHealth health = FeedHealth::Ok);

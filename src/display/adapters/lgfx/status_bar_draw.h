@@ -19,6 +19,6 @@
 // below the header, so it's safe to call on its own (CLAUDE.md "Redraw
 // policy": minute rollover, health change, new poll).
 // `badge` != None adds the device-alert "!" right of the app name.
-void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, OpenSkyHealth health,
+void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, FeedHealth health,
                    AlertSeverity badge, std::time_t localEpoch, bool timeSynced,
                    int16_t screenWidth);

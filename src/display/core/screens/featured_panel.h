@@ -18,7 +18,7 @@
 #include "display/core/screens/aircraft_summary.h"  // RouteFormat, the identity/route formatters
 #include "display/core/theme/lcars_theme.h"
 #include "enrichment/core/route_lookup.h"  // AirportInfo
-#include "display/core/screens/status_bar.h"    // OpenSkyHealth, emptyStateText()
+#include "display/core/screens/status_bar.h"    // FeedHealth, emptyStateText()
 
 // ---- Pure logic (no TFT/Arduino dependency) — testable under
 // `pio test -e native`.

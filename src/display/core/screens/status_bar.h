@@ -17,7 +17,7 @@
 #include <cstdint>
 #include <string>
 
-#include "airspace/core/feed_health.h"  // OpenSkyHealth
+#include "airspace/core/feed_health.h"  // FeedHealth
 #include "admin/core/device_alerts.h"  // AlertSeverity
 #include "display/core/i18n.h"           // Language
 
@@ -50,7 +50,7 @@ std::string statusBarBlockLabel(int aircraftCount, bool hasData, Language lang);
 // feed's health: green when Ok, yellow while rate-limited (429), red for
 // auth or network errors (the aircraft shown may be stale). Never the
 // peach of the active nav button. Pure — native-tested.
-uint16_t statusBarHealthColor(OpenSkyHealth health);
+uint16_t statusBarHealthColor(FeedHealth health);
 
 // What a screen with no aircraft to show says — why it's empty. Ok: the sky
 // really is empty ("BRAK LOTÓW W ZASIĘGU" / short "BRAK LOTU"); otherwise the
@@ -58,7 +58,7 @@ uint16_t statusBarHealthColor(OpenSkyHealth health);
 // empty screen must not claim "no flights" when we simply can't ask.
 // `shortForm` for narrow slots (radar summary panel, <= 15 chars).
 // Pure — native-tested.
-Str emptyStateText(OpenSkyHealth health, bool shortForm);
+Str emptyStateText(FeedHealth health, bool shortForm);
 
 // The app name shown at the left of the header.
 constexpr const char *kStatusBarAppName = "SKY TRACKER";

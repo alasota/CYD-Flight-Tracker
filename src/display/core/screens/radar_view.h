@@ -19,7 +19,7 @@
 
 #include "display/core/screens/radar_geometry.h"
 #include "enrichment/core/route_lookup.h"  // AirportInfo
-#include "airspace/core/feed_health.h"     // OpenSkyHealth
+#include "airspace/core/feed_health.h"     // FeedHealth
 #include "airspace/core/tracked_flight.h"  // AircraftRow
 #include "display/core/i18n.h"             // Language
 

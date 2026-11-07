@@ -86,7 +86,7 @@ void drawColumnHeader(LGFX &gfx, int16_t screenWidth, const std::string &pageLab
 }  // namespace
 
 void drawTablePage(LGFX &gfx, const std::vector<AircraftRow> &rows, int16_t screenWidth,
-                   int page, OpenSkyHealth health) {
+                   int page, FeedHealth health) {
   FeaturedSplit split = splitFeaturedAndRest(rows);
 
   if (split.hasFeatured) {

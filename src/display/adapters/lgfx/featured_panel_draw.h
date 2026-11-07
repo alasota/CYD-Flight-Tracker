@@ -17,4 +17,4 @@ void drawFeaturedPanel(LGFX &gfx, const AircraftRow &row, int16_t screenWidth);
 
 // Draws the empty placeholder in the same bounds: "no aircraft in range",
 // or why there is no data (emptyStateText(health)).
-void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth, OpenSkyHealth health);
+void drawFeaturedPanelEmpty(LGFX &gfx, int16_t screenWidth, FeedHealth health);

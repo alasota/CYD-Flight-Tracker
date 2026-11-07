@@ -111,7 +111,7 @@ void drawRadar(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg
   gfx.fillCircle(layout.center_x, layout.center_y, 2, LCARS_YELLOW);
 }
 
-void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, OpenSkyHealth health) {
+void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, FeedHealth health) {
   // No frame and no divider (both dropped by request). Keep any long text
   // from spilling past the panel into the radar.
   gfx.setClipRect(static_cast<int16_t>(kSummaryX + kSummaryInset), kContentTop,
@@ -169,7 +169,7 @@ void drawSummaryPanel(LGFX &gfx, const std::vector<AircraftRow> &rows, OpenSkyHe
 }  // namespace
 
 void drawRadarView(LGFX &gfx, const std::vector<AircraftRow> &rows, float radius_deg,
-                   int16_t screenWidth, OpenSkyHealth health) {
+                   int16_t screenWidth, FeedHealth health) {
   (void)screenWidth;  // fixed 320px layout — parameter kept for signature symmetry
 
   drawRadar(gfx, rows, radius_deg);

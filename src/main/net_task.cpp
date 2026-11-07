@@ -226,16 +226,16 @@ LookupPorts productionPorts() {
   return p;
 }
 
-OpenSkyHealth healthFor(OpenSkyPollStatus s) {
+FeedHealth healthFor(OpenSkyPollStatus s) {
   switch (s) {
     case OpenSkyPollStatus::Ok:
-      return OpenSkyHealth::Ok;
+      return FeedHealth::Ok;
     case OpenSkyPollStatus::RateLimited:
-      return OpenSkyHealth::RateLimited;
+      return FeedHealth::RateLimited;
     case OpenSkyPollStatus::AuthError:
-      return OpenSkyHealth::AuthError;
+      return FeedHealth::AuthError;
     default:
-      return OpenSkyHealth::NetworkError;
+      return FeedHealth::NetworkError;
   }
 }
 

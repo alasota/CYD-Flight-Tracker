@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "airspace/core/feed_health.h"      // OpenSkyHealth
+#include "airspace/core/feed_health.h"      // FeedHealth
 #include "airspace/core/tracked_flight.h"  // AircraftRow
 #include "airspace/core/flight_ordering.h"  // splitFeaturedAndRest() — drawTablePage()
 #include "display/core/screens/featured_panel.h"
