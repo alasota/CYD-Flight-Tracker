@@ -104,7 +104,7 @@ static void test_light_state_text(void) {
 
 static void test_display_card(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = Language::EN;
+  m.cfg.web.language = Language::EN;
   m.cfg.home.configured = true;
   std::string h = render(m);
   // Defaults: automatic brightness, sunset to sunrise, no pause.
@@ -207,14 +207,14 @@ static void test_only_the_active_tab_is_visible(void) {
 
 static void test_web_language_switches_the_page_text(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = Language::EN;
+  m.cfg.web.language = Language::EN;
   m.cfg.display.language = Language::PL;  // the display language doesn't matter here
   std::string h = render(m);
   ASSERT_CONTAINS(h, "<html lang=\"en\">");
   ASSERT_CONTAINS(h, ">Location</button>");
   ASSERT_CONTAINS(h, "<button class=\"on\">EN</button>");
 
-  m.cfg.web_language = Language::PL;
+  m.cfg.web.language = Language::PL;
   h = render(m);
   ASSERT_CONTAINS(h, "<html lang=\"pl\">");
   ASSERT_CONTAINS(h, ">Lokalizacja</button>");
@@ -240,7 +240,7 @@ static std::vector<std::string> langForms(const std::string &h) {
 static void test_language_switch_is_post_forms_without_lang_links(void) {
   for (Language lang : {Language::PL, Language::EN}) {
     ConfigPageModel m = baseModel();
-    m.cfg.web_language = lang;
+    m.cfg.web.language = lang;
     const std::string h = render(m);
     const std::vector<std::string> forms = langForms(h);
     TEST_ASSERT_EQUAL_INT_MESSAGE(2, static_cast<int>(forms.size()), languageCode(lang));
@@ -291,7 +291,7 @@ static void test_lang_forms_have_no_external_action(void) {
 static void test_selects_reflect_both_languages_independently(void) {
   ConfigPageModel m = baseModel();
   m.cfg.display.language = Language::EN;
-  m.cfg.web_language = Language::PL;
+  m.cfg.web.language = Language::PL;
   const std::string h = render(m);
   const size_t display = h.find("name=\"language\"");
   const size_t web = h.find("name=\"web_language\"");
@@ -310,7 +310,7 @@ static void test_user_values_are_escaped(void) {
 
 static void test_message_and_detail(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = Language::EN;
+  m.cfg.web.language = Language::EN;
   m.hasMessage = true;
   m.message = WebStr::SavedWithInvalid;
   m.isError = true;
@@ -325,7 +325,7 @@ static void test_message_and_detail(void) {
 
 static void test_status_and_daily_credit_readout(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = Language::EN;
+  m.cfg.web.language = Language::EN;
   std::string h = render(m);  // anonymous, 15 s polls: 5760 > 400
   ASSERT_CONTAINS(h, "Anonymous mode");
   ASSERT_CONTAINS(h, "<b>5760</b> credits a day");
@@ -350,11 +350,11 @@ static void test_auto_cycle_checkbox_state(void) {
 
 static void test_footer_shows_the_firmware_version(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = Language::PL;
+  m.cfg.web.language = Language::PL;
   std::string h = render(m);
   // Native builds get no injected version -> the fallback.
   ASSERT_CONTAINS(h, "wersja <span id=\"ver\">dev</span>");
-  m.cfg.web_language = Language::EN;
+  m.cfg.web.language = Language::EN;
   ASSERT_CONTAINS(render(m), "version <span id=\"ver\">dev</span>");
 }
 
@@ -405,7 +405,7 @@ static void test_quota_status_text(void) {
 
 static void test_opensky_tab_shows_the_quota(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = Language::EN;
+  m.cfg.web.language = Language::EN;
   m.quota.state = OpenSkyQuota::State::Available;
   m.quota.remaining = 3971;
   std::string h = render(m);
@@ -420,7 +420,7 @@ static void test_opensky_tab_shows_the_quota(void) {
 
 static void test_firmware_tab(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = Language::EN;
+  m.cfg.web.language = Language::EN;
   m.tab = SettingsTab::Firmware;
   const std::string h = render(m);
   ASSERT_CONTAINS(h, "<section data-tab=\"firmware\">");
@@ -437,11 +437,11 @@ static void test_firmware_tab(void) {
 
 static ConfigPageModel updateModel(bool withPre) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = Language::EN;
+  m.cfg.web.language = Language::EN;
   m.tab = SettingsTab::Firmware;
   m.update = updateDemoState(withPre);
   m.installedVersion = m.update.installed;
-  m.cfg.update_show_prerelease = withPre;
+  m.cfg.update.show_prerelease = withPre;
   return m;
 }
 
@@ -483,7 +483,7 @@ static void test_update_card_while_a_check_is_pending(void) {
   ASSERT_CONTAINS(h, "x.onerror=function(){window.upl=0;");
   ASSERT_CONTAINS(h, ">Check now</button>");
 
-  m.cfg.web_language = Language::PL;
+  m.cfg.web.language = Language::PL;
   ASSERT_CONTAINS(render(m), "Sprawdzam na GitHubie\xE2\x80\xA6</span>");
 }
 
@@ -516,7 +516,7 @@ static void test_update_card_development_channel(void) {
   ASSERT_CONTAINS(h, ">Install v1.4.0-rc.1</button>");
   ASSERT_CONTAINS(h, "<form id=\"uip\" method=\"POST\" action=\"/update/install\">" "<input type=\"hidden\" name=\"tag\" value=\"v1.4.0-rc.1\">");
   // Switch off: the pre-release isn't shown even if the state still has it.
-  m.cfg.update_show_prerelease = false;
+  m.cfg.update.show_prerelease = false;
   h = render(m);
   ASSERT_NOT_CONTAINS(h, "id=\"upre\"");
   ASSERT_NOT_CONTAINS(h, ">Install v1.4.0-rc.1</button>");
@@ -547,9 +547,9 @@ static void test_update_card_escapes_what_came_from_the_network(void) {
 
 static void test_update_check_switch_on_general(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = Language::EN;
+  m.cfg.web.language = Language::EN;
   ASSERT_CONTAINS(render(m), "name=\"update_check\" value=\"1\" checked");
-  m.cfg.update_check_enabled = false;
+  m.cfg.update.check_enabled = false;
   const std::string h = render(m);
   ASSERT_CONTAINS(h, "name=\"update_check\" value=\"1\">");
   ASSERT_NOT_CONTAINS(h, "name=\"update_check\" value=\"1\" checked");
@@ -566,8 +566,8 @@ static void test_render_firmware_tab_demo(void) {
   }
   for (bool withPre : {false, true}) {
     ConfigPageModel m = updateModel(withPre);
-    m.cfg.web_language = Language::PL;
-    m.cfg.web_password = "demo-password";  // no "no password" warning in the picture
+    m.cfg.web.language = Language::PL;
+    m.cfg.web.password = "demo-password";  // no "no password" warning in the picture
     const std::string path =
         std::string(dir) + (withPre ? "/web_firmware_dev.html" : "/web_firmware.html");
     std::FILE *f = std::fopen(path.c_str(), "wb");
@@ -585,8 +585,8 @@ static void test_render_firmware_tab_demo(void) {
 static ConfigPageModel displayDemoModel(SettingsTab tab) {
   ConfigPageModel m = baseModel();
   m.tab = tab;
-  m.cfg.web_language = Language::PL;
-  m.cfg.web_password = "demo-password";
+  m.cfg.web.language = Language::PL;
+  m.cfg.web.password = "demo-password";
   m.cfg.home.configured = true;
   m.cfg.opensky.client_id = "demo-client";
   m.cfg.opensky.client_secret = "demo-secret";
@@ -625,7 +625,7 @@ static void test_render_general_and_opensky_demo(void) {
 
 static void test_restarting_page_reloads_itself(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = Language::EN;
+  m.cfg.web.language = Language::EN;
   m.tab = SettingsTab::Firmware;
   m.hasMessage = true;
   m.message = WebStr::OtaOk;
@@ -640,7 +640,7 @@ static void test_restarting_page_reloads_itself(void) {
 
 static void test_saved_secret_never_reaches_the_page(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = Language::EN;
+  m.cfg.web.language = Language::EN;
   m.cfg.opensky.client_id = "my-id";
   m.cfg.opensky.client_secret = "TOP-SECRET-VALUE";
   std::string h = render(m);
@@ -656,7 +656,7 @@ static void test_saved_secret_never_reaches_the_page(void) {
 
 static void test_panel_password_card(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = Language::EN;
+  m.cfg.web.language = Language::EN;
   std::string h = render(m);
   // No password: warned on General and on Firmware, nothing to remove.
   ASSERT_CONTAINS(h, "The panel has no password");
@@ -666,7 +666,7 @@ static void test_panel_password_card(void) {
   ASSERT_CONTAINS(h, "name=\"new_password2\"");
   ASSERT_NOT_CONTAINS(h, "name=\"clear_password\"");
 
-  m.cfg.web_password = "hunter22-secret";
+  m.cfg.web.password = "hunter22-secret";
   h = render(m);
   ASSERT_NOT_CONTAINS(h, "hunter22-secret");  // never echoed
   ASSERT_NOT_CONTAINS(h, "The panel has no password");
@@ -679,7 +679,7 @@ static void test_panel_password_card(void) {
 
 static ConfigPageModel alertModel(Language lang) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = lang;
+  m.cfg.web.language = lang;
   const AlertDemo demo = alertDemoState();
   m.alerts = demo.alerts;
   m.alertDetails = demo.details;
@@ -746,7 +746,7 @@ static void test_render_alert_demo(void) {
     return;
   }
   ConfigPageModel m = alertModel(Language::PL);
-  m.cfg.web_password = "demo-password";
+  m.cfg.web.password = "demo-password";
   m.tab = SettingsTab::OpenSky;
   // The demo's login alert, also on the OpenSky tab: red pill + warning.
   m.cfg.opensky.client_id = "demo-client";
@@ -773,7 +773,7 @@ constexpr uint32_t kNowMs = 5000000u;
 // Credentials in cfg and an auth state for exactly these credentials.
 static ConfigPageModel authModel(OpenSkyAuthState::Mode mode, Language lang) {
   ConfigPageModel m = baseModel();
-  m.cfg.web_language = lang;
+  m.cfg.web.language = lang;
   m.tab = SettingsTab::OpenSky;
   m.nowMs = kNowMs;
   if (mode == OpenSkyAuthState::Mode::NoCredentials) return m;
@@ -1052,7 +1052,7 @@ static void test_page_script_texts_come_from_web_i18n(void) {
   assertAssetsNotEmpty();
   for (Language lang : {Language::PL, Language::EN}) {
     ConfigPageModel m = displayDemoModel(SettingsTab::General);
-    m.cfg.web_language = lang;
+    m.cfg.web.language = lang;
     ASSERT_CONTAINS(render(m), scriptTextsBlock(lang) + kWebAppJs);
   }
   for (const char *js : {kWebAppJs, kWebRestartJs, kWebCheckPendingJs}) {

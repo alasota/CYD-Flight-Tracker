@@ -18,7 +18,7 @@
 namespace {
 
 UpdateState state;
-Config cfg;
+UpdateSettings settings;  // the last releaseCheckBegin()'s
 bool begun = false;
 uint32_t nextCheckAtMs = 0;
 ManualCheck manualCheck;  // "check now" / the development switch, run from releaseCheckLoop()
@@ -163,7 +163,7 @@ CheckOutcome runCheck(bool useEtag) {
   if (o != CheckOutcome::Failed && isTimeSynced()) state.checkedAt = timeSyncNowLocal();
 
   // Development channel: only for the admin who asked for it.
-  if (!cfg.update_show_prerelease) {
+  if (!settings.show_prerelease) {
     state.latestPre = ReleaseInfo();
     etagList.clear();
   } else if (o != CheckOutcome::Failed && o != CheckOutcome::RateLimited) {
@@ -320,7 +320,7 @@ void runInstall(const std::string &tag) {
   ReleaseInfo r;
   if (tag == state.latest.tag && statusAllowsInstall(state.status)) {
     r = state.latest;
-  } else if (cfg.update_show_prerelease && tag == state.latestPre.tag) {
+  } else if (settings.show_prerelease && tag == state.latestPre.tag) {
     r = state.latestPre;
   } else {
     Serial.printf("[update] %s is no longer on offer (latest %s), not installing\n", tag.c_str(),
@@ -352,21 +352,21 @@ void runInstall(const std::string &tag) {
 
 }  // namespace
 
-void releaseCheckBegin(const Config &config) {
-  const bool preWas = cfg.update_show_prerelease;
-  cfg = config;
+void releaseCheckBegin(const UpdateSettings &update) {
+  const bool preWas = settings.show_prerelease;
+  settings = update;
   state.installed = firmwareVersion();
   if (!begun) {
     begun = true;
     nextCheckAtMs = millis() + kUpdateFirstCheckAfterMs;
   }
-  if (cfg.update_show_prerelease != preWas) {
+  if (settings.show_prerelease != preWas) {
     etagList.clear();
-    if (!cfg.update_show_prerelease) state.latestPre = ReleaseInfo();
+    if (!settings.show_prerelease) state.latestPre = ReleaseInfo();
   }
-  if (!cfg.update_check_enabled && state.status == UpdateStatus::NeverChecked) {
+  if (!settings.check_enabled && state.status == UpdateStatus::NeverChecked) {
     state.status = UpdateStatus::Disabled;
-  } else if (cfg.update_check_enabled && state.status == UpdateStatus::Disabled) {
+  } else if (settings.check_enabled && state.status == UpdateStatus::Disabled) {
     state.status = UpdateStatus::NeverChecked;
   }
 }
@@ -404,7 +404,7 @@ bool releaseCheckPending() { return manualCheckPending(manualCheck, millis()); }
 bool releaseInstallRequest(const std::string &tag) {
   if (!pendingInstallTag.empty() || tag.empty() || tag == state.installed) return false;
   const bool release = tag == state.latest.tag && statusAllowsInstall(state.status);
-  const bool pre = cfg.update_show_prerelease && tag == state.latestPre.tag &&
+  const bool pre = settings.show_prerelease && tag == state.latestPre.tag &&
                    preReleaseWorthShowing(state.latestPre, state.latest);
   if (!release && !pre) return false;
   pendingInstallTag = tag;

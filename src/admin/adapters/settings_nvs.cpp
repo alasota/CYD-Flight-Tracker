@@ -32,13 +32,13 @@ Config loadConfig() {
   cfg.home.configured = prefs.getBool("home_cfg", cfg.home.configured);
   cfg.display.language =
       clampLanguage(prefs.getUChar("lang", static_cast<uint8_t>(cfg.display.language)));
-  cfg.web_language =
-      clampLanguage(prefs.getUChar("wlang", static_cast<uint8_t>(cfg.web_language)));
+  cfg.web.language =
+      clampLanguage(prefs.getUChar("wlang", static_cast<uint8_t>(cfg.web.language)));
   // isKey() first: getString() logs an error for a key that was never written.
-  if (prefs.isKey("wpass")) cfg.web_password = prefs.getString("wpass", "").c_str();
-  cfg.update_check_enabled = prefs.getBool("updchk", cfg.update_check_enabled);
-  cfg.update_show_prerelease = prefs.getBool("updpre", cfg.update_show_prerelease);
-  if (prefs.isKey("updskip")) cfg.update_skipped_tag = prefs.getString("updskip", "").c_str();
+  if (prefs.isKey("wpass")) cfg.web.password = prefs.getString("wpass", "").c_str();
+  cfg.update.check_enabled = prefs.getBool("updchk", cfg.update.check_enabled);
+  cfg.update.show_prerelease = prefs.getBool("updpre", cfg.update.show_prerelease);
+  if (prefs.isKey("updskip")) cfg.update.skipped_tag = prefs.getString("updskip", "").c_str();
   cfg.backlight.brightness_auto = prefs.getBool("bl_auto", cfg.backlight.brightness_auto);
   cfg.backlight.brightness_fixed_pct = prefs.getUChar("bl_fix", cfg.backlight.brightness_fixed_pct);
   cfg.backlight.brightness_min_pct = prefs.getUChar("bl_min", cfg.backlight.brightness_min_pct);
@@ -74,11 +74,11 @@ void saveConfig(const Config &cfg) {
   prefs.putFloat("climb_mps", sanitized.phase.climb_rate_threshold_mps);
   prefs.putBool("home_cfg", sanitized.home.configured);
   prefs.putUChar("lang", static_cast<uint8_t>(sanitized.display.language));
-  prefs.putUChar("wlang", static_cast<uint8_t>(sanitized.web_language));
-  prefs.putString("wpass", sanitized.web_password.c_str());
-  prefs.putBool("updchk", sanitized.update_check_enabled);
-  prefs.putBool("updpre", sanitized.update_show_prerelease);
-  prefs.putString("updskip", sanitized.update_skipped_tag.c_str());
+  prefs.putUChar("wlang", static_cast<uint8_t>(sanitized.web.language));
+  prefs.putString("wpass", sanitized.web.password.c_str());
+  prefs.putBool("updchk", sanitized.update.check_enabled);
+  prefs.putBool("updpre", sanitized.update.show_prerelease);
+  prefs.putString("updskip", sanitized.update.skipped_tag.c_str());
   prefs.putBool("bl_auto", sanitized.backlight.brightness_auto);
   prefs.putUChar("bl_fix", sanitized.backlight.brightness_fixed_pct);
   prefs.putUChar("bl_min", sanitized.backlight.brightness_min_pct);

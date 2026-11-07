@@ -112,14 +112,14 @@ void otaOnEnd(bool ok) {
 void reloadConfig() {
   cfg = std::make_shared<const Config>(loadConfig());
   ++cfgSeq;
-  releaseCheckBegin(*cfg);
+  releaseCheckBegin(cfg->update);
 }
 
 // ---- GitHub gate ----------------------------------------------------------
 
 CheckGate updateGate() {
   CheckGate g;
-  g.enabled = cfg->update_check_enabled;
+  g.enabled = cfg->update.check_enabled;
   g.wifi = wifiManagerStatus() == WifiStatus::Connected;
   g.timeSynced = isTimeSynced();
   g.otaBusy = otaFlashSession().inProgress() || configPortalRestartPending();
@@ -374,7 +374,7 @@ void netTask(void *) {
   configPortalSetOtaObserver(otaObs);
   otaObs.onStart = githubOtaOnStart;
   releaseSetOtaObserver(otaObs);
-  releaseCheckBegin(*cfg);
+  releaseCheckBegin(cfg->update);
   configPortalSetPerfSource(perfJsonNow);
   publishIfChanged();
 

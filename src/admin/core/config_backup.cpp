@@ -29,13 +29,13 @@ std::string configToBackupJson(const Config &cfg, bool includeSecrets, const cha
 
   JsonObject general = doc["general"].to<JsonObject>();
   general["language"] = languageCode(cfg.display.language);
-  general["web_language"] = languageCode(cfg.web_language);
+  general["web_language"] = languageCode(cfg.web.language);
   general["auto_cycle"] = cfg.auto_cycle.enabled;
   general["auto_cycle_interval_s"] = cfg.auto_cycle.interval_s;
   general["near_airport_km"] = cfg.phase.near_airport_km;
   general["climb_rate_mps"] = cfg.phase.climb_rate_threshold_mps;
-  general["update_check"] = cfg.update_check_enabled;
-  general["update_show_prerelease"] = cfg.update_show_prerelease;
+  general["update_check"] = cfg.update.check_enabled;
+  general["update_show_prerelease"] = cfg.update.show_prerelease;
 
   JsonObject display = doc["display"].to<JsonObject>();
   display["brightness_auto"] = cfg.backlight.brightness_auto;
@@ -51,8 +51,8 @@ std::string configToBackupJson(const Config &cfg, bool includeSecrets, const cha
 
   // The panel password is a secret too: only with includeSecrets, and only
   // when one is set.
-  if (includeSecrets && !cfg.web_password.empty()) {
-    doc["security"]["web_password"] = cfg.web_password;
+  if (includeSecrets && !cfg.web.password.empty()) {
+    doc["security"]["web_password"] = cfg.web.password;
   }
 
   std::string out;
@@ -187,13 +187,13 @@ BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const C
 
   JsonObjectConst general = doc["general"];
   a.language(general, "general", "language", c.display.language);
-  a.language(general, "general", "web_language", c.web_language);
+  a.language(general, "general", "web_language", c.web.language);
   a.flag(general, "general", "auto_cycle", c.auto_cycle.enabled);
   a.count(general, "general", "auto_cycle_interval_s", c.auto_cycle.interval_s);
   a.number(general, "general", "near_airport_km", c.phase.near_airport_km);
   a.number(general, "general", "climb_rate_mps", c.phase.climb_rate_threshold_mps);
-  a.flag(general, "general", "update_check", c.update_check_enabled);
-  a.flag(general, "general", "update_show_prerelease", c.update_show_prerelease);
+  a.flag(general, "general", "update_check", c.update.check_enabled);
+  a.flag(general, "general", "update_show_prerelease", c.update.show_prerelease);
 
   JsonObjectConst display = doc["display"];
   a.flag(display, "display", "brightness_auto", c.backlight.brightness_auto);
@@ -208,12 +208,12 @@ BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const C
   a.flag(display, "display", "night_pause_polling", c.backlight.night_pause_polling);
 
   JsonObjectConst security = doc["security"];
-  std::string password = c.web_password;
+  std::string password = c.web.password;
   const int beforePassword = r.appliedFields;
   a.text(security, "security", "web_password", password);
   if (r.appliedFields > beforePassword) {
     if (validateWebPassword(password) == WebPasswordCheck::Ok) {
-      c.web_password = password;
+      c.web.password = password;
     } else {
       --r.appliedFields;
       r.invalidFields.push_back("security.web_password");

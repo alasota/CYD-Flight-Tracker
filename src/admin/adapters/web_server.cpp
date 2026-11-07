@@ -41,7 +41,7 @@ OtaObserver otaObserver;            // see configPortalSetOtaObserver()
 std::string webPassword;
 AuthThrottle authThrottle;
 
-void refreshPassword() { webPassword = loadConfig().web_password; }
+void refreshPassword() { webPassword = loadConfig().web.password; }
 
 bool sentCredentials() { return server.header("Authorization").length() > 0; }
 
@@ -214,7 +214,7 @@ void handleRoot() {
 void handleLang() {
   if (!requireSameOrigin() || !authorize()) return;
   Config cfg = loadConfig();
-  cfg.web_language = languageFromCode(server.arg("l").c_str());
+  cfg.web.language = languageFromCode(server.arg("l").c_str());
   saveConfig(cfg);
   server.sendHeader("Location", String("/?tab=") + settingsTabId(requestedTab()));
   server.send(303, "text/plain", "");
@@ -247,7 +247,7 @@ void handleSave() {
   const SettingsTab tab = requestedTab();
   if (!out.rejected.empty()) {
     sendConfigPage(saved, tab, WebStr::SavedWithInvalid, true,
-                   rejectedFieldsText(out.rejected, saved.web_language));
+                   rejectedFieldsText(out.rejected, saved.web.language));
   } else {
     sendConfigPage(saved, tab, out.message, false);
   }
@@ -594,8 +594,7 @@ void handleUpdatePrerelease() {
   const bool on = server.arg("on") == "1";
   saveUpdateShowPrerelease(on);
   ++saveCount;  // net_task reloads the config (and the UI gets it via NetState)
-  Config cfg = loadConfig();
-  releaseCheckBegin(cfg);
+  releaseCheckBegin(loadConfig().update);
   requestCheckAndAnswer();
 }
 

@@ -511,7 +511,7 @@ void updateCard(Writer &w, const ConfigPageModel &m, const std::string &installe
   w.raw("</button>");
 
   // Development versions: only on request (spec/02 §8.6).
-  const bool showPre = m.cfg.update_show_prerelease;
+  const bool showPre = m.cfg.update.show_prerelease;
   w.raw("<label class=\"switch\" style=\"margin:18px 0 0\"><span>");
   w.t(WebStr::UpdShowPrerelease);
   w.raw(showPre ? "</span><input type=\"checkbox\" name=\"on\" value=\"1\" form=\"upr\" "
@@ -695,7 +695,7 @@ void installForm(Writer &w, const char *id, const std::string &tag) {
 
 void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   const Config &c = m.cfg;
-  const Language lang = c.web_language;
+  const Language lang = c.web.language;
   Writer w(emit, lang);
   const std::string installed = m.installedVersion.empty() ? firmwareVersion() : m.installedVersion;
 
@@ -886,7 +886,7 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.t(WebStr::SectionLanguage);
   w.raw("</h2>");
   w.languageSelect("lang", "language", WebStr::DisplayLanguage, c.display.language);
-  w.languageSelect("wlang", "web_language", WebStr::WebLanguage, c.web_language);
+  w.languageSelect("wlang", "web_language", WebStr::WebLanguage, c.web.language);
   w.raw("</div>");
   displayCard(w, m, lang);
   w.raw("<div class=\"card\"><h2>");
@@ -901,7 +901,7 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
           fmtU(c.auto_cycle.interval_s));
   w.raw("<label class=\"switch\" style=\"margin:0\"><span>");
   w.t(WebStr::UpdAutoCheck);
-  w.raw(c.update_check_enabled
+  w.raw(c.update.check_enabled
             ? "</span><input type=\"checkbox\" name=\"update_check\" value=\"1\" checked></label>"
             : "</span><input type=\"checkbox\" name=\"update_check\" value=\"1\"></label>");
   w.raw("</div><div class=\"card\"><h2>");
@@ -916,7 +916,7 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.raw("</div>");
 
   // Panel password: the fields are never pre-filled; both empty = no change.
-  const bool hasPassword = !c.web_password.empty();
+  const bool hasPassword = !c.web.password.empty();
   w.raw("<div class=\"card\" id=\"access\"><h2>");
   w.t(WebStr::SectionAccess);
   w.raw("</h2>");

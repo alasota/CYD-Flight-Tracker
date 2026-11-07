@@ -247,10 +247,10 @@ static void test_diff_backlight_or_web_change_is_nothing(void) {
       {"backlight.brightness_fixed_pct", [](Config &c) { c.backlight.brightness_fixed_pct = 42; }},
       {"backlight.night_mode", [](Config &c) { c.backlight.night_mode = NightMode::Off; }},
       {"backlight.night_pause_polling", [](Config &c) { c.backlight.night_pause_polling = true; }},
-      {"web.language", [](Config &c) { c.web_language = Language::EN; }},
-      {"web.password", [](Config &c) { c.web_password = "hunter22"; }},
-      {"update.check_enabled", [](Config &c) { c.update_check_enabled = false; }},
-      {"update.skipped_tag", [](Config &c) { c.update_skipped_tag = "v1.4.0"; }},
+      {"web.language", [](Config &c) { c.web.language = Language::EN; }},
+      {"web.password", [](Config &c) { c.web.password = "hunter22"; }},
+      {"update.check_enabled", [](Config &c) { c.update.check_enabled = false; }},
+      {"update.skipped_tag", [](Config &c) { c.update.skipped_tag = "v1.4.0"; }},
   };
   for (const auto &ch : changes) {
     NetState b = a;

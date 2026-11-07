@@ -195,8 +195,8 @@ void setup() {
 
   // A forgotten panel password: a finger on the screen at power-up (before
   // net_task exists — the blocking delay() steps are fine here).
-  runPasswordReset(tft, !bootCfg.web_password.empty(), [&bootCfg] {
-    bootCfg.web_password.clear();
+  runPasswordReset(tft, !bootCfg.web.password.empty(), [&bootCfg] {
+    bootCfg.web.password.clear();
     saveConfig(bootCfg);
     bootCfg = loadConfig();
     Serial.println("[auth] web password cleared from the touchscreen");
