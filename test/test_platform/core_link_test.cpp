@@ -131,7 +131,7 @@ static NetState baseState() {
   NetState s;
   auto cfg = std::make_shared<Settings>();
   cfg->home.configured = true;
-  s.cfg = cfg;
+  s.settings = cfg;
   auto d = std::make_shared<AirspaceSnapshot>();
   d->rows.resize(2);
   s.data = d;
@@ -193,45 +193,46 @@ static void test_diff_health_on_empty_screen_repaints_content(void) {
 static void test_diff_language_change(void) {
   const NetState a = baseState();
   NetState b = a;
-  auto cfg = std::make_shared<Settings>(*a.cfg);
-  cfg->display.language = a.cfg->display.language == Language::PL ? Language::EN : Language::PL;
-  b.cfg = cfg;
+  auto cfg = std::make_shared<Settings>(*a.settings);
+  cfg->display.language =
+      a.settings->display.language == Language::PL ? Language::EN : Language::PL;
+  b.settings = cfg;
   TEST_ASSERT_TRUE(diffNetState(&a, b).languageChanged);
 }
 
 static void test_diff_home_configured_is_first_draw(void) {
   NetState a = baseState();
-  auto unset = std::make_shared<Settings>(*a.cfg);
+  auto unset = std::make_shared<Settings>(*a.settings);
   unset->home.configured = false;
-  a.cfg = unset;
+  a.settings = unset;
   NetState b = a;
-  auto set = std::make_shared<Settings>(*a.cfg);
+  auto set = std::make_shared<Settings>(*a.settings);
   set->home.configured = true;
-  b.cfg = set;
+  b.settings = set;
   TEST_ASSERT_TRUE(diffNetState(&a, b).firstDraw);
 }
 
 static void test_diff_radius_or_home_moves_content(void) {
   const NetState a = baseState();
   NetState b = a;
-  auto cfg = std::make_shared<Settings>(*a.cfg);
-  cfg->home.radius_deg = a.cfg->home.radius_deg + 1.0f;
-  b.cfg = cfg;
+  auto cfg = std::make_shared<Settings>(*a.settings);
+  cfg->home.radius_deg = a.settings->home.radius_deg + 1.0f;
+  b.settings = cfg;
   TEST_ASSERT_TRUE(diffNetState(&a, b).newPoll);
 
   NetState c = a;
-  auto moved = std::make_shared<Settings>(*a.cfg);
+  auto moved = std::make_shared<Settings>(*a.settings);
   moved->home.lat += 0.5f;
-  c.cfg = moved;
+  c.settings = moved;
   TEST_ASSERT_TRUE(diffNetState(&a, c).newPoll);
 }
 
 static void test_diff_unrelated_config_change_is_nothing(void) {
   const NetState a = baseState();
   NetState b = a;
-  auto cfg = std::make_shared<Settings>(*a.cfg);
-  cfg->poll.interval_s = a.cfg->poll.interval_s + 10;
-  b.cfg = cfg;
+  auto cfg = std::make_shared<Settings>(*a.settings);
+  cfg->poll.interval_s = a.settings->poll.interval_s + 10;
+  b.settings = cfg;
   TEST_ASSERT_FALSE(any(diffNetState(&a, b)));
 }
 
@@ -256,9 +257,9 @@ static void test_diff_backlight_or_web_change_is_nothing(void) {
   };
   for (const auto &ch : changes) {
     NetState b = a;
-    auto cfg = std::make_shared<Settings>(*a.cfg);
+    auto cfg = std::make_shared<Settings>(*a.settings);
     ch.change(*cfg);
-    b.cfg = cfg;
+    b.settings = cfg;
     TEST_ASSERT_FALSE_MESSAGE(any(diffNetState(&a, b)), ch.what);
   }
 }

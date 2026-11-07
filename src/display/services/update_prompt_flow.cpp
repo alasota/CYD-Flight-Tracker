@@ -8,9 +8,9 @@ PromptGate updatePromptGate(const NetState &s, int currentScreen, uint32_t nowMs
   PromptGate g;
   g.status = s.update.status;
   g.latestTag = s.update.latestTag;
-  g.skippedTag = s.cfg->update.skipped_tag;
+  g.skippedTag = s.settings->update.skipped_tag;
   g.installedIsDev = isDevelopmentBuild(parseFwVersion(s.update.installed));
-  g.homeConfigured = s.cfg->home.configured;
+  g.homeConfigured = s.settings->home.configured;
   g.currentScreen = currentScreen;
   const CpaPrediction cpa = netCpaAt(s, nowMs);
   g.cpaFound = cpa.found;

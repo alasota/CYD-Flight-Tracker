@@ -159,8 +159,8 @@ struct UpdateSummary {
 
 struct NetState {
   std::shared_ptr<const AirspaceSnapshot> data;  // nullptr until the first good poll
-  std::shared_ptr<const Settings> cfg;       // always set
-  uint32_t cfgSeq = 0;                       // bumped when the config is reloaded
+  std::shared_ptr<const Settings> settings;      // always set
+  uint32_t settingsSeq = 0;                      // bumped when the settings are reloaded
   FeedHealth health = FeedHealth::Ok;
   WifiStatus wifi = WifiStatus::Connecting;
   bool restartPending = false;  // a good upload: the board restarts in a moment
