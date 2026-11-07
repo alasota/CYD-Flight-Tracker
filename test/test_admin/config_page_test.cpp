@@ -1,12 +1,16 @@
 // config_page: config page HTML, tabs, credits readouts, OpenSky login state (spec 06). CLAUDE.md "Code conventions" (web_server / config_page).
 #include <unity.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 
 #include "admin/core/config_page.h"
+#include "admin/core/web_assets.h"
+#include "admin/core/web_i18n.h"
 #include "test_support.h"
 
 namespace {
@@ -967,6 +971,120 @@ static void test_login_failed_pill_style(void) {
   ASSERT_CONTAINS(h, ".pill.err .dot{background:var(--err)}");
 }
 
+// ---- Spec 12 stage 6: the CSS, JS and icon come from src/admin/assets/ (web_assets.h) -------
+
+// The panel script's texts: the T={…} block keys and their web_i18n strings, in page order.
+const struct {
+  const char *key;
+  WebStr id;
+} kScriptTexts[] = {
+    {"day", WebStr::CreditsPerDay},      {"lim", WebStr::DailyLimit},
+    {"over", WebStr::OverLimit},         {"up", WebStr::FirmwareUploading},
+    {"full", WebStr::FirmwareLooksLikeFull}, {"fail", WebStr::OtaAborted},
+    {"lday", WebStr::LightDay},          {"lnt", WebStr::LightNight},
+    {"loff", WebStr::LightScreenOff},    {"lwk", WebStr::LightWoken},
+    {"lns", WebStr::LightNotSynced},     {"lpz", WebStr::LightPollingPaused},
+};
+
+void assertAssetsNotEmpty() {
+  TEST_ASSERT_TRUE_MESSAGE(std::strlen(kWebFaviconUri) > 0, "kWebFaviconUri is empty");
+  TEST_ASSERT_TRUE_MESSAGE(std::strlen(kWebStyleCss) > 0, "kWebStyleCss is empty");
+  TEST_ASSERT_TRUE_MESSAGE(std::strlen(kWebAppJs) > 0, "kWebAppJs is empty");
+  TEST_ASSERT_TRUE_MESSAGE(std::strlen(kWebRestartJs) > 0, "kWebRestartJs is empty");
+  TEST_ASSERT_TRUE_MESSAGE(std::strlen(kWebCheckPendingJs) > 0, "kWebCheckPendingJs is empty");
+}
+
+// `<script>var T={day:"…",…};` as the page writes it in `lang`.
+std::string scriptTextsBlock(Language lang) {
+  std::string out = "<script>var T={";
+  for (const auto &t : kScriptTexts) {
+    if (out.back() != '{') out += ",";
+    out += std::string(t.key) + ":\"" + webTr(t.id, lang) + "\"";
+  }
+  return out + "};";
+}
+
+// The contents of every '…' / "…" string literal in `js`, one per line.
+std::string jsStringLiterals(const std::string &js) {
+  std::string out;
+  for (size_t i = 0; i < js.size(); ++i) {
+    const char q = js[i];
+    if (q != '\'' && q != '"') continue;
+    size_t j = i + 1;
+    while (j < js.size() && js[j] != q) j += js[j] == '\\' ? 2 : 1;
+    out += js.substr(i + 1, j - i - 1) + "\n";
+    i = j;
+  }
+  return out;
+}
+
+// Scenario: Strona ustawień wstawia styl, skrypt i ikonę z zasobów w te same miejsca co przed
+// etapem
+static void test_page_inlines_style_script_and_icon_from_assets(void) {
+  assertAssetsNotEmpty();
+  const std::string icon =
+      std::string("<link rel=\"icon\" type=\"image/svg+xml\" href=\"") + kWebFaviconUri + "\">";
+  const std::string style = std::string("<style>") + kWebStyleCss + "</style>";
+  const struct {
+    bool restarting, pending;
+    const char *extraJs;
+  } cases[] = {{false, false, ""},
+               {true, false, kWebRestartJs},
+               {false, true, kWebCheckPendingJs},
+               {true, true, kWebRestartJs}};  // restarting wins, as before
+  for (const auto &c : cases) {
+    ConfigPageModel m = displayDemoModel(SettingsTab::General);
+    m.restarting = c.restarting;
+    m.updateCheckPending = c.pending;
+    const std::string h = render(m);
+    ASSERT_CONTAINS(h, "</title>" + icon + style + "</head>");
+    const std::string tail = std::string(kWebAppJs) + c.extraJs + "</script></body></html>";
+    TEST_ASSERT_TRUE(h.size() >= tail.size());
+    ASSERT_STR_EQ(tail, h.substr(h.size() - tail.size()));
+  }
+}
+
+// Scenario Outline: Teksty skryptu panelu dalej przychodzą z web_i18n w języku panelu, a pliki
+// zasobów nie mają tekstów (PL, EN). A text "occurs" in an asset when it is inside one of its
+// string literals, or anywhere for a text with a space or a non-ASCII letter (prose) — the
+// short words "day" / "night" are also property names in the script (T.day, dataset.night).
+static void test_page_script_texts_come_from_web_i18n(void) {
+  assertAssetsNotEmpty();
+  for (Language lang : {Language::PL, Language::EN}) {
+    ConfigPageModel m = displayDemoModel(SettingsTab::General);
+    m.cfg.web_language = lang;
+    ASSERT_CONTAINS(render(m), scriptTextsBlock(lang) + kWebAppJs);
+  }
+  for (const char *js : {kWebAppJs, kWebRestartJs, kWebCheckPendingJs}) {
+    const std::string literals = jsStringLiterals(js);
+    for (Language lang : {Language::PL, Language::EN}) {
+      for (const auto &t : kScriptTexts) {
+        const std::string text = webTr(t.id, lang);
+        ASSERT_NOT_CONTAINS(literals, text);
+        const bool prose = text.find(' ') != std::string::npos ||
+                           std::any_of(text.begin(), text.end(),
+                                       [](char ch) { return (ch & 0x80) != 0; });
+        if (prose) ASSERT_NOT_CONTAINS(std::string(js), text);
+      }
+    }
+  }
+}
+
+// Edge case (spec 12 stage 6): the paused minutes need only the backlight's settings object.
+static void test_paused_minutes_take_only_backlight_settings(void) {
+  BacklightSettings b;
+  const BacklightStatus light;  // sun not known
+  b.night_pause_polling = true;
+  b.night_mode = NightMode::Off;
+  TEST_ASSERT_EQUAL_UINT32(0u, pausedMinutesPerDay(b, light));
+  b.night_mode = NightMode::Schedule;
+  b.night_from_min = 23 * 60;
+  b.night_to_min = 6 * 60 + 30;
+  TEST_ASSERT_EQUAL_UINT32(450u, pausedMinutesPerDay(b, light));
+  b.night_pause_polling = false;
+  TEST_ASSERT_EQUAL_UINT32(0u, pausedMinutesPerDay(b, light));
+}
+
 }  // namespace
 
 void run_config_page_tests() {
@@ -1026,4 +1144,7 @@ void run_config_page_tests() {
   RUN_TEST(test_login_failed_detail_omits_since_when_too_old);
   RUN_TEST(test_login_failed_marks_live_estimate);
   RUN_TEST(test_login_failed_pill_style);
+  RUN_TEST(test_page_inlines_style_script_and_icon_from_assets);
+  RUN_TEST(test_page_script_texts_come_from_web_i18n);
+  RUN_TEST(test_paused_minutes_take_only_backlight_settings);
 }

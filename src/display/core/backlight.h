@@ -69,6 +69,22 @@ const char *nightModeCode(NightMode m);  // "off" / "schedule" / "sun"
 // "off" / "schedule" / "sun" -> mode; false for anything else.
 bool nightModeFromCode(const std::string &code, NightMode *out);
 
+// TODO(spec 12): stub from test-author — the backlight's settings object (spec 12 §7, stage 6
+// step 4); Config still has the flat fields until then. Defaults = Config's. Assign members, never
+// {…}-initialize (gnu++11 on env:cyd: not an aggregate with these initializers).
+struct BacklightSettings {
+  bool brightness_auto = true;
+  uint8_t brightness_fixed_pct = 80;
+  uint8_t brightness_min_pct = 10;
+  uint8_t brightness_max_pct = 100;
+  NightMode night_mode = kDefaultNightMode;
+  uint16_t night_from_min = 23 * 60;
+  uint16_t night_to_min = 6 * 60 + 30;
+  uint8_t night_pct = 10;
+  uint16_t night_wake_s = 60;
+  bool night_pause_polling = false;
+};
+
 // Window in minutes after local midnight; through midnight (23:00-06:30) or
 // not (01:00-05:00); from == to -> never.
 bool inNightWindow(int nowMin, int fromMin, int toMin);

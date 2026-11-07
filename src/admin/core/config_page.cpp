@@ -74,6 +74,12 @@ uint32_t pausedMinutesPerDay(const Config &cfg, const BacklightStatus &light) {
   return cfg.night_pause_polling ? nightMinutesToday(cfg, light) : 0;
 }
 
+// TODO(spec 12): stub from test-author
+uint32_t pausedMinutesPerDay(const BacklightSettings & /*backlight*/,
+                             const BacklightStatus & /*light*/) {
+  return 0;
+}
+
 std::string lightStateText(const BacklightStatus &s, Language lang) {
   WebStr id = WebStr::LightDay;
   if (!s.synced) {

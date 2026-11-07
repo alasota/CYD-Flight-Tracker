@@ -78,12 +78,25 @@ static void test_clamp_poll_interval_enforces_minimum(void) {
   TEST_ASSERT_EQUAL_UINT32(3600, clampPollIntervalS(3600));
 }
 
+// Scenario: sanitizeConfig() przycina te same pola do tych samych granic, teraz w obiektach
+// kontekstów (an out-of-range value in every object: home, poll, auto-cycle, phase, backlight,
+// display, web).
 static void test_sanitize_config_clamps_all_fields(void) {
   Config cfg;
-  cfg.home_lat = 500.0f;
+  cfg.home_lat = 200.0f;
   cfg.home_lon = -500.0f;
-  cfg.radius_deg = -1.0f;
-  cfg.poll_interval_s = 0;
+  cfg.radius_deg = 0.0f;
+  cfg.poll_interval_s = 1;
+  cfg.auto_cycle_interval_s = 0;
+  cfg.near_airport_km = 0.0f;
+  cfg.climb_rate_threshold_mps = 0.0f;
+  cfg.brightness_fixed_pct = 0;
+  cfg.brightness_max_pct = 200;
+  cfg.night_from_min = 2000;
+  cfg.night_to_min = 2000;
+  cfg.last_screen = 7;
+  cfg.language = static_cast<Language>(9);
+  cfg.web_language = static_cast<Language>(9);
 
   Config out = sanitizeConfig(cfg);
 
@@ -91,6 +104,16 @@ static void test_sanitize_config_clamps_all_fields(void) {
   TEST_ASSERT_EQUAL_FLOAT(-180.0f, out.home_lon);
   TEST_ASSERT_EQUAL_FLOAT(0.1f, out.radius_deg);
   TEST_ASSERT_EQUAL_UINT32(5, out.poll_interval_s);
+  TEST_ASSERT_EQUAL_UINT32(3, out.auto_cycle_interval_s);
+  TEST_ASSERT_EQUAL_FLOAT(0.5f, out.near_airport_km);
+  TEST_ASSERT_EQUAL_FLOAT(0.1f, out.climb_rate_threshold_mps);
+  TEST_ASSERT_EQUAL_UINT8(5, out.brightness_fixed_pct);
+  TEST_ASSERT_EQUAL_UINT8(100, out.brightness_max_pct);
+  TEST_ASSERT_EQUAL_UINT16(1439, out.night_from_min);
+  TEST_ASSERT_EQUAL_UINT16(1439, out.night_to_min);
+  TEST_ASSERT_EQUAL_INT(0, out.last_screen);
+  ASSERT_ENUM_EQ(kDefaultLanguage, out.language);
+  ASSERT_ENUM_EQ(kDefaultLanguage, out.web_language);
 }
 
 static void test_sanitize_config_leaves_in_range_values_untouched(void) {
@@ -99,6 +122,16 @@ static void test_sanitize_config_leaves_in_range_values_untouched(void) {
   cfg.home_lon = -0.1f;
   cfg.radius_deg = 3.0f;
   cfg.poll_interval_s = 30;
+  cfg.auto_cycle_interval_s = 20;
+  cfg.near_airport_km = 20.0f;
+  cfg.climb_rate_threshold_mps = 2.0f;
+  cfg.brightness_fixed_pct = 42;
+  cfg.brightness_max_pct = 90;
+  cfg.night_from_min = 22 * 60;
+  cfg.night_to_min = 5 * 60;
+  cfg.last_screen = 2;
+  cfg.language = Language::EN;
+  cfg.web_language = Language::EN;
 
   Config out = sanitizeConfig(cfg);
 
@@ -106,6 +139,16 @@ static void test_sanitize_config_leaves_in_range_values_untouched(void) {
   TEST_ASSERT_EQUAL_FLOAT(-0.1f, out.home_lon);
   TEST_ASSERT_EQUAL_FLOAT(3.0f, out.radius_deg);
   TEST_ASSERT_EQUAL_UINT32(30, out.poll_interval_s);
+  TEST_ASSERT_EQUAL_UINT32(20, out.auto_cycle_interval_s);
+  TEST_ASSERT_EQUAL_FLOAT(20.0f, out.near_airport_km);
+  TEST_ASSERT_EQUAL_FLOAT(2.0f, out.climb_rate_threshold_mps);
+  TEST_ASSERT_EQUAL_UINT8(42, out.brightness_fixed_pct);
+  TEST_ASSERT_EQUAL_UINT8(90, out.brightness_max_pct);
+  TEST_ASSERT_EQUAL_UINT16(22 * 60, out.night_from_min);
+  TEST_ASSERT_EQUAL_UINT16(5 * 60, out.night_to_min);
+  TEST_ASSERT_EQUAL_INT(2, out.last_screen);
+  ASSERT_ENUM_EQ(Language::EN, out.language);
+  ASSERT_ENUM_EQ(Language::EN, out.web_language);
 }
 
 static void test_clamp_last_screen_accepts_0_1_2(void) {
@@ -271,6 +314,48 @@ static void test_sanitize_display_settings(void) {
   TEST_ASSERT_EQUAL_UINT16(600, s.night_wake_s);
 }
 
+// Scenario: Wartości domyślne ustawień są te same co przed etapem — every field of every
+// object against its v1.11.3 default.
+static void test_default_config_keeps_every_stage_5_default(void) {
+  const Config c = defaultConfig();
+  // home
+  TEST_ASSERT_EQUAL_FLOAT(0.0f, c.home_lat);
+  TEST_ASSERT_EQUAL_FLOAT(0.0f, c.home_lon);
+  TEST_ASSERT_EQUAL_FLOAT(2.5f, c.radius_deg);
+  TEST_ASSERT_FALSE(c.home_configured);
+  // phase
+  TEST_ASSERT_EQUAL_FLOAT(15.0f, c.near_airport_km);
+  TEST_ASSERT_EQUAL_FLOAT(1.5f, c.climb_rate_threshold_mps);
+  // opensky, poll
+  TEST_ASSERT_TRUE(c.opensky_client_id.empty());
+  TEST_ASSERT_TRUE(c.opensky_client_secret.empty());
+  TEST_ASSERT_EQUAL_UINT32(15, c.poll_interval_s);
+  // display, auto_cycle
+  ASSERT_ENUM_EQ(Language::PL, c.language);
+  TEST_ASSERT_EQUAL_INT(0, c.last_screen);
+  TEST_ASSERT_FALSE(c.auto_cycle_enabled);
+  TEST_ASSERT_EQUAL_UINT32(15, c.auto_cycle_interval_s);
+  // backlight
+  TEST_ASSERT_TRUE(c.brightness_auto);
+  TEST_ASSERT_EQUAL_UINT8(80, c.brightness_fixed_pct);
+  TEST_ASSERT_EQUAL_UINT8(10, c.brightness_min_pct);
+  TEST_ASSERT_EQUAL_UINT8(100, c.brightness_max_pct);
+  ASSERT_ENUM_EQ(NightMode::Sun, c.night_mode);
+  ASSERT_ENUM_EQ(kDefaultNightMode, c.night_mode);
+  TEST_ASSERT_EQUAL_UINT16(23 * 60, c.night_from_min);
+  TEST_ASSERT_EQUAL_UINT16(6 * 60 + 30, c.night_to_min);
+  TEST_ASSERT_EQUAL_UINT8(10, c.night_pct);
+  TEST_ASSERT_EQUAL_UINT16(60, c.night_wake_s);
+  TEST_ASSERT_FALSE(c.night_pause_polling);
+  // update
+  TEST_ASSERT_TRUE(c.update_check_enabled);
+  TEST_ASSERT_FALSE(c.update_show_prerelease);
+  TEST_ASSERT_TRUE(c.update_skipped_tag.empty());
+  // web
+  ASSERT_ENUM_EQ(Language::PL, c.web_language);
+  TEST_ASSERT_TRUE(c.web_password.empty());
+}
+
 }  // namespace
 
 void run_config_store_tests() {
@@ -298,4 +383,5 @@ void run_config_store_tests() {
   RUN_TEST(test_update_settings_defaults_and_sanitizing);
   RUN_TEST(test_display_defaults);
   RUN_TEST(test_sanitize_display_settings);
+  RUN_TEST(test_default_config_keeps_every_stage_5_default);
 }

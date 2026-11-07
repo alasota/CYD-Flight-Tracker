@@ -268,6 +268,194 @@ static void test_display_group_bad_values_and_old_backups(void) {
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
 }
 
+// ---- Spec 12 stage 6: the backup must not change when Config is rebuilt from context objects --
+
+// A non-default value in every setting that goes into a backup (25 of them), plus what never
+// does: the skipped release (device state) and the last screen.
+Config everyFieldChanged() {
+  Config c = makeConfig();  // Warsaw, home_configured
+  c.radius_deg = 1.5f;
+  c.poll_interval_s = 30;
+  c.opensky_client_id = "my-client";
+  c.opensky_client_secret = "s3cr\"et";
+  c.language = Language::EN;
+  c.web_language = Language::EN;
+  c.auto_cycle_enabled = true;
+  c.auto_cycle_interval_s = 20;
+  c.near_airport_km = 12.5f;
+  c.climb_rate_threshold_mps = 2.25f;
+  c.update_check_enabled = false;
+  c.update_show_prerelease = true;
+  c.brightness_auto = false;
+  c.brightness_fixed_pct = 42;
+  c.brightness_min_pct = 15;
+  c.brightness_max_pct = 90;
+  c.night_mode = NightMode::Schedule;
+  c.night_from_min = 22 * 60 + 15;
+  c.night_to_min = 7 * 60;
+  c.night_pct = 5;
+  c.night_wake_s = 120;
+  c.night_pause_polling = true;
+  c.web_password = "hunter22";
+  c.update_skipped_tag = "v1.4.0";  // device state: never in a backup
+  c.last_screen = 2;                // nav state: never in a backup
+  return c;
+}
+
+// What v1.11.3 (c0a10e3) wrote for everyFieldChanged(), captured from configToBackupJson()
+// before stage 6 — the groups, key names, order and pretty-printing a restore depends on.
+// serializeJsonPretty() ends lines with CRLF; the raw strings below are compared through
+// crlf(), so the checkout's line endings don't matter.
+const char kV1113BackupWithSecrets[] = R"({
+  "format": "cyd-sky-tracker-config",
+  "format_version": 1,
+  "firmware": "v1.11.3",
+  "location": {
+    "lat": 52.2297,
+    "lon": 21.0122,
+    "radius_deg": 1.5
+  },
+  "opensky": {
+    "client_id": "my-client",
+    "client_secret": "s3cr\"et",
+    "poll_interval_s": 30
+  },
+  "general": {
+    "language": "en",
+    "web_language": "en",
+    "auto_cycle": true,
+    "auto_cycle_interval_s": 20,
+    "near_airport_km": 12.5,
+    "climb_rate_mps": 2.25,
+    "update_check": false,
+    "update_show_prerelease": true
+  },
+  "display": {
+    "brightness_auto": false,
+    "brightness_fixed": 42,
+    "brightness_min": 15,
+    "brightness_max": 90,
+    "night_mode": "schedule",
+    "night_from": "22:15",
+    "night_to": "07:00",
+    "night_brightness": 5,
+    "night_wake_s": 120,
+    "night_pause_polling": true
+  },
+  "security": {
+    "web_password": "hunter22"
+  }
+})";
+
+const char kV1113BackupWithoutSecrets[] = R"({
+  "format": "cyd-sky-tracker-config",
+  "format_version": 1,
+  "firmware": "v1.11.3",
+  "location": {
+    "lat": 52.2297,
+    "lon": 21.0122,
+    "radius_deg": 1.5
+  },
+  "opensky": {
+    "poll_interval_s": 30
+  },
+  "general": {
+    "language": "en",
+    "web_language": "en",
+    "auto_cycle": true,
+    "auto_cycle_interval_s": 20,
+    "near_airport_km": 12.5,
+    "climb_rate_mps": 2.25,
+    "update_check": false,
+    "update_show_prerelease": true
+  },
+  "display": {
+    "brightness_auto": false,
+    "brightness_fixed": 42,
+    "brightness_min": 15,
+    "brightness_max": 90,
+    "night_mode": "schedule",
+    "night_from": "22:15",
+    "night_to": "07:00",
+    "night_brightness": 5,
+    "night_wake_s": 120,
+    "night_pause_polling": true
+  }
+})";
+
+// `text` with every line break as CRLF.
+std::string crlf(const char *text) {
+  std::string out;
+  for (const char *p = text; *p != '\0'; ++p) {
+    if (*p == '\r') continue;
+    if (*p == '\n') out += '\r';
+    out += *p;
+  }
+  return out;
+}
+
+// Scenario: Kopia zapasowa ma bajt w bajt ten sam JSON co przed etapem
+static void test_backup_json_is_the_same_as_before_stage_6(void) {
+  const Config c = everyFieldChanged();
+  const std::string withSecrets = configToBackupJson(c, true, "v1.11.3");
+  const std::string withoutSecrets = configToBackupJson(c, false, "v1.11.3");
+  ASSERT_STR_EQ(crlf(kV1113BackupWithSecrets), withSecrets);
+  ASSERT_STR_EQ(crlf(kV1113BackupWithoutSecrets), withoutSecrets);
+  ASSERT_NOT_CONTAINS(withSecrets, "v1.4.0");  // the skipped release (updskip) never travels
+}
+
+// Scenario: Kopia zapasowa zrobiona przed etapem 6 odtwarza każde ustawienie
+static void test_restore_of_a_stage_5_backup_fills_every_setting(void) {
+  const BackupRestoreResult r = restoreConfigFromBackupJson(crlf(kV1113BackupWithSecrets),
+                                                            defaultConfig());
+  ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(r.invalidFields.size()));
+  TEST_ASSERT_EQUAL_INT(25, r.appliedFields);
+  const Config &c = r.config;
+  // location
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 52.2297f, c.home_lat);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 21.0122f, c.home_lon);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.5f, c.radius_deg);
+  TEST_ASSERT_TRUE(c.home_configured);
+  // opensky
+  ASSERT_STR_EQ("my-client", c.opensky_client_id);
+  ASSERT_STR_EQ("s3cr\"et", c.opensky_client_secret);
+  TEST_ASSERT_EQUAL_UINT32(30u, c.poll_interval_s);
+  // general
+  ASSERT_ENUM_EQ(Language::EN, c.language);
+  ASSERT_ENUM_EQ(Language::EN, c.web_language);
+  TEST_ASSERT_TRUE(c.auto_cycle_enabled);
+  TEST_ASSERT_EQUAL_UINT32(20u, c.auto_cycle_interval_s);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 12.5f, c.near_airport_km);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.25f, c.climb_rate_threshold_mps);
+  TEST_ASSERT_FALSE(c.update_check_enabled);
+  TEST_ASSERT_TRUE(c.update_show_prerelease);
+  // display
+  TEST_ASSERT_FALSE(c.brightness_auto);
+  TEST_ASSERT_EQUAL_UINT8(42, c.brightness_fixed_pct);
+  TEST_ASSERT_EQUAL_UINT8(15, c.brightness_min_pct);
+  TEST_ASSERT_EQUAL_UINT8(90, c.brightness_max_pct);
+  ASSERT_ENUM_EQ(NightMode::Schedule, c.night_mode);
+  TEST_ASSERT_EQUAL_UINT16(22 * 60 + 15, c.night_from_min);
+  TEST_ASSERT_EQUAL_UINT16(7 * 60, c.night_to_min);
+  TEST_ASSERT_EQUAL_UINT8(5, c.night_pct);
+  TEST_ASSERT_EQUAL_UINT16(120, c.night_wake_s);
+  TEST_ASSERT_TRUE(c.night_pause_polling);
+  // security
+  ASSERT_STR_EQ("hunter22", c.web_password);
+  // Not in a backup: left as they were.
+  TEST_ASSERT_TRUE(c.update_skipped_tag.empty());
+  TEST_ASSERT_EQUAL_INT(0, c.last_screen);
+
+  // The two languages land in their own objects (both are "en" above, so swap one).
+  std::string json = crlf(kV1113BackupWithSecrets);
+  const std::string displayEn = "\"language\": \"en\"";  // not "web_language": its '"' differs
+  json.replace(json.find(displayEn), displayEn.size(), "\"language\": \"pl\"");
+  const BackupRestoreResult r2 = restoreConfigFromBackupJson(json, defaultConfig());
+  ASSERT_ENUM_EQ(Language::PL, r2.config.language);
+  ASSERT_ENUM_EQ(Language::EN, r2.config.web_language);
+}
+
 }  // namespace
 
 void run_config_backup_tests() {
@@ -286,4 +474,6 @@ void run_config_backup_tests() {
   RUN_TEST(test_panel_password_travels_only_with_secrets);
   RUN_TEST(test_restore_without_password_keeps_the_devices);
   RUN_TEST(test_invalid_password_in_backup_is_reported_and_skipped);
+  RUN_TEST(test_backup_json_is_the_same_as_before_stage_6);
+  RUN_TEST(test_restore_of_a_stage_5_backup_fills_every_setting);
 }
