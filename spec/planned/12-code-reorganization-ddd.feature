@@ -587,7 +587,7 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
     Examples:
       | symbol                      | nowy_nagłówek                            | stary_nagłówek                    |
       | parseOpenSkyCredentialsJson | admin/core/settings_form.h               | admin/adapters/web_server.h       |
-      | OpenSkyCredentials          | admin/core/settings_form.h               | admin/adapters/web_server.h       |
+      | CredentialsFile             | admin/core/settings_form.h               | admin/adapters/web_server.h       |
       | isValidFloatString          | admin/core/settings_form.h               | admin/adapters/web_server.h       |
       | isValidUnsignedIntString    | admin/core/settings_form.h               | admin/adapters/web_server.h       |
       | OtaObserver                 | admin/core/firmware/ota_update.h         | admin/adapters/web_server.h       |

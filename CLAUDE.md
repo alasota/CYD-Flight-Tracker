@@ -57,18 +57,18 @@ functions with plain types too, an adapter defines them (`LGFX &` ones: in the a
 `#ifdef ARDUINO` only in `platform/` and adapters. Layers: docs/architecture.md "Source layout".
 
 - **Data, core 0:** `wifi_manager` (connect + captive portal) · `opensky_client` (JSON of
-  `/states/all` → `Aircraft`, **no drawing**) · `opensky_auth` (login, 30-min retry, Bearer /
-  refresh / anonymous) · `opensky_quota` (credits left) · `scan_area` (credit cost) ·
-  `aircraft_lookup` (icao24 → airline / type) · `route_lookup` (callsign → route, airport → IATA /
+  `/states/all` → `Aircraft`, **no drawing**) · `opensky_settings` · `opensky_auth` (login, 30-min
+  retry, Bearer / refresh / anonymous) · `opensky_quota` (credits left) · `scan_area` (credit cost)
+  · `aircraft_lookup` (icao24 → airline / type) · `route_lookup` (callsign → route, airport → IATA /
   country) · `aircraft_names` (airline by callsign, type names) · `place_names` (IATA → city,
-  `asciiFold()`) · `lookup_cache` (LRU) · `lookup_store` (NVS copy) · `lookup_budget` (new lookups
-  per poll) · `hexdb_http` (HTTPS GET) · `poll_pipeline` (one answer → `DataSnapshot`: sort,
-  lookups, phases, CPA, NOW pick) · `net_task` (the core-0 task) · `net_config` (HTTP timeouts).
-- **Settings and maintenance:** `config_store` (settings, sanitizing) · `settings_form` (`/save`
-  form → `Config`, checks, credentials file) · `config_page` (page HTML) · `config_backup` (JSON
-  backup / restore) · `web_auth` (password, throttle, origin check) · `web_i18n` (page strings) ·
-  `ota_update` (image checks, marker, `OtaSession`) · `release_check` (GitHub releases) ·
-  `version` · `device_alerts` (the "!") · `screenshot` (BMP, `?screen=`) · `perf_stats`.
+  `asciiFold()`) · `lookup_cache` (LRU) · `lookup_store` (NVS copy) · `lookup_budget` (lookups per
+  poll) · `hexdb_http` (HTTPS GET) · `poll_pipeline` (one answer → `DataSnapshot`: sort, lookups,
+  phases, CPA, NOW pick) · `net_task` (the core-0 task) · `net_config` (HTTP timeouts).
+- **Settings and maintenance:** `config_store` (settings: aggregate of context objects) ·
+  `settings_form` (`/save` form, checks, credentials file) · `config_page` (page HTML; CSS / JS in
+  `admin/assets/`) · `config_backup` (JSON backup / restore) · `web_auth` (password, throttle, origin)
+  · `web_i18n` (page strings) · `ota_update` (image checks, `OtaSession`) · `release_check` (GitHub
+  releases) · `version` · `device_alerts` (the "!") · `screenshot` (BMP, `?screen=`) · `perf_stats`.
 - **Shared / platform:** `core_link` (what crosses the cores) · `time_sync` (NTP) · `clock` (date
   / time text) · `sun_times` (sunrise / sunset) · `geo` (distance, bearing, compass point) ·
   `backlight` (brightness, night mode) · `i18n` (display strings) · `touch_input` (raw → screen).
@@ -77,7 +77,7 @@ functions with plain types too, an adapter defines them (`LGFX &` ones: in the a
   `ota_flash` (`Update`) · `github_http` (check / install) · `alert_sources` (alert inputs) ·
   `backlight_ldr` (LDR, PWM) · `touch_xpt2046` · `service_flows` (service-screen drivers) ·
   `lgfx/<module>_draw` (screens, theme, fonts) · `lgfx/ui_draw` · `lgfx/screenshot_panel`.
-- **Sky model (`airspace/core`):** `aircraft_state` (`Aircraft`, `inferOnGround()`) ·
+- **Sky model (`airspace/core`):** `aircraft_state` (`Aircraft`, `inferOnGround()`) · `home` ·
   `tracked_flight` (`AircraftRow`) · `flight_ordering` (order, featured split) · `now_pick` (NOW
   aircraft) · `feed_health` (`OpenSkyHealth`) · `flight_phase` · `cpa_predictor`.
 - **Display, core 1:** `lcars_theme` (palette roles, font metrics, icon / arrow shapes) ·
@@ -85,7 +85,7 @@ functions with plain types too, an adapter defines them (`LGFX &` ones: in the a
   `screen_nav` (screen, hit tests, auto-cycle) · `redraw_policy` (events → redraw mask) ·
   `aircraft_summary` (identity block of all screens) · `featured_panel` · `table_view` ·
   `flight_screen` · `radar_view` · `radar_geometry` (polar → screen) · `service_screen` (OTA,
-  password reset, alert screen).
+  password reset, alert screen) · `display_settings` (+ auto-cycle).
 - **UI flows (`display/services`):** `ui_flow` (taps, table page, screen changes, ticks,
   auto-cycle, health, `UiView`) · `service_screen_flows` (`ota_screen_flow`, `update_prompt_flow`,
   `alert_screen_flow` as one step) · `password_reset_flow` · `screenshot_bridge` · `ui_perf` ·
@@ -235,7 +235,7 @@ Details: docs/architecture.md "Concurrency — two cores". Spec: `spec/done/04-d
   references, removed symbols, `main.cpp` in core-0 modules, CLAUDE.md size),
   `python tools/check_layers.py [--strict]` (spec 12 layer rules; report only in CI)
 - Tool tests (CI): `python tools/test_<name>.py` for check_bdd, release_plan, build_site,
-  check_comments, check_layers, rewrite_includes, subset_efont
+  check_comments, check_layers, rewrite_includes, subset_efont, embed_assets
 - Project page: `python tools/build_site.py --out _site` (`--firmware DIR` adds the installer)
 - Settings page / update question screenshots: `python tools/screenshots.py [--device cyd-sky.local]`
 - Spec / issue → PR: `/implement 05`, `/implement #12`; bug → PR: `/fix <description>`,

@@ -56,9 +56,16 @@ with their code; stage 5 moved the 19 screenshot hand-over tests (`ScreenshotBri
 `src/display/services/` but its 9 tests stay in `test_admin` (the settings page serves the
 screenshot); the hand-over between the cores is `screenshot_bridge`, tested in `test_display`.
 
-Cases per suite (spec 12 stage 5): admin 251 (3 skipped), airspace 71, display 408, enrichment
-80, opensky 74, platform 83 — 967, the same as the `RUN_TEST(` count (`LayoutTest` keeps it
+Cases per suite (spec 12 stage 6): admin 257 (3 skipped), airspace 71, display 408, enrichment
+80, opensky 74, platform 84 — 974, the same as the `RUN_TEST(` count (`LayoutTest` keeps it
 ≥ 874).
+
+Settings are guarded against a silent change of format: `config_backup_test.cpp` compares the
+whole backup JSON (with and without secrets) to a golden string and restores a pre-stage-6
+backup field by field, `config_store_test.cpp` pins every default, and
+`tools/test_check_layers.py` pins the NVS keys and their types. Settings are nested objects
+(`c.home.lat`, `c.backlight.night_mode`, `c.web.password` — docs/architecture.md "Source
+layout (spec 12)"); members are assigned, never `{…}`-initialized (gnu++11 on `cyd`).
 
 The UI flows are tested as plain step functions: build the flow, feed it `millis()` values
 (odd ones where a `0` sentinel matters, and across the 32-bit wrap) and touch states, assert the
@@ -69,7 +76,8 @@ injects a fake command queue as the `CommandSender`; `screenshot_bridge_test.cpp
 `support/` (on the include path via `-I test/support`, header-only):
 
 - `test_support.h` — the assertions below and `resetAllForTesting()`.
-- `fixtures.h` — `makeAircraft()`, `makeRow()`, `makeConfig()` (defaults + home in Warsaw),
+- `fixtures.h` — `makeAircraft()`, `makeRow()`, `makeConfig()` (defaults + `home` in Warsaw,
+  `home.configured`),
   `stubPorts()` (stub hexdb.io for `poll_pipeline`; `stubHexdb()` holds what is "cached" and
   records every fetch).
 - `json_assert.h` — `parseJson()`, `assertJsonBool / Int / String / Missing(doc, "a.b.c", …)`.
