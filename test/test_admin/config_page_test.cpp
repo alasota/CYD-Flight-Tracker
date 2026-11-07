@@ -70,19 +70,19 @@ static void test_daily_credits_with_a_night_pause(void) {
 static void test_paused_minutes_follow_the_settings(void) {
   Config c = defaultConfig();
   BacklightStatus l;
-  c.night_mode = NightMode::Schedule;  // 23:00-06:30 by default
-  TEST_ASSERT_EQUAL_UINT32(450u, nightMinutesToday(c, l));
-  TEST_ASSERT_EQUAL_UINT32(0u, pausedMinutesPerDay(c, l));  // pause off (default)
-  c.night_pause_polling = true;
-  TEST_ASSERT_EQUAL_UINT32(450u, pausedMinutesPerDay(c, l));
-  c.night_mode = NightMode::Sun;  // sun not known yet
-  TEST_ASSERT_EQUAL_UINT32(0u, pausedMinutesPerDay(c, l));
+  c.backlight.night_mode = NightMode::Schedule;  // 23:00-06:30 by default
+  TEST_ASSERT_EQUAL_UINT32(450u, nightMinutesToday(c.backlight, l));
+  TEST_ASSERT_EQUAL_UINT32(0u, pausedMinutesPerDay(c.backlight, l));  // pause off (default)
+  c.backlight.night_pause_polling = true;
+  TEST_ASSERT_EQUAL_UINT32(450u, pausedMinutesPerDay(c.backlight, l));
+  c.backlight.night_mode = NightMode::Sun;  // sun not known yet
+  TEST_ASSERT_EQUAL_UINT32(0u, pausedMinutesPerDay(c.backlight, l));
   l.sun_known = true;
   l.sun_local.sunrise_min = 7 * 60 + 17;
   l.sun_local.sunset_min = 17 * 60 + 23;
-  TEST_ASSERT_EQUAL_UINT32(834u, pausedMinutesPerDay(c, l));  // 17:23 -> 07:17
-  c.night_mode = NightMode::Off;
-  TEST_ASSERT_EQUAL_UINT32(0u, pausedMinutesPerDay(c, l));
+  TEST_ASSERT_EQUAL_UINT32(834u, pausedMinutesPerDay(c.backlight, l));  // 17:23 -> 07:17
+  c.backlight.night_mode = NightMode::Off;
+  TEST_ASSERT_EQUAL_UINT32(0u, pausedMinutesPerDay(c.backlight, l));
 }
 
 static void test_light_state_text(void) {
@@ -121,10 +121,10 @@ static void test_display_card(void) {
   ASSERT_NOT_CONTAINS(h, "name=\"night_pause\" value=\"1\" checked");
   ASSERT_CONTAINS(h, "Sunrise and sunset appear once the clock is synced.");
 
-  m.cfg.brightness_auto = false;
-  m.cfg.night_mode = NightMode::Schedule;
-  m.cfg.night_from_min = 22 * 60 + 30;
-  m.cfg.night_pause_polling = true;
+  m.cfg.backlight.brightness_auto = false;
+  m.cfg.backlight.night_mode = NightMode::Schedule;
+  m.cfg.backlight.night_from_min = 22 * 60 + 30;
+  m.cfg.backlight.night_pause_polling = true;
   m.light.synced = true;
   m.light.sun_known = true;
   m.light.sun_local.sunrise_min = 7 * 60 + 17;
@@ -144,7 +144,7 @@ static void test_display_card(void) {
   ASSERT_CONTAINS(h, "<b id=\"ntsv\">1920</b> fewer requests tonight");
   ASSERT_CONTAINS(h, "data-night=\"480\">≈ <b>3840</b>");
 
-  m.cfg.night_mode = NightMode::Off;
+  m.cfg.backlight.night_mode = NightMode::Off;
   m.cfg.home.configured = false;
   h = render(m);
   ASSERT_CONTAINS(h, "<div id=\"ntopt\" hidden>");
@@ -208,7 +208,7 @@ static void test_only_the_active_tab_is_visible(void) {
 static void test_web_language_switches_the_page_text(void) {
   ConfigPageModel m = baseModel();
   m.cfg.web_language = Language::EN;
-  m.cfg.language = Language::PL;  // the display language doesn't matter here
+  m.cfg.display.language = Language::PL;  // the display language doesn't matter here
   std::string h = render(m);
   ASSERT_CONTAINS(h, "<html lang=\"en\">");
   ASSERT_CONTAINS(h, ">Location</button>");
@@ -290,7 +290,7 @@ static void test_lang_forms_have_no_external_action(void) {
 
 static void test_selects_reflect_both_languages_independently(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.language = Language::EN;
+  m.cfg.display.language = Language::EN;
   m.cfg.web_language = Language::PL;
   const std::string h = render(m);
   const size_t display = h.find("name=\"language\"");
@@ -342,9 +342,9 @@ static void test_status_and_daily_credit_readout(void) {
 
 static void test_auto_cycle_checkbox_state(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.auto_cycle_enabled = true;
+  m.cfg.auto_cycle.enabled = true;
   ASSERT_CONTAINS(render(m), "name=\"auto_cycle\" value=\"1\" checked");
-  m.cfg.auto_cycle_enabled = false;
+  m.cfg.auto_cycle.enabled = false;
   ASSERT_NOT_CONTAINS(render(m), "name=\"auto_cycle\" value=\"1\" checked");
 }
 
@@ -590,7 +590,7 @@ static ConfigPageModel displayDemoModel(SettingsTab tab) {
   m.cfg.home.configured = true;
   m.cfg.opensky.client_id = "demo-client";
   m.cfg.opensky.client_secret = "demo-secret";
-  m.cfg.night_pause_polling = true;
+  m.cfg.backlight.night_pause_polling = true;
   m.quota.state = OpenSkyQuota::State::Available;
   m.quota.remaining = 2814;
   m.light.raw = 0;

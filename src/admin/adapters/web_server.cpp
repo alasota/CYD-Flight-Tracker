@@ -150,7 +150,7 @@ void sendPage(ConfigPageModel model, int status = 200) {
   model.update = releaseUpdateState();
   model.updateCheckPending = releaseCheckPending();
   model.installedVersion = firmwareVersion();
-  model.light = backlightStatus(model.cfg);
+  model.light = backlightStatus(model.cfg.backlight);
   // The same alerts as the display's "!" (net_task computes them the same way).
   const AlertInputs alertIn = deviceAlertInputs(model.cfg);
   model.alerts = collectAlerts(alertIn);
@@ -329,7 +329,8 @@ void handlePerf() {
 void handleLight() {
   if (!authorize()) return;
   server.sendHeader("Cache-Control", "no-store");
-  server.send(200, "application/json", lightStatusJson(backlightStatus(loadConfig())).c_str());
+  const BacklightStatus light = backlightStatus(loadConfig().backlight);
+  server.send(200, "application/json", lightStatusJson(light).c_str());
 }
 
 void handleNotFound() { server.send(404, "text/plain", "Not found"); }

@@ -71,27 +71,27 @@ Config sanitizeConfig(const Config &cfg) {
   out.home.lon = clampLon(out.home.lon);
   out.home.radius_deg = clampRadiusDeg(out.home.radius_deg);
   out.poll.interval_s = clampPollIntervalS(out.poll.interval_s);
-  out.last_screen = clampLastScreen(out.last_screen);
-  out.auto_cycle_interval_s = clampAutoCycleIntervalS(out.auto_cycle_interval_s);
+  out.display.last_screen = clampLastScreen(out.display.last_screen);
+  out.auto_cycle.interval_s = clampAutoCycleIntervalS(out.auto_cycle.interval_s);
   out.phase.near_airport_km = clampNearAirportKm(out.phase.near_airport_km);
   out.phase.climb_rate_threshold_mps =
       clampClimbRateThresholdMps(out.phase.climb_rate_threshold_mps);
-  out.language = clampLanguage(static_cast<int>(out.language));
+  out.display.language = clampLanguage(static_cast<int>(out.display.language));
   out.web_language = clampLanguage(static_cast<int>(out.web_language));
   if (validateWebPassword(out.web_password) != WebPasswordCheck::Ok) out.web_password.clear();
   if (!out.update_skipped_tag.empty() && !isReleaseTagFormat(out.update_skipped_tag)) {
     out.update_skipped_tag.clear();
   }
-  out.brightness_fixed_pct = clampBrightnessPct(out.brightness_fixed_pct);
-  out.brightness_min_pct = clampBrightnessPct(out.brightness_min_pct);
-  out.brightness_max_pct = clampBrightnessPct(out.brightness_max_pct);
-  if (out.brightness_min_pct > out.brightness_max_pct) {
-    std::swap(out.brightness_min_pct, out.brightness_max_pct);
+  out.backlight.brightness_fixed_pct = clampBrightnessPct(out.backlight.brightness_fixed_pct);
+  out.backlight.brightness_min_pct = clampBrightnessPct(out.backlight.brightness_min_pct);
+  out.backlight.brightness_max_pct = clampBrightnessPct(out.backlight.brightness_max_pct);
+  if (out.backlight.brightness_min_pct > out.backlight.brightness_max_pct) {
+    std::swap(out.backlight.brightness_min_pct, out.backlight.brightness_max_pct);
   }
-  out.night_mode = clampNightMode(static_cast<int>(out.night_mode));
-  out.night_from_min = clampClockMinutes(out.night_from_min);
-  out.night_to_min = clampClockMinutes(out.night_to_min);
-  out.night_pct = clampNightPct(out.night_pct);
-  out.night_wake_s = clampNightWakeS(out.night_wake_s);
+  out.backlight.night_mode = clampNightMode(static_cast<int>(out.backlight.night_mode));
+  out.backlight.night_from_min = clampClockMinutes(out.backlight.night_from_min);
+  out.backlight.night_to_min = clampClockMinutes(out.backlight.night_to_min);
+  out.backlight.night_pct = clampNightPct(out.backlight.night_pct);
+  out.backlight.night_wake_s = clampNightWakeS(out.backlight.night_wake_s);
   return out;
 }

@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <string>
 
+#include "airspace/core/home.h"  // Home — backlightLoop()'s sun times (backlight_ldr.h)
 #include "shared/sun_times.h"
 
 // ---- Sensor (measured on the board, spec/03 §10) -------------------------
@@ -69,9 +70,16 @@ const char *nightModeCode(NightMode m);  // "off" / "schedule" / "sun"
 // "off" / "schedule" / "sun" -> mode; false for anything else.
 bool nightModeFromCode(const std::string &code, NightMode *out);
 
-// TODO(spec 12): stub from test-author — the backlight's settings object (spec 12 §7, stage 6
-// step 4); Config still has the flat fields until then. Defaults = Config's. Assign members, never
-// {…}-initialize (gnu++11 on env:cyd: not an aggregate with these initializers).
+// The backlight's settings object (spec 12 §7; Config holds one as `backlight`,
+// clamped by config_store). brightness_auto: from the light sensor between min
+// and max (NVS `bl_auto`, `bl_min`, `bl_max`), else fixed (`bl_fix`); percent,
+// 5..100. night_mode Off / by the clock (night_from..night_to, minutes after
+// local midnight; `nt_from`, `nt_to`) / sunset to sunrise (`nt_mode`); at night
+// the brightness is night_pct (0 = backlight off; `nt_pct`). A touch at night
+// wakes the screen / the polling for night_wake_s (`nt_wake`).
+// night_pause_polling: no OpenSky requests at night outside that (`nt_poll`).
+// gnu++11 on env:cyd: not an aggregate with these initializers — assign
+// members, never `BacklightSettings{…}`.
 struct BacklightSettings {
   bool brightness_auto = true;
   uint8_t brightness_fixed_pct = 80;
@@ -169,11 +177,10 @@ std::string lightStatusJson(const BacklightStatus &s);
 
 // ---- Device state (defined in display/adapters/backlight_ldr.cpp) ---------
 
-struct Config;
-
 // The last backlightLoop() decision (UI core).
 const BacklightDecision &backlightDecision();
 // A new touch: true = swallowed (it only woke a dark screen).
-bool backlightHandleTouch(const Config &cfg);
-// Safe from either core: a copy taken at the end of the last backlightLoop().
-BacklightStatus backlightStatus(const Config &cfg);
+bool backlightHandleTouch(const BacklightSettings &settings);
+// Safe from either core: a copy taken at the end of the last backlightLoop();
+// `polling` from settings.night_pause_polling.
+BacklightStatus backlightStatus(const BacklightSettings &settings);

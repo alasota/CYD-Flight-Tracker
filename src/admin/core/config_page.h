@@ -45,10 +45,8 @@ uint32_t openSkyDailyCredits(float radius_deg, uint32_t poll_interval_s,
 
 // Minutes of tonight's night window (by the clock, or today's sunset ->
 // sunrise from `light`); 0 when the night mode is off or the sun unknown.
-uint32_t nightMinutesToday(const Config &cfg, const BacklightStatus &light);
+uint32_t nightMinutesToday(const BacklightSettings &backlight, const BacklightStatus &light);
 // Minutes a day OpenSky isn't polled: the night window, if pausing is on.
-uint32_t pausedMinutesPerDay(const Config &cfg, const BacklightStatus &light);
-// TODO(spec 12): stub from test-author — replaces the Config overload in stage 6 step 4.
 uint32_t pausedMinutesPerDay(const BacklightSettings &backlight, const BacklightStatus &light);
 
 // The General tab's "Now: ..." state word(s): day / night / screen off /

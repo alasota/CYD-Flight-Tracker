@@ -409,8 +409,8 @@ static void test_tap_context_of_view_has_pages_and_header(void) {
 static void test_auto_cycle_input_from_settings_and_cpa(void) {
   NetState s = polledState(1000);
   Config cfg = *s.cfg;
-  cfg.auto_cycle_enabled = true;
-  cfg.auto_cycle_interval_s = 25;
+  cfg.auto_cycle.enabled = true;
+  cfg.auto_cycle.interval_s = 25;
   s.cfg = std::make_shared<const Config>(cfg);
   const AutoCycleInput in = autoCycleInputAt(s, kScreenFlight, true, 7000, 11000);
   TEST_ASSERT_TRUE(in.enabled);
@@ -518,8 +518,8 @@ static void test_ui_flow_page_tap_redraws_only_when_moved(void) {
 static void test_ui_flow_tick_countdown_minute_and_auto_cycle(void) {
   NetState s = polledState(1000);
   Config cfg = *s.cfg;
-  cfg.auto_cycle_enabled = true;
-  cfg.auto_cycle_interval_s = 15;
+  cfg.auto_cycle.enabled = true;
+  cfg.auto_cycle.interval_s = 15;
   s.cfg = std::make_shared<const Config>(cfg);
   UiFlow ui;
   ui.screenChanges.begin(kScreenRadar, 1000);

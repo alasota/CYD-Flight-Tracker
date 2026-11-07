@@ -64,20 +64,14 @@ uint32_t openSkyDailyCredits(float radius_deg, uint32_t poll_interval_s,
          static_cast<uint32_t>(openSkyCreditCost(radius_deg));
 }
 
-uint32_t nightMinutesToday(const Config &cfg, const BacklightStatus &light) {
-  const NightWindow w = nightWindowFor(cfg.night_mode, cfg.night_from_min, cfg.night_to_min,
-                                       light.sun_local, light.sun_known);
+uint32_t nightMinutesToday(const BacklightSettings &backlight, const BacklightStatus &light) {
+  const NightWindow w = nightWindowFor(backlight.night_mode, backlight.night_from_min,
+                                       backlight.night_to_min, light.sun_local, light.sun_known);
   return static_cast<uint32_t>(nightWindowMinutes(w));
 }
 
-uint32_t pausedMinutesPerDay(const Config &cfg, const BacklightStatus &light) {
-  return cfg.night_pause_polling ? nightMinutesToday(cfg, light) : 0;
-}
-
-// TODO(spec 12): stub from test-author
-uint32_t pausedMinutesPerDay(const BacklightSettings & /*backlight*/,
-                             const BacklightStatus & /*light*/) {
-  return 0;
+uint32_t pausedMinutesPerDay(const BacklightSettings &backlight, const BacklightStatus &light) {
+  return backlight.night_pause_polling ? nightMinutesToday(backlight, light) : 0;
 }
 
 std::string lightStateText(const BacklightStatus &s, Language lang) {
@@ -561,49 +555,53 @@ void displayCard(Writer &w, const ConfigPageModel &m, Language lang) {
   const Writer::Option modes[] = {{"auto", WebStr::BrightnessAuto},
                                   {"fixed", WebStr::BrightnessFixed}};
   w.select("blm", "brightness_mode", WebStr::BrightnessMode, modes, 2,
-           c.brightness_auto ? "auto" : "fixed");
-  w.raw(c.brightness_auto ? "<div id=\"blauto\">" : "<div id=\"blauto\" hidden>");
+           c.backlight.brightness_auto ? "auto" : "fixed");
+  w.raw(c.backlight.brightness_auto ? "<div id=\"blauto\">" : "<div id=\"blauto\" hidden>");
   w.raw("<div class=\"row\">");
   w.field("blmin", WebStr::BrightnessMin, "type=\"number\" name=\"bl_min\" min=\"5\" max=\"100\"",
-          fmtU(c.brightness_min_pct));
+          fmtU(c.backlight.brightness_min_pct));
   w.field("blmax", WebStr::BrightnessMax, "type=\"number\" name=\"bl_max\" min=\"5\" max=\"100\"",
-          fmtU(c.brightness_max_pct));
+          fmtU(c.backlight.brightness_max_pct));
   w.raw("</div><div class=\"hint\" style=\"margin:0 0 18px\">");
   w.t(WebStr::BrightnessAutoHint);
   w.raw("</div></div>");
-  w.raw(c.brightness_auto ? "<div id=\"blfix\" hidden>" : "<div id=\"blfix\">");
+  w.raw(c.backlight.brightness_auto ? "<div id=\"blfix\" hidden>" : "<div id=\"blfix\">");
   w.field("blfx", WebStr::BrightnessFixedPct,
-          "type=\"number\" name=\"bl_fixed\" min=\"5\" max=\"100\"", fmtU(c.brightness_fixed_pct));
+          "type=\"number\" name=\"bl_fixed\" min=\"5\" max=\"100\"",
+          fmtU(c.backlight.brightness_fixed_pct));
   w.raw("</div>");
 
   const Writer::Option nights[] = {{"off", WebStr::NightOff},
                                    {"schedule", WebStr::NightSchedule},
                                    {"sun", WebStr::NightSun}};
-  w.select("ntm", "night_mode", WebStr::NightModeLabel, nights, 3, nightModeCode(c.night_mode));
-  w.raw(c.night_mode == NightMode::Schedule ? "<div id=\"ntsch\">" : "<div id=\"ntsch\" hidden>");
+  w.select("ntm", "night_mode", WebStr::NightModeLabel, nights, 3,
+           nightModeCode(c.backlight.night_mode));
+  w.raw(c.backlight.night_mode == NightMode::Schedule ? "<div id=\"ntsch\">"
+                                                      : "<div id=\"ntsch\" hidden>");
   w.raw("<div class=\"row\" style=\"margin-bottom:18px\">");
   w.field("ntf", WebStr::NightFrom, "type=\"time\" name=\"night_from\"",
-          formatClockMinutes(c.night_from_min));
+          formatClockMinutes(c.backlight.night_from_min));
   w.field("ntt", WebStr::NightTo, "type=\"time\" name=\"night_to\"",
-          formatClockMinutes(c.night_to_min));
+          formatClockMinutes(c.backlight.night_to_min));
   w.raw("</div></div>");
-  w.raw(c.night_mode == NightMode::Off ? "<div id=\"ntopt\" hidden>" : "<div id=\"ntopt\">");
+  w.raw(c.backlight.night_mode == NightMode::Off ? "<div id=\"ntopt\" hidden>"
+                                                 : "<div id=\"ntopt\">");
   const WebStr nightHint = WebStr::NightBrightnessHint;
   w.field("ntpct", WebStr::NightBrightness,
-          "type=\"number\" name=\"night_pct\" min=\"0\" max=\"100\"", fmtU(c.night_pct),
+          "type=\"number\" name=\"night_pct\" min=\"0\" max=\"100\"", fmtU(c.backlight.night_pct),
           &nightHint);
   w.field("ntw", WebStr::NightWake, "type=\"number\" name=\"night_wake_s\" min=\"10\" max=\"600\"",
-          fmtU(c.night_wake_s));
+          fmtU(c.backlight.night_wake_s));
   w.raw("<label class=\"switch\" style=\"margin:0\"><span>");
   w.t(WebStr::NightPause);
-  w.raw(c.night_pause_polling
+  w.raw(c.backlight.night_pause_polling
             ? "</span><input type=\"checkbox\" id=\"ntp\" name=\"night_pause\" value=\"1\" checked>"
             : "</span><input type=\"checkbox\" id=\"ntp\" name=\"night_pause\" value=\"1\">");
   w.raw("</label><div class=\"hint\">");
   w.t(WebStr::NightPauseHint);
   const uint32_t poll = c.poll.interval_s == 0 ? 1 : c.poll.interval_s;
   w.raw(" \xE2\x89\x88 <b id=\"ntsv\">");
-  w.uint((nightMinutesToday(c, l) * 60u + poll - 1) / poll);
+  w.uint((nightMinutesToday(c.backlight, l) * 60u + poll - 1) / poll);
   w.raw("</b> ");
   w.t(WebStr::NightPauseSaving);
   w.raw(".</div></div>");
@@ -854,11 +852,12 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.field("poll", WebStr::PollInterval, "type=\"number\" name=\"poll_interval\" min=\"5\"",
           fmtU(c.poll.interval_s));
   const uint32_t daily =
-      openSkyDailyCredits(c.home.radius_deg, c.poll.interval_s, pausedMinutesPerDay(c, m.light));
+      openSkyDailyCredits(c.home.radius_deg, c.poll.interval_s,
+                          pausedMinutesPerDay(c.backlight, m.light));
   const uint32_t limit = openSkyDailyLimit(auth);
   w.raw(loginFailed ? "<div class=\"stat\" id=\"daily\" data-lf=\"1\" data-night=\""
                     : "<div class=\"stat\" id=\"daily\" data-night=\"");
-  w.uint(nightMinutesToday(c, m.light));
+  w.uint(nightMinutesToday(c.backlight, m.light));
   w.raw("\">\xE2\x89\x88 <b>");
   w.uint(daily);
   w.raw("</b> ");
@@ -886,7 +885,7 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.raw("<div class=\"card\"><h2>");
   w.t(WebStr::SectionLanguage);
   w.raw("</h2>");
-  w.languageSelect("lang", "language", WebStr::DisplayLanguage, c.language);
+  w.languageSelect("lang", "language", WebStr::DisplayLanguage, c.display.language);
   w.languageSelect("wlang", "web_language", WebStr::WebLanguage, c.web_language);
   w.raw("</div>");
   displayCard(w, m, lang);
@@ -894,12 +893,12 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   w.t(WebStr::SectionScreens);
   w.raw("</h2><label class=\"switch\"><span>");
   w.t(WebStr::AutoCycle);
-  w.raw(c.auto_cycle_enabled
+  w.raw(c.auto_cycle.enabled
             ? "</span><input type=\"checkbox\" name=\"auto_cycle\" value=\"1\" checked></label>"
             : "</span><input type=\"checkbox\" name=\"auto_cycle\" value=\"1\"></label>");
   w.field("aci", WebStr::AutoCycleInterval,
           "type=\"number\" name=\"auto_cycle_interval\" min=\"3\"",
-          fmtU(c.auto_cycle_interval_s));
+          fmtU(c.auto_cycle.interval_s));
   w.raw("<label class=\"switch\" style=\"margin:0\"><span>");
   w.t(WebStr::UpdAutoCheck);
   w.raw(c.update_check_enabled

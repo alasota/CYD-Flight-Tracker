@@ -11,7 +11,9 @@
 // After tft.init(): ADC attenuation, backlight to full.
 void backlightBegin(LGFX &tft);
 // Every loop(): samples the sensor, decides, ramps the PWM.
-void backlightLoop(LGFX &tft, const Config &cfg, bool serviceScreen);
+// `home` gives the sun times of the sunset-to-sunrise night mode.
+void backlightLoop(LGFX &tft, const BacklightSettings &settings, const Home &home,
+                   bool serviceScreen);
 // A service screen (OTA progress...) is about to be drawn from outside
 // loop(): full brightness now.
 void backlightFullNow(LGFX &tft);
