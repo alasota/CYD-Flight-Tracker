@@ -63,7 +63,7 @@ struct StatesAttempt {
   bool body_ok = false;       // a 200 whose body parsed cleanly
   std::string retry_after;    // X-Rate-Limit-Retry-After-Seconds, if sent
   std::string remaining;      // X-Rate-Limit-Remaining, if sent
-  std::vector<Aircraft> aircraft;
+  std::vector<AircraftState> aircraft;
 };
 
 // `httpCode` gets the login server's status (0 = no answer) for opensky_auth.

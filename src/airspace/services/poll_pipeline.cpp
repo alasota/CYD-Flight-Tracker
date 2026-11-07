@@ -23,7 +23,7 @@ PipelineParams cacheOnly(PipelineParams p) {
   return p;
 }
 
-AirspaceSnapshot buildAirspaceSnapshot(const std::vector<Aircraft> &aircraft,
+AirspaceSnapshot buildAirspaceSnapshot(const std::vector<AircraftState> &aircraft,
                                        const PipelineParams &p, const EnrichmentPort &ports,
                                        uint32_t polledAtMs) {
   AirspaceSnapshot s;
@@ -122,7 +122,7 @@ AirspaceSnapshot buildAirspaceSnapshot(const std::vector<Aircraft> &aircraft,
   // the one overhead soonest is shown (the UI ticks its countdown).
   std::vector<CpaPrediction> cpas(rows.size());
   for (size_t i = 0; i < rows.size(); ++i) {
-    const Aircraft &ac = rows[i].aircraft;
+    const AircraftState &ac = rows[i].aircraft;
     if (!ac.has_position) continue;
     cpas[i] = predictCpa(p.home.lat, p.home.lon, ac.lat, ac.lon, ac.velocity, ac.true_track);
   }

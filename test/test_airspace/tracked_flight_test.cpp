@@ -9,7 +9,7 @@ namespace {
 // ---- buildEnrichedRecords ---------------------------------------------------
 
 static void test_build_enriched_records_found_true(void) {
-  Aircraft ac;
+  AircraftState ac;
   ac.icao24 = "4010ee";
   ac.callsign = "DLH9LH";
   ac.lat = 50.1210f;
@@ -44,7 +44,7 @@ static void test_build_enriched_records_found_true(void) {
 }
 
 static void test_build_enriched_records_found_false_when_lookup_missing(void) {
-  Aircraft ac;
+  AircraftState ac;
   ac.icao24 = "a1b2c3";
   ac.callsign = "N12345";
   ac.has_position = true;
@@ -66,7 +66,7 @@ static void test_build_enriched_records_found_false_when_lookup_missing(void) {
 static void test_build_enriched_records_missing_route_renders_as_dash(void) {
   // Airline/type lookup resolved, but route_lookup hasn't (yet) — the two
   // enrichment sources fail independently (docs/data-sources.md "Route & airport lookup").
-  Aircraft ac;
+  AircraftState ac;
   ac.icao24 = "4010ee";
   ac.callsign = "DLH9LH";
   ac.has_position = true;
@@ -89,7 +89,7 @@ static void test_build_enriched_records_missing_route_renders_as_dash(void) {
 }
 
 static void test_build_enriched_records_found_false_from_cached_miss(void) {
-  Aircraft ac;
+  AircraftState ac;
   ac.icao24 = "ffffff";
   ac.has_position = true;
 

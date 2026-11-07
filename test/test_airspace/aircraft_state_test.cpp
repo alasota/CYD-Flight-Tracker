@@ -6,7 +6,7 @@
 namespace {
 
 static void test_infer_on_ground_rules(void) {
-  Aircraft a;
+  AircraftState a;
   a.on_ground = false;
   a.has_altitude = true;
   a.baro_altitude = 900.0f;

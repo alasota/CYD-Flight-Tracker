@@ -11,7 +11,7 @@
 #include "airspace/services/poll_pipeline.h"
 #include "airspace/core/tracked_flight.h"
 
-// ---- Aircraft / TrackedFlight ------------------------------------------------
+// ---- AircraftState / TrackedFlight -------------------------------------------
 
 struct AircraftOpts {
   bool ground = false;
@@ -24,8 +24,9 @@ struct AircraftOpts {
 inline AircraftOpts groundOpts() { return AircraftOpts{true, 0.0f, 5.0f, 180.0f}; }
 
 // A state vector with a position, altitude (airborne only), speed and track.
-inline Aircraft makeAircraft(const char *hex, const char *callsign, float lat, float lon, AircraftOpts o = {}) {
-  Aircraft a;
+inline AircraftState makeAircraft(const char *hex, const char *callsign, float lat, float lon,
+                                  AircraftOpts o = {}) {
+  AircraftState a;
   a.icao24 = hex;
   a.callsign = callsign;
   a.lat = lat;

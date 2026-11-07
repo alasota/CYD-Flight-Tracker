@@ -25,7 +25,7 @@
 
 #include "enrichment/core/aircraft_lookup.h"
 #include "platform/core_link.h"  // AirspaceSnapshot
-#include "airspace/core/aircraft_state.h"  // Aircraft
+#include "airspace/core/aircraft_state.h"  // AircraftState
 #include "airspace/core/flight_phase.h"    // PhaseThresholds
 #include "airspace/core/home.h"            // Home
 #include "enrichment/core/route_lookup.h"
@@ -56,7 +56,7 @@ struct PipelineParams {
 // One snapshot from `aircraft`. `polledAtMs` = when /states/all answered
 // (the countdown's base). `fetches` in the result counts the lookups that
 // were not cached — i.e. the hexdb.io requests this call made.
-AirspaceSnapshot buildAirspaceSnapshot(const std::vector<Aircraft> &aircraft,
+AirspaceSnapshot buildAirspaceSnapshot(const std::vector<AircraftState> &aircraft,
                                        const PipelineParams &p, const EnrichmentPort &ports,
                                        uint32_t polledAtMs);
 
