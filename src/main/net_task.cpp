@@ -123,7 +123,7 @@ CheckGate updateGate() {
   g.wifi = wifiManagerStatus() == WifiStatus::Connected;
   g.timeSynced = isTimeSynced();
   g.otaBusy = otaFlashSession().inProgress() || configPortalRestartPending();
-  g.msUntilNextPoll = openSkyMsUntilNextPoll(millis(), *cfg);
+  g.msUntilNextPoll = openSkyMsUntilNextPoll(millis(), cfg->poll);
   g.maxFreeBlock = ESP.getMaxAllocHeap();
   return g;
 }
@@ -250,7 +250,7 @@ void pollOpenSky() {
   }
   if (!allowed) return;
 
-  OpenSkyPollResult poll = openSkyClientPoll(millis(), *cfg);
+  OpenSkyPollResult poll = openSkyClientPoll(millis(), cfg->opensky, cfg->home, cfg->poll);
   if (poll.status == OpenSkyPollStatus::NotDue) return;
   const uint32_t polledAt = millis();
 

@@ -15,6 +15,7 @@
 #include "airspace/core/home.h"          // Home
 #include "display/core/backlight.h"      // NightMode
 #include "display/core/i18n.h"           // Language
+#include "opensky/core/opensky_settings.h"  // OpenSkyCredentials, PollSettings
 
 // Clamps the auto-cycle interval (see docs/screens.md "Auto screen cycling") to
 // a sane floor — a few seconds minimum, so the display can't be
@@ -32,9 +33,8 @@ int clampLastScreen(int raw);
 
 struct Config {
   Home home;  // home position, scan radius, configured flag (airspace)
-  uint32_t poll_interval_s = 15;
-  std::string opensky_client_id;
-  std::string opensky_client_secret;
+  PollSettings poll;            // seconds between /states/all requests (opensky)
+  OpenSkyCredentials opensky;   // OAuth2 client id / secret (opensky)
   // Which of the three screens was showing at last power-down (0/1/2),
   // restored on boot — replaces the old two-screen `last_view` boolean now
   // that there are three screens (see docs/screens.md "Screen navigation").

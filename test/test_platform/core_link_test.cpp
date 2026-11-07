@@ -230,7 +230,7 @@ static void test_diff_unrelated_config_change_is_nothing(void) {
   const NetState a = baseState();
   NetState b = a;
   auto cfg = std::make_shared<Config>(*a.cfg);
-  cfg->poll_interval_s = a.cfg->poll_interval_s + 10;
+  cfg->poll.interval_s = a.cfg->poll.interval_s + 10;
   b.cfg = cfg;
   TEST_ASSERT_FALSE(any(diffNetState(&a, b)));
 }

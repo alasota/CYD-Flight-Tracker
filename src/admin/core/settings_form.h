@@ -13,13 +13,11 @@
 #include "admin/core/web_auth.h"      // PasswordChange
 #include "admin/core/web_i18n.h"      // WebStr, Language
 
-// Parsed OpenSky OAuth client credentials from the JSON file OpenSky's
-// account page generates for download: {"clientId":"...","clientSecret":
-// "..."}.
-struct OpenSkyCredentials {
+// The OpenSky OAuth client credentials file OpenSky's account page
+// generates for download: {"clientId":"...","clientSecret":"..."}, parsed.
+struct CredentialsFile {
   bool ok = false;  // true only if both fields were present and non-empty
-  std::string client_id;
-  std::string client_secret;
+  OpenSkyCredentials creds;
 };
 
 // Hard ceiling on how large a credentials JSON body
@@ -32,7 +30,7 @@ constexpr size_t kMaxCredentialsJsonBytes = 4096;
 // tab, web_server). A body over kMaxCredentialsJsonBytes is rejected outright
 // without being parsed. Pure — uses ArduinoJson but no WebServer/hardware
 // dependency — tested under `pio test -e native`.
-OpenSkyCredentials parseOpenSkyCredentialsJson(const std::string &json);
+CredentialsFile parseOpenSkyCredentialsJson(const std::string &json);
 
 // True if `s` parses entirely as a valid (base-10) floating point number —
 // no trailing garbage, not empty (leading whitespace is tolerated, same as

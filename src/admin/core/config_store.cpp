@@ -70,7 +70,7 @@ Config sanitizeConfig(const Config &cfg) {
   out.home.lat = clampLat(out.home.lat);
   out.home.lon = clampLon(out.home.lon);
   out.home.radius_deg = clampRadiusDeg(out.home.radius_deg);
-  out.poll_interval_s = clampPollIntervalS(out.poll_interval_s);
+  out.poll.interval_s = clampPollIntervalS(out.poll.interval_s);
   out.last_screen = clampLastScreen(out.last_screen);
   out.auto_cycle_interval_s = clampAutoCycleIntervalS(out.auto_cycle_interval_s);
   out.phase.near_airport_km = clampNearAirportKm(out.phase.near_airport_km);

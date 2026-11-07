@@ -13,9 +13,9 @@ namespace {
 Config sample() {
   Config c = makeConfig();  // Warsaw, home_configured
   c.home.radius_deg = 1.5f;
-  c.poll_interval_s = 30;
-  c.opensky_client_id = "my-client";
-  c.opensky_client_secret = "s3cr\"et";  // a quote: must survive JSON escaping
+  c.poll.interval_s = 30;
+  c.opensky.client_id = "my-client";
+  c.opensky.client_secret = "s3cr\"et";  // a quote: must survive JSON escaping
   c.language = Language::EN;
   c.web_language = Language::PL;
   c.auto_cycle_enabled = true;
@@ -40,9 +40,9 @@ static void test_round_trip_restores_every_setting(void) {
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, original.home.lat, c.home.lat);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, original.home.lon, c.home.lon);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.5f, c.home.radius_deg);
-  TEST_ASSERT_EQUAL_UINT32(30u, c.poll_interval_s);
-  TEST_ASSERT_EQUAL_STRING("my-client", c.opensky_client_id.c_str());
-  TEST_ASSERT_EQUAL_STRING("s3cr\"et", c.opensky_client_secret.c_str());
+  TEST_ASSERT_EQUAL_UINT32(30u, c.poll.interval_s);
+  TEST_ASSERT_EQUAL_STRING("my-client", c.opensky.client_id.c_str());
+  TEST_ASSERT_EQUAL_STRING("s3cr\"et", c.opensky.client_secret.c_str());
   ASSERT_ENUM_EQ(Language::EN, c.language);
   ASSERT_ENUM_EQ(Language::PL, c.web_language);
   TEST_ASSERT_TRUE(c.auto_cycle_enabled);
@@ -96,13 +96,13 @@ static void test_backup_without_secrets_keeps_the_devices_credentials(void) {
   ASSERT_NOT_CONTAINS(json, "s3cr");  // nowhere else either
 
   Config device = defaultConfig();
-  device.opensky_client_id = "device-id";
-  device.opensky_client_secret = "device-secret";
+  device.opensky.client_id = "device-id";
+  device.opensky.client_secret = "device-secret";
   BackupRestoreResult r = restoreConfigFromBackupJson(json, device);
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
-  TEST_ASSERT_EQUAL_STRING("device-id", r.config.opensky_client_id.c_str());
-  TEST_ASSERT_EQUAL_STRING("device-secret", r.config.opensky_client_secret.c_str());
-  TEST_ASSERT_EQUAL_UINT32(30u, r.config.poll_interval_s);  // the rest still restored
+  TEST_ASSERT_EQUAL_STRING("device-id", r.config.opensky.client_id.c_str());
+  TEST_ASSERT_EQUAL_STRING("device-secret", r.config.opensky.client_secret.c_str());
+  TEST_ASSERT_EQUAL_UINT32(30u, r.config.poll.interval_s);  // the rest still restored
 }
 
 static void test_missing_keys_keep_current_values(void) {
@@ -115,7 +115,7 @@ static void test_missing_keys_keep_current_values(void) {
   TEST_ASSERT_EQUAL_INT(1, r.appliedFields);
   TEST_ASSERT_FALSE(r.config.auto_cycle_enabled);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, current.home.lat, r.config.home.lat);
-  TEST_ASSERT_EQUAL_STRING("my-client", r.config.opensky_client_id.c_str());
+  TEST_ASSERT_EQUAL_STRING("my-client", r.config.opensky.client_id.c_str());
 }
 
 static void test_wrong_types_are_skipped_and_reported(void) {
@@ -130,7 +130,7 @@ static void test_wrong_types_are_skipped_and_reported(void) {
   TEST_ASSERT_EQUAL_INT(1, r.appliedFields);  // only location.lon
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 20.5f, r.config.home.lon);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, current.home.lat, r.config.home.lat);  // kept
-  TEST_ASSERT_EQUAL_UINT32(30u, r.config.poll_interval_s);                // kept
+  TEST_ASSERT_EQUAL_UINT32(30u, r.config.poll.interval_s);                // kept
   ASSERT_ENUM_EQ(Language::EN, r.config.language);                    // kept
   TEST_ASSERT_EQUAL_INT(4, static_cast<int>(r.invalidFields.size()));
   TEST_ASSERT_EQUAL_STRING("location.lat", r.invalidFields[0].c_str());
@@ -162,7 +162,7 @@ static void test_rejects_files_that_are_not_backups(void) {
   ASSERT_ENUM_EQ(BackupRestoreStatus::WrongFormat, restoreConfigFromBackupJson("{\"format\":\"cyd-sky-tracker-config\",\"format_version\":2}", current) .status);
   // A rejected file leaves the config untouched.
   BackupRestoreResult r = restoreConfigFromBackupJson("{\"format\":\"other\"}", current);
-  TEST_ASSERT_EQUAL_STRING("my-client", r.config.opensky_client_id.c_str());
+  TEST_ASSERT_EQUAL_STRING("my-client", r.config.opensky.client_id.c_str());
 }
 
 static void test_rejects_oversized_files(void) {
@@ -275,9 +275,9 @@ static void test_display_group_bad_values_and_old_backups(void) {
 Config everyFieldChanged() {
   Config c = makeConfig();  // Warsaw, home_configured
   c.home.radius_deg = 1.5f;
-  c.poll_interval_s = 30;
-  c.opensky_client_id = "my-client";
-  c.opensky_client_secret = "s3cr\"et";
+  c.poll.interval_s = 30;
+  c.opensky.client_id = "my-client";
+  c.opensky.client_secret = "s3cr\"et";
   c.language = Language::EN;
   c.web_language = Language::EN;
   c.auto_cycle_enabled = true;
@@ -418,9 +418,9 @@ static void test_restore_of_a_stage_5_backup_fills_every_setting(void) {
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.5f, c.home.radius_deg);
   TEST_ASSERT_TRUE(c.home.configured);
   // opensky
-  ASSERT_STR_EQ("my-client", c.opensky_client_id);
-  ASSERT_STR_EQ("s3cr\"et", c.opensky_client_secret);
-  TEST_ASSERT_EQUAL_UINT32(30u, c.poll_interval_s);
+  ASSERT_STR_EQ("my-client", c.opensky.client_id);
+  ASSERT_STR_EQ("s3cr\"et", c.opensky.client_secret);
+  TEST_ASSERT_EQUAL_UINT32(30u, c.poll.interval_s);
   // general
   ASSERT_ENUM_EQ(Language::EN, c.language);
   ASSERT_ENUM_EQ(Language::EN, c.web_language);

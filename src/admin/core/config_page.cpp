@@ -49,7 +49,7 @@ WebStr settingsTabLabel(SettingsTab tab) {
 }
 
 bool hasOpenSkyCredentials(const Config &cfg) {
-  return !cfg.opensky_client_id.empty() && !cfg.opensky_client_secret.empty();
+  return !cfg.opensky.client_id.empty() && !cfg.opensky.client_secret.empty();
 }
 
 uint32_t openSkyDailyRequests(uint32_t poll_interval_s, uint32_t paused_min_per_day) {
@@ -601,7 +601,7 @@ void displayCard(Writer &w, const ConfigPageModel &m, Language lang) {
             : "</span><input type=\"checkbox\" id=\"ntp\" name=\"night_pause\" value=\"1\">");
   w.raw("</label><div class=\"hint\">");
   w.t(WebStr::NightPauseHint);
-  const uint32_t poll = c.poll_interval_s == 0 ? 1 : c.poll_interval_s;
+  const uint32_t poll = c.poll.interval_s == 0 ? 1 : c.poll.interval_s;
   w.raw(" \xE2\x89\x88 <b id=\"ntsv\">");
   w.uint((nightMinutesToday(c, l) * 60u + poll - 1) / poll);
   w.raw("</b> ");
@@ -787,7 +787,7 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   // The login state for the credentials in this config: other credentials
   // than the ones the board last tried (just saved) read as Account.
   const OpenSkyAuthState auth =
-      onCredentials(m.auth, credentialsHash(c.opensky_client_id, c.opensky_client_secret), authed);
+      onCredentials(m.auth, credentialsHash(c.opensky.client_id, c.opensky.client_secret), authed);
   const bool loginFailed = auth.mode == OpenSkyAuthState::Mode::LoginFailed;
   w.sectionOpen(SettingsTab::OpenSky, m.tab);
   if (loginFailed) {
@@ -815,14 +815,14 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
   }
   w.field("cid", WebStr::ClientId,
           "name=\"client_id\" autocomplete=\"off\" autocapitalize=\"off\" spellcheck=\"false\"",
-          c.opensky_client_id);
+          c.opensky.client_id);
   w.raw("<div class=\"f\"><label for=\"cs\">");
   w.t(WebStr::ClientSecret);
   // The saved secret never goes into the page (anyone could read it from the
   // source): the field stays empty, empty = keep it.
   w.raw("</label><div class=\"pw\"><input id=\"cs\" type=\"password\" name=\"client_secret\" "
         "autocomplete=\"off\" value=\"\"");
-  if (!c.opensky_client_secret.empty()) {
+  if (!c.opensky.client_secret.empty()) {
     w.raw(" data-saved=\"1\" placeholder=\"");
     w.t(WebStr::SecretKeepPlaceholder);
     w.raw("\"");
@@ -852,9 +852,9 @@ void renderConfigPage(const ConfigPageModel &m, const HtmlSink &emit) {
 
   w.raw("<div class=\"card\">");
   w.field("poll", WebStr::PollInterval, "type=\"number\" name=\"poll_interval\" min=\"5\"",
-          fmtU(c.poll_interval_s));
+          fmtU(c.poll.interval_s));
   const uint32_t daily =
-      openSkyDailyCredits(c.home.radius_deg, c.poll_interval_s, pausedMinutesPerDay(c, m.light));
+      openSkyDailyCredits(c.home.radius_deg, c.poll.interval_s, pausedMinutesPerDay(c, m.light));
   const uint32_t limit = openSkyDailyLimit(auth);
   w.raw(loginFailed ? "<div class=\"stat\" id=\"daily\" data-lf=\"1\" data-night=\""
                     : "<div class=\"stat\" id=\"daily\" data-night=\"");

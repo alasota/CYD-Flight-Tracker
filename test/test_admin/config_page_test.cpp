@@ -154,9 +154,9 @@ static void test_display_card(void) {
 static void test_credentials_need_both_fields(void) {
   Config c = defaultConfig();
   TEST_ASSERT_FALSE(hasOpenSkyCredentials(c));
-  c.opensky_client_id = "id";
+  c.opensky.client_id = "id";
   TEST_ASSERT_FALSE(hasOpenSkyCredentials(c));
-  c.opensky_client_secret = "secret";
+  c.opensky.client_secret = "secret";
   TEST_ASSERT_TRUE(hasOpenSkyCredentials(c));
 }
 
@@ -169,7 +169,7 @@ static void test_html_escape(void) {
 
 static void test_page_is_complete_and_never_emits_empty_chunks(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.opensky_client_id = "";  // empty values must not produce empty chunks
+  m.cfg.opensky.client_id = "";  // empty values must not produce empty chunks
   const std::string h = render(m);
   TEST_ASSERT_EQUAL_INT(0, emptyChunks);
   ASSERT_CONTAINS(h, "<!DOCTYPE html>");
@@ -302,7 +302,7 @@ static void test_selects_reflect_both_languages_independently(void) {
 
 static void test_user_values_are_escaped(void) {
   ConfigPageModel m = baseModel();
-  m.cfg.opensky_client_id = "a\"><script>x</script>";
+  m.cfg.opensky.client_id = "a\"><script>x</script>";
   const std::string h = render(m);
   ASSERT_NOT_CONTAINS(h, "<script>x</script>");
   ASSERT_CONTAINS(h, "a&quot;&gt;&lt;script&gt;");
@@ -331,9 +331,9 @@ static void test_status_and_daily_credit_readout(void) {
   ASSERT_CONTAINS(h, "<b>5760</b> credits a day");
   ASSERT_CONTAINS(h, "limit 400<div class=\"warn\">");
 
-  m.cfg.opensky_client_id = "id";
-  m.cfg.opensky_client_secret = "secret";
-  m.cfg.poll_interval_s = 30;  // 2880 <= 4000
+  m.cfg.opensky.client_id = "id";
+  m.cfg.opensky.client_secret = "secret";
+  m.cfg.poll.interval_s = 30;  // 2880 <= 4000
   h = render(m);
   ASSERT_CONTAINS(h, "class=\"pill ok\"");
   ASSERT_CONTAINS(h, "<b>2880</b>");
@@ -588,8 +588,8 @@ static ConfigPageModel displayDemoModel(SettingsTab tab) {
   m.cfg.web_language = Language::PL;
   m.cfg.web_password = "demo-password";
   m.cfg.home.configured = true;
-  m.cfg.opensky_client_id = "demo-client";
-  m.cfg.opensky_client_secret = "demo-secret";
+  m.cfg.opensky.client_id = "demo-client";
+  m.cfg.opensky.client_secret = "demo-secret";
   m.cfg.night_pause_polling = true;
   m.quota.state = OpenSkyQuota::State::Available;
   m.quota.remaining = 2814;
@@ -641,14 +641,14 @@ static void test_restarting_page_reloads_itself(void) {
 static void test_saved_secret_never_reaches_the_page(void) {
   ConfigPageModel m = baseModel();
   m.cfg.web_language = Language::EN;
-  m.cfg.opensky_client_id = "my-id";
-  m.cfg.opensky_client_secret = "TOP-SECRET-VALUE";
+  m.cfg.opensky.client_id = "my-id";
+  m.cfg.opensky.client_secret = "TOP-SECRET-VALUE";
   std::string h = render(m);
   ASSERT_NOT_CONTAINS(h, "TOP-SECRET-VALUE");
   ASSERT_CONTAINS(h, "name=\"client_secret\" autocomplete=\"off\" value=\"\" " "data-saved=\"1\" placeholder=\"saved");
   ASSERT_CONTAINS(h, "name=\"clear_credentials\"");
 
-  m.cfg.opensky_client_secret.clear();
+  m.cfg.opensky.client_secret.clear();
   h = render(m);
   ASSERT_NOT_CONTAINS(h, "data-saved");
   ASSERT_NOT_CONTAINS(h, "name=\"clear_credentials\"");
@@ -749,8 +749,8 @@ static void test_render_alert_demo(void) {
   m.cfg.web_password = "demo-password";
   m.tab = SettingsTab::OpenSky;
   // The demo's login alert, also on the OpenSky tab: red pill + warning.
-  m.cfg.opensky_client_id = "demo-client";
-  m.cfg.opensky_client_secret = "demo-secret";
+  m.cfg.opensky.client_id = "demo-client";
+  m.cfg.opensky.client_secret = "demo-secret";
   m.auth = onCredentials(OpenSkyAuthState{}, credentialsHash("demo-client", "demo-secret"), true);
   m.auth.mode = OpenSkyAuthState::Mode::LoginFailed;
   m.auth.lastHttpCode = 401;
@@ -777,8 +777,8 @@ static ConfigPageModel authModel(OpenSkyAuthState::Mode mode, Language lang) {
   m.tab = SettingsTab::OpenSky;
   m.nowMs = kNowMs;
   if (mode == OpenSkyAuthState::Mode::NoCredentials) return m;
-  m.cfg.opensky_client_id = "id";
-  m.cfg.opensky_client_secret = "secret";
+  m.cfg.opensky.client_id = "id";
+  m.cfg.opensky.client_secret = "secret";
   m.auth = onCredentials(OpenSkyAuthState{}, credentialsHash("id", "secret"), true);
   if (mode == OpenSkyAuthState::Mode::LoginFailed) {
     // Rejected with 401 three minutes ago (14:32), the clock now says 14:35.
@@ -885,13 +885,13 @@ static void test_no_login_warning_unless_failed(void) {
 // Scenario: W stanie LoginFailed szacunek kredytów dziennie porównywany jest z limitem 400
 static void test_daily_limit_is_anonymous_when_login_failed(void) {
   ConfigPageModel m = authModel(OpenSkyAuthState::Mode::LoginFailed, Language::EN);
-  m.cfg.poll_interval_s = 30;  // 2880 credits a day
+  m.cfg.poll.interval_s = 30;  // 2880 credits a day
   std::string h = render(m);
   ASSERT_CONTAINS(h, "<b>2880</b> credits a day");
   ASSERT_CONTAINS(h, "limit 400<div class=\"warn\">");
 
   m = authModel(OpenSkyAuthState::Mode::Account, Language::EN);
-  m.cfg.poll_interval_s = 30;
+  m.cfg.poll.interval_s = 30;
   h = render(m);
   ASSERT_CONTAINS(h, "<b>2880</b> credits a day");
   ASSERT_CONTAINS(h, "limit 4000</div>");
@@ -902,7 +902,7 @@ static void test_daily_limit_is_anonymous_when_login_failed(void) {
 static void test_just_saved_credentials_show_account(void) {
   ConfigPageModel m = authModel(OpenSkyAuthState::Mode::LoginFailed, Language::EN);
   m.auth.credentialsHash = credentialsHash("old-id", "old-secret");  // learnt for the old ones
-  m.cfg.poll_interval_s = 30;
+  m.cfg.poll.interval_s = 30;
   const std::string h = render(m);
   ASSERT_CONTAINS(h, "<span class=\"pill ok\"><span class=\"dot\"></span>OpenSky account configured");
   ASSERT_CONTAINS(h, "limit 4000</div>");

@@ -20,9 +20,9 @@ Config loadConfig() {
   cfg.home.lat = prefs.getFloat("home_lat", cfg.home.lat);
   cfg.home.lon = prefs.getFloat("home_lon", cfg.home.lon);
   cfg.home.radius_deg = prefs.getFloat("radius_deg", cfg.home.radius_deg);
-  cfg.poll_interval_s = prefs.getUInt("poll_s", cfg.poll_interval_s);
-  cfg.opensky_client_id = prefs.getString("os_id", "").c_str();
-  cfg.opensky_client_secret = prefs.getString("os_secret", "").c_str();
+  cfg.poll.interval_s = prefs.getUInt("poll_s", cfg.poll.interval_s);
+  cfg.opensky.client_id = prefs.getString("os_id", "").c_str();
+  cfg.opensky.client_secret = prefs.getString("os_secret", "").c_str();
   cfg.last_screen = clampLastScreen(prefs.getInt("last_screen", cfg.last_screen));
   cfg.auto_cycle_enabled = prefs.getBool("auto_cyc", cfg.auto_cycle_enabled);
   cfg.auto_cycle_interval_s = prefs.getUInt("auto_cyc_s", cfg.auto_cycle_interval_s);
@@ -62,9 +62,9 @@ void saveConfig(const Config &cfg) {
   prefs.putFloat("home_lat", sanitized.home.lat);
   prefs.putFloat("home_lon", sanitized.home.lon);
   prefs.putFloat("radius_deg", sanitized.home.radius_deg);
-  prefs.putUInt("poll_s", sanitized.poll_interval_s);
-  prefs.putString("os_id", sanitized.opensky_client_id.c_str());
-  prefs.putString("os_secret", sanitized.opensky_client_secret.c_str());
+  prefs.putUInt("poll_s", sanitized.poll.interval_s);
+  prefs.putString("os_id", sanitized.opensky.client_id.c_str());
+  prefs.putString("os_secret", sanitized.opensky.client_secret.c_str());
   prefs.putInt("last_screen", sanitized.last_screen);
   prefs.putBool("auto_cyc", sanitized.auto_cycle_enabled);
   prefs.putUInt("auto_cyc_s", sanitized.auto_cycle_interval_s);
