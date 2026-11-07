@@ -130,7 +130,7 @@ static void test_guarded_copy(void) {
 static NetState baseState() {
   NetState s;
   auto cfg = std::make_shared<Config>();
-  cfg->home_configured = true;
+  cfg->home.configured = true;
   s.cfg = cfg;
   auto d = std::make_shared<DataSnapshot>();
   d->rows.resize(2);
@@ -202,11 +202,11 @@ static void test_diff_language_change(void) {
 static void test_diff_home_configured_is_first_draw(void) {
   NetState a = baseState();
   auto unset = std::make_shared<Config>(*a.cfg);
-  unset->home_configured = false;
+  unset->home.configured = false;
   a.cfg = unset;
   NetState b = a;
   auto set = std::make_shared<Config>(*a.cfg);
-  set->home_configured = true;
+  set->home.configured = true;
   b.cfg = set;
   TEST_ASSERT_TRUE(diffNetState(&a, b).firstDraw);
 }
@@ -215,13 +215,13 @@ static void test_diff_radius_or_home_moves_content(void) {
   const NetState a = baseState();
   NetState b = a;
   auto cfg = std::make_shared<Config>(*a.cfg);
-  cfg->radius_deg = a.cfg->radius_deg + 1.0f;
+  cfg->home.radius_deg = a.cfg->home.radius_deg + 1.0f;
   b.cfg = cfg;
   TEST_ASSERT_TRUE(diffNetState(&a, b).newPoll);
 
   NetState c = a;
   auto moved = std::make_shared<Config>(*a.cfg);
-  moved->home_lat += 0.5f;
+  moved->home.lat += 0.5f;
   c.cfg = moved;
   TEST_ASSERT_TRUE(diffNetState(&a, c).newPoll);
 }

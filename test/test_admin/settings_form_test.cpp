@@ -130,11 +130,11 @@ static void assertRejected(const std::vector<WebStr> &want, const std::vector<We
 // Saved settings that differ from every value the forms below send.
 static Config savedConfig() {
   Config c = makeConfig();
-  c.radius_deg = 2.0f;
+  c.home.radius_deg = 2.0f;
   c.poll_interval_s = 60;
   c.auto_cycle_interval_s = 45;
-  c.near_airport_km = 12.0f;
-  c.climb_rate_threshold_mps = 1.0f;
+  c.phase.near_airport_km = 12.0f;
+  c.phase.climb_rate_threshold_mps = 1.0f;
   c.brightness_min_pct = 15;
   c.night_wake_s = 90;
   c.night_from_min = 23 * 60;
@@ -148,7 +148,7 @@ static Config savedConfig() {
 // Poprawny formularz ustawia wszystkie pola i oznacza dom jako ustawiony
 static void test_form_valid_submit_sets_every_field_and_home_configured(void) {
   Config cfg = defaultConfig();
-  TEST_ASSERT_FALSE(cfg.home_configured);
+  TEST_ASSERT_FALSE(cfg.home.configured);
   const FormArgs args = form({{"lat", "50.0614"},
                               {"lon", "19.9366"},
                               {"radius", "1.5"},
@@ -176,14 +176,14 @@ static void test_form_valid_submit_sets_every_field_and_home_configured(void) {
                               {"new_password2", ""}});
   const SettingsFormOutcome out = applySettingsForm(cfg, args);
 
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 50.0614f, cfg.home_lat);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 19.9366f, cfg.home_lon);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.5f, cfg.radius_deg);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 50.0614f, cfg.home.lat);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 19.9366f, cfg.home.lon);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.5f, cfg.home.radius_deg);
   TEST_ASSERT_EQUAL_UINT32(30, cfg.poll_interval_s);
   TEST_ASSERT_TRUE(cfg.auto_cycle_enabled);
   TEST_ASSERT_EQUAL_UINT32(20, cfg.auto_cycle_interval_s);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 10.0f, cfg.near_airport_km);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.5f, cfg.climb_rate_threshold_mps);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 10.0f, cfg.phase.near_airport_km);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.5f, cfg.phase.climb_rate_threshold_mps);
   TEST_ASSERT_TRUE(cfg.update_check_enabled);
   TEST_ASSERT_FALSE(cfg.brightness_auto);
   TEST_ASSERT_EQUAL_UINT8(20, cfg.brightness_min_pct);
@@ -199,7 +199,7 @@ static void test_form_valid_submit_sets_every_field_and_home_configured(void) {
   ASSERT_ENUM_EQ(Language::EN, cfg.web_language);
   ASSERT_STR_EQ("my-id", cfg.opensky_client_id);
   ASSERT_STR_EQ("my-secret", cfg.opensky_client_secret);
-  TEST_ASSERT_TRUE(cfg.home_configured);
+  TEST_ASSERT_TRUE(cfg.home.configured);
   assertRejected({}, out.rejected);
   ASSERT_ENUM_EQ(WebStr::Saved, out.message);
 }
@@ -213,17 +213,17 @@ static void test_form_rejects_malformed_number_and_keeps_old_value(void) {
     std::function<float(const Config &)> get;
   };
   const Example examples[] = {
-      {"lat", "abc", WebStr::Latitude, [](const Config &c) { return c.home_lat; }},
-      {"lon", "12.3.4", WebStr::Longitude, [](const Config &c) { return c.home_lon; }},
-      {"radius", "", WebStr::Radius, [](const Config &c) { return c.radius_deg; }},
+      {"lat", "abc", WebStr::Latitude, [](const Config &c) { return c.home.lat; }},
+      {"lon", "12.3.4", WebStr::Longitude, [](const Config &c) { return c.home.lon; }},
+      {"radius", "", WebStr::Radius, [](const Config &c) { return c.home.radius_deg; }},
       {"poll_interval", "-5", WebStr::PollInterval,
        [](const Config &c) { return static_cast<float>(c.poll_interval_s); }},
       {"auto_cycle_interval", "10s", WebStr::AutoCycleInterval,
        [](const Config &c) { return static_cast<float>(c.auto_cycle_interval_s); }},
       {"near_airport_km", "1e", WebStr::NearAirport,
-       [](const Config &c) { return c.near_airport_km; }},
+       [](const Config &c) { return c.phase.near_airport_km; }},
       {"climb_rate_mps", "x", WebStr::ClimbRate,
-       [](const Config &c) { return c.climb_rate_threshold_mps; }},
+       [](const Config &c) { return c.phase.climb_rate_threshold_mps; }},
       {"bl_min", "12345", WebStr::BrightnessMin,
        [](const Config &c) { return static_cast<float>(c.brightness_min_pct); }},
       {"night_wake_s", "3.5", WebStr::NightWake,
@@ -267,13 +267,13 @@ static void test_form_missing_checkbox_unchecked_missing_text_unchanged(void) {
   cfg.auto_cycle_enabled = true;
   cfg.update_check_enabled = true;
   cfg.night_pause_polling = true;
-  const float lat = cfg.home_lat;
+  const float lat = cfg.home.lat;
   const SettingsFormOutcome out = applySettingsForm(cfg, form({{"lon", "21.5"}}));
   TEST_ASSERT_FALSE(cfg.auto_cycle_enabled);
   TEST_ASSERT_FALSE(cfg.update_check_enabled);
   TEST_ASSERT_FALSE(cfg.night_pause_polling);
-  TEST_ASSERT_FLOAT_WITHIN(1e-6f, lat, cfg.home_lat);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 21.5f, cfg.home_lon);
+  TEST_ASSERT_FLOAT_WITHIN(1e-6f, lat, cfg.home.lat);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 21.5f, cfg.home.lon);
   assertRejected({}, out.rejected);
 }
 
@@ -350,7 +350,7 @@ static void test_form_args_first_value_wins(void) {
   ASSERT_STR_EQ("52.1", args.get("lat"));
   Config cfg = savedConfig();
   const SettingsFormOutcome out = applySettingsForm(cfg, args);
-  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 52.1f, cfg.home_lat);
+  TEST_ASSERT_FLOAT_WITHIN(1e-4f, 52.1f, cfg.home.lat);
   assertRejected({}, out.rejected);
 }
 

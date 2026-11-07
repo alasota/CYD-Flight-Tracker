@@ -57,9 +57,9 @@ inline AircraftRow makeRow(const char *callsign, float km, bool onGround = false
 // defaultConfig() with the home set to central Warsaw.
 inline Config makeConfig() {
   Config c = defaultConfig();
-  c.home_lat = 52.2297f;
-  c.home_lon = 21.0122f;
-  c.home_configured = true;
+  c.home.lat = 52.2297f;
+  c.home.lon = 21.0122f;
+  c.home.configured = true;
   return c;
 }
 

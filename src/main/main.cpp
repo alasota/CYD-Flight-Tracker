@@ -67,7 +67,7 @@ static UiView view() {
 // prompt stands in for the screens (`setupPrompt`: on a full redraw).
 static void redrawPending(bool setupPrompt) {
   const uint8_t mask = ui.takeRedrawMask(nav.current());
-  if (mask != 0 && cfg().home_configured) {
+  if (mask != 0 && cfg().home.configured) {
     applyRedraw(tft, mask, view());
   } else if (setupPrompt && (mask & kRedrawFull)) {
     drawSetupPrompt(tft);  // "set your home location" until web_server is used

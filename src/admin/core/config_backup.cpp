@@ -16,9 +16,9 @@ std::string configToBackupJson(const Config &cfg, bool includeSecrets, const cha
   doc["firmware"] = firmwareVersion != nullptr ? firmwareVersion : "";
 
   JsonObject location = doc["location"].to<JsonObject>();
-  location["lat"] = cfg.home_lat;
-  location["lon"] = cfg.home_lon;
-  location["radius_deg"] = cfg.radius_deg;
+  location["lat"] = cfg.home.lat;
+  location["lon"] = cfg.home.lon;
+  location["radius_deg"] = cfg.home.radius_deg;
 
   JsonObject opensky = doc["opensky"].to<JsonObject>();
   if (includeSecrets) {
@@ -32,8 +32,8 @@ std::string configToBackupJson(const Config &cfg, bool includeSecrets, const cha
   general["web_language"] = languageCode(cfg.web_language);
   general["auto_cycle"] = cfg.auto_cycle_enabled;
   general["auto_cycle_interval_s"] = cfg.auto_cycle_interval_s;
-  general["near_airport_km"] = cfg.near_airport_km;
-  general["climb_rate_mps"] = cfg.climb_rate_threshold_mps;
+  general["near_airport_km"] = cfg.phase.near_airport_km;
+  general["climb_rate_mps"] = cfg.phase.climb_rate_threshold_mps;
   general["update_check"] = cfg.update_check_enabled;
   general["update_show_prerelease"] = cfg.update_show_prerelease;
 
@@ -175,10 +175,10 @@ BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const C
 
   JsonObjectConst location = doc["location"];
   const int beforeLocation = r.appliedFields;
-  a.number(location, "location", "lat", c.home_lat);
-  a.number(location, "location", "lon", c.home_lon);
-  a.number(location, "location", "radius_deg", c.radius_deg);
-  if (r.appliedFields > beforeLocation) c.home_configured = true;
+  a.number(location, "location", "lat", c.home.lat);
+  a.number(location, "location", "lon", c.home.lon);
+  a.number(location, "location", "radius_deg", c.home.radius_deg);
+  if (r.appliedFields > beforeLocation) c.home.configured = true;
 
   JsonObjectConst opensky = doc["opensky"];
   a.text(opensky, "opensky", "client_id", c.opensky_client_id);
@@ -190,8 +190,8 @@ BackupRestoreResult restoreConfigFromBackupJson(const std::string &json, const C
   a.language(general, "general", "web_language", c.web_language);
   a.flag(general, "general", "auto_cycle", c.auto_cycle_enabled);
   a.count(general, "general", "auto_cycle_interval_s", c.auto_cycle_interval_s);
-  a.number(general, "general", "near_airport_km", c.near_airport_km);
-  a.number(general, "general", "climb_rate_mps", c.climb_rate_threshold_mps);
+  a.number(general, "general", "near_airport_km", c.phase.near_airport_km);
+  a.number(general, "general", "climb_rate_mps", c.phase.climb_rate_threshold_mps);
   a.flag(general, "general", "update_check", c.update_check_enabled);
   a.flag(general, "general", "update_show_prerelease", c.update_show_prerelease);
 

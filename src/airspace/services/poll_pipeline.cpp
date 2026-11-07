@@ -32,7 +32,7 @@ DataSnapshot buildDataSnapshot(const std::vector<Aircraft> &aircraft, const Pipe
   // Rank aircraft (airborne nearest-first, then ground) so the limited per-poll
   // lookup budget is spent on the ones the user actually sees first.
   rows = buildEnrichedRecords(aircraft, {}, {});
-  annotateDistances(rows, p.homeLat, p.homeLon);
+  annotateDistances(rows, p.home.lat, p.home.lon);
   sortRowsForDisplay(rows);  // airborne first, then ground traffic (#9)
 
   std::vector<LookupKeys> byPriority;
@@ -85,7 +85,7 @@ DataSnapshot buildDataSnapshot(const std::vector<Aircraft> &aircraft, const Pipe
       r.route_pending = !r.aircraft.callsign.empty();
     }
   }
-  classifyPhases(rows, p.nearAirportKm, p.climbRateMps);
+  classifyPhases(rows, p.phase.near_airport_km, p.phase.climb_rate_threshold_mps);
 
   // Route-endpoint airports for every row with a route, so the whole UI
   // shows IATA codes. Cache hits are free; new lookups are budgeted
@@ -121,7 +121,7 @@ DataSnapshot buildDataSnapshot(const std::vector<Aircraft> &aircraft, const Pipe
   for (size_t i = 0; i < rows.size(); ++i) {
     const Aircraft &ac = rows[i].aircraft;
     if (!ac.has_position) continue;
-    cpas[i] = predictCpa(p.homeLat, p.homeLon, ac.lat, ac.lon, ac.velocity, ac.true_track);
+    cpas[i] = predictCpa(p.home.lat, p.home.lon, ac.lat, ac.lon, ac.velocity, ac.true_track);
   }
   const NowPick now = pickNowAircraft(rows, cpas, kOverheadRadiusKm);
   s.nowRowIndex = now.index;

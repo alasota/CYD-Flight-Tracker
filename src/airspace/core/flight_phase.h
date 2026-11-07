@@ -19,6 +19,16 @@ enum class Phase {
   OVERFLIGHT,  // airborne, not near an airport (or near one but level)
 };
 
+// The two thresholds below as settings (spec 12 §7; Config holds one as
+// `phase`, clamped by config_store). near_airport_km is really "near HOME"
+// (this project has no airport coordinate database). Defaults match
+// docs/screens.md "Flight phase": ~15 km, and ~1.5 m/s for the climb/descent
+// cutoff. gnu++11 on env:cyd: assign members, never `PhaseThresholds{…}`.
+struct PhaseThresholds {
+  float near_airport_km = 15.0f;
+  float climb_rate_threshold_mps = 1.5f;
+};
+
 // Classifies flight phase from:
 //   distance_km          — aircraft's distance from the nearest airport
 //   vertical_rate_mps     — vertical rate, positive = climbing

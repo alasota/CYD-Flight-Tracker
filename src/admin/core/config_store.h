@@ -11,8 +11,10 @@
 #include <cstdint>
 #include <string>
 
-#include "display/core/backlight.h"  // NightMode
-#include "display/core/i18n.h"       // Language
+#include "airspace/core/flight_phase.h"  // PhaseThresholds
+#include "airspace/core/home.h"          // Home
+#include "display/core/backlight.h"      // NightMode
+#include "display/core/i18n.h"           // Language
 
 // Clamps the auto-cycle interval (see docs/screens.md "Auto screen cycling") to
 // a sane floor — a few seconds minimum, so the display can't be
@@ -29,11 +31,7 @@ uint32_t clampAutoCycleIntervalS(uint32_t interval_s);
 int clampLastScreen(int raw);
 
 struct Config {
-  float home_lat = 0.0f;
-  float home_lon = 0.0f;
-  // Bounding-box half-width in degrees. Default keeps the resulting OpenSky
-  // bbox in the 1-credit tier (<=25 sq deg) — see docs/data-sources.md "Rate limits".
-  float radius_deg = 2.5f;
+  Home home;  // home position, scan radius, configured flag (airspace)
   uint32_t poll_interval_s = 15;
   std::string opensky_client_id;
   std::string opensky_client_secret;
@@ -48,11 +46,7 @@ struct Config {
   // web_server.
   bool auto_cycle_enabled = false;
   uint32_t auto_cycle_interval_s = 15;
-  // flight_phase thresholds (docs/screens.md "Flight phase"). near_airport_km
-  // is really "near HOME" (this project has no airport coordinate database).
-  // Defaults match the docs: ~15 km, and ~1.5 m/s for the climb/descent cutoff.
-  float near_airport_km = 15.0f;
-  float climb_rate_threshold_mps = 1.5f;
+  PhaseThresholds phase;  // flight_phase thresholds (airspace)
   // On-screen language (CLAUDE.md "Language"), chosen on the config page.
   // Stored in NVS as its numeric index; an out-of-range stored value is
   // reset to kDefaultLanguage by sanitizeConfig().
@@ -94,14 +88,6 @@ struct Config {
   uint8_t night_pct = 10;
   uint16_t night_wake_s = 60;
   bool night_pause_polling = false;
-  // True once the user has saved the settings form at least once via
-  // web_server. (0, 0) is a real place (Gulf of Guinea) — without this
-  // flag there's no way to tell "user hasn't configured their home
-  // location yet" apart from "user's home really is at 0,0", so the
-  // firmware would happily poll/display aircraft around Null Island with
-  // no indication anything needs setting up. See docs/review-notes-2026.md
-  // 1.5.
-  bool home_configured = false;
 };
 
 // Hardcoded fallback values used before anything has ever been saved to NVS.

@@ -28,12 +28,12 @@ UiView makeUiView(const NetState &s, int screen, int page, OpenSkyHealth shownHe
   v.hasData = s.data != nullptr;
   v.nowRowIndex = v.hasData ? s.data->nowRowIndex : -1;
   v.cpa = netCpaAt(s, nowMs);
-  v.radiusDeg = s.cfg != nullptr ? s.cfg->radius_deg : 0.0f;
+  v.radiusDeg = s.cfg != nullptr ? s.cfg->home.radius_deg : 0.0f;
   v.health = shownHealth;
   v.alertBadge = s.alerts.displaySeverity();
   v.local = local;
   v.synced = synced;
-  v.homeConfigured = s.cfg != nullptr && s.cfg->home_configured;
+  v.homeConfigured = s.cfg != nullptr && s.cfg->home.configured;
   return v;
 }
 
@@ -176,7 +176,7 @@ AutoCycleInput autoCycleInputAt(const NetState &s, int currentScreen, bool scree
                                 uint32_t elapsedMs, uint32_t nowMs) {
   AutoCycleInput in;
   in.enabled = s.cfg->auto_cycle_enabled;
-  in.homeConfigured = s.cfg->home_configured;
+  in.homeConfigured = s.cfg->home.configured;
   in.screenOff = screenOff;
   in.currentScreen = currentScreen;
   const CpaPrediction cpa = netCpaAt(s, nowMs);

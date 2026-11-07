@@ -257,20 +257,18 @@ void pollOpenSky() {
   state.health = healthFor(poll.status);
   Serial.printf("[main] poll status=%d aircraft=%u home_configured=%d free_heap=%u\n",
                 static_cast<int>(poll.status), static_cast<unsigned>(poll.aircraft.size()),
-                cfg->home_configured ? 1 : 0, static_cast<unsigned>(ESP.getFreeHeap()));
+                cfg->home.configured ? 1 : 0, static_cast<unsigned>(ESP.getFreeHeap()));
 
   // Only a clean poll updates the aircraft list — a failure keeps the last
   // good data on screen (same DataSnapshot pointer) rather than blanking it.
-  if (poll.status != OpenSkyPollStatus::Ok || !cfg->home_configured) {
+  if (poll.status != OpenSkyPollStatus::Ok || !cfg->home.configured) {
     publishIfChanged();
     return;
   }
 
   PipelineParams p;
-  p.homeLat = cfg->home_lat;
-  p.homeLon = cfg->home_lon;
-  p.nearAirportKm = cfg->near_airport_km;
-  p.climbRateMps = cfg->climb_rate_threshold_mps;
+  p.home = cfg->home;
+  p.phase = cfg->phase;
   p.lookupBudget = kDefaultLookupBudget;
   p.airportBudget = kDefaultAirportLookupBudget;
 

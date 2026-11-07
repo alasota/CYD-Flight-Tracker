@@ -112,13 +112,15 @@ bool setClock(const std::string &v, uint16_t &out) {
 // functions, not lambdas: the firmware builds as C++11, where a lambda's
 // conversion to a function pointer isn't constexpr and the table below would
 // be initialized at boot, in RAM.
-bool setLat(Config &c, const std::string &v) { return setFloat(v, c.home_lat); }
-bool setLon(Config &c, const std::string &v) { return setFloat(v, c.home_lon); }
-bool setRadius(Config &c, const std::string &v) { return setFloat(v, c.radius_deg); }
+bool setLat(Config &c, const std::string &v) { return setFloat(v, c.home.lat); }
+bool setLon(Config &c, const std::string &v) { return setFloat(v, c.home.lon); }
+bool setRadius(Config &c, const std::string &v) { return setFloat(v, c.home.radius_deg); }
 bool setPoll(Config &c, const std::string &v) { return setUnsigned(v, c.poll_interval_s); }
 bool setCycle(Config &c, const std::string &v) { return setUnsigned(v, c.auto_cycle_interval_s); }
-bool setNearKm(Config &c, const std::string &v) { return setFloat(v, c.near_airport_km); }
-bool setClimb(Config &c, const std::string &v) { return setFloat(v, c.climb_rate_threshold_mps); }
+bool setNearKm(Config &c, const std::string &v) { return setFloat(v, c.phase.near_airport_km); }
+bool setClimb(Config &c, const std::string &v) {
+  return setFloat(v, c.phase.climb_rate_threshold_mps);
+}
 bool setBlMin(Config &c, const std::string &v) {
   return setClamped(v, c.brightness_min_pct, clampBrightnessPct);
 }
@@ -229,7 +231,7 @@ SettingsFormOutcome applySettingsForm(Config &cfg, const FormArgs &args) {
   // The user has now been through the settings form at least once
   // (docs/review-notes-2026.md 1.5): what the UI checks, through NetState, to
   // tell "not configured yet" apart from "home really is at (0,0)".
-  cfg.home_configured = true;
+  cfg.home.configured = true;
   return out;
 }
 

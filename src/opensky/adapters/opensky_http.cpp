@@ -234,7 +234,7 @@ OpenSkyPollResult fetchAircraftStates(const Config &cfg) {
     tokenFetched = true;
   }
 
-  BoundingBox bbox = computeBoundingBox(cfg.home_lat, cfg.home_lon, cfg.radius_deg);
+  BoundingBox bbox = computeBoundingBox(cfg.home.lat, cfg.home.lon, cfg.home.radius_deg);
 
   bool bearer = planStatesRequest(auth, cachedToken.valid);
   StatesAttempt att = requestStatesOnce(bbox, bearer ? cachedToken.access_token : std::string());

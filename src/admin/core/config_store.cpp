@@ -67,14 +67,15 @@ uint16_t clampNightWakeS(int seconds) {
 
 Config sanitizeConfig(const Config &cfg) {
   Config out = cfg;
-  out.home_lat = clampLat(out.home_lat);
-  out.home_lon = clampLon(out.home_lon);
-  out.radius_deg = clampRadiusDeg(out.radius_deg);
+  out.home.lat = clampLat(out.home.lat);
+  out.home.lon = clampLon(out.home.lon);
+  out.home.radius_deg = clampRadiusDeg(out.home.radius_deg);
   out.poll_interval_s = clampPollIntervalS(out.poll_interval_s);
   out.last_screen = clampLastScreen(out.last_screen);
   out.auto_cycle_interval_s = clampAutoCycleIntervalS(out.auto_cycle_interval_s);
-  out.near_airport_km = clampNearAirportKm(out.near_airport_km);
-  out.climb_rate_threshold_mps = clampClimbRateThresholdMps(out.climb_rate_threshold_mps);
+  out.phase.near_airport_km = clampNearAirportKm(out.phase.near_airport_km);
+  out.phase.climb_rate_threshold_mps =
+      clampClimbRateThresholdMps(out.phase.climb_rate_threshold_mps);
   out.language = clampLanguage(static_cast<int>(out.language));
   out.web_language = clampLanguage(static_cast<int>(out.web_language));
   if (validateWebPassword(out.web_password) != WebPasswordCheck::Ok) out.web_password.clear();
