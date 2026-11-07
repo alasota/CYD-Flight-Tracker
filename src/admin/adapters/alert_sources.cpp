@@ -5,7 +5,7 @@
 #include "admin/core/device_alerts.h"
 
 #include "admin/core/config_page.h"       // openSkyDailyCredits(), pausedMinutesPerDay()
-#include "admin/core/config_store.h"      // Settings
+#include "admin/core/settings.h"      // Settings
 #include "display/core/backlight.h"       // backlightStatus() — tonight's window
 #include "opensky/core/opensky_client.h"  // openSkyQuota(), openSkyAuthStatus()
 

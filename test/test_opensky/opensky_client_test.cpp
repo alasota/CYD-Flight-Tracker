@@ -11,7 +11,7 @@ namespace {
 // ---- computeScanArea -------------------------------------------------
 
 static void test_bbox_default_radius_matches_config_portal_1_credit_tier(void) {
-  // radius 2.5 deg is config_store's/web_server's default, sitting
+  // radius 2.5 deg is defaultSettings()'s and web_server's default, sitting
   // exactly at the 1-credit tier boundary (bbox area = 25 sq deg there).
   ScanArea bbox = computeScanArea(51.5f, -0.1f, 2.5f);
 

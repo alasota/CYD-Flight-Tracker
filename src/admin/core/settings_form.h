@@ -1,5 +1,5 @@
 // settings_form — what the settings page's forms send, checked before it
-// reaches config_store: the number fields (no "abc" silently read as 0) and
+// reaches Settings: the number fields (no "abc" silently read as 0) and
 // the OpenSky credentials file. Pure, tested under `pio test -e native`; the
 // WebServer routes that use it are web_server.
 #pragma once
@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "admin/core/config_store.h"  // Settings
+#include "admin/core/settings.h"  // Settings
 #include "admin/core/web_auth.h"      // PasswordChange
 #include "admin/core/web_i18n.h"      // WebStr, Language
 

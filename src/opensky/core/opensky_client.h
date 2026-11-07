@@ -77,7 +77,7 @@ bool shouldUseOAuth(const std::string &client_id, const std::string &client_secr
 
 // Hard ceiling on how large a /states/all response body parseStatesResponse()
 // will attempt to parse. A well-formed response for even a maxed-out (400
-// sq deg, per config_store's radius clamp) bounding box over a busy
+// sq deg, per sanitizeSettings()'s radius clamp) bounding box over a busy
 // airspace is a few tens of KB; this is a defensive cap against an
 // unexpectedly huge or corrupted body consuming unbounded heap during JSON
 // parsing — ArduinoJson's JsonDocument has no capacity limit of its own

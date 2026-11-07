@@ -1,4 +1,4 @@
-// config_store — Preferences/NVS-backed persistence for all user-configurable
+// settings — Preferences/NVS-backed persistence for all user-configurable
 // settings: `Settings`, the aggregate of the contexts' settings objects (home,
 // flight phases, OpenSky account and poll interval, display, auto-cycle,
 // backlight, update check, settings page). See CLAUDE.md "Code conventions".

@@ -14,7 +14,7 @@
 #include "admin/core/device_alerts.h"  // deviceAlertInputs() — the alert card above the tabs
 #include "admin/core/config_backup.h"
 #include "admin/core/config_page.h"
-#include "admin/core/config_store.h"
+#include "admin/core/settings.h"
 #include "admin/core/settings_form.h"  // form checks, credentials file
 #include "opensky/core/opensky_client.h"  // openSkyQuota() — credits left, shown on the OpenSky tab
 #include "admin/core/firmware/ota_update.h"
@@ -235,7 +235,7 @@ void handleSave() {
   for (int i = 0; i < server.args(); ++i) args.add(server.argName(i).c_str(), server.arg(i).c_str());
   Settings cfg = loadSettings();
   const SettingsFormOutcome out = applySettingsForm(cfg, args);
-  saveSettings(cfg);  // sanitizes internally (see config_store)
+  saveSettings(cfg);  // sanitizes internally (see settings.h)
   ++saveCount;
   refreshPassword();
   if (out.password.outcome == PasswordChange::Outcome::Set ||
@@ -399,7 +399,7 @@ void handleCredentialsUpload() {
   }
 
   cfg.opensky = file.creds;
-  saveSettings(cfg);  // sanitizes internally (see config_store)
+  saveSettings(cfg);  // sanitizes internally (see settings.h)
   ++saveCount;
 
   Settings saved = loadSettings();
@@ -435,7 +435,7 @@ void handleRestore() {
     return;
   }
 
-  saveSettings(r.config);  // sanitizes internally (see config_store)
+  saveSettings(r.config);  // sanitizes internally (see settings.h)
   ++saveCount;             // net_task reloads: language, home location, ...
   refreshPassword();       // a backup with secrets carries the panel password
 

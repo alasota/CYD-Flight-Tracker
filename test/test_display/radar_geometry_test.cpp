@@ -112,7 +112,7 @@ static void test_negative_distance_does_not_invert_point(void) {
 }
 
 static void test_non_positive_max_distance_collapses_to_center(void) {
-  // Defensive: config_store's radius clamp keeps this from happening in
+  // Defensive: sanitizeSettings()'s radius clamp keeps this from happening in
   // practice, but a zero/negative max shouldn't divide by zero or produce
   // garbage coordinates.
   ScreenPoint p = polarToScreen(45.0f, 10.0f, 0.0f, kCx, kCy, kRadiusPx);

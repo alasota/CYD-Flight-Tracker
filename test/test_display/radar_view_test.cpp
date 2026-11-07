@@ -56,7 +56,7 @@ static void test_screen3_radar_zone_resolves_to_spec_center_and_radius(void) {
 // ---- radiusDegToKm -----------------------------------------------------------
 
 static void test_radius_deg_to_km_default_radius(void) {
-  // config_store's default radius_deg is 2.5 -> ~278 km.
+  // defaultSettings()'s radius_deg is 2.5 -> ~278 km.
   TEST_ASSERT_FLOAT_WITHIN(0.5f, 278.0f, radiusDegToKm(2.5f));
 }
 

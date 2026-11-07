@@ -14,7 +14,7 @@
 #include <functional>
 #include <string>
 
-#include "admin/core/config_store.h"   // Settings
+#include "admin/core/settings.h"   // Settings
 #include "admin/core/device_alerts.h"  // AlertSet, AlertDetails
 #include "opensky/core/opensky_auth.h"   // OpenSkyAuthState
 #include "opensky/core/opensky_quota.h"  // OpenSkyQuota

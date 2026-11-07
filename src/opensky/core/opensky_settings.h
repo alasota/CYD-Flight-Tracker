@@ -1,9 +1,9 @@
 // opensky_settings — OpenSky's settings objects (spec 12 §7): the account it
-// logs in with and how often it is asked. Settings (admin/core/config_store.h)
+// logs in with and how often it is asked. Settings (admin/core/settings.h)
 // holds them as `opensky` and `poll`; opensky_client's adapter reads only
 // these (plus airspace's Home for the bounding box).
 //
-// Header-only, no logic: the clamps live in config_store (the aggregate keeps
+// Header-only, no logic: the clamps live in sanitizeSettings() (the aggregate keeps
 // its invariants). ⚠️ env:cyd is gnu++11 — with default member initializers
 // these structs aren't aggregates there: assign members, never `X{…}`.
 #pragma once

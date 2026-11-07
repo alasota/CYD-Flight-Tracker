@@ -1,7 +1,7 @@
-// config_store: defaults, sanitizing, NVS keys. CLAUDE.md "Code conventions" (config_store).
+// settings: defaults, sanitizing, NVS keys. CLAUDE.md "Code conventions" (settings).
 #include <unity.h>
 
-#include "admin/core/config_store.h"
+#include "admin/core/settings.h"
 #include "test_support.h"
 
 namespace {
@@ -358,7 +358,7 @@ static void test_default_config_keeps_every_stage_5_default(void) {
 
 }  // namespace
 
-void run_config_store_tests() {
+void run_settings_tests() {
   UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
   RUN_TEST(test_web_language_is_independent_and_sanitized);
   RUN_TEST(test_web_password_defaults_to_none_and_invalid_ones_are_dropped);

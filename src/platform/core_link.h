@@ -27,7 +27,7 @@
 #include <utility>
 #include <vector>
 
-#include "admin/core/config_store.h"   // Settings
+#include "admin/core/settings.h"   // Settings
 #include "airspace/core/cpa_predictor.h"  // CpaPrediction
 #include "admin/core/device_alerts.h"  // AlertSet, AlertDetails
 #include "display/core/redraw_policy.h"  // RedrawEvents
