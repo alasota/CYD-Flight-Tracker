@@ -2,7 +2,7 @@
 
 The rule tests feed the pure functions {relpath: text} dicts (the included targets are in the
 dict too, so they resolve); LayoutTest / BuildConfigTest / WorkflowTest read this repository
-and pin the state spec 12 stages 2–5 leave behind.
+and pin the state spec 12 stages 2–6 leave behind.
 """
 
 import configparser
@@ -297,6 +297,70 @@ STAGE_5_MOVED_TESTS = {
     "test_return_not_triggered_without_prepare": (_BRIDGE_TESTS, _SHOT_TESTS),
     "test_header_fields": (_SHOT_TESTS, _BRIDGE_TESTS),
 }
+
+# Stage 6 (spec 12 section 7, plan "§7 -> objects"): Config field -> (its object type, the
+# header from src/ that declares it, the object's fields). Nothing else is left in Config.
+STAGE_6_SETTINGS = {
+    "home": ("Home", "airspace/core/home.h", ["lat", "lon", "radius_deg", "configured"]),
+    "phase": ("PhaseThresholds", "airspace/core/flight_phase.h",
+              ["near_airport_km", "climb_rate_threshold_mps"]),
+    "opensky": ("OpenSkyCredentials", "opensky/core/opensky_settings.h",
+                ["client_id", "client_secret"]),
+    "poll": ("PollSettings", "opensky/core/opensky_settings.h", ["interval_s"]),
+    "display": ("DisplaySettings", "display/core/display_settings.h",
+                ["language", "last_screen"]),
+    "auto_cycle": ("AutoCycleSettings", "display/core/display_settings.h",
+                   ["enabled", "interval_s"]),
+    "backlight": ("BacklightSettings", "display/core/backlight.h",
+                  ["brightness_auto", "brightness_fixed_pct", "brightness_min_pct",
+                   "brightness_max_pct", "night_mode", "night_from_min", "night_to_min",
+                   "night_pct", "night_wake_s", "night_pause_polling"]),
+    "update": ("UpdateSettings", "admin/core/config_store.h",
+               ["check_enabled", "show_prerelease", "skipped_tag"]),
+    "web": ("WebSettings", "admin/core/config_store.h", ["language", "password"]),
+}
+
+# Every type a settings parameter can have: the aggregate and its objects.
+SETTINGS_TYPES = {"Config"} | {t for t, _, _ in STAGE_6_SETTINGS.values()}
+
+# Stage 6: the 28 NVS keys of v1.11.3 and the Preferences type each is read and written with
+# (namespace "cydsky"); `isKey()` doesn't count.
+STAGE_6_NVS_KEYS = {
+    "home_lat": "Float", "home_lon": "Float", "radius_deg": "Float", "poll_s": "UInt",
+    "os_id": "String", "os_secret": "String", "last_screen": "Int", "auto_cyc": "Bool",
+    "auto_cyc_s": "UInt", "near_km": "Float", "climb_mps": "Float", "home_cfg": "Bool",
+    "lang": "UChar", "wlang": "UChar", "wpass": "String", "updchk": "Bool", "updpre": "Bool",
+    "updskip": "String", "bl_auto": "Bool", "bl_fix": "UChar", "bl_min": "UChar",
+    "bl_max": "UChar", "nt_mode": "UChar", "nt_from": "UShort", "nt_to": "UShort",
+    "nt_pct": "UChar", "nt_wake": "UShort", "nt_poll": "Bool",
+}
+
+# Stage 6: (header from src/, function or struct, its settings parameters / members) -- the
+# .feature's Examples. A struct row lists "<type> <member>".
+STAGE_6_SIGNATURES = [
+    ("opensky/core/opensky_client.h", "fetchAircraftStates",
+     ["const OpenSkyCredentials &", "const Home &"]),
+    ("opensky/core/opensky_client.h", "openSkyClientPoll",
+     ["const OpenSkyCredentials &", "const Home &", "const PollSettings &"]),
+    ("opensky/core/opensky_client.h", "openSkyAuthStatus", ["const OpenSkyCredentials &"]),
+    ("opensky/core/opensky_client.h", "openSkyMsUntilNextPoll", ["const PollSettings &"]),
+    ("display/core/backlight.h", "backlightHandleTouch", ["const BacklightSettings &"]),
+    ("display/core/backlight.h", "backlightStatus", ["const BacklightSettings &"]),
+    ("display/adapters/backlight_ldr.h", "backlightLoop",
+     ["const BacklightSettings &", "const Home &"]),
+    ("airspace/services/poll_pipeline.h", "PipelineParams", ["Home home", "PhaseThresholds phase"]),
+    ("admin/core/firmware/release_check.h", "releaseCheckBegin", ["const UpdateSettings &"]),
+    ("admin/core/config_page.h", "pausedMinutesPerDay", ["const BacklightSettings &"]),
+]
+
+# Stage 6: the settings objects the display may read from NetState (cfg->X / cfg().X), and the
+# only field of `update` it needs (the update question's skipped release).
+STAGE_6_DISPLAY_SETTINGS = {"home", "display", "auto_cycle", "backlight", "update"}
+STAGE_6_DISPLAY_UPDATE_FIELDS = {"skipped_tag"}
+
+# Stage 6: adapters that read settings through config_store.h before; afterwards no layer
+# finding at all comes from them.
+STAGE_6_GONE_FINDINGS = ["opensky/adapters/opensky_http.cpp", "display/adapters/backlight_ldr.cpp"]
 
 # Old layer folder names in a path: <ctx>/domain, <ctx>/app, src/app/, the -<app/> filter.
 OLD_LAYER_PATH_RE = re.compile(r"\b(airspace|enrichment|opensky|display|admin)/(domain|app)\b"
@@ -1139,6 +1203,113 @@ class LayoutTest(unittest.TestCase):
                 self.assertEqual(1, run_test_calls(sources[new], name),
                                  f"RUN_TEST({name}) in test/{new}")
 
+    # Scenario Outline: Config składa się z obiektów wartości kontekstów, a każdy obiekt leży
+    # w swoim kontekście
+    def test_config_is_built_from_context_objects(self):
+        store = (ROOT / "src" / "admin" / "core" / "config_store.h").read_text(
+            encoding="utf-8", errors="replace")
+        members = struct_members(store, "Config")
+        self.assertIsNotNone(members, "no struct Config { ... } in src/admin/core/config_store.h")
+        self.assertEqual({field: t for field, (t, _, _) in STAGE_6_SETTINGS.items()},
+                         {name: t for t, name in members}, "the fields of Config")
+        self.assertEqual(len(STAGE_6_SETTINGS), len(members), f"Config's fields: {members}")
+        headers = {p: t for p, t in repo_sources("src").items() if p.endswith((".h", ".hpp"))}
+        for field, (type_, header, fields) in STAGE_6_SETTINGS.items():
+            with self.subTest(field=field, type=type_):
+                hits = [f"{p}:{n}" for p, t in headers.items() for n in declaration_lines(t, type_)]
+                self.assertEqual([f"src/{header}"], [h.rsplit(":", 1)[0] for h in hits],
+                                 f"declarations of {type_}: {hits or 'none'}")
+                inner = struct_members(headers[f"src/{header}"], type_)
+                self.assertCountEqual(fields, [name for _, name in inner or []],
+                                      f"the fields of {type_}")
+
+    # Scenario: Klucze NVS i ich typy są te same co przed etapem
+    def test_settings_nvs_keys_and_types_unchanged(self):
+        self.assertEqual(28, len(STAGE_6_NVS_KEYS))
+        code = strip_comments((ROOT / "src" / "admin" / "adapters" / "settings_nvs.cpp")
+                              .read_text(encoding="utf-8", errors="replace"))
+        self.assertRegex(code, r'\bkNamespace\[\]\s*=\s*"cydsky"')
+        seen = {}
+        for m in re.finditer(r'\bprefs\.(get|put)(\w+)\(\s*"(\w+)"', code):
+            seen.setdefault(m.group(3), set()).add((m.group(1), m.group(2)))
+        self.assertEqual(sorted(STAGE_6_NVS_KEYS), sorted(seen), "the NVS keys")
+        for key, type_ in STAGE_6_NVS_KEYS.items():
+            with self.subTest(key=key):
+                self.assertEqual({("get", type_), ("put", type_)}, seen[key])
+
+    # Scenario: Poza admin/ ustawienia dołączają tylko core_link i korzenie kompozycji
+    # (§10 pkt 4)
+    def test_only_admin_roots_and_core_link_include_settings(self):
+        includers = sorted(p for p, t in repo_sources("src").items()
+                           if "admin/core/config_store.h"
+                           in [i.name for i in check_layers.find_includes(t) if not i.angle])
+        self.assertGreater(len(includers), 3, f"includers of config_store.h: {includers}")
+        outside = [p for p in includers if not p.startswith(("src/admin/", "src/main/"))
+                   and p != "src/platform/core_link.h"]
+        self.assertEqual([], outside, "config_store.h included outside admin/, the roots and "
+                                      "core_link.h")
+        self.assertIn("src/platform/core_link.h", includers)
+
+    # Scenario: Moduły innych kontekstów nie znają typu Config, nawet z deklaracji zapowiadającej
+    def test_config_type_named_only_in_admin_roots_and_core_link(self):
+        files = repo_sources("src/airspace", "src/enrichment", "src/opensky", "src/display",
+                             "src/shared")
+        self.assertGreater(len(files), 50)
+        hits = [f"{p}:{code.count(chr(10), 0, m.start()) + 1}"
+                for p, t in files.items() for code in [strip_comments(t)]
+                for m in re.finditer(r"\bConfig\b", code)]
+        self.assertEqual([], hits, f"{len(hits)} use(s) of Config outside admin/, the roots and "
+                         "core_link:\n" + "\n".join(hits))
+
+    # Scenario Outline: Funkcje innych kontekstów dostają tylko swoje obiekty ustawień
+    def test_context_functions_take_their_settings_objects(self):
+        self.assertEqual(10, len(STAGE_6_SIGNATURES))
+        for header, symbol, expected in STAGE_6_SIGNATURES:
+            with self.subTest(symbol=symbol):
+                path = ROOT / "src" / header
+                self.assertTrue(path.is_file(), f"src/{header}")
+                text = path.read_text(encoding="utf-8", errors="replace")
+                members = struct_members(text, symbol)
+                if members is not None:
+                    got = [[f"{t} {n}" for t, n in members if is_settings_type(t)]]
+                    flat = {"homeLat", "homeLon", "nearAirportKm", "climbRateMps"}
+                    self.assertEqual(set(), flat & {n for _, n in members},
+                                     f"flat settings left in {symbol}")
+                else:
+                    decls = parameter_types(text, symbol)
+                    self.assertTrue(decls, f"no declaration of {symbol}() in src/{header}")
+                    got = [[t for t in d if is_settings_type(t)] for d in decls]
+                for g in got:
+                    self.assertEqual(expected, g, f"settings parameters of {symbol}")
+
+    # Scenario: Ekran czyta z NetState tylko obiekty ustawień, które go dotyczą
+    def test_display_reads_only_its_settings_from_net_state(self):
+        reads = []
+        for p, t in repo_sources("src/display").items():
+            code = strip_comments(t)
+            for m in re.finditer(r"\bcfg(?:\s*\(\s*\))?\s*->\s*(\w+)(?:\s*\.\s*(\w+))?"
+                                 r"|\bcfg\s*\(\s*\)\s*\.\s*(\w+)(?:\s*\.\s*(\w+))?", code):
+                obj, field = m.group(1) or m.group(3), m.group(2) or m.group(4)
+                reads.append((f"{p}:{code.count(chr(10), 0, m.start()) + 1}", obj, field))
+        self.assertGreaterEqual(len(reads), 4, "found too few cfg-> reads in src/display/")
+        wrong = [f"{where}: cfg->{obj}" for where, obj, _ in reads
+                 if obj not in STAGE_6_DISPLAY_SETTINGS]
+        self.assertEqual([], wrong, "the display reads settings that aren't its own")
+        update = [f"{where}: cfg->update.{field}" for where, obj, field in reads
+                  if obj == "update" and field not in STAGE_6_DISPLAY_UPDATE_FIELDS]
+        self.assertEqual([], update, "the display reads update settings beyond the skipped tag")
+
+    # Scenario: Adaptery OpenSky i podświetlenia nie sięgają już po ustawienia z admin/core
+    def test_stage_6_removes_the_settings_findings_of_adapters(self):
+        files = check_layers.load_tree(ROOT)
+        findings = check_layers.check_files(files) + check_layers.full_path_findings(files)
+        self.assertGreater(len(findings), 0, "check_layers found nothing at all")
+        for path in STAGE_6_GONE_FINDINGS:
+            with self.subTest(path=path):
+                self.assertTrue((ROOT / "src" / path).is_file(), f"src/{path}")
+                hits = [f for f in findings if f.path == f"src/{path}"]
+                self.assertEqual([], hits, show(hits, limit=len(hits)))
+
 
 def strip_comments(text):
     """`text` with // and /* */ comments blanked (newlines kept, so line numbers stay); string
@@ -1270,6 +1441,84 @@ def run_test_calls(text, name):
                           strip_comments(text)))
 
 
+def struct_members(text, name):
+    """[(type, member)] of the data members of the first `struct|class <name> {...}` in `text`
+    (comments ignored; member functions, access labels and initializers skipped; spaces in the
+    type collapsed), or None when `text` has no such definition."""
+    code = strip_comments(text)
+    m = re.search(r"\b(?:struct|class)\s+" + re.escape(name)
+                  + r"\b\s*(?:final\s*)?(?::[^{;]*)?\{", code)
+    if m is None:
+        return None
+    depth, i, start = 1, m.end(), m.end()
+    while i < len(code) and depth:
+        depth += {"{": 1, "}": -1}.get(code[i], 0)
+        i += 1
+    body = code[start:i - 1]
+    statements, current, depth = [], [], 0
+    for ch in body:
+        if ch in "({[":
+            depth += 1
+        elif ch in ")}]":
+            depth -= 1
+        if depth == 0 and ch == ";":
+            statements.append("".join(current))
+            current = []
+        elif depth == 0 and ch == "}" and "(" in "".join(current).split("{")[0]:
+            current = []  # the end of a member function's body
+        else:
+            current.append(ch)
+    members = []
+    for s in statements:
+        s = re.sub(r"^\s*(?:(?:public|private|protected)\s*:\s*)+", "", " ".join(s.split()))
+        if not s or "(" in re.split(r"[={]", s)[0] or re.match(r"(?:static|using|friend|"
+                                                               r"typedef)\b", s):
+            continue
+        d = re.match(r"^(.*?[\w>*&])\s*\b([A-Za-z_]\w*)\s*(?:=.*|\{.*\})?$", s)
+        if d:
+            members.append((d.group(1).strip(), d.group(2)))
+    return members
+
+
+def parameter_types(text, symbol):
+    """For each declaration of the function `symbol` in `text` (declaration_lines()): its
+    parameter types, names and default values dropped, written as `const Home &`."""
+    code = strip_comments(text)
+    starts = [0] + [k + 1 for k, ch in enumerate(code) if ch == "\n"]
+    call = re.compile(r"\b" + re.escape(symbol) + r"\s*\(")
+    out = []
+    for line in declaration_lines(text, symbol):
+        m = call.search(code, starts[line - 1])
+        depth, j = 1, m.end()
+        while j < len(code) and depth:
+            depth += {"(": 1, ")": -1}.get(code[j], 0)
+            j += 1
+        params, current, depth = [], [], 0
+        for ch in code[m.end():j - 1]:
+            depth += {"(": 1, "<": 1, ")": -1, ">": -1}.get(ch, 0)
+            if ch == "," and depth == 0:
+                params.append("".join(current))
+                current = []
+            else:
+                current.append(ch)
+        params.append("".join(current))
+        types = []
+        for p in params:
+            p = " ".join(p.split("=")[0].split())
+            if not p or p == "void":
+                continue
+            k = max(p.rfind("&"), p.rfind("*"))
+            t = p[:k + 1] if k >= 0 else (p.rsplit(" ", 1)[0] if " " in p else p)
+            types.append(re.sub(r"\s*([&*])", r" \1", t).strip())
+        out.append(types)
+    return out
+
+
+def is_settings_type(type_text):
+    """True when a parameter / member type names Config or one of its stage-6 objects."""
+    return bool(set(re.findall(r"[A-Za-z_]\w*", type_text)) & SETTINGS_TYPES)
+
+
 class DeclarationMatchTest(unittest.TestCase):
     def test_forward_declaration_and_longer_names_do_not_count(self):
         self.assertEqual([], declaration_lines("struct AircraftRow;\n", "AircraftRow"))
@@ -1329,6 +1578,25 @@ class DeclarationMatchTest(unittest.TestCase):
                 "// #ifdef ARDUINO\n"
                 "#ifndef ARDUINO_GUARD_H\n#endif\n")
         self.assertEqual([1, 3, 5, 6], arduino_condition_lines(text))
+
+    def test_struct_members_and_parameter_types(self):
+        text = ("struct Home {\n  float lat = 0.0f;  // degrees\n  float radius_deg{2.5f};\n"
+                "  bool configured = false;\n  bool valid() const { return lat < 90; }\n"
+                " public:\n  std::string name;\n  static constexpr int kMax = 3;\n};\n"
+                "struct HomeX { int a; };\n")
+        self.assertEqual([("float", "lat"), ("float", "radius_deg"), ("bool", "configured"),
+                          ("std::string", "name")], struct_members(text, "Home"))
+        self.assertIsNone(struct_members("struct Home;\n", "Home"))
+        decl = ("OpenSkyPollResult openSkyClientPoll(uint32_t now_ms, const OpenSkyCredentials &c,\n"
+                "                                    const Home& home, const PollSettings &p = {});\n"
+                "void backlightLoop(LGFX &tft, const BacklightSettings &b, bool serviceScreen);\n"
+                "  x = openSkyClientPoll(now, c, h, p);\n")
+        self.assertEqual([["uint32_t", "const OpenSkyCredentials &", "const Home &",
+                           "const PollSettings &"]], parameter_types(decl, "openSkyClientPoll"))
+        self.assertEqual([["LGFX &", "const BacklightSettings &", "bool"]],
+                         parameter_types(decl, "backlightLoop"))
+        self.assertTrue(is_settings_type("const Config &"))
+        self.assertFalse(is_settings_type("const ConfigPageModel &"))
 
     def test_lovyangfx_names_in_code_but_not_comments_or_include_names(self):
         text = ('#include "display/adapters/lgfx/LGFX_CYD.hpp"\n'

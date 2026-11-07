@@ -235,6 +235,32 @@ static void test_diff_unrelated_config_change_is_nothing(void) {
   TEST_ASSERT_FALSE(any(diffNetState(&a, b)));
 }
 
+// Spec 12 stage 6 (edge case of "Zapis ustawień daje te same zdarzenia przerysowania co przed
+// etapem"): a save that changes only the backlight, web or update settings redraws nothing —
+// the backlight follows on its own, the panel and the update question aren't on the screens.
+static void test_diff_backlight_or_web_change_is_nothing(void) {
+  const NetState a = baseState();
+  const struct {
+    const char *what;
+    void (*change)(Config &);
+  } changes[] = {
+      {"backlight.brightness_fixed_pct", [](Config &c) { c.brightness_fixed_pct = 42; }},
+      {"backlight.night_mode", [](Config &c) { c.night_mode = NightMode::Off; }},
+      {"backlight.night_pause_polling", [](Config &c) { c.night_pause_polling = true; }},
+      {"web.language", [](Config &c) { c.web_language = Language::EN; }},
+      {"web.password", [](Config &c) { c.web_password = "hunter22"; }},
+      {"update.check_enabled", [](Config &c) { c.update_check_enabled = false; }},
+      {"update.skipped_tag", [](Config &c) { c.update_skipped_tag = "v1.4.0"; }},
+  };
+  for (const auto &ch : changes) {
+    NetState b = a;
+    auto cfg = std::make_shared<Config>(*a.cfg);
+    ch.change(*cfg);
+    b.cfg = cfg;
+    TEST_ASSERT_FALSE_MESSAGE(any(diffNetState(&a, b)), ch.what);
+  }
+}
+
 static void test_differs(void) {
   const NetState a = baseState();
   NetState b = a;
@@ -543,6 +569,7 @@ void run_core_link_tests() {
   RUN_TEST(test_diff_home_configured_is_first_draw);
   RUN_TEST(test_diff_radius_or_home_moves_content);
   RUN_TEST(test_diff_unrelated_config_change_is_nothing);
+  RUN_TEST(test_diff_backlight_or_web_change_is_nothing);
 
   RUN_TEST(test_differs);
   RUN_TEST(test_command_tag_round_trip);
