@@ -141,7 +141,7 @@ static Config savedConfig() {
   c.backlight.night_to_min = 6 * 60;
   c.opensky.client_id = "old-id";
   c.opensky.client_secret = "old-secret";
-  c.web_password = "stare-haslo";
+  c.web.password = "stare-haslo";
   return c;
 }
 
@@ -184,7 +184,7 @@ static void test_form_valid_submit_sets_every_field_and_home_configured(void) {
   TEST_ASSERT_EQUAL_UINT32(20, cfg.auto_cycle.interval_s);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 10.0f, cfg.phase.near_airport_km);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.5f, cfg.phase.climb_rate_threshold_mps);
-  TEST_ASSERT_TRUE(cfg.update_check_enabled);
+  TEST_ASSERT_TRUE(cfg.update.check_enabled);
   TEST_ASSERT_FALSE(cfg.backlight.brightness_auto);
   TEST_ASSERT_EQUAL_UINT8(20, cfg.backlight.brightness_min_pct);
   TEST_ASSERT_EQUAL_UINT8(90, cfg.backlight.brightness_max_pct);
@@ -196,7 +196,7 @@ static void test_form_valid_submit_sets_every_field_and_home_configured(void) {
   TEST_ASSERT_EQUAL_UINT16(120, cfg.backlight.night_wake_s);
   TEST_ASSERT_TRUE(cfg.backlight.night_pause_polling);
   ASSERT_ENUM_EQ(Language::EN, cfg.display.language);
-  ASSERT_ENUM_EQ(Language::EN, cfg.web_language);
+  ASSERT_ENUM_EQ(Language::EN, cfg.web.language);
   ASSERT_STR_EQ("my-id", cfg.opensky.client_id);
   ASSERT_STR_EQ("my-secret", cfg.opensky.client_secret);
   TEST_ASSERT_TRUE(cfg.home.configured);
@@ -265,12 +265,12 @@ static void test_form_rejected_labels_in_form_order_in_panel_language(void) {
 static void test_form_missing_checkbox_unchecked_missing_text_unchanged(void) {
   Config cfg = savedConfig();
   cfg.auto_cycle.enabled = true;
-  cfg.update_check_enabled = true;
+  cfg.update.check_enabled = true;
   cfg.backlight.night_pause_polling = true;
   const float lat = cfg.home.lat;
   const SettingsFormOutcome out = applySettingsForm(cfg, form({{"lon", "21.5"}}));
   TEST_ASSERT_FALSE(cfg.auto_cycle.enabled);
-  TEST_ASSERT_FALSE(cfg.update_check_enabled);
+  TEST_ASSERT_FALSE(cfg.update.check_enabled);
   TEST_ASSERT_FALSE(cfg.backlight.night_pause_polling);
   TEST_ASSERT_FLOAT_WITHIN(1e-6f, lat, cfg.home.lat);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 21.5f, cfg.home.lon);
@@ -315,7 +315,7 @@ static void test_form_password_outcomes_and_messages(void) {
     FormArgs args = form({{"new_password", e.pw}, {"new_password2", e.repeat}});
     if (e.clear) args.add("clear_password", "1");
     const SettingsFormOutcome out = applySettingsForm(cfg, args);
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(e.result, cfg.web_password.c_str(), what.c_str());
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(e.result, cfg.web.password.c_str(), what.c_str());
     if (e.rejected) {
       TEST_ASSERT_EQUAL_STRING_MESSAGE(labels({e.message}).c_str(), labels(out.rejected).c_str(),
                                        what.c_str());
@@ -368,10 +368,10 @@ static void test_form_args_absent_value_is_empty_string(void) {
 static void test_form_unknown_language_code_falls_back_to_default(void) {
   Config cfg = savedConfig();
   cfg.display.language = Language::EN;
-  cfg.web_language = Language::EN;
+  cfg.web.language = Language::EN;
   applySettingsForm(cfg, form({{"language", "xx"}, {"web_language", "de"}}));
   ASSERT_ENUM_EQ(kDefaultLanguage, cfg.display.language);
-  ASSERT_ENUM_EQ(kDefaultLanguage, cfg.web_language);
+  ASSERT_ENUM_EQ(kDefaultLanguage, cfg.web.language);
   cfg.display.language = Language::EN;
   applySettingsForm(cfg, form({{"lat", "52.0"}}));  // no language field: unchanged
   ASSERT_ENUM_EQ(Language::EN, cfg.display.language);

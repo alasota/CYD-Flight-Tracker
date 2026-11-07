@@ -11,12 +11,12 @@
 #include <cstdint>
 #include <string>
 
-#include "airspace/core/flight_phase.h"  // PhaseThresholds
-#include "airspace/core/home.h"          // Home
-#include "display/core/backlight.h"      // BacklightSettings, NightMode
-#include "display/core/display_settings.h"  // DisplaySettings, AutoCycleSettings
-#include "display/core/i18n.h"           // Language
-#include "opensky/core/opensky_settings.h"  // OpenSkyCredentials, PollSettings
+#include "airspace/core/flight_phase.h"       // PhaseThresholds
+#include "airspace/core/home.h"               // Home
+#include "display/core/backlight.h"           // BacklightSettings, NightMode
+#include "display/core/display_settings.h"    // DisplaySettings, AutoCycleSettings
+#include "display/core/i18n.h"                // Language
+#include "opensky/core/opensky_settings.h"    // OpenSkyCredentials, PollSettings
 
 // Clamps the auto-cycle interval (see docs/screens.md "Auto screen cycling") to
 // a sane floor — a few seconds minimum, so the display can't be
@@ -32,33 +32,48 @@ uint32_t clampAutoCycleIntervalS(uint32_t interval_s);
 // value left behind by a future format change) falls back to 0 (Flights).
 int clampLastScreen(int raw);
 
-struct Config {
-  Home home;  // home position, scan radius, configured flag (airspace)
-  PollSettings poll;            // seconds between /states/all requests (opensky)
-  OpenSkyCredentials opensky;   // OAuth2 client id / secret (opensky)
-  PhaseThresholds phase;  // flight_phase thresholds (airspace)
-  DisplaySettings display;         // display language, last screen (display)
-  AutoCycleSettings auto_cycle;    // auto screen cycling (display)
-  BacklightSettings backlight;     // brightness, night mode (display)
-  // Language of the config web page itself (web_i18n), independent of the
-  // display's. NVS key `wlang`, same index/clamping as `language`.
-  Language web_language = kDefaultLanguage;
+// New versions on GitHub (release_check, spec/done/02-github-release-check.md),
+// admin's settings object. check_enabled: ask GitHub once a day (NVS
+// `updchk`) — it only checks, installing always needs a YES.
+// show_prerelease: the config page also lists development versions
+// (pre-releases; NVS `updpre`). skipped_tag: the release NO was tapped for on
+// the display, which then isn't asked about again (NVS `updskip`; not in
+// backups — device state, not a setting); one that isn't a vX.Y.Z tag is
+// dropped by sanitizeConfig().
+struct UpdateSettings {
+  bool check_enabled = true;
+  bool show_prerelease = false;
+  std::string skipped_tag;
+};
+
+// The settings page itself (admin's settings object).
+struct WebSettings {
+  // Language of the config web page (web_i18n), independent of the
+  // display's. NVS key `wlang`, same index/clamping as the display language.
+  Language language = kDefaultLanguage;
   // Optional password of the config web page (web_auth; HTTP Digest, login
   // "admin"). Empty = no password. NVS key `wpass`, plain text — Digest needs
   // the password itself. One that fails validateWebPassword() is dropped by
   // sanitizeConfig().
-  std::string web_password;
-  // New versions on GitHub (release_check, spec/done/02-github-release-check.md).
-  // update_check_enabled: ask GitHub once a day (NVS `updchk`) — it only
-  // checks, installing always needs a YES. update_show_prerelease: the
-  // config page also lists development versions (pre-releases; NVS
-  // `updpre`). update_skipped_tag: the release NO was tapped for on the
-  // display, which then isn't asked about again (NVS `updskip`; not in
-  // backups — device state, not a setting); one that isn't a vX.Y.Z tag is
-  // dropped by sanitizeConfig().
-  bool update_check_enabled = true;
-  bool update_show_prerelease = false;
-  std::string update_skipped_tag;
+  std::string password;
+};
+
+// All settings: the aggregate of the contexts' settings objects (spec 12 §7).
+// Each context's modules get only their objects; the NVS keys
+// (admin/adapters/settings_nvs) and the backup JSON (config_backup) are flat
+// and the same as before the split. ⚠️ gnu++11 on env:cyd: none of these
+// structs is an aggregate there (default member initializers) — assign
+// members, never `{…}`-initialize them.
+struct Config {
+  Home home;                    // position, scan radius, configured (airspace)
+  PhaseThresholds phase;        // flight_phase thresholds (airspace)
+  OpenSkyCredentials opensky;   // OAuth2 client id / secret (opensky)
+  PollSettings poll;            // seconds between /states/all requests (opensky)
+  DisplaySettings display;      // display language, last screen (display)
+  AutoCycleSettings auto_cycle;  // auto screen cycling (display)
+  BacklightSettings backlight;  // brightness, night mode (display)
+  UpdateSettings update;        // GitHub release check (admin)
+  WebSettings web;              // settings page language, password (admin)
 };
 
 // Hardcoded fallback values used before anything has ever been saved to NVS.

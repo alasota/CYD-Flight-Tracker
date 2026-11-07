@@ -170,7 +170,7 @@ static void test_update_prompt_gate_from_net_state(void) {
   data->cpa.t_cpa_seconds = 50.0f;
   data->polledAtMs = 1000;
   Config cfg = makeConfig();
-  cfg.update_skipped_tag = "v1.2.9";
+  cfg.update.skipped_tag = "v1.2.9";
   NetState s;
   s.data = data;
   s.cfg = std::make_shared<const Config>(cfg);

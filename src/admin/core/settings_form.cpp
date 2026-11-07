@@ -185,7 +185,7 @@ SettingsFormOutcome applySettingsForm(Config &cfg, const FormArgs &args) {
   // Checkboxes: the browser sends one only when it's ticked. POST /save is
   // always a full settings-form submit, so a missing one means "unchecked".
   cfg.auto_cycle.enabled = args.has("auto_cycle");
-  cfg.update_check_enabled = args.has("update_check");
+  cfg.update.check_enabled = args.has("update_check");
   cfg.backlight.night_pause_polling = args.has("night_pause");
 
   if (args.has("brightness_mode")) {
@@ -198,7 +198,7 @@ SettingsFormOutcome applySettingsForm(Config &cfg, const FormArgs &args) {
   // An unknown code falls back to the default language.
   if (args.has("language")) cfg.display.language = languageFromCode(args.get("language").c_str());
   if (args.has("web_language")) {
-    cfg.web_language = languageFromCode(args.get("web_language").c_str());
+    cfg.web.language = languageFromCode(args.get("web_language").c_str());
   }
 
   if (args.has("client_id")) cfg.opensky.client_id = args.get("client_id");
@@ -215,11 +215,11 @@ SettingsFormOutcome applySettingsForm(Config &cfg, const FormArgs &args) {
                                       args.has("clear_password"));
   switch (out.password.outcome) {
     case PasswordChange::Outcome::Set:
-      cfg.web_password = out.password.value;
+      cfg.web.password = out.password.value;
       out.message = WebStr::PasswordChanged;
       break;
     case PasswordChange::Outcome::Cleared:
-      cfg.web_password.clear();
+      cfg.web.password.clear();
       out.message = WebStr::PasswordCleared;
       break;
     case PasswordChange::Outcome::Mismatch:

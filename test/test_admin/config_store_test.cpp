@@ -96,7 +96,7 @@ static void test_sanitize_config_clamps_all_fields(void) {
   cfg.backlight.night_to_min = 2000;
   cfg.display.last_screen = 7;
   cfg.display.language = static_cast<Language>(9);
-  cfg.web_language = static_cast<Language>(9);
+  cfg.web.language = static_cast<Language>(9);
 
   Config out = sanitizeConfig(cfg);
 
@@ -113,7 +113,7 @@ static void test_sanitize_config_clamps_all_fields(void) {
   TEST_ASSERT_EQUAL_UINT16(1439, out.backlight.night_to_min);
   TEST_ASSERT_EQUAL_INT(0, out.display.last_screen);
   ASSERT_ENUM_EQ(kDefaultLanguage, out.display.language);
-  ASSERT_ENUM_EQ(kDefaultLanguage, out.web_language);
+  ASSERT_ENUM_EQ(kDefaultLanguage, out.web.language);
 }
 
 static void test_sanitize_config_leaves_in_range_values_untouched(void) {
@@ -131,7 +131,7 @@ static void test_sanitize_config_leaves_in_range_values_untouched(void) {
   cfg.backlight.night_to_min = 5 * 60;
   cfg.display.last_screen = 2;
   cfg.display.language = Language::EN;
-  cfg.web_language = Language::EN;
+  cfg.web.language = Language::EN;
 
   Config out = sanitizeConfig(cfg);
 
@@ -148,7 +148,7 @@ static void test_sanitize_config_leaves_in_range_values_untouched(void) {
   TEST_ASSERT_EQUAL_UINT16(5 * 60, out.backlight.night_to_min);
   TEST_ASSERT_EQUAL_INT(2, out.display.last_screen);
   ASSERT_ENUM_EQ(Language::EN, out.display.language);
-  ASSERT_ENUM_EQ(Language::EN, out.web_language);
+  ASSERT_ENUM_EQ(Language::EN, out.web.language);
 }
 
 static void test_clamp_last_screen_accepts_0_1_2(void) {
@@ -226,46 +226,46 @@ static void test_sanitize_config_resets_invalid_language(void) {
 
 static void test_web_language_is_independent_and_sanitized(void) {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::PL),
-                        static_cast<int>(defaultConfig().web_language));
+                        static_cast<int>(defaultConfig().web.language));
   Config c;
   c.display.language = Language::PL;
-  c.web_language = Language::EN;
+  c.web.language = Language::EN;
   Config s = sanitizeConfig(c);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::PL), static_cast<int>(s.display.language));
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::EN), static_cast<int>(s.web_language));
-  c.web_language = static_cast<Language>(9);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(Language::EN), static_cast<int>(s.web.language));
+  c.web.language = static_cast<Language>(9);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(kDefaultLanguage),
-                        static_cast<int>(sanitizeConfig(c).web_language));
+                        static_cast<int>(sanitizeConfig(c).web.language));
 }
 
 static void test_web_password_defaults_to_none_and_invalid_ones_are_dropped(void) {
-  TEST_ASSERT_TRUE(defaultConfig().web_password.empty());
+  TEST_ASSERT_TRUE(defaultConfig().web.password.empty());
   Config c = defaultConfig();
-  c.web_password = "hunter22";
-  TEST_ASSERT_EQUAL_STRING("hunter22", sanitizeConfig(c).web_password.c_str());
-  c.web_password = "short";
-  TEST_ASSERT_TRUE(sanitizeConfig(c).web_password.empty());
-  c.web_password = "zaÅ¼Ã³Åcgesl";
-  TEST_ASSERT_TRUE(sanitizeConfig(c).web_password.empty());
+  c.web.password = "hunter22";
+  TEST_ASSERT_EQUAL_STRING("hunter22", sanitizeConfig(c).web.password.c_str());
+  c.web.password = "short";
+  TEST_ASSERT_TRUE(sanitizeConfig(c).web.password.empty());
+  c.web.password = "zaÅ¼Ã³Åcgesl";
+  TEST_ASSERT_TRUE(sanitizeConfig(c).web.password.empty());
 }
 
 static void test_update_settings_defaults_and_sanitizing(void) {
   const Config d = defaultConfig();
-  TEST_ASSERT_TRUE(d.update_check_enabled);    // checks by default, never installs by itself
-  TEST_ASSERT_FALSE(d.update_show_prerelease);  // development versions only on request
-  TEST_ASSERT_TRUE(d.update_skipped_tag.empty());
+  TEST_ASSERT_TRUE(d.update.check_enabled);    // checks by default, never installs by itself
+  TEST_ASSERT_FALSE(d.update.show_prerelease);  // development versions only on request
+  TEST_ASSERT_TRUE(d.update.skipped_tag.empty());
 
   Config c = defaultConfig();
-  c.update_check_enabled = false;
-  c.update_show_prerelease = true;
-  c.update_skipped_tag = "v1.4.0";
+  c.update.check_enabled = false;
+  c.update.show_prerelease = true;
+  c.update.skipped_tag = "v1.4.0";
   Config s = sanitizeConfig(c);
-  TEST_ASSERT_FALSE(s.update_check_enabled);
-  TEST_ASSERT_TRUE(s.update_show_prerelease);
-  TEST_ASSERT_EQUAL_STRING("v1.4.0", s.update_skipped_tag.c_str());
+  TEST_ASSERT_FALSE(s.update.check_enabled);
+  TEST_ASSERT_TRUE(s.update.show_prerelease);
+  TEST_ASSERT_EQUAL_STRING("v1.4.0", s.update.skipped_tag.c_str());
   for (const char *bad : {"garbage", "v1.4", "v1.4.0-3-gabc1234", "<script>"}) {
-    c.update_skipped_tag = bad;
-    TEST_ASSERT_TRUE_MESSAGE(sanitizeConfig(c).update_skipped_tag.empty(), bad);
+    c.update.skipped_tag = bad;
+    TEST_ASSERT_TRUE_MESSAGE(sanitizeConfig(c).update.skipped_tag.empty(), bad);
   }
 }
 
@@ -348,12 +348,12 @@ static void test_default_config_keeps_every_stage_5_default(void) {
   TEST_ASSERT_EQUAL_UINT16(60, c.backlight.night_wake_s);
   TEST_ASSERT_FALSE(c.backlight.night_pause_polling);
   // update
-  TEST_ASSERT_TRUE(c.update_check_enabled);
-  TEST_ASSERT_FALSE(c.update_show_prerelease);
-  TEST_ASSERT_TRUE(c.update_skipped_tag.empty());
+  TEST_ASSERT_TRUE(c.update.check_enabled);
+  TEST_ASSERT_FALSE(c.update.show_prerelease);
+  TEST_ASSERT_TRUE(c.update.skipped_tag.empty());
   // web
-  ASSERT_ENUM_EQ(Language::PL, c.web_language);
-  TEST_ASSERT_TRUE(c.web_password.empty());
+  ASSERT_ENUM_EQ(Language::PL, c.web.language);
+  TEST_ASSERT_TRUE(c.web.password.empty());
 }
 
 }  // namespace

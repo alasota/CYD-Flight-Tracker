@@ -17,14 +17,14 @@ Config sample() {
   c.opensky.client_id = "my-client";
   c.opensky.client_secret = "s3cr\"et";  // a quote: must survive JSON escaping
   c.display.language = Language::EN;
-  c.web_language = Language::PL;
+  c.web.language = Language::PL;
   c.auto_cycle.enabled = true;
   c.auto_cycle.interval_s = 20;
   c.phase.near_airport_km = 12.5f;
   c.phase.climb_rate_threshold_mps = 2.0f;
-  c.update_check_enabled = false;
-  c.update_show_prerelease = true;
-  c.update_skipped_tag = "v1.4.0";  // device state: never in a backup
+  c.update.check_enabled = false;
+  c.update.show_prerelease = true;
+  c.update.skipped_tag = "v1.4.0";  // device state: never in a backup
   return c;
 }
 
@@ -44,15 +44,15 @@ static void test_round_trip_restores_every_setting(void) {
   TEST_ASSERT_EQUAL_STRING("my-client", c.opensky.client_id.c_str());
   TEST_ASSERT_EQUAL_STRING("s3cr\"et", c.opensky.client_secret.c_str());
   ASSERT_ENUM_EQ(Language::EN, c.display.language);
-  ASSERT_ENUM_EQ(Language::PL, c.web_language);
+  ASSERT_ENUM_EQ(Language::PL, c.web.language);
   TEST_ASSERT_TRUE(c.auto_cycle.enabled);
   TEST_ASSERT_EQUAL_UINT32(20u, c.auto_cycle.interval_s);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 12.5f, c.phase.near_airport_km);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.0f, c.phase.climb_rate_threshold_mps);
   TEST_ASSERT_TRUE(c.home.configured);
-  TEST_ASSERT_FALSE(c.update_check_enabled);
-  TEST_ASSERT_TRUE(c.update_show_prerelease);
-  TEST_ASSERT_TRUE(c.update_skipped_tag.empty());
+  TEST_ASSERT_FALSE(c.update.check_enabled);
+  TEST_ASSERT_TRUE(c.update.show_prerelease);
+  TEST_ASSERT_TRUE(c.update.skipped_tag.empty());
 }
 
 static void test_update_settings_in_the_general_group(void) {
@@ -63,11 +63,11 @@ static void test_update_settings_in_the_general_group(void) {
   ASSERT_NOT_CONTAINS(json, "v1.4.0");
   // An older backup without the keys keeps the current values.
   Config current = defaultConfig();
-  current.update_check_enabled = false;
+  current.update.check_enabled = false;
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,\"general\":{}}", current);
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
-  TEST_ASSERT_FALSE(r.config.update_check_enabled);
+  TEST_ASSERT_FALSE(r.config.update.check_enabled);
   // A wrong type is skipped and listed.
   r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"format_version\":1,"
@@ -174,7 +174,7 @@ static void test_rejects_oversized_files(void) {
 
 static void test_panel_password_travels_only_with_secrets(void) {
   Config c = sample();
-  c.web_password = "hunter22";
+  c.web.password = "hunter22";
   assertJsonString(parseJson(configToBackupJson(c, true, "v1")), "security.web_password", "hunter22");
   ASSERT_NOT_CONTAINS(configToBackupJson(c, false, "v1"), "hunter22");
   assertJsonMissing(parseJson(configToBackupJson(c, false, "v1")), "security");
@@ -182,26 +182,26 @@ static void test_panel_password_travels_only_with_secrets(void) {
 
   BackupRestoreResult r = restoreConfigFromBackupJson(configToBackupJson(c, true, "v1"),
                                                       defaultConfig());
-  TEST_ASSERT_EQUAL_STRING("hunter22", r.config.web_password.c_str());
+  TEST_ASSERT_EQUAL_STRING("hunter22", r.config.web.password.c_str());
   TEST_ASSERT_EQUAL_INT(25, r.appliedFields);
 }
 
 static void test_restore_without_password_keeps_the_devices(void) {
   Config device = defaultConfig();
-  device.web_password = "device-pass";
+  device.web.password = "device-pass";
   BackupRestoreResult r = restoreConfigFromBackupJson(configToBackupJson(sample(), false, "v1"),
                                                       device);
-  TEST_ASSERT_EQUAL_STRING("device-pass", r.config.web_password.c_str());
+  TEST_ASSERT_EQUAL_STRING("device-pass", r.config.web.password.c_str());
 }
 
 static void test_invalid_password_in_backup_is_reported_and_skipped(void) {
   Config device = defaultConfig();
-  device.web_password = "device-pass";
+  device.web.password = "device-pass";
   BackupRestoreResult r = restoreConfigFromBackupJson(
       "{\"format\":\"cyd-sky-tracker-config\",\"security\":{\"web_password\":\"short\"}}",
       device);
   ASSERT_ENUM_EQ(BackupRestoreStatus::Ok, r.status);
-  TEST_ASSERT_EQUAL_STRING("device-pass", r.config.web_password.c_str());
+  TEST_ASSERT_EQUAL_STRING("device-pass", r.config.web.password.c_str());
   TEST_ASSERT_EQUAL_INT(0, r.appliedFields);
   TEST_ASSERT_EQUAL_INT(1, static_cast<int>(r.invalidFields.size()));
   TEST_ASSERT_EQUAL_STRING("security.web_password", r.invalidFields[0].c_str());
@@ -279,13 +279,13 @@ Config everyFieldChanged() {
   c.opensky.client_id = "my-client";
   c.opensky.client_secret = "s3cr\"et";
   c.display.language = Language::EN;
-  c.web_language = Language::EN;
+  c.web.language = Language::EN;
   c.auto_cycle.enabled = true;
   c.auto_cycle.interval_s = 20;
   c.phase.near_airport_km = 12.5f;
   c.phase.climb_rate_threshold_mps = 2.25f;
-  c.update_check_enabled = false;
-  c.update_show_prerelease = true;
+  c.update.check_enabled = false;
+  c.update.show_prerelease = true;
   c.backlight.brightness_auto = false;
   c.backlight.brightness_fixed_pct = 42;
   c.backlight.brightness_min_pct = 15;
@@ -296,8 +296,8 @@ Config everyFieldChanged() {
   c.backlight.night_pct = 5;
   c.backlight.night_wake_s = 120;
   c.backlight.night_pause_polling = true;
-  c.web_password = "hunter22";
-  c.update_skipped_tag = "v1.4.0";  // device state: never in a backup
+  c.web.password = "hunter22";
+  c.update.skipped_tag = "v1.4.0";  // device state: never in a backup
   c.display.last_screen = 2;                // nav state: never in a backup
   return c;
 }
@@ -423,13 +423,13 @@ static void test_restore_of_a_stage_5_backup_fills_every_setting(void) {
   TEST_ASSERT_EQUAL_UINT32(30u, c.poll.interval_s);
   // general
   ASSERT_ENUM_EQ(Language::EN, c.display.language);
-  ASSERT_ENUM_EQ(Language::EN, c.web_language);
+  ASSERT_ENUM_EQ(Language::EN, c.web.language);
   TEST_ASSERT_TRUE(c.auto_cycle.enabled);
   TEST_ASSERT_EQUAL_UINT32(20u, c.auto_cycle.interval_s);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 12.5f, c.phase.near_airport_km);
   TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.25f, c.phase.climb_rate_threshold_mps);
-  TEST_ASSERT_FALSE(c.update_check_enabled);
-  TEST_ASSERT_TRUE(c.update_show_prerelease);
+  TEST_ASSERT_FALSE(c.update.check_enabled);
+  TEST_ASSERT_TRUE(c.update.show_prerelease);
   // display
   TEST_ASSERT_FALSE(c.backlight.brightness_auto);
   TEST_ASSERT_EQUAL_UINT8(42, c.backlight.brightness_fixed_pct);
@@ -442,9 +442,9 @@ static void test_restore_of_a_stage_5_backup_fills_every_setting(void) {
   TEST_ASSERT_EQUAL_UINT16(120, c.backlight.night_wake_s);
   TEST_ASSERT_TRUE(c.backlight.night_pause_polling);
   // security
-  ASSERT_STR_EQ("hunter22", c.web_password);
+  ASSERT_STR_EQ("hunter22", c.web.password);
   // Not in a backup: left as they were.
-  TEST_ASSERT_TRUE(c.update_skipped_tag.empty());
+  TEST_ASSERT_TRUE(c.update.skipped_tag.empty());
   TEST_ASSERT_EQUAL_INT(0, c.display.last_screen);
 
   // The two languages land in their own objects (both are "en" above, so swap one).
@@ -453,7 +453,7 @@ static void test_restore_of_a_stage_5_backup_fills_every_setting(void) {
   json.replace(json.find(displayEn), displayEn.size(), "\"language\": \"pl\"");
   const BackupRestoreResult r2 = restoreConfigFromBackupJson(json, defaultConfig());
   ASSERT_ENUM_EQ(Language::PL, r2.config.display.language);
-  ASSERT_ENUM_EQ(Language::EN, r2.config.web_language);
+  ASSERT_ENUM_EQ(Language::EN, r2.config.web.language);
 }
 
 }  // namespace

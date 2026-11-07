@@ -230,10 +230,10 @@ UpdateState updateDemoState(bool withPrerelease);
 
 // ---- Device side (defined in admin/adapters/github_http.cpp) ---------------
 
-struct Config;  // config_store.h
+struct UpdateSettings;  // config_store.h
 
-// Takes the settings (call again after they change).
-void releaseCheckBegin(const Config &cfg);
+// Takes the update settings (call again after they change).
+void releaseCheckBegin(const UpdateSettings &update);
 // From loop(): starts an asked-for install, a "check now" or a due check when `gate` allows.
 // Blocks while it runs (~1-3 s for a check, ~30-60 s for an install, with
 // the OTA screen up), like an OpenSky poll.

@@ -77,10 +77,10 @@ Config sanitizeConfig(const Config &cfg) {
   out.phase.climb_rate_threshold_mps =
       clampClimbRateThresholdMps(out.phase.climb_rate_threshold_mps);
   out.display.language = clampLanguage(static_cast<int>(out.display.language));
-  out.web_language = clampLanguage(static_cast<int>(out.web_language));
-  if (validateWebPassword(out.web_password) != WebPasswordCheck::Ok) out.web_password.clear();
-  if (!out.update_skipped_tag.empty() && !isReleaseTagFormat(out.update_skipped_tag)) {
-    out.update_skipped_tag.clear();
+  out.web.language = clampLanguage(static_cast<int>(out.web.language));
+  if (validateWebPassword(out.web.password) != WebPasswordCheck::Ok) out.web.password.clear();
+  if (!out.update.skipped_tag.empty() && !isReleaseTagFormat(out.update.skipped_tag)) {
+    out.update.skipped_tag.clear();
   }
   out.backlight.brightness_fixed_pct = clampBrightnessPct(out.backlight.brightness_fixed_pct);
   out.backlight.brightness_min_pct = clampBrightnessPct(out.backlight.brightness_min_pct);
