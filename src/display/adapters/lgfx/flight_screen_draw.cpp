@@ -26,7 +26,7 @@ uint8_t bigTextSize(CountdownDisplay::Mode mode) {
 }  // namespace
 
 void drawFlightScreen(LGFX &gfx, const AircraftRow &nearest, bool hasNearest,
-                      const CpaPrediction &cpa, int16_t screenWidth, OpenSkyHealth health) {
+                      const CpaPrediction &cpa, int16_t screenWidth, FeedHealth health) {
   const int16_t cx = static_cast<int16_t>(screenWidth / 2);
 
   // ---- Identity panel (kFlightIdentityTop, kFlightIdentityHeight) — text only, no frame (same as Screen 1).
@@ -150,7 +150,7 @@ void flightScreenReserveSprite(int16_t screenWidth) {
 }
 
 void drawFlightCountdown(LGFX &gfx, bool hasNearest, const CpaPrediction &cpa,
-                         int16_t screenWidth, OpenSkyHealth health) {
+                         int16_t screenWidth, FeedHealth health) {
   const CountdownDisplay cd = computeCountdownDisplay(hasNearest ? cpa : CpaPrediction{},
                                                       i18nLanguage(), hasNearest, health);
   flightScreenReserveSprite(screenWidth);  // no-op after boot

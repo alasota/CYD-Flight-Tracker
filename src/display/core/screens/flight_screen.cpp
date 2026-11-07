@@ -25,7 +25,7 @@ std::string nowStatsText(const AircraftRow &row, Language lang) {
 }
 
 CountdownDisplay computeCountdownDisplay(const CpaPrediction &cpa, Language lang,
-                                         bool anyAircraft, OpenSkyHealth health) {
+                                         bool anyAircraft, FeedHealth health) {
   CountdownDisplay out;
 
   const float t = cpa.t_cpa_seconds;

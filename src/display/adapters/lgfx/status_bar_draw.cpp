@@ -2,7 +2,7 @@
 
 #include "display/adapters/lgfx/lcars_theme_draw.h"  // palette, fonts
 
-void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, OpenSkyHealth health,
+void drawStatusBar(LGFX &gfx, int aircraftCount, bool hasData, FeedHealth health,
                    AlertSeverity badge, std::time_t localEpoch, bool timeSynced,
                    int16_t screenWidth) {
   // Black strip + a 1px lilac rule along its bottom edge — no filled block,

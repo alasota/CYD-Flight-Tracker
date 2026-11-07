@@ -115,16 +115,16 @@ static void test_block_label_never_longer_than_11_chars(void) {
 // ---- statusBarHealthColor (the status dot) --------------------------------
 
 static void test_health_dot_colour(void) {
-  TEST_ASSERT_EQUAL_HEX16(LCARS_GREEN, statusBarHealthColor(OpenSkyHealth::Ok));
-  TEST_ASSERT_EQUAL_HEX16(LCARS_YELLOW, statusBarHealthColor(OpenSkyHealth::RateLimited));
-  TEST_ASSERT_EQUAL_HEX16(THEME_ALERT, statusBarHealthColor(OpenSkyHealth::AuthError));  // red
-  TEST_ASSERT_EQUAL_HEX16(THEME_ALERT, statusBarHealthColor(OpenSkyHealth::NetworkError));
+  TEST_ASSERT_EQUAL_HEX16(LCARS_GREEN, statusBarHealthColor(FeedHealth::Ok));
+  TEST_ASSERT_EQUAL_HEX16(LCARS_YELLOW, statusBarHealthColor(FeedHealth::RateLimited));
+  TEST_ASSERT_EQUAL_HEX16(THEME_ALERT, statusBarHealthColor(FeedHealth::AuthError));  // red
+  TEST_ASSERT_EQUAL_HEX16(THEME_ALERT, statusBarHealthColor(FeedHealth::NetworkError));
 }
 
 static void test_header_uses_no_button_colour(void) {
   // Variant A: nothing in the header may look like the active nav button.
-  for (OpenSkyHealth h : {OpenSkyHealth::Ok, OpenSkyHealth::RateLimited,
-                          OpenSkyHealth::AuthError, OpenSkyHealth::NetworkError}) {
+  for (FeedHealth h : {FeedHealth::Ok, FeedHealth::RateLimited,
+                          FeedHealth::AuthError, FeedHealth::NetworkError}) {
     TEST_ASSERT_NOT_EQUAL(THEME_CHROME_ACCENT, statusBarHealthColor(h));
   }
 }
@@ -154,25 +154,25 @@ static void test_count_is_centred_in_the_free_space(void) {
 
 static void test_empty_state_says_why_it_is_empty(void) {
   // Ok: the sky really is empty.
-  ASSERT_ENUM_EQ(Str::NoFlightsInRange, emptyStateText(OpenSkyHealth::Ok, false));
-  ASSERT_ENUM_EQ(Str::NoFlight, emptyStateText(OpenSkyHealth::Ok, true));
+  ASSERT_ENUM_EQ(Str::NoFlightsInRange, emptyStateText(FeedHealth::Ok, false));
+  ASSERT_ENUM_EQ(Str::NoFlight, emptyStateText(FeedHealth::Ok, true));
   // Feed problems must not read "no flights".
   TEST_ASSERT_EQUAL_STRING("LIMIT OPENSKY WYCZERPANY",
-                           tr(emptyStateText(OpenSkyHealth::RateLimited, false), Language::PL));
+                           tr(emptyStateText(FeedHealth::RateLimited, false), Language::PL));
   TEST_ASSERT_EQUAL_STRING("OPENSKY LIMIT REACHED",
-                           tr(emptyStateText(OpenSkyHealth::RateLimited, false), Language::EN));
-  ASSERT_ENUM_EQ(Str::FeedAuthError, emptyStateText(OpenSkyHealth::AuthError, false));
-  ASSERT_ENUM_EQ(Str::FeedUnreachable, emptyStateText(OpenSkyHealth::NetworkError, false));
-  ASSERT_ENUM_EQ(Str::FeedQuotaShort, emptyStateText(OpenSkyHealth::RateLimited, true));
-  ASSERT_ENUM_EQ(Str::FeedErrorShort, emptyStateText(OpenSkyHealth::AuthError, true));
+                           tr(emptyStateText(FeedHealth::RateLimited, false), Language::EN));
+  ASSERT_ENUM_EQ(Str::FeedAuthError, emptyStateText(FeedHealth::AuthError, false));
+  ASSERT_ENUM_EQ(Str::FeedUnreachable, emptyStateText(FeedHealth::NetworkError, false));
+  ASSERT_ENUM_EQ(Str::FeedQuotaShort, emptyStateText(FeedHealth::RateLimited, true));
+  ASSERT_ENUM_EQ(Str::FeedErrorShort, emptyStateText(FeedHealth::AuthError, true));
 }
 
 static void test_empty_state_texts_fit_their_slots(void) {
   // Long form: centred across the 320px screen in the 8px body font;
   // short form: the radar's 120px summary panel (minus insets) -> 13 chars.
-  const OpenSkyHealth all[] = {OpenSkyHealth::Ok, OpenSkyHealth::RateLimited,
-                               OpenSkyHealth::AuthError, OpenSkyHealth::NetworkError};
-  for (OpenSkyHealth h : all) {
+  const FeedHealth all[] = {FeedHealth::Ok, FeedHealth::RateLimited,
+                               FeedHealth::AuthError, FeedHealth::NetworkError};
+  for (FeedHealth h : all) {
     for (Language lang : {Language::PL, Language::EN}) {
       TEST_ASSERT_TRUE(utf8Length(tr(emptyStateText(h, false), lang)) * LCARS_FONT_BODY_CHAR_PX <= 300);
       TEST_ASSERT_TRUE(utf8Length(tr(emptyStateText(h, true), lang)) <= 13);

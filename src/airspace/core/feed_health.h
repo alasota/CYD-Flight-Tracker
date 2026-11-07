@@ -10,7 +10,7 @@
 // network) isn't invisible — the aircraft list on screen may be stale
 // (net_task keeps the last good DataSnapshot rather than blanking it). See
 // docs/review-notes-2026.md 1.2/1.3/1.4.
-enum class OpenSkyHealth {
+enum class FeedHealth {
   Ok,            // last poll succeeded
   RateLimited,   // 429 — credits exhausted, backing off
   AuthError,     // 401 persisted after a token refresh — check credentials

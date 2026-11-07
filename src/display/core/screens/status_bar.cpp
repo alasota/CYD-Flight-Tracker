@@ -47,28 +47,28 @@ std::string statusBarBlockLabel(int aircraftCount, bool hasData, Language lang) 
   return number + " " + tr(word, lang);
 }
 
-uint16_t statusBarHealthColor(OpenSkyHealth health) {
+uint16_t statusBarHealthColor(FeedHealth health) {
   switch (health) {
-    case OpenSkyHealth::RateLimited:
+    case FeedHealth::RateLimited:
       return LCARS_YELLOW;
-    case OpenSkyHealth::AuthError:
-    case OpenSkyHealth::NetworkError:
+    case FeedHealth::AuthError:
+    case FeedHealth::NetworkError:
       return THEME_ALERT;
-    case OpenSkyHealth::Ok:
+    case FeedHealth::Ok:
     default:
       return LCARS_GREEN;
   }
 }
 
-Str emptyStateText(OpenSkyHealth health, bool shortForm) {
+Str emptyStateText(FeedHealth health, bool shortForm) {
   switch (health) {
-    case OpenSkyHealth::RateLimited:
+    case FeedHealth::RateLimited:
       return shortForm ? Str::FeedQuotaShort : Str::FeedQuotaExhausted;
-    case OpenSkyHealth::AuthError:
+    case FeedHealth::AuthError:
       return shortForm ? Str::FeedErrorShort : Str::FeedAuthError;
-    case OpenSkyHealth::NetworkError:
+    case FeedHealth::NetworkError:
       return shortForm ? Str::FeedErrorShort : Str::FeedUnreachable;
-    case OpenSkyHealth::Ok:
+    case FeedHealth::Ok:
     default:
       return shortForm ? Str::NoFlight : Str::NoFlightsInRange;
   }

@@ -19,7 +19,7 @@ CpaPrediction netCpaAt(const NetState &s, uint32_t nowMs) {
   return extrapolateCpa(s.data->cpa, nowMs - s.data->polledAtMs);
 }
 
-UiView makeUiView(const NetState &s, int screen, int page, OpenSkyHealth shownHealth,
+UiView makeUiView(const NetState &s, int screen, int page, FeedHealth shownHealth,
                   uint32_t nowMs, std::time_t local, bool synced) {
   UiView v;
   v.screen = screen;
@@ -189,11 +189,11 @@ AutoCycleInput autoCycleInputAt(const NetState &s, int currentScreen, bool scree
 
 // ---- The health the header shows ------------------------------------------------
 
-ShownHealthStep shownHealthStep(OpenSkyHealth shownNow, OpenSkyHealth netHealth, uint32_t nowMs,
+ShownHealthStep shownHealthStep(FeedHealth shownNow, FeedHealth netHealth, uint32_t nowMs,
                                 uint32_t netBeatMs, bool rowsEmpty) {
   ShownHealthStep r;
   r.stalled = heartbeatStale(nowMs, netBeatMs, kNetStallLimitMs);
-  r.shown = r.stalled ? OpenSkyHealth::NetworkError : netHealth;
+  r.shown = r.stalled ? FeedHealth::NetworkError : netHealth;
   if (r.shown == shownNow) return r;
   r.healthChanged = true;
   r.newPoll = rowsEmpty;  // an empty screen says why it is empty (emptyStateText())
