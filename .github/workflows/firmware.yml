@@ -90,6 +90,7 @@ jobs:
           python tools/test_check_layers.py
           python tools/test_rewrite_includes.py
           python tools/test_subset_efont.py
+          python tools/test_embed_assets.py
           python tools/check_bdd.py
 
       - name: Comment and doc-reference check (warnings only)
