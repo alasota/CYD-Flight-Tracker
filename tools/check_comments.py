@@ -5,6 +5,8 @@
 
 Finds, in src/ and test/:
   * symbols removed in spec 11 (dead code that must not come back) — in code or comments,
+  * the old names of the compound glossary names spec 12 stage 7 renamed — in code or
+    comments, but not in "quoted text" (strings, quoted doc headings),
   * comments in network-core modules (net_task, core 0) that credit main.cpp / loopTask,
   * doc references (`CLAUDE.md "X"`, `CLAUDE.md's "X"`, `docs/<f>.md "X"`) that don't hit a
     heading of that file (any level; the heading has to *start with* X),
@@ -39,6 +41,25 @@ REMOVED_SYMBOLS = [
     "RefreshNow", "rssiToBars",
 ]
 
+# Renamed in spec 12 stage 7 (section 3, the glossary): {old: new}. Only compound names; the plain
+# words Aircraft and Config (types AircraftState, Settings) are also English words, so
+# tools/test_rename_symbols.py guards them on code tokens instead.
+RENAMED_SYMBOLS = {
+    "BoundingBox": "ScanArea", "computeBoundingBox": "computeScanArea",
+    "OpenSkyHealth": "FeedHealth",
+    "DataSnapshot": "AirspaceSnapshot", "buildDataSnapshot": "buildAirspaceSnapshot",
+    "LookupPorts": "EnrichmentPort",
+    "AircraftRow": "TrackedFlight",
+    **{"configPortal" + s: "webServer" + s for s in (
+        "Begin", "Loop", "IsActive", "SaveCount", "SetScreenshotSource", "SetOtaObserver",
+        "SetPerfSource", "RestartPending")},
+    "defaultConfig": "defaultSettings", "sanitizeConfig": "sanitizeSettings",
+    "loadConfig": "loadSettings", "saveConfig": "saveSettings", "reloadConfig": "reloadSettings",
+    "configToBackupJson": "settingsToBackupJson",
+    "restoreConfigFromBackupJson": "restoreSettingsFromBackupJson",
+    "makeConfig": "makeSettings",
+}
+
 # Modules (file stems in src/) whose code runs in net_task on core 0. A comment in one of them
 # that says main.cpp / loopTask does the work is describing the pre-spec-04 single loop().
 NET_MODULES = {
@@ -53,6 +74,9 @@ SOURCE_SUFFIXES = {".h", ".hpp", ".c", ".cpp"}
 
 _SYMBOL_RE = re.compile(r"\b(" + "|".join(sorted(REMOVED_SYMBOLS, key=len, reverse=True))
                         + r")\b")
+_RENAMED_RE = re.compile(r"\b(" + "|".join(sorted(RENAMED_SYMBOLS, key=len, reverse=True))
+                         + r")\b")
+_QUOTED_RE = re.compile(r'"[^"\n]*(?:"|$)', re.M)
 _MAIN_CPP_RE = re.compile(r"\bmain\.cpp\b|\bloopTask\b")
 _DOC_REF_RE = re.compile(r"\b(CLAUDE\.md|docs/[\w.-]+\.md)(?:'s)? \"([^\"]+)\"")
 _OLD_REVIEW_NOTES_RE = re.compile(r"\bCLAUDE\.md(?:'s)? review notes\b")
@@ -138,6 +162,60 @@ def find_removed_symbols(files):
         for n, raw in enumerate(text.splitlines(), 1):
             for m in _SYMBOL_RE.finditer(raw):
                 found.append(Finding(path, n, f"{m.group(1)} was removed in spec 11"))
+    return found
+
+
+def _blank(s):
+    return "".join(ch if ch == "\n" else " " for ch in s)
+
+
+def _without_quoted_text(text):
+    """text with "strings", 'chars' and raw strings blanked, and with the "quoted text" inside
+    comments blanked too (a quote ends at its line's end); newlines kept, so lines stay."""
+    out = []
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if text.startswith("//", i) or text.startswith("/*", i):
+            if c == "/" and text[i + 1] == "/":
+                end = text.find("\n", i)
+                end = n if end < 0 else end
+            else:
+                end = text.find("*/", i + 2)
+                end = n if end < 0 else end + 2
+            out.append(_QUOTED_RE.sub(lambda m: _blank(m.group(0)), text[i:end]))
+            i = end
+            continue
+        if c == "R" and text.startswith('R"', i) and (i == 0 or not _ident_char(text[i - 1])
+                                                      or text[i - 1] in "u8LU"):
+            open_paren = text.find("(", i + 2)
+            delim = text[i + 2:open_paren]
+            end = text.find(")" + delim + '"', open_paren)
+            end = n if end < 0 else end + len(delim) + 2
+        elif c == '"' or (c == "'" and not (i > 0 and text[i - 1].isalnum())):
+            end = i + 1
+            while end < n and text[end] != c and text[end] != "\n":
+                end += 2 if text[end] == "\\" else 1
+            end = min(end + 1, n)
+        else:
+            out.append(c)
+            i += 1
+            continue
+        out.append(_blank(text[i:end]))
+        i = end
+    return "".join(out)
+
+
+def find_renamed_symbols(files):
+    """files: {relpath: text}. Findings for every old name of a stage-7 rename, in code or in
+    a comment outside "quoted text"."""
+    found = []
+    for path, text in sorted(files.items()):
+        for n, raw in enumerate(_without_quoted_text(text).split("\n"), 1):
+            for m in _RENAMED_RE.finditer(raw):
+                name = m.group(1)
+                found.append(Finding(path, n, f"{name} was renamed {RENAMED_SYMBOLS[name]} "
+                                     "in spec 12 stage 7"))
     return found
 
 
@@ -235,8 +313,8 @@ def main(argv=None):
 
     files = load_tree(args.root)
     docs = load_docs(args.root)
-    findings = (find_removed_symbols(files) + find_main_cpp_comments(files)
-                + find_bad_doc_refs(files, docs))
+    findings = (find_removed_symbols(files) + find_renamed_symbols(files)
+                + find_main_cpp_comments(files) + find_bad_doc_refs(files, docs))
     if "CLAUDE.md" in docs:
         findings += check_claude_md_size(docs["CLAUDE.md"])
     for f in findings:
