@@ -87,7 +87,7 @@ bool shouldDeferAutoSwitch(int currentScreen, bool cpaFound, float tCpaSeconds);
 // Auto-cycle "advance now?" decision, pure so it's testable without
 // the UI loop or a real millis() clock. Inputs:
 //   elapsedMs  - millis() elapsed since the last screen change
-//   intervalS  - configured auto_cycle_interval_s (config_store)
+//   intervalS  - configured AutoCycleSettings::interval_s (display_settings)
 //   deferHold  - the current shouldDeferAutoSwitch() result
 //
 //   advance  <=>  elapsedMs >= intervalS * 1000  &&  !deferHold

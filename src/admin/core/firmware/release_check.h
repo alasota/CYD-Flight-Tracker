@@ -134,7 +134,7 @@ uint32_t nextCheckDelayMs(CheckOutcome o, uint32_t rateLimitWaitS);
 
 // May a background check (or the download) start right now?
 struct CheckGate {
-  bool enabled = false;      // update_check_enabled (a manual check ignores it)
+  bool enabled = false;      // update.check_enabled (a manual check ignores it)
   bool wifi = false;         // connected to a network
   bool timeSynced = false;   // certificates need a real date
   bool otaBusy = false;      // an update is already being written / restarting
@@ -204,7 +204,7 @@ bool preReleaseWorthShowing(const ReleaseInfo &pre, const ReleaseInfo &latest);
 struct PromptGate {
   UpdateStatus status = UpdateStatus::NeverChecked;
   std::string latestTag;
-  std::string skippedTag;          // update_skipped_tag: NO was tapped for it
+  std::string skippedTag;          // update.skipped_tag: NO was tapped for it
   bool installedIsDev = false;     // a development build never gets asked
   bool alreadyPromptedThisBoot = false;
   bool homeConfigured = false;     // the setup prompt has the screen

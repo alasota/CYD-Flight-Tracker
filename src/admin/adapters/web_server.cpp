@@ -35,7 +35,7 @@ uint32_t saveCount = 0;  // see configPortalSaveCount()
 ScreenshotSource screenshotSource;  // see configPortalSetScreenshotSource()
 OtaObserver otaObserver;            // see configPortalSetOtaObserver()
 
-// ---- Panel password (web_auth). A copy of Config::web_password, refreshed
+// ---- Panel password (web_auth). A copy of the settings' web.password, refreshed
 // whenever this module saves the settings (the only writer besides the
 // boot-time touchscreen reset, which runs before configPortalBegin()).
 std::string webPassword;
@@ -439,7 +439,7 @@ void handleRestore() {
   ++saveCount;           // net_task reloads: language, home location, ...
   refreshPassword();     // a backup with secrets carries the panel password
 
-  Config saved = loadConfig();  // its web_language may just have changed
+  Config saved = loadConfig();  // its web.language may just have changed
   if (r.invalidFields.empty()) {
     sendConfigPage(saved, SettingsTab::Backup, WebStr::RestoreOk, false);
   } else {

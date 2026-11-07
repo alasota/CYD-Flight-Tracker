@@ -12,8 +12,8 @@
 #include "admin/core/firmware/ota_update.h"  // OtaObserver
 
 // --- Hardware adapter: serves the local config web page at cyd-sky.local
-// (mDNS) with a form for lat/lon/radius/poll_interval/auto_cycle_enabled/
-// auto_cycle_interval_s/OpenSky credentials,
+// (mDNS) with a form for lat/lon/radius/poll interval/auto-cycle/OpenSky
+// credentials (and the rest of Config's settings objects),
 // read/persisted via config_store. The radius field's credit cost updates
 // live in the browser (client-side JS mirroring scan_area's openSkyCreditCost())
 // as the user types, no round trip needed. A second form lets the user

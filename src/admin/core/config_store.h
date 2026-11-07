@@ -1,6 +1,7 @@
 // config_store — Preferences/NVS-backed persistence for all user-configurable
-// settings (home position, scan radius, poll interval, OpenSky OAuth
-// credentials, last-active screen). See CLAUDE.md "Code conventions".
+// settings: `Config`, the aggregate of the contexts' settings objects (home,
+// flight phases, OpenSky account and poll interval, display, auto-cycle,
+// backlight, update check, settings page). See CLAUDE.md "Code conventions".
 //
 // Split in two per CLAUDE.md "Testing": the struct + pure validation/default
 // helpers below have no hardware dependency and run under `pio test -e
