@@ -122,7 +122,7 @@ bool fetchToken(const std::string &client_id, const std::string &client_secret, 
   return true;
 }
 
-StatesAttempt requestStatesOnce(const BoundingBox &bbox, const std::string &bearerToken) {
+StatesAttempt requestStatesOnce(const ScanArea &bbox, const std::string &bearerToken) {
   StatesAttempt att;
 
   // Built into a fixed buffer instead of concatenating Arduino Strings
@@ -233,7 +233,7 @@ OpenSkyPollResult fetchAircraftStates(const OpenSkyCredentials &creds, const Hom
     tokenFetched = true;
   }
 
-  BoundingBox bbox = computeBoundingBox(home.lat, home.lon, home.radius_deg);
+  ScanArea bbox = computeScanArea(home.lat, home.lon, home.radius_deg);
 
   bool bearer = planStatesRequest(auth, cachedToken.valid);
   StatesAttempt att = requestStatesOnce(bbox, bearer ? cachedToken.access_token : std::string());

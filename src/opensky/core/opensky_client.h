@@ -20,7 +20,7 @@
 // ---- Pure logic (no WiFi/HTTP dependency) — testable under
 // `pio test -e native`.
 
-struct BoundingBox {
+struct ScanArea {
   float lamin = 0.0f;
   float lomin = 0.0f;
   float lamax = 0.0f;
@@ -34,7 +34,7 @@ struct BoundingBox {
 // produces a proportionally larger box here. Does not handle antimeridian
 // wraparound (a home point near ±180° longitude just gets clipped, not
 // wrapped) — an accepted limitation for a fixed home-location tracker.
-BoundingBox computeBoundingBox(float lat, float lon, float radius_deg);
+ScanArea computeScanArea(float lat, float lon, float radius_deg);
 
 // Cached-token state as plain data, so tests can construct it directly
 // without performing any HTTP call.
