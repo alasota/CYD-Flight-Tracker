@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **etap 5 z 8 zrobiony (v1.11.3)** 2026-11-05, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etapy 6–8 do zrobienia. Jedna specyfikacja dla całej
+Status: **w trakcie — etap 6 z 8** (etap 5 zrobiony w v1.11.3) 2026-11-05, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etapy 6–8 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 

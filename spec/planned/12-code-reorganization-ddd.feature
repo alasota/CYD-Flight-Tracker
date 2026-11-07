@@ -1,4 +1,4 @@
-Feature: Reorganizacja kodu według DDD — etapy 1–5: katalogi kontekstów i warstw (core / services / adapters, korzenie w main/), include'y z pełną ścieżką, raport zależności, źle położone typy w swoich kontekstach, podział czyste / sprzętowe, przepływy UI i formularz ustawień w services/ i core/ z testami
+Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i warstw (core / services / adapters, korzenie w main/), include'y z pełną ścieżką, raport zależności, źle położone typy w swoich kontekstach, podział czyste / sprzętowe, przepływy UI i formularz ustawień w services/ i core/ z testami, ustawienia per kontekst i zasoby panelu WWW jako pliki
   Etap 1 przeniósł pliki z płaskiego src/ (git mv, bez dzielenia) do katalogów kontekstów i warstw
   z §4; każdy #include "…" podaje ścieżkę od src/ (flaga -I src), środowisko native nie kompiluje
   korzeni kompozycji ani adapterów, a tools/check_layers.py raportuje naruszenia tabeli z §5
@@ -16,8 +16,14 @@ Feature: Reorganizacja kodu według DDD — etapy 1–5: katalogi kontekstów i 
   (dotyk i strony tabeli, pytanie o aktualizację, ekran OTA, ekran ostrzeżeń, reset hasła, zrzut
   ekranu, pomiar pętli UI) do display/services/, a z trasy POST /save logikę formularza do
   admin/core/settings_form — każdy z testami natywnymi; main.cpp ma mniej niż 250 linii, zachowanie
-  urządzenia się nie zmienia. Wyniki płytki z etapów 1–4 są w specyfikacji (§8 „Wynik etapu N”);
-  etapy 6–8 dostaną swoje scenariusze w tym pliku, gdy przyjdzie ich kolej.
+  urządzenia się nie zmienia. Etap 6 składa Config z małych obiektów wartości kontekstów (§7: Home,
+  PhaseThresholds, OpenSkyCredentials, PollSettings, DisplaySettings, AutoCycleSettings,
+  BacklightSettings, UpdateSettings, WebSettings) — moduły spoza admin/ dostają tylko swoje obiekty,
+  klucze NVS i format kopii zapasowej się nie zmieniają — a CSS, JS i ikonę panelu WWW przenosi z
+  literałów w config_page.cpp do plików w src/admin/assets/, z których tools/embed_assets.py generuje
+  admin/core/web_assets.h; strona panelu jest bajt w bajt taka sama. Wyniki płytki z etapów 1–5 są w
+  specyfikacji (§8 „Wynik etapu N”); etapy 7–8 dostaną swoje scenariusze w tym pliku, gdy przyjdzie
+  ich kolej.
 
   # ---- etap 1 (aktualne po etapie 2): układ katalogów i include'y
 
@@ -293,12 +299,12 @@ Feature: Reorganizacja kodu według DDD — etapy 1–5: katalogi kontekstów i 
     Then filtr to +<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp>
     And filtr nie przywraca żadnego pliku z adapters/ (od etapu 4 trasy WebServer są w admin/adapters/web_server.cpp bez czystych funkcji, a testy tych funkcji w admin/core/settings_form)
 
-  # (zmienione w etapie 3: limit to stan po ostatnim wydanym etapie — 51 po etapie 2, 47 po etapie 3; w etapie 4: 14)
+  # (zmienione w etapie 3: limit to stan po ostatnim wydanym etapie — 51 po etapie 2, 47 po etapie 3; w etapie 4: 14; w etapie 6: 12)
   @test=tools/test_check_layers.py:LayoutTest.test_layer_findings_do_not_exceed_the_stage_limit
   Scenario: Liczba naruszeń w raporcie warstw nie rośnie ponad stan po ostatnim etapie
-    Given limit naruszeń zapisany w teście: 14 (stan po etapie 4; po etapie 2 było 51, po etapie 3 47)
+    Given limit naruszeń zapisany w teście: 12 (stan po etapie 6; po etapie 2 było 51, po etapie 3 47, po etapach 4 i 5 14)
     When uruchamiam check_layers na drzewie repozytorium
-    Then łączna liczba naruszeń jest nie większa niż 14
+    Then łączna liczba naruszeń jest nie większa niż 12
     And nowe naruszenie powyżej limitu kończy test błędem, a lista naruszeń jest w komunikacie
 
   @test=tools/test_check_layers.py:LayoutTest.test_no_old_layer_paths_left_in_code_and_build_files
@@ -1165,3 +1171,237 @@ Feature: Reorganizacja kodu według DDD — etapy 1–5: katalogi kontekstów i 
     And aktualizacja OTA przez WiFi pokazuje ekran aktualizacji z paskiem i kończy się nowym obrazem oznaczonym jako ważny; wysłanie pliku, który nie jest firmware'em, pokazuje „aktualizacja nieudana” przez 5 s i wraca do ekranów
     And z ustawionym hasłem panelu palec na ekranie przy włączeniu daje ekran trzymania, po 5 s pytanie TAK / NIE; NIE zostawia hasło
     And zapis formularza bez zmian zachowuje wartości, szerokość „abc” i długość „x” są odrzucone z komunikatem wymieniającym oba pola w tej kolejności, a zmiana interwału auto-cycle przetrwa restart
+
+  # ---- etap 6: ustawienia per kontekst (§7) — Config składa się z obiektów wartości kontekstów (nazwa Config zostaje do etapu 7)
+
+  @test=tools/test_check_layers.py:LayoutTest.test_config_is_built_from_context_objects
+  Scenario Outline: Config składa się z obiektów wartości kontekstów, a każdy obiekt leży w swoim kontekście
+    Given src/admin/core/config_store.h po etapie 6
+    When czytam pola struct Config i miejsce deklaracji ich typów
+    Then Config ma pole <pole> typu <obiekt> z nagłówka <nagłówek>, a w nim pola <pola>
+    And Config nie ma żadnego innego pola (żadnego z 28 dawnych pól płaskich)
+
+    Examples:
+      | pole       | obiekt             | nagłówek                              | pola                                                                                                                                                    |
+      | home       | Home               | airspace/core/home.h                  | lat, lon, radius_deg, configured                                                                                                                        |
+      | phase      | PhaseThresholds    | airspace/core/flight_phase.h          | near_airport_km, climb_rate_threshold_mps                                                                                                               |
+      | opensky    | OpenSkyCredentials | opensky/core/opensky_settings.h       | client_id, client_secret                                                                                                                                |
+      | poll       | PollSettings       | opensky/core/opensky_settings.h       | interval_s                                                                                                                                              |
+      | display    | DisplaySettings    | display/core/display_settings.h       | language, last_screen                                                                                                                                   |
+      | auto_cycle | AutoCycleSettings  | display/core/display_settings.h       | enabled, interval_s                                                                                                                                     |
+      | backlight  | BacklightSettings  | display/core/backlight.h              | brightness_auto, brightness_fixed_pct, brightness_min_pct, brightness_max_pct, night_mode, night_from_min, night_to_min, night_pct, night_wake_s, night_pause_polling |
+      | update     | UpdateSettings     | admin/core/config_store.h             | check_enabled, show_prerelease, skipped_tag                                                                                                             |
+      | web        | WebSettings        | admin/core/config_store.h             | language, password                                                                                                                                      |
+
+  @test=test_admin/config_store_test.cpp:test_default_config_keeps_every_stage_5_default
+  Scenario: Wartości domyślne ustawień są te same co przed etapem
+    Given defaultConfig() po etapie 6
+    When porównuję każde pole każdego obiektu z wartością domyślną z v1.11.3
+    Then dom to (0, 0), zasięg 2,5°, nieskonfigurowany; poll co 15 s; auto-cycle wyłączony, co 15 s; lotnisko 15 km, wznoszenie 1,5 m/s; ekran i panel po polsku, ostatni ekran 0
+    And sprawdzanie aktualizacji włączone, wersje rozwojowe wyłączone, bez pominiętej wersji i hasła; jasność automatyczna 10–100 %, stała 80 %, noc od zachodu do wschodu słońca (kDefaultNightMode = Sun; okno zegarowe 23:00–06:30), w nocy 10 %, wybudzenie 60 s, bez pauzy pollingu
+
+  @test=test_admin/config_store_test.cpp:test_sanitize_config_clamps_all_fields
+  @test=test_admin/config_store_test.cpp:test_sanitize_config_leaves_in_range_values_untouched
+  Scenario: sanitizeConfig() przycina te same pola do tych samych granic, teraz w obiektach kontekstów
+    Given ustawienia z wartościami poza zakresem w każdym obiekcie (szerokość 200°, zasięg 0, poll 1 s, auto-cycle 0 s, lotnisko 0 km, jasność 0 / 200 %, noc 2000 min, ekran 7, język 9)
+    When sanitizeConfig() je porządkuje
+    Then każde pole ma tę samą wartość co przed etapem (testy sprzed etapu, zmieniona tylko ścieżka pola, np. cfg.backlight.night_pct zamiast cfg.night_pct)
+    And ustawienia w zakresie zostają nietknięte
+
+  @test=tools/test_check_layers.py:LayoutTest.test_settings_nvs_keys_and_types_unchanged
+  Scenario: Klucze NVS i ich typy są te same co przed etapem
+    Given src/admin/adapters/settings_nvs.cpp po etapie 6
+    When zbieram każde prefs.get…("klucz") i prefs.put…("klucz") z loadConfig(), saveConfig() i zapisów jednego klucza
+    Then to dokładnie 28 kluczy z v1.11.3 (home_lat, home_lon, radius_deg, poll_s, os_id, os_secret, last_screen, auto_cyc, auto_cyc_s, near_km, climb_mps, home_cfg, lang, wlang, wpass, updchk, updpre, updskip, bl_auto, bl_fix, bl_min, bl_max, nt_mode, nt_from, nt_to, nt_pct, nt_wake, nt_poll) w przestrzeni "cydsky"
+    And każdy klucz jest czytany i zapisywany tym samym typem co przed etapem (Float, UInt, String, Int, Bool, UChar, UShort)
+
+  @test=test_admin/config_backup_test.cpp:test_backup_json_is_the_same_as_before_stage_6
+  Scenario: Kopia zapasowa ma bajt w bajt ten sam JSON co przed etapem
+    Given ustawienia z niedomyślną wartością w każdym polu, które trafia do kopii, i hasłem panelu
+    When configToBackupJson() tworzy kopię z sekretami i bez nich
+    Then tekst JSON jest równy zapisanemu w teście wzorcowi z v1.11.3 (grupy location, opensky, general, display, security; te same nazwy kluczy, kolejność i formatowanie)
+    And pominięta wersja (updskip) nie trafia do kopii
+
+  @test=test_admin/config_backup_test.cpp:test_restore_of_a_stage_5_backup_fills_every_setting
+  Scenario: Kopia zapasowa zrobiona przed etapem 6 odtwarza każde ustawienie
+    Given plik kopii zapisany w teście tak, jak wygenerował go v1.11.3 (z sekretami)
+    When restoreConfigFromBackupJson() go wczytuje
+    Then status to Ok, 25 zastosowanych pól, brak błędnych, a każde pole każdego obiektu kontekstu ma wartość z pliku (dom oznaczony jako skonfigurowany)
+
+  @test=test_admin/settings_form_test.cpp:test_form_valid_submit_sets_every_field_and_home_configured
+  Scenario: Formularz ustawień zapisuje każde pole w jego obiekcie kontekstu, jak przed etapem
+    Given zapisane ustawienia i formularz z każdym polem
+    When applySettingsForm() go stosuje
+    Then każde pole ma wartość z formularza (cfg.home.lat, cfg.poll.interval_s, cfg.backlight.night_from_min…), cfg.home.configured = true, komunikat „Zapisano.”
+
+  @test=tools/test_check_layers.py:LayoutTest.test_only_admin_roots_and_core_link_include_settings
+  Scenario: Poza admin/ ustawienia dołączają tylko core_link i korzenie kompozycji (§10 pkt 4)
+    Given src/ po etapie 6
+    When szukam #include "admin/core/config_store.h"
+    Then dołączają go tylko pliki z src/admin/, src/main/ i src/platform/core_link.h (NetState niesie ustawienia, §7)
+    And nie dołącza go już opensky/adapters/opensky_http.cpp ani display/adapters/backlight_ldr.cpp
+
+  @test=tools/test_check_layers.py:LayoutTest.test_config_type_named_only_in_admin_roots_and_core_link
+  Scenario: Moduły innych kontekstów nie znają typu Config, nawet z deklaracji zapowiadającej
+    Given kod (bez komentarzy) z src/airspace/, src/enrichment/, src/opensky/, src/display/ i src/shared/
+    When szukam słowa Config
+    Then nie ma żadnego trafienia (zniknęły struct Config; z opensky_client.h i backlight.h)
+
+  @test=tools/test_check_layers.py:LayoutTest.test_context_functions_take_their_settings_objects
+  Scenario Outline: Funkcje innych kontekstów dostają tylko swoje obiekty ustawień
+    Given nagłówek <nagłówek> po etapie 6
+    When czytam deklarację <funkcja>
+    Then jej parametry ustawień to <parametry>, bez Config
+
+    Examples:
+      | nagłówek                              | funkcja                | parametry                                                         |
+      | opensky/core/opensky_client.h         | fetchAircraftStates    | const OpenSkyCredentials &, const Home &                          |
+      | opensky/core/opensky_client.h         | openSkyClientPoll      | const OpenSkyCredentials &, const Home &, const PollSettings &    |
+      | opensky/core/opensky_client.h         | openSkyAuthStatus      | const OpenSkyCredentials &                                        |
+      | opensky/core/opensky_client.h         | openSkyMsUntilNextPoll | const PollSettings &                                              |
+      | display/core/backlight.h              | backlightHandleTouch   | const BacklightSettings &                                         |
+      | display/core/backlight.h              | backlightStatus        | const BacklightSettings &                                         |
+      | display/adapters/backlight_ldr.h      | backlightLoop          | const BacklightSettings &, const Home &                           |
+      | airspace/services/poll_pipeline.h     | PipelineParams         | Home home, PhaseThresholds phase                                  |
+      | admin/core/firmware/release_check.h   | releaseCheckBegin      | const UpdateSettings &                                            |
+      | admin/core/config_page.h              | pausedMinutesPerDay    | const BacklightSettings &                                         |
+
+  @test=tools/test_check_layers.py:LayoutTest.test_display_reads_only_its_settings_from_net_state
+  Scenario: Ekran czyta z NetState tylko obiekty ustawień, które go dotyczą
+    Given kod z src/display/ po etapie 6
+    When zbieram każde cfg->X i cfg().X
+    Then X należy do home, display, auto_cycle, backlight i update (pominięta wersja dla pytania o aktualizację)
+    But nigdy opensky, poll, phase ani web
+
+  @test=test_platform/core_link_test.cpp:test_diff_language_change
+  @test=test_platform/core_link_test.cpp:test_diff_home_configured_is_first_draw
+  @test=test_platform/core_link_test.cpp:test_diff_radius_or_home_moves_content
+  @test=test_platform/core_link_test.cpp:test_diff_unrelated_config_change_is_nothing
+  Scenario Outline: Zapis ustawień daje te same zdarzenia przerysowania co przed etapem
+    Given NetState z ustawieniami i drugi z nowym wskaźnikiem ustawień, w którym zmieniło się <pole>
+    When diffNetState() porównuje oba
+    Then zdarzenie to <zdarzenie>
+
+    Examples:
+      | pole                  | zdarzenie        |
+      | display.language      | languageChanged  |
+      | home.configured       | firstDraw        |
+      | home.radius_deg       | newPoll          |
+      | home.lat              | newPoll          |
+      | poll.interval_s       | brak             |
+
+  @test=tools/test_check_layers.py:LayoutTest.test_stage_6_removes_the_settings_findings_of_adapters
+  Scenario: Adaptery OpenSky i podświetlenia nie sięgają już po ustawienia z admin/core
+    Given raport check_layers po etapie 6
+    When szukam naruszeń z opensky/adapters/opensky_http.cpp i display/adapters/backlight_ldr.cpp
+    Then nie ma ani opensky_http.cpp -> admin/core, ani backlight_ldr.cpp -> admin/core (config_store.h)
+    And backlight_ldr.cpp i opensky_http.cpp nie mają też żadnego nowego naruszenia (Home dochodzi przez nagłówki display/core i opensky/core)
+
+  # ---- etap 6: zasoby panelu WWW jako pliki (src/admin/assets/ → tools/embed_assets.py → admin/core/web_assets.h)
+
+  @test=tools/test_embed_assets.py:EmbedTextTest.test_css_comments_indentation_and_line_breaks_are_dropped
+  Scenario: CSS z pliku traci komentarze, wcięcia i końce linii, a reszta zostaje bez zmian
+    Given style.css z komentarzem /* … */ w osobnej linii, wciętymi regułami i pustą linią
+    When embed_assets.py składa z niego tekst
+    Then tekst to linie bez wcięć i spacji na końcu, sklejone bez separatora, bez komentarza i pustej linii
+    And spacje wewnątrz linii (np. font:15px/1.5 system-ui) zostają
+
+  @test=tools/test_embed_assets.py:EmbedTextTest.test_js_comment_lines_are_dropped_and_code_kept
+  Scenario: JS z pliku traci linie komentarza, ale nie // w napisie
+    Given app.js z linią // komentarz, linią kodu z 'http://…' w napisie i wciętym blokiem
+    When embed_assets.py składa z niego tekst
+    Then linii komentarza nie ma, napis z // jest cały, linie kodu są sklejone bez wcięć
+
+  @test=tools/test_embed_assets.py:EmbedTextTest.test_lines_that_would_glue_two_tokens_are_an_error
+  Scenario Outline: Linia, której sklejenie z następną skleiłoby dwa słowa, przerywa generowanie
+    Given plik <plik>, w którym linia kończy się na „<koniec>”, a następna zaczyna od „<początek>”
+    When embed_assets.py składa z niego tekst
+    Then skrypt kończy się błędem z nazwą pliku i numerem linii, a nagłówek nie jest zapisany
+
+    Examples:
+      | plik      | koniec   | początek |
+      | app.js    | return   | x        |
+      | app.js    | var a=1  | b=2      |
+      | style.css | margin:0 | auto     |
+
+  @test=tools/test_embed_assets.py:EmbedSvgTest.test_svg_becomes_a_single_quoted_data_uri
+  Scenario: Ikona SVG staje się adresem data: z apostrofami i %23 zamiast #
+    Given favicon.svg w kilku liniach, z atrybutami w cudzysłowach i kolorami #1d1f24, #ff9966
+    When embed_assets.py składa z niego adres
+    Then adres zaczyna się od data:image/svg+xml,<svg, nie ma odstępów między znacznikami, cudzysłowy to apostrofy, a # to %23
+
+  @test=tools/test_embed_assets.py:CLiteralTest.test_quotes_and_backslashes_escaped_utf8_kept
+  Scenario: Tekst w nagłówku C jest literałem, który kompilator odczyta z powrotem dokładnie
+    Given tekst z ", \, apostrofem i znakami UTF-8 ≈ · …
+    When embed_assets.py zapisuje go jako literał C
+    Then " i \ są poprzedzone \, apostrof i znaki UTF-8 zostają jak są, a odczytanie literału daje tekst wejściowy
+
+  @test=tools/test_embed_assets.py:CliTest.test_check_reports_a_stale_header_without_writing
+  @test=tools/test_embed_assets.py:CliTest.test_unchanged_header_is_not_rewritten
+  Scenario: Tryb --check zgłasza nieaktualny nagłówek, a zwykły przebieg nie przepisuje aktualnego
+    Given katalog z zasobami i nagłówek wygenerowany ze starszej wersji style.css
+    When uruchamiam embed_assets.py --check, a potem embed_assets.py dwa razy
+    Then --check kończy się kodem 1 i nazywa nieaktualny plik, nie zmieniając go
+    And pierwszy zwykły przebieg zapisuje nagłówek, drugi go nie dotyka (czas modyfikacji bez zmian — kompilacja nie rusza)
+
+  @test=tools/test_embed_assets.py:RepoTest.test_checked_in_header_matches_the_assets
+  Scenario: Nagłówek w repozytorium odpowiada plikom z src/admin/assets/
+    Given src/admin/assets/ (style.css, app.js, restart.js, check_pending.js, favicon.svg) i src/admin/core/web_assets.h z repozytorium
+    When embed_assets.py generuje nagłówek w pamięci (końce linii CRLF / LF bez znaczenia)
+    Then jest równy plikowi z repozytorium
+
+  @test=tools/test_embed_assets.py:RepoTest.test_cyd_and_native_generate_the_header_before_the_build
+  @test=tools/test_embed_assets.py:RepoTest.test_ci_runs_the_embed_assets_tests
+  Scenario: Kompilacja firmware'u i testów natywnych odświeża nagłówek, a CI sprawdza go testem narzędzi
+    Given platformio.ini i .github/workflows/firmware.yml
+    When czytam extra_scripts środowisk cyd i native oraz krok testów narzędzi
+    Then oba środowiska mają pre:tools/embed_assets.py (cyd-ota i native-asan dziedziczą), cyd obok pre:tools/pio_version.py
+    And krok testów narzędzi uruchamia python tools/test_embed_assets.py
+
+  @test=tools/test_embed_assets.py:RepoTest.test_only_config_page_includes_the_assets
+  @test=tools/test_embed_assets.py:RepoTest.test_config_page_keeps_no_css_or_js_literals
+  Scenario: Zasoby są w firmware raz, a config_page.cpp nie ma już własnego CSS ani JS
+    Given src/ po etapie 6
+    When szukam #include "admin/core/web_assets.h" i literałów CSS / JS w config_page.cpp
+    Then nagłówek dołącza w src/ tylko admin/core/config_page.cpp
+    And w config_page.cpp nie ma reguł CSS (selektor{właściwość:) ani funkcji JS (function(), tylko znaczniki <style>, <script> i blok T={…} z tekstami web_i18n
+
+  @test=test_admin/config_page_test.cpp:test_page_inlines_style_script_and_icon_from_assets
+  Scenario: Strona ustawień wstawia styl, skrypt i ikonę z zasobów w te same miejsca co przed etapem
+    Given model strony z demo i odpowiednio restarting / updateCheckPending
+    When renderConfigPage() składa stronę
+    Then w <head> jest <link rel="icon" … href="kWebFaviconUri"> i <style>kWebStyleCss</style>
+    And przed </script></body></html> jest kWebAppJs, a po nim kWebRestartJs (restarting) albo kWebCheckPendingJs (updateCheckPending) albo nic
+
+  @test=test_admin/config_page_test.cpp:test_page_script_texts_come_from_web_i18n
+  Scenario Outline: Teksty skryptu panelu dalej przychodzą z web_i18n w języku panelu, a pliki zasobów nie mają tekstów
+    Given panel w języku <język>
+    When renderConfigPage() składa stronę
+    Then blok T={…} przed skryptem ma teksty webTr(…, <język>) (dziennie, limit, ponad limit, wysyłanie, …)
+    And żaden z tych tekstów, w żadnym języku, nie występuje w kWebAppJs, kWebRestartJs ani kWebCheckPendingJs
+
+    Examples:
+      | język |
+      | PL    |
+      | EN    |
+
+  # ---- etap 6: rozmiar, liczby testów, płytka
+
+  @manual
+  Scenario: Etap 6 nie zmienia zachowania ani strony panelu, a firmware ma ten sam rozmiar ± 1 KB
+    Given na gałęzi przed etapem 6 (v1.11.3, c0a10e3): przypadki w 6 grupach pio test -e native (admin 251, airspace 71, display 408, enrichment 80, opensky 74, platform 83 = 967), RUN_TEST( 967, firmware.bin 1 348 752 B, „Flash: used” 1 342 169, „RAM: used” 62 036 B, lista bibliotek, check_layers 14, strony panelu z SCREENSHOT_OUT (pio test -e native -f test_admin) i PNG z python tools/screenshots.py
+    When mierzę to samo po każdym kroku i na końcu etapu (po usunięciu .pio/build/native i .pio/build/cyd)
+    Then wszystkie grupy są zielone, przypadków jest 967 + nowe testy z tests.md, RUN_TEST( rośnie o tyle samo
+    And firmware.bin różni się od 1 348 752 B najwyżej o 1 024 B, RAM statyczny nie rośnie, lista bibliotek ta sama
+    And pliki HTML stron panelu z SCREENSHOT_OUT są bajt w bajt takie same jak przed etapem, a PNG z tools/screenshots.py nie różnią się
+    And python tools/check_layers.py zgłasza 12 naruszeń — listę sprzed etapu bez opensky_http.cpp -> admin/core i backlight_ldr.cpp -> admin/core; python tools/rewrite_includes.py --check kończy się kodem 0, python tools/check_comments.py --strict nic nie zgłasza, python tools/check_bdd.py 0 problemów
+
+  @manual
+  Scenario: Płytka po kroku etapu 6 ma te same ustawienia i działa jak przedtem; panel wygląda i działa tak samo
+    Given GET /backup.json (bez sekretów) z płytki na v1.11.3 przed wgraniem i firmware z kroku wgrany (USB COM3 albo pio run -e cyd-ota -t upload, za zgodą właściciela), pio device monitor -b 115200 przez 2–3 minuty
+    When płytka startuje, łączy się z WiFi i odbiera kilka pollów
+    Then GET /backup.json po wgraniu różni się od tego sprzed wgrania tylko polem firmware (NVS czytane tymi samymi kluczami)
+    And log szeregowy nie pokazuje paniki ani restartu poza startem, poll idzie z kontem OpenSky (pigułka „Konto” w panelu), /screenshot.bmp?screen=0, 1, 2 pokazują LOTY, TERAZ i RADAR jak po etapie 5, /perf.json w zakresie etapu 5
+    And zapis formularza bez zmian zachowuje wartości; zmiana zasięgu przerysowuje pierścienie RADARU, zmiana języka ekranu przerysowuje cały ekran, oba wracają po przywróceniu
+    And /light.json pokazuje ten sam tryb nocy i jasność co przed wgraniem; „Sprawdź teraz” na karcie Firmware odpowiada; aktualizacja OTA przez WiFi kończy się obrazem oznaczonym jako ważny
+    And w przeglądarce panel ma ten sam wygląd (ikona karty, ciemny motyw), zakładki się przełączają, koszt w kredytach liczy się na żywo przy zmianie zasięgu, linia „Teraz” na karcie Ogólne odświeża się co 2 s, a wysyłanie firmware'u pokazuje pasek postępu
