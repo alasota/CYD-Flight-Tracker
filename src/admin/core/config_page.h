@@ -14,7 +14,7 @@
 #include <functional>
 #include <string>
 
-#include "admin/core/config_store.h"   // Config
+#include "admin/core/config_store.h"   // Settings
 #include "admin/core/device_alerts.h"  // AlertSet, AlertDetails
 #include "opensky/core/opensky_auth.h"   // OpenSkyAuthState
 #include "opensky/core/opensky_quota.h"  // OpenSkyQuota
@@ -33,7 +33,7 @@ WebStr settingsTabLabel(SettingsTab tab);
 
 // True when both OpenSky OAuth fields are set (else the firmware polls
 // anonymously).
-bool hasOpenSkyCredentials(const Config &cfg);
+bool hasOpenSkyCredentials(const Settings &cfg);
 
 // Rough OpenSky credit use per day if the display polls non-stop except for
 // `paused_min_per_day` minutes (night pause, spec/03):
@@ -57,7 +57,7 @@ std::string lightStateText(const BacklightStatus &s, Language lang);
 std::string htmlEscape(const std::string &in);
 
 struct ConfigPageModel {
-  Config cfg;
+  Settings cfg;
   SettingsTab tab = SettingsTab::Location;  // tab shown on load
   bool hasMessage = false;
   WebStr message = WebStr::Saved;

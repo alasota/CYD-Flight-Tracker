@@ -56,7 +56,7 @@ static UiPerfMeter perfMeter;
 // runs (ota_update::shouldMarkAppValid(), including "this UI loop is alive").
 extern "C" bool verifyRollbackLater() { return true; }
 
-static const Config &cfg() { return *net->cfg; }
+static const Settings &cfg() { return *net->cfg; }
 
 static UiView view() {
   return makeUiView(*net, nav.current(), ui.pager.page(), ui.shownHealth, millis(),
@@ -184,7 +184,7 @@ void setup() {
   tft.setRotation(1);   // landscape, 320x240
   tft.fillScreen(LCARS_BLACK);
 
-  Config bootCfg = loadConfig();
+  Settings bootCfg = loadConfig();
   i18nSetLanguage(bootCfg.display.language);  // before anything is drawn
   Serial.printf("[ota] %s\n", firmwareMarker());
   const bool appPendingVerify = otaFlashRunningPendingVerify();
@@ -206,7 +206,7 @@ void setup() {
 
   // The first snapshot: the settings, no data yet — the chrome and "--" go on
   // screen right away, before WiFi is even up.
-  auto cfgPtr = std::make_shared<const Config>(bootCfg);
+  auto cfgPtr = std::make_shared<const Settings>(bootCfg);
   auto first = std::make_shared<NetState>();
   first->cfg = cfgPtr;
   net = first;

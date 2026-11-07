@@ -28,7 +28,7 @@ namespace {
 
 // ---- State owned by this task (nothing here is touched from core 1) ------
 
-std::shared_ptr<const Config> cfg;  // the current settings, shared with the UI
+std::shared_ptr<const Settings> cfg;  // the current settings, shared with the UI
 uint32_t cfgSeq = 0;
 uint32_t seenSaveCount = 0;
 bool appPendingVerify = false;
@@ -107,10 +107,10 @@ void otaOnEnd(bool ok) {
   publishIfChanged();
 }
 
-// ---- Config ------------------------------------------------------------------
+// ---- Settings ----------------------------------------------------------------
 
 void reloadConfig() {
-  cfg = std::make_shared<const Config>(loadConfig());
+  cfg = std::make_shared<const Settings>(loadConfig());
   ++cfgSeq;
   releaseCheckBegin(cfg->update);
 }
@@ -410,7 +410,7 @@ void netTask(void *) {
 
 }  // namespace
 
-void netTaskStart(std::shared_ptr<const Config> bootCfg, bool pendingVerify) {
+void netTaskStart(std::shared_ptr<const Settings> bootCfg, bool pendingVerify) {
   cfg = std::move(bootCfg);
   appPendingVerify = pendingVerify;
   state.cfg = cfg;

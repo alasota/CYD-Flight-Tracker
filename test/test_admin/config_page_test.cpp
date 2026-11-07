@@ -68,7 +68,7 @@ static void test_daily_credits_with_a_night_pause(void) {
 }
 
 static void test_paused_minutes_follow_the_settings(void) {
-  Config c = defaultConfig();
+  Settings c = defaultConfig();
   BacklightStatus l;
   c.backlight.night_mode = NightMode::Schedule;  // 23:00-06:30 by default
   TEST_ASSERT_EQUAL_UINT32(450u, nightMinutesToday(c.backlight, l));
@@ -152,7 +152,7 @@ static void test_display_card(void) {
 }
 
 static void test_credentials_need_both_fields(void) {
-  Config c = defaultConfig();
+  Settings c = defaultConfig();
   TEST_ASSERT_FALSE(hasOpenSkyCredentials(c));
   c.opensky.client_id = "id";
   TEST_ASSERT_FALSE(hasOpenSkyCredentials(c));

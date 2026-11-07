@@ -17,7 +17,7 @@
 #include <cstdint>
 #include <memory>
 
-struct Config;
+struct Settings;
 
 constexpr uint32_t kNetTaskStackBytes = 16 * 1024;  // TLS to GitHub verifies P-384 chains
 constexpr UBaseType_t kNetTaskPriority = 1;         // below WiFi (23) / lwIP (18)
@@ -27,4 +27,4 @@ constexpr uint32_t kNetIdleSleepMs = 5;             // each pass: the web page s
 
 // Starts the task. `bootCfg` is what setup() loaded (no second NVS read);
 // `appPendingVerify`: the running image still has to be marked valid.
-void netTaskStart(std::shared_ptr<const Config> bootCfg, bool appPendingVerify);
+void netTaskStart(std::shared_ptr<const Settings> bootCfg, bool appPendingVerify);

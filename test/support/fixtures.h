@@ -1,5 +1,5 @@
 // Test data builders shared by the suites (spec/done/07-test-reorganization.md §4):
-// aircraft, table rows, a configured Config and stub hexdb.io lookup ports.
+// aircraft, table rows, configured Settings and stub hexdb.io lookup ports.
 #pragma once
 
 #include <set>
@@ -54,11 +54,11 @@ inline TrackedFlight makeRow(const char *callsign, float km, bool onGround = fal
   return r;
 }
 
-// ---- Config --------------------------------------------------------------------
+// ---- Settings ------------------------------------------------------------------
 
 // defaultConfig() with the home set to central Warsaw.
-inline Config makeConfig() {
-  Config c = defaultConfig();
+inline Settings makeConfig() {
+  Settings c = defaultConfig();
   c.home.lat = 52.2297f;
   c.home.lon = 21.0122f;
   c.home.configured = true;

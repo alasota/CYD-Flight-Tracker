@@ -12,11 +12,11 @@ namespace {
 constexpr char kNamespace[] = "cydsky";
 }  // namespace
 
-Config loadConfig() {
+Settings loadConfig() {
   Preferences prefs;
   prefs.begin(kNamespace, /*readOnly=*/true);
 
-  Config cfg = defaultConfig();
+  Settings cfg = defaultConfig();
   cfg.home.lat = prefs.getFloat("home_lat", cfg.home.lat);
   cfg.home.lon = prefs.getFloat("home_lon", cfg.home.lon);
   cfg.home.radius_deg = prefs.getFloat("radius_deg", cfg.home.radius_deg);
@@ -55,8 +55,8 @@ Config loadConfig() {
   return sanitizeConfig(cfg);
 }
 
-void saveConfig(const Config &cfg) {
-  Config sanitized = sanitizeConfig(cfg);
+void saveConfig(const Settings &cfg) {
+  Settings sanitized = sanitizeConfig(cfg);
 
   Preferences prefs;
   prefs.begin(kNamespace, /*readOnly=*/false);
