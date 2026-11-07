@@ -1,4 +1,4 @@
-Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i warstw (core / services / adapters, korzenie w main/), include'y z pełną ścieżką, raport zależności, źle położone typy w swoich kontekstach, podział czyste / sprzętowe, przepływy UI i formularz ustawień w services/ i core/ z testami, ustawienia per kontekst i zasoby panelu WWW jako pliki
+Feature: Reorganizacja kodu według DDD — etapy 1–7: katalogi kontekstów i warstw (core / services / adapters, korzenie w main/), include'y z pełną ścieżką, raport zależności, źle położone typy w swoich kontekstach, podział czyste / sprzętowe, przepływy UI i formularz ustawień w services/ i core/ z testami, ustawienia per kontekst i zasoby panelu WWW jako pliki, nazwy ze słownika (§3) w kodzie
   Etap 1 przeniósł pliki z płaskiego src/ (git mv, bez dzielenia) do katalogów kontekstów i warstw
   z §4; każdy #include "…" podaje ścieżkę od src/ (flaga -I src), środowisko native nie kompiluje
   korzeni kompozycji ani adapterów, a tools/check_layers.py raportuje naruszenia tabeli z §5
@@ -21,9 +21,14 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
   BacklightSettings, UpdateSettings, WebSettings) — moduły spoza admin/ dostają tylko swoje obiekty,
   klucze NVS i format kopii zapasowej się nie zmieniają — a CSS, JS i ikonę panelu WWW przenosi z
   literałów w config_page.cpp do plików w src/admin/assets/, z których tools/embed_assets.py generuje
-  admin/core/web_assets.h; strona panelu jest bajt w bajt taka sama. Wyniki płytki z etapów 1–5 są w
-  specyfikacji (§8 „Wynik etapu N”); etapy 7–8 dostaną swoje scenariusze w tym pliku, gdy przyjdzie
-  ich kolej.
+  admin/core/web_assets.h; strona panelu jest bajt w bajt taka sama. Etap 7 zmienia nazwy na te ze
+  słownika (§3: BoundingBox → ScanArea, OpenSkyHealth → FeedHealth, DataSnapshot → AirspaceSnapshot,
+  LookupPorts → EnrichmentPort, AircraftRow → TrackedFlight, Aircraft → AircraftState, Config →
+  Settings z funkcjami i plikiem config_store → settings, configPortal*() → webServer*()), po jednej
+  na commit, narzędziem tools/rename_symbols.py, które zmienia tylko identyfikatory w kodzie — napisy
+  (klucze NVS, klucze JSON, trasy WWW) i kod wynikowy zostają te same. Scenariusze etapów 3–6 używają
+  już nazw po etapie 7. Wyniki płytki z etapów 1–6 są w specyfikacji (§8 „Wynik etapu N”); etap 8
+  dostanie swoje scenariusze w tym pliku, gdy przyjdzie jego kolej.
 
   # ---- etap 1 (aktualne po etapie 2): układ katalogów i include'y
 
@@ -342,7 +347,7 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
 
     Examples:
       | symbol                 | plik                                   | dawniej                                   |
-      | AircraftRow            | airspace/core/tracked_flight.h         | display/core/screens/table_view.h         |
+      | TrackedFlight          | airspace/core/tracked_flight.h         | display/core/screens/table_view.h         |
       | buildEnrichedRecords   | airspace/core/tracked_flight.h         | display/core/screens/table_view.h         |
       | annotateDistances      | airspace/core/tracked_flight.h         | display/core/screens/table_view.h         |
       | classifyPhases         | airspace/core/tracked_flight.h         | display/core/screens/table_view.h         |
@@ -350,8 +355,8 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
       | sortRowsByDistance     | airspace/core/flight_ordering.h        | display/core/screens/table_view.h         |
       | splitFeaturedAndRest   | airspace/core/flight_ordering.h        | display/core/screens/table_view.h         |
       | pickNowAircraft        | airspace/core/now_pick.h               | display/core/screens/flight_screen.h      |
-      | OpenSkyHealth          | airspace/core/feed_health.h            | display/core/screens/status_bar.h         |
-      | Aircraft               | airspace/core/aircraft_state.h         | opensky/core/opensky_client.h             |
+      | FeedHealth             | airspace/core/feed_health.h            | display/core/screens/status_bar.h         |
+      | AircraftState          | airspace/core/aircraft_state.h         | opensky/core/opensky_client.h             |
       | inferOnGround          | airspace/core/aircraft_state.h         | opensky/core/opensky_client.h             |
       | computeDistanceBearing | shared/geo.h                           | display/core/screens/table_view.h         |
       | compassPoint           | shared/geo.h                           | display/core/theme/lcars_theme.h          |
@@ -405,7 +410,7 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
     Given src/platform/core_link.h po etapie 3
     When czytam jego dyrektywy #include
     Then żadna nie wskazuje pliku w display/core/screens/
-    And AircraftRow i OpenSkyHealth przychodzą z airspace/core/tracked_flight.h i airspace/core/feed_health.h
+    And TrackedFlight i FeedHealth przychodzą z airspace/core/tracked_flight.h i airspace/core/feed_health.h
 
   @test=test_platform/geo_test.cpp:test_distance_london_to_paris_sanity_check
   @test=test_platform/geo_test.cpp:test_distance_zero_when_home_equals_aircraft
@@ -457,7 +462,7 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
 
   @test=test_airspace/tracked_flight_test.cpp:test_build_enriched_records_found_false_when_lookup_missing
   @test=test_airspace/tracked_flight_test.cpp:test_annotate_leaves_no_position_aircraft_unset
-  Scenario: Lot (AircraftRow) składa się w airspace bez znajomości ekranu
+  Scenario: Lot (TrackedFlight) składa się w airspace bez znajomości ekranu
     Given stan samolotu bez wpisu w danych hexdb.io i drugi bez pozycji
     When buduję wiersze lotów i liczę odległości od domu
     Then pierwszy ma linię i typ jako nieznalezione (wyświetlane „--”), a nie znika
@@ -509,7 +514,7 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
 
   @test=test_display/status_bar_test.cpp:test_health_dot_colour
   @test=test_platform/core_link_test.cpp:test_diff_health_with_rows_is_header_only
-  Scenario: Stan źródła danych (OpenSkyHealth z airspace) dalej koloruje kropkę w nagłówku i odświeża tylko nagłówek
+  Scenario: Stan źródła danych (FeedHealth z airspace) dalej koloruje kropkę w nagłówku i odświeża tylko nagłówek
     Given stan źródła Ok, RateLimited, AuthError, NetworkError
     When nagłówek dobiera kolor kropki, a zmiana stanu przy widocznych lotach przechodzi przez diffNetState
     Then kolory są jak przed etapem (zielony, żółty, czerwony, czerwony)
@@ -574,7 +579,7 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
       | fetchAircraftStates       | opensky/adapters/opensky_http.cpp               | opensky/core/opensky_client.cpp           |
       | otaFlashSession           | admin/adapters/ota_flash.cpp                    | admin/core/firmware/ota_update.cpp        |
       | releaseCheckLoop          | admin/adapters/github_http.cpp                  | admin/core/firmware/release_check.cpp     |
-      | loadConfig                | admin/adapters/settings_nvs.cpp                 | admin/core/config_store.cpp               |
+      | loadSettings              | admin/adapters/settings_nvs.cpp                 | admin/core/settings.cpp                   |
       | deviceAlertInputs         | admin/adapters/alert_sources.cpp                | admin/core/device_alerts.cpp              |
 
   @test=tools/test_check_layers.py:LayoutTest.test_stage_4_symbols_are_declared_in_their_new_home
@@ -1172,14 +1177,14 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
     And z ustawionym hasłem panelu palec na ekranie przy włączeniu daje ekran trzymania, po 5 s pytanie TAK / NIE; NIE zostawia hasło
     And zapis formularza bez zmian zachowuje wartości, szerokość „abc” i długość „x” są odrzucone z komunikatem wymieniającym oba pola w tej kolejności, a zmiana interwału auto-cycle przetrwa restart
 
-  # ---- etap 6: ustawienia per kontekst (§7) — Config składa się z obiektów wartości kontekstów (nazwa Config zostaje do etapu 7)
+  # ---- etap 6: ustawienia per kontekst (§7) — Settings (do etapu 7 Config w config_store.h) składa się z obiektów wartości kontekstów
 
   @test=tools/test_check_layers.py:LayoutTest.test_config_is_built_from_context_objects
-  Scenario Outline: Config składa się z obiektów wartości kontekstów, a każdy obiekt leży w swoim kontekście
-    Given src/admin/core/config_store.h po etapie 6
-    When czytam pola struct Config i miejsce deklaracji ich typów
-    Then Config ma pole <pole> typu <obiekt> z nagłówka <nagłówek>, a w nim pola <pola>
-    And Config nie ma żadnego innego pola (żadnego z 28 dawnych pól płaskich)
+  Scenario Outline: Settings składa się z obiektów wartości kontekstów, a każdy obiekt leży w swoim kontekście
+    Given src/admin/core/settings.h po etapie 7
+    When czytam pola struct Settings i miejsce deklaracji ich typów
+    Then Settings ma pole <pole> typu <obiekt> z nagłówka <nagłówek>, a w nim pola <pola>
+    And Settings nie ma żadnego innego pola (żadnego z 28 dawnych pól płaskich)
 
     Examples:
       | pole       | obiekt             | nagłówek                              | pola                                                                                                                                                    |
@@ -1190,42 +1195,42 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
       | display    | DisplaySettings    | display/core/display_settings.h       | language, last_screen                                                                                                                                   |
       | auto_cycle | AutoCycleSettings  | display/core/display_settings.h       | enabled, interval_s                                                                                                                                     |
       | backlight  | BacklightSettings  | display/core/backlight.h              | brightness_auto, brightness_fixed_pct, brightness_min_pct, brightness_max_pct, night_mode, night_from_min, night_to_min, night_pct, night_wake_s, night_pause_polling |
-      | update     | UpdateSettings     | admin/core/config_store.h             | check_enabled, show_prerelease, skipped_tag                                                                                                             |
-      | web        | WebSettings        | admin/core/config_store.h             | language, password                                                                                                                                      |
+      | update     | UpdateSettings     | admin/core/settings.h                 | check_enabled, show_prerelease, skipped_tag                                                                                                             |
+      | web        | WebSettings        | admin/core/settings.h                 | language, password                                                                                                                                      |
 
-  @test=test_admin/config_store_test.cpp:test_default_config_keeps_every_stage_5_default
+  @test=test_admin/settings_test.cpp:test_default_config_keeps_every_stage_5_default
   Scenario: Wartości domyślne ustawień są te same co przed etapem
-    Given defaultConfig() po etapie 6
+    Given defaultSettings() po etapie 7
     When porównuję każde pole każdego obiektu z wartością domyślną z v1.11.3
     Then dom to (0, 0), zasięg 2,5°, nieskonfigurowany; poll co 15 s; auto-cycle wyłączony, co 15 s; lotnisko 15 km, wznoszenie 1,5 m/s; ekran i panel po polsku, ostatni ekran 0
     And sprawdzanie aktualizacji włączone, wersje rozwojowe wyłączone, bez pominiętej wersji i hasła; jasność automatyczna 10–100 %, stała 80 %, noc od zachodu do wschodu słońca (kDefaultNightMode = Sun; okno zegarowe 23:00–06:30), w nocy 10 %, wybudzenie 60 s, bez pauzy pollingu
 
-  @test=test_admin/config_store_test.cpp:test_sanitize_config_clamps_all_fields
-  @test=test_admin/config_store_test.cpp:test_sanitize_config_leaves_in_range_values_untouched
-  Scenario: sanitizeConfig() przycina te same pola do tych samych granic, teraz w obiektach kontekstów
+  @test=test_admin/settings_test.cpp:test_sanitize_config_clamps_all_fields
+  @test=test_admin/settings_test.cpp:test_sanitize_config_leaves_in_range_values_untouched
+  Scenario: sanitizeSettings() przycina te same pola do tych samych granic, teraz w obiektach kontekstów
     Given ustawienia z wartościami poza zakresem w każdym obiekcie (szerokość 200°, zasięg 0, poll 1 s, auto-cycle 0 s, lotnisko 0 km, jasność 0 / 200 %, noc 2000 min, ekran 7, język 9)
-    When sanitizeConfig() je porządkuje
+    When sanitizeSettings() je porządkuje
     Then każde pole ma tę samą wartość co przed etapem (testy sprzed etapu, zmieniona tylko ścieżka pola, np. cfg.backlight.night_pct zamiast cfg.night_pct)
     And ustawienia w zakresie zostają nietknięte
 
   @test=tools/test_check_layers.py:LayoutTest.test_settings_nvs_keys_and_types_unchanged
   Scenario: Klucze NVS i ich typy są te same co przed etapem
     Given src/admin/adapters/settings_nvs.cpp po etapie 6
-    When zbieram każde prefs.get…("klucz") i prefs.put…("klucz") z loadConfig(), saveConfig() i zapisów jednego klucza
+    When zbieram każde prefs.get…("klucz") i prefs.put…("klucz") z loadSettings(), saveSettings() i zapisów jednego klucza
     Then to dokładnie 28 kluczy z v1.11.3 (home_lat, home_lon, radius_deg, poll_s, os_id, os_secret, last_screen, auto_cyc, auto_cyc_s, near_km, climb_mps, home_cfg, lang, wlang, wpass, updchk, updpre, updskip, bl_auto, bl_fix, bl_min, bl_max, nt_mode, nt_from, nt_to, nt_pct, nt_wake, nt_poll) w przestrzeni "cydsky"
     And każdy klucz jest czytany i zapisywany tym samym typem co przed etapem (Float, UInt, String, Int, Bool, UChar, UShort)
 
   @test=test_admin/config_backup_test.cpp:test_backup_json_is_the_same_as_before_stage_6
   Scenario: Kopia zapasowa ma bajt w bajt ten sam JSON co przed etapem
     Given ustawienia z niedomyślną wartością w każdym polu, które trafia do kopii, i hasłem panelu
-    When configToBackupJson() tworzy kopię z sekretami i bez nich
+    When settingsToBackupJson() tworzy kopię z sekretami i bez nich
     Then tekst JSON jest równy zapisanemu w teście wzorcowi z v1.11.3 (grupy location, opensky, general, display, security; te same nazwy kluczy, kolejność i formatowanie)
     And pominięta wersja (updskip) nie trafia do kopii
 
   @test=test_admin/config_backup_test.cpp:test_restore_of_a_stage_5_backup_fills_every_setting
   Scenario: Kopia zapasowa zrobiona przed etapem 6 odtwarza każde ustawienie
     Given plik kopii zapisany w teście tak, jak wygenerował go v1.11.3 (z sekretami)
-    When restoreConfigFromBackupJson() go wczytuje
+    When restoreSettingsFromBackupJson() go wczytuje
     Then status to Ok, 25 zastosowanych pól, brak błędnych, a każde pole każdego obiektu kontekstu ma wartość z pliku (dom oznaczony jako skonfigurowany)
 
   @test=test_admin/settings_form_test.cpp:test_form_valid_submit_sets_every_field_and_home_configured
@@ -1237,21 +1242,21 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
   @test=tools/test_check_layers.py:LayoutTest.test_only_admin_roots_and_core_link_include_settings
   Scenario: Poza admin/ ustawienia dołączają tylko core_link i korzenie kompozycji (§10 pkt 4)
     Given src/ po etapie 6
-    When szukam #include "admin/core/config_store.h"
+    When szukam #include "admin/core/settings.h"
     Then dołączają go tylko pliki z src/admin/, src/main/ i src/platform/core_link.h (NetState niesie ustawienia, §7)
     And nie dołącza go już opensky/adapters/opensky_http.cpp ani display/adapters/backlight_ldr.cpp
 
   @test=tools/test_check_layers.py:LayoutTest.test_config_type_named_only_in_admin_roots_and_core_link
-  Scenario: Moduły innych kontekstów nie znają typu Config, nawet z deklaracji zapowiadającej
+  Scenario: Moduły innych kontekstów nie znają typu Settings, nawet z deklaracji zapowiadającej
     Given kod (bez komentarzy) z src/airspace/, src/enrichment/, src/opensky/, src/display/ i src/shared/
-    When szukam słowa Config
-    Then nie ma żadnego trafienia (zniknęły struct Config; z opensky_client.h i backlight.h)
+    When szukam słowa Settings (i dawnego Config)
+    Then nie ma żadnego trafienia (w etapie 6 zniknęły struct Config; z opensky_client.h i backlight.h)
 
   @test=tools/test_check_layers.py:LayoutTest.test_context_functions_take_their_settings_objects
   Scenario Outline: Funkcje innych kontekstów dostają tylko swoje obiekty ustawień
     Given nagłówek <nagłówek> po etapie 6
     When czytam deklarację <funkcja>
-    Then jej parametry ustawień to <parametry>, bez Config
+    Then jej parametry ustawień to <parametry>, bez Settings
 
     Examples:
       | nagłówek                              | funkcja                | parametry                                                         |
@@ -1269,7 +1274,7 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
   @test=tools/test_check_layers.py:LayoutTest.test_display_reads_only_its_settings_from_net_state
   Scenario: Ekran czyta z NetState tylko obiekty ustawień, które go dotyczą
     Given kod z src/display/ po etapie 6
-    When zbieram każde cfg->X i cfg().X
+    When zbieram każde settings->X z NetState (w etapie 6: cfg->X i cfg().X)
     Then X należy do home, display, auto_cycle, backlight i update (pominięta wersja dla pytania o aktualizację)
     But nigdy opensky, poll, phase ani web
 
@@ -1294,7 +1299,7 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
   Scenario: Adaptery OpenSky i podświetlenia nie sięgają już po ustawienia z admin/core
     Given raport check_layers po etapie 6
     When szukam naruszeń z opensky/adapters/opensky_http.cpp i display/adapters/backlight_ldr.cpp
-    Then nie ma ani opensky_http.cpp -> admin/core, ani backlight_ldr.cpp -> admin/core (config_store.h)
+    Then nie ma ani opensky_http.cpp -> admin/core, ani backlight_ldr.cpp -> admin/core (settings.h, w etapie 6 config_store.h)
     And backlight_ldr.cpp i opensky_http.cpp nie mają też żadnego nowego naruszenia (Home dochodzi przez nagłówki display/core i opensky/core)
 
   # ---- etap 6: zasoby panelu WWW jako pliki (src/admin/assets/ → tools/embed_assets.py → admin/core/web_assets.h)
@@ -1405,3 +1410,136 @@ Feature: Reorganizacja kodu według DDD — etapy 1–6: katalogi kontekstów i 
     And zapis formularza bez zmian zachowuje wartości; zmiana zasięgu przerysowuje pierścienie RADARU, zmiana języka ekranu przerysowuje cały ekran, oba wracają po przywróceniu
     And /light.json pokazuje ten sam tryb nocy i jasność co przed wgraniem; „Sprawdź teraz” na karcie Firmware odpowiada; aktualizacja OTA przez WiFi kończy się obrazem oznaczonym jako ważny
     And w przeglądarce panel ma ten sam wygląd (ikona karty, ciemny motyw), zakładki się przełączają, koszt w kredytach liczy się na żywo przy zmianie zasięgu, linia „Teraz” na karcie Ogólne odświeża się co 2 s, a wysyłanie firmware'u pokazuje pasek postępu
+
+  # ---- etap 7: nazwy ze słownika (§3) — tools/rename_symbols.py, jedna zmiana nazwy na commit
+
+  @test=tools/test_rename_symbols.py:RepoTest.test_old_names_are_gone_from_code
+  Scenario Outline: Nazwa ze słownika zastępuje dawną w całym kodzie src/ i test/
+    Given src/ i test/ po etapie 7
+    When szukam <dawna> jako całego identyfikatora w kodzie (poza napisami i komentarzami)
+    Then nie ma żadnego trafienia
+    And <nowa> jest zadeklarowana albo zdefiniowana w <plik>
+
+    Examples:
+      | dawna                       | nowa                          | plik                                  |
+      | BoundingBox                 | ScanArea                      | src/opensky/core/opensky_client.h     |
+      | computeBoundingBox          | computeScanArea               | src/opensky/core/opensky_client.h     |
+      | OpenSkyHealth               | FeedHealth                    | src/airspace/core/feed_health.h       |
+      | DataSnapshot                | AirspaceSnapshot              | src/platform/core_link.h              |
+      | buildDataSnapshot           | buildAirspaceSnapshot         | src/airspace/services/poll_pipeline.h |
+      | LookupPorts                 | EnrichmentPort                | src/airspace/services/poll_pipeline.h |
+      | AircraftRow                 | TrackedFlight                 | src/airspace/core/tracked_flight.h    |
+      | Aircraft                    | AircraftState                 | src/airspace/core/aircraft_state.h    |
+      | configPortalBegin           | webServerBegin                | src/admin/adapters/web_server.h       |
+      | configPortalRestartPending  | webServerRestartPending       | src/admin/adapters/web_server.h       |
+      | Config                      | Settings                      | src/admin/core/settings.h             |
+      | defaultConfig               | defaultSettings               | src/admin/core/settings.h             |
+      | sanitizeConfig              | sanitizeSettings              | src/admin/core/settings.h             |
+      | loadConfig                  | loadSettings                  | src/admin/core/settings.h             |
+      | saveConfig                  | saveSettings                  | src/admin/core/settings.h             |
+      | configToBackupJson          | settingsToBackupJson          | src/admin/core/config_backup.h        |
+      | restoreConfigFromBackupJson | restoreSettingsFromBackupJson | src/admin/core/config_backup.h        |
+      | reloadConfig                | reloadSettings                | src/main/net_task.cpp                 |
+      | makeConfig                  | makeSettings                  | test/support/fixtures.h               |
+
+  @test=tools/test_rename_symbols.py:RenameTextTest.test_only_whole_identifiers_are_renamed
+  Scenario: Zmiana nazwy dotyka tylko całego identyfikatora, nie jego części
+    Given kod z Aircraft &ac, AircraftRow row, makeAircraft(), extractAircraftFromStates(states) i kAircraftCacheCapacity
+    When narzędzie zmienia nazwę Aircraft na AircraftState
+    Then zmienia się tylko Aircraft &ac
+    And pozostałe identyfikatory są bajt w bajt takie same
+
+  @test=tools/test_rename_symbols.py:RenameTextTest.test_string_literals_and_quoted_doc_headings_are_kept
+  Scenario: Napisy w kodzie i cytowane nagłówki dokumentacji w komentarzach się nie zmieniają
+    Given kod z napisem "Config", surowym napisem R"({"error":"Aircraft not found."})", znakiem '"' i komentarzem // docs/data-sources.md "Aircraft identification"
+    When narzędzie zmienia nazwy Aircraft i Config
+    Then każdy napis, surowy napis, znak i tekst w cudzysłowie w komentarzu jest taki sam jak przed zmianą
+    And kod między dwoma napisami w jednej linii (np. {"web.password", [](Config &c) {…}}) dostaje nową nazwę
+
+  @test=tools/test_rename_symbols.py:RenameTextTest.test_plain_word_in_a_comment_is_reported_not_renamed
+  Scenario: Słowo z prozy w komentarzu jest zgłaszane do decyzji, a nie zmieniane
+    Given wpis tabeli dla nazwy, która jest też zwykłym słowem (Aircraft, Config), i komentarze „// Aircraft past the budget render as --” oraz „// returns an Aircraft list”
+    When narzędzie zmienia nazwę
+    Then oba komentarze zostają bez zmian, a raport wymienia je jako plik:linia do ręcznej decyzji
+    But dla nazwy złożonej (AircraftRow, DataSnapshot, OpenSkyHealth…) komentarz poza cudzysłowem dostaje nową nazwę
+
+  @test=tools/test_rename_symbols.py:RenameTextTest.test_prefix_rename_keeps_library_names
+  Scenario: Zmiana przedrostka configPortal na webServer nie dotyka nazw z bibliotek
+    Given kod z configPortalBegin(), configPortalSetOtaObserver(obs), wm.setConfigPortalBlocking(false), wm.getConfigPortalActive(), wm.setConfigPortalTimeout(180) i configTzTime(tz, ntp)
+    When narzędzie stosuje wpis przedrostka configPortal → webServer
+    Then są webServerBegin() i webServerSetOtaObserver(obs)
+    And wywołania WiFiManagera i configTzTime() są takie same jak przed zmianą
+
+  @test=tools/test_rename_symbols.py:CliTest.test_check_lists_leftovers_without_writing
+  @test=tools/test_rename_symbols.py:CliTest.test_second_run_changes_nothing
+  @test=tools/test_rename_symbols.py:CliTest.test_line_endings_and_generated_files_are_kept
+  Scenario: Tryb --check tylko raportuje, drugi przebieg nic nie zmienia, końce linii zostają
+    Given drzewo src/ i test/ w katalogu tymczasowym, z plikami CRLF i LF oraz wygenerowanymi web_assets.h i lcars_efont.c
+    When uruchamiam python tools/rename_symbols.py --check <wpis>, potem bez --check, potem drugi raz
+    Then --check kończy się kodem 1, wypisuje plik:linia każdego trafienia i niczego nie zapisuje
+    And pierwszy przebieg zmienia pliki, drugi nie zmienia żadnego bajtu
+    And każdy plik zachowuje swoje końce linii, a pliki wygenerowane nie są zmieniane
+
+  @test=tools/test_rename_symbols.py:RepoTest.test_ci_runs_the_rename_symbols_tests
+  Scenario: CI uruchamia testy narzędzia zmiany nazw
+    Given .github/workflows/firmware.yml
+    When czytam krok testów narzędzi
+    Then jest w nim python tools/test_rename_symbols.py
+
+  @test=tools/test_check_layers.py:LayoutTest.test_settings_module_is_admin_core_settings
+  @test=tools/test_rewrite_includes.py:MoveTableTest.test_stage_7_renames_config_store_to_settings
+  Scenario: Moduł ustawień nazywa się settings, a jego testy settings_test.cpp
+    Given src/ i test/ po etapie 7
+    When szukam plików i include'ów modułu ustawień
+    Then są src/admin/core/settings.h i settings.cpp (git mv z config_store.*, tabela MOVES_STAGE_7 w rewrite_includes.py), a żaden plik ani #include nie nazywa się już config_store
+    And testy są w test/test_admin/settings_test.cpp z run_settings_tests(), a -DTEST_MODULE=settings uruchamia tylko je
+    And python tools/rewrite_includes.py --check kończy się kodem 0
+
+  @test=tools/test_check_layers.py:LayoutTest.test_net_state_carries_settings
+  Scenario: NetState niesie ustawienia pod nazwą settings
+    Given src/platform/core_link.h po etapie 7
+    When czytam struct NetState
+    Then ma pola std::shared_ptr<const Settings> settings i settingsSeq
+    And nie ma już pól cfg ani cfgSeq
+
+  @test=tools/test_check_layers.py:LayoutTest.test_web_server_functions_are_named_after_the_module
+  Scenario: Funkcje serwera WWW nazywają się jak jego moduł
+    Given src/admin/adapters/web_server.h i jego wywołania w src/main/
+    When zbieram nazwy zadeklarowanych funkcji
+    Then wszystkie zaczynają się od webServer (Begin, Loop, IsActive, SaveCount, SetScreenshotSource, SetOtaObserver, SetPerfSource, RestartPending)
+    And w src/ nie ma żadnego configPortal…(), a src/platform/wifi_manager.cpp dalej woła setConfigPortalBlocking() z WiFiManagera
+
+  @test=tools/test_check_comments.py:RenamedSymbolsTest.test_old_glossary_name_is_reported_with_its_new_name
+  @test=tools/test_check_comments.py:RepoTest.test_renamed_symbols_absent_from_src_and_test
+  Scenario: Dawna nazwa złożona, która wraca do kodu albo komentarza, jest zgłaszana
+    Given plik w src/ z komentarzem „// one AircraftRow per aircraft” i kodem DataSnapshot snap;
+    When python tools/check_comments.py go sprawdza
+    Then zgłasza oba miejsca jako plik:linia z nową nazwą („AircraftRow was renamed TrackedFlight in spec 12 stage 7”)
+    And repozytorium po etapie 7 nie ma żadnego takiego zgłoszenia (tekst w cudzysłowie, np. nagłówek dokumentacji, się nie liczy)
+
+  @test=tools/test_check_layers.py:LayoutTest.test_settings_nvs_keys_and_types_unchanged
+  @test=test_admin/config_backup_test.cpp:test_backup_json_is_the_same_as_before_stage_6
+  @test=test_admin/config_backup_test.cpp:test_restore_of_a_stage_5_backup_fills_every_setting
+  Scenario: Zmiany nazw nie zmieniają kluczy NVS ani kopii zapasowej
+    Given ustawienia po zmianie nazwy Config → Settings i funkcji ustawień
+    When zapisuję je i robię z nich kopię zapasową
+    Then klucze NVS i ich typy są te same 28 co w v1.11.3
+    And JSON kopii jest bajt w bajt równy wzorcowi sprzed etapu 6, a kopia sprzed etapu 6 odtwarza każde ustawienie
+
+  # ---- etap 7: rozmiar, liczby testów, płytka
+
+  @manual
+  Scenario: Etap 7 nie zmienia kodu wynikowego ani liczby testów
+    Given na gałęzi przed etapem 7 (9e3fc9a): przypadki w 6 grupach pio test -e native, RUN_TEST(, firmware.elf i firmware.bin zbudowane z FW_VERSION=v0.0.0-stage7 po usunięciu .pio/build/cyd, rozmiary sekcji (xtensa-esp32-elf-size -A), „Flash: used” / „RAM: used”, lista bibliotek, lista 12 naruszeń check_layers i 5 stron panelu z SCREENSHOT_OUT
+    When mierzę to samo po każdym commicie zmiany nazwy (ten sam FW_VERSION)
+    Then wszystkie grupy są zielone, liczba przypadków i RUN_TEST( jest ta sama co przed etapem (nazwy funkcji testowych bez zmian)
+    And rozmiary sekcji z size -A są te same, a firmware.bin różni się najwyżej skrótami obrazu (SHA-256 ELF w opisie aplikacji, suma kontrolna, SHA-256 obrazu); przy zmianie nazwy plików config_store → settings dopuszczalna różnica z kolejności linkowania, w granicy ± 1 KB; RAM statyczny bez zmian
+    And strony panelu z SCREENSHOT_OUT są bajt w bajt takie same, check_layers zgłasza te same 12 naruszeń, rewrite_includes.py --check, embed_assets.py --check i check_comments.py --strict są czyste, check_bdd.py 0 problemów
+
+  @manual
+  Scenario: Płytka z firmware'em etapu 7 działa jak przedtem i ma te same ustawienia
+    Given z płytki przed wgraniem: GET /backup.json bez sekretów, GET / (HTML panelu), /perf.json, /light.json i /screenshot.bmp?screen=0, 1, 2; potem obraz końcowy etapu 7 wgrany przez USB (pio run -e cyd -t upload, za zgodą właściciela) i pio device monitor -b 115200 przez 3 minuty
+    When płytka startuje, łączy się z WiFi i odbiera kilka pollów
+    Then log szeregowy nie pokazuje paniki ani restartu poza startem, a /backup.json różni się od tego sprzed wgrania tylko polem firmware
+    And GET / różni się tylko wersją i wartościami na żywo; ekrany 0–2 pokazują LOTY, TERAZ i RADAR jak przed wgraniem; /perf.json w zakresie etapu 6 (przerwa pętli UI ok. 100 ms, 0 wolnych przejść, największy blok ≥ 50 KB); /light.json ten sam tryb i jasność
+    And zapis formularza bez zmian daje tę samą kopię zapasową, a aktualizacja OTA przez WiFi (curl -F firmware=@… /update) kończy się restartem i obrazem oznaczonym jako ważny
