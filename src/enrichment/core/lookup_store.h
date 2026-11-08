@@ -8,11 +8,12 @@
 // with the ASCII unit separator (0x1F). Confirmed misses are stored too
 // ("hexdb.io doesn't know it" is an answer worth keeping).
 //
-// The encode/decode half is pure (native-tested). The Preferences half is a
-// thin adapter (enrichment/adapters/lookup_store_nvs): one NVS namespace per kind; when NVS is full the namespace
-// is wiped and the write retried — a crude but bounded eviction (the 20 KB
-// NVS partition also holds the settings, which live in their own namespace
-// and are never touched here).
+// The encode/decode half and storeSaveRecord() are pure (native-tested). The
+// Preferences half is a thin adapter (enrichment/adapters/lookup_store_nvs):
+// one NVS namespace per kind. Eviction is crude but bounded: a record that
+// would eat into kLookupStoreReserveEntries wipes whole lookup namespaces first
+// (the 20 KB NVS partition also holds the settings and the WiFi credentials,
+// which are never touched here).
 #pragma once
 
 #include <cstddef>
@@ -34,6 +35,11 @@ bool decodeAirportInfo(const std::string &text, AirportInfo &out);
 // with the settings and the WiFi credentials.
 constexpr size_t kLookupStoreReserveEntries = 64;
 
+// One NVS namespace per kind of record.
+constexpr char kLookupNsAircraft[] = "lk_ac";
+constexpr char kLookupNsRoute[] = "lk_rt";
+constexpr char kLookupNsAirport[] = "lk_ap";
+
 // What storeSaveRecord() needs from NVS. freeEntries() counts only the slots a
 // write can use (not the spare page NVS keeps for its own garbage collection).
 class LookupNvs {
@@ -44,7 +50,10 @@ class LookupNvs {
   virtual size_t freeEntries() = 0;
 };
 
-// Writes one record into namespace `ns`; true when it is stored.
+// Writes one record into namespace `ns`; true when it is stored. While the
+// record would leave fewer than kLookupStoreReserveEntries free, lookup
+// namespaces are wiped (`ns` first, then the other two); a write that still
+// fails wipes the next one and is retried.
 bool storeSaveRecord(LookupNvs &nvs, const char *ns, const std::string &key,
                      const std::string &value);
 

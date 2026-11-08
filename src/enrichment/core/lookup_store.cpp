@@ -1,5 +1,6 @@
 #include "enrichment/core/lookup_store.h"
 
+#include <cstring>
 #include <vector>
 
 namespace {
@@ -44,15 +45,31 @@ bool split(const std::string &text, size_t count, std::vector<std::string> &fiel
 
 const char *flag(bool b) { return b ? "1" : "0"; }
 
+// Slots a string takes in NVS: one header plus one per started 32 bytes,
+// counting its NUL.
+size_t slotsForString(size_t length) { return 1 + (length + 1 + 31) / 32; }
+
 }  // namespace
 
-// TODO(fix fix-lookup-store-nvs-full): stub from bug-investigator: a copy of
-// save() in lookup_store_nvs.cpp, so the regression tests run today's behaviour.
 bool storeSaveRecord(LookupNvs &nvs, const char *ns, const std::string &key,
                      const std::string &value) {
-  if (nvs.put(ns, key, value)) return true;
-  nvs.clear(ns);
-  return nvs.put(ns, key, value);
+  // Wipe order: this record's own kind first, then the others.
+  const char *const kinds[] = {kLookupNsAircraft, kLookupNsRoute, kLookupNsAirport};
+  const char *order[1 + sizeof(kinds) / sizeof(kinds[0])] = {ns};
+  size_t count = 1;
+  for (const char *kind : kinds) {
+    if (strcmp(kind, ns) != 0) order[count++] = kind;
+  }
+
+  const size_t needed = kLookupStoreReserveEntries + slotsForString(value.size());
+  size_t next = 0;
+  while (next < count && nvs.freeEntries() < needed) nvs.clear(order[next++]);
+
+  while (!nvs.put(ns, key, value)) {
+    if (next == count) return false;
+    nvs.clear(order[next++]);
+  }
+  return true;
 }
 
 std::string encodeAircraftInfo(const AircraftInfo &info) {
