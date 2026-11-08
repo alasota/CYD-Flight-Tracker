@@ -286,6 +286,7 @@
   /* Save + messages */                                                                            \
   X(Save, "Zapisz", "Save")                                                                        \
   X(Saved, "Zapisano.", "Saved.")                                                                  \
+  X(SaveFailed, "", "")                                                                            \
   X(SavedWithInvalid, "Zapisano, ale te pola były błędne i zostały poprzednie wartości:",          \
     "Saved, but these fields were invalid and kept their previous values:")                        \
   X(UploadTooLarge, "Nie wczytano: plik jest za duży.", "Not loaded: the file is too large.")      \

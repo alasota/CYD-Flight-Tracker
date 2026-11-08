@@ -356,10 +356,57 @@ static void test_default_config_keeps_every_stage_5_default(void) {
   TEST_ASSERT_TRUE(c.web.password.empty());
 }
 
+// Regression: a put refused on a full NVS partition went unnoticed and the page said "saved"
+static void test_write_check_reports_a_failed_put(void) {
+  NvsWriteCheck check(/*opened=*/true);
+  check.note(4);
+  check.note(0);
+  check.note(1);
+  TEST_ASSERT_FALSE(check.ok());
+  TEST_ASSERT_EQUAL_INT(1, check.failures());
+}
+
+static void test_write_check_passes_when_every_put_wrote(void) {
+  NvsWriteCheck check(/*opened=*/true);
+  check.note(4);
+  check.noteText(5, 5, 5);
+  TEST_ASSERT_TRUE(check.ok());
+}
+
+static void test_write_check_fails_when_the_namespace_did_not_open(void) {
+  NvsWriteCheck check(/*opened=*/false);
+  TEST_ASSERT_FALSE(check.ok());
+}
+
+static void test_write_check_reports_a_string_that_wrote_nothing(void) {
+  NvsWriteCheck check(/*opened=*/true);
+  check.noteText(/*length=*/8, /*written=*/0, /*storedLength=*/0);
+  TEST_ASSERT_FALSE(check.ok());
+}
+
+static void test_write_check_accepts_an_empty_string(void) {
+  NvsWriteCheck check(/*opened=*/true);
+  check.noteText(/*length=*/0, /*written=*/0, /*storedLength=*/0);
+  TEST_ASSERT_TRUE(check.ok());
+}
+
+// Clearing a password on a full partition: the put writes 0 either way, the old value stays.
+static void test_write_check_reports_an_empty_string_that_left_the_old_value(void) {
+  NvsWriteCheck check(/*opened=*/true);
+  check.noteText(/*length=*/0, /*written=*/0, /*storedLength=*/12);
+  TEST_ASSERT_FALSE(check.ok());
+}
+
 }  // namespace
 
 void run_settings_tests() {
   UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
+  RUN_TEST(test_write_check_reports_a_failed_put);
+  RUN_TEST(test_write_check_passes_when_every_put_wrote);
+  RUN_TEST(test_write_check_fails_when_the_namespace_did_not_open);
+  RUN_TEST(test_write_check_reports_a_string_that_wrote_nothing);
+  RUN_TEST(test_write_check_accepts_an_empty_string);
+  RUN_TEST(test_write_check_reports_an_empty_string_that_left_the_old_value);
   RUN_TEST(test_web_language_is_independent_and_sanitized);
   RUN_TEST(test_web_password_defaults_to_none_and_invalid_ones_are_dropped);
   RUN_TEST(test_default_language_is_polish);

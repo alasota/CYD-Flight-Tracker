@@ -104,6 +104,27 @@ uint8_t clampNightPct(int pct);
 uint16_t clampClockMinutes(int minutes);
 uint16_t clampNightWakeS(int seconds);
 
+// Adds up the results of one save's Preferences::put* calls, which return the
+// bytes written and 0 on failure. Pure — native-tested.
+class NvsWriteCheck {
+ public:
+  explicit NvsWriteCheck(bool opened) : opened_(opened) {}
+
+  // A fixed-size value (never 0 bytes when it worked).
+  void note(size_t written);
+  // A string: an empty one writes 0 bytes when it works too, so for that case
+  // `storedLength`, read back after the put, is what tells (a failed put leaves
+  // the old value there).
+  void noteText(size_t length, size_t written, size_t storedLength);
+
+  int failures() const { return failures_; }
+  bool ok() const { return opened_ && failures_ == 0; }
+
+ private:
+  bool opened_;
+  int failures_ = 0;
+};
+
 // --- Hardware adapter: reads/writes ESP32 NVS via the Preferences library.
 // Thin wrapper around a hardware/SDK API — see CLAUDE.md "Testing" — not
 // covered by Unity. Both always sanitize before returning/persisting.
