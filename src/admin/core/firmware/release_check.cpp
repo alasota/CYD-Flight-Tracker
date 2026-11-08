@@ -379,6 +379,16 @@ bool manualCheckPending(const ManualCheck &m, uint32_t nowMs) {
   return m.queued && nowMs - m.askedMs < kUpdateManualCheckExpiryMs;
 }
 
+// ---- Install asked for by hand
+
+// TODO(fix fix-github-install-never-starts): stub from bug-investigator.
+InstallStep stepPendingInstall(const CheckGate &g, uint32_t /*askedMs*/, uint32_t /*nowMs*/) {
+  CheckGate asked = g;
+  asked.enabled = true;
+  asked.msUntilNextPoll = UINT32_MAX;
+  return canStartNetworkTask(asked) ? InstallStep::Start : InstallStep::Wait;
+}
+
 // ---- Status
 
 WebStr updateStatusMessage(UpdateStatus s) {
