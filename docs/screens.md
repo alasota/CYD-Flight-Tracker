@@ -325,11 +325,18 @@ turn, so it degrades further out. Turn-aware prediction is out of scope.
 
 ## Time — the header clock
 
+- **Zone:** `setup()` calls `timeSyncSetZone()` (`setenv("TZ", TZ_WARSAW)` + `tzset()`) first
+  thing, before `net_task` starts or anything reads local time. `TZ_WARSAW =
+  "CET-1CEST,M3.5.0,M10.5.0/3"` (POSIX rule for Europe/Warsaw, handles CEST). If the clock is
+  ever off by an hour, check the EU DST rule.
 - **NTP:** after WiFi connects, `net_task` calls `configTzTime(TZ_WARSAW, "pool.ntp.org",
-  "time.nist.gov")` with `TZ_WARSAW = "CET-1CEST,M3.5.0,M10.5.0/3"` (POSIX rule for
-  Europe/Warsaw, handles CEST). If the clock is ever off by an hour, check the EU DST rule.
-- Until the first sync `isTimeSynced()` is false and the header shows `--.--.----` / `--:--`,
-  not the ESP32's 1970 date.
+  "time.nist.gov")` (the same zone again).
+- `isTimeSynced()` is the heuristic `time() > 2021-01-01`. After a power-on it is false until
+  the first SNTP sync and the header shows `--.--.----` / `--:--`, not the ESP32's 1970 date.
+- ⚠️ A software reset (OTA, restore, `ESP.restart()`) keeps the system clock: `isTimeSynced()`
+  is true from the first microsecond, before WiFi / NTP. "Synced" does not mean "zone set" —
+  that's why the zone is set in `setup()`, not only by `configTzTime()` (docs/history.md
+  "Brightness").
 - The formatting is the pure `shared/clock` (`time_sync` keeps only NTP) and takes the `time_t` as a parameter (testable regardless of
   when the test runs): `formatDate()` → `"DD.MM.YYYY"` (zero-padded, e.g. `07.03.2026`),
   `formatTime()` → `"HH:MM"` (24 h), `minuteOf()` (changes exactly when `formatTime()` does).
