@@ -43,7 +43,7 @@ REMOVED_SYMBOLS = [
 
 # Renamed in spec 12 stage 7 (section 3, the glossary): {old: new}. Only compound names; the plain
 # words Aircraft and Config (types AircraftState, Settings) are also English words, so
-# tools/test_rename_symbols.py guards them on code tokens instead.
+# they are not in this table.
 RENAMED_SYMBOLS = {
     "BoundingBox": "ScanArea", "computeBoundingBox": "computeScanArea",
     "OpenSkyHealth": "FeedHealth",

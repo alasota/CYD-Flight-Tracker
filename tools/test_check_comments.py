@@ -86,7 +86,7 @@ class RemovedSymbolsTest(unittest.TestCase):
 # ---- spec 12 stage 7: renamed glossary names ---------------------------------------------------
 
 # The compound names stage 7 renames (spec 12 section 3); the plain words Aircraft and Config
-# are guarded by tools/test_rename_symbols.py on code tokens only.
+# are not in the table: they are also ordinary English words.
 STAGE_7_RENAMED = {
     "BoundingBox": "ScanArea", "computeBoundingBox": "computeScanArea",
     "OpenSkyHealth": "FeedHealth",
