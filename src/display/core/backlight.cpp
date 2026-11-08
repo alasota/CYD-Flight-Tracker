@@ -154,6 +154,33 @@ std::string formatClockMinutes(int minutes) {
   return buf;
 }
 
+// ---- Today's sun ----------------------------------------------------------------
+
+// TODO(fix fix-sun-times-utc-after-boot): stub from bug-investigator — today's
+// refreshSun() from display/adapters/backlight_ldr.cpp moved here as it is (the
+// cache ignores the UTC offset), so the regression tests reproduce the bug.
+bool refreshSunToday(SunToday &sun, bool synced, std::time_t utc, std::time_t local,
+                     const Home &home) {
+  if (!synced || !home.configured) {
+    sun.known = false;
+    return false;
+  }
+  const std::tm t = *std::gmtime(&local);  // local wall-clock fields (pre-shifted)
+  const int dayKey = (t.tm_year + 1900) * 400 + t.tm_yday;
+  if (sun.known && dayKey == sun.day_key && home.lat == sun.lat && home.lon == sun.lon) {
+    return false;
+  }
+  const int offsetMin = static_cast<int>((local - utc) / 60);
+  sun.local = shiftSunTimes(
+      computeSunTimes(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, home.lat, home.lon), offsetMin);
+  sun.known = true;
+  sun.day_key = dayKey;
+  sun.lat = home.lat;
+  sun.lon = home.lon;
+  sun.offset_min = offsetMin;
+  return true;
+}
+
 // ---- Decision ---------------------------------------------------------------
 
 bool msBefore(uint32_t nowMs, uint32_t untilMs) {

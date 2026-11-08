@@ -340,6 +340,75 @@ static void test_status_json(void) {
   ASSERT_CONTAINS(j, "\"polling\":false");
 }
 
+// ---- Today's sun ----------------------------------------------------------------
+
+Home warsawHome() {
+  Home h;
+  h.lat = 52.23f;
+  h.lon = 21.01f;
+  h.configured = true;
+  return h;
+}
+
+// "HH:MM" of today's sun shifted by `offsetMin` — what /light.json should show.
+std::string sunriseAt(int year, int month, int day, int offsetMin) {
+  const Home h = warsawHome();
+  return formatClockMinutes(
+      shiftSunTimes(computeSunTimes(year, month, day, h.lat, h.lon), offsetMin).sunrise_min);
+}
+std::string sunsetAt(int year, int month, int day, int offsetMin) {
+  const Home h = warsawHome();
+  return formatClockMinutes(
+      shiftSunTimes(computeSunTimes(year, month, day, h.lat, h.lon), offsetMin).sunset_min);
+}
+
+constexpr std::time_t k20261108_0000Utc = 1794096000;  // 08.11.2026 00:00 UTC
+
+// Regression: after an OTA / software reset the RTC keeps the time, so the clock reads "synced"
+// before net_task's configTzTime() sets the zone; the sun computed then (offset 0 = UTC,
+// "05:44 / 14:57") stayed cached all day instead of following the CET offset that came next.
+static void test_sun_times_follow_the_utc_offset_once_the_zone_is_set(void) {
+  SunToday sun;
+  const Home home = warsawHome();
+  const std::time_t utc = k20261108_0000Utc + 10 * 3600;  // 10:00 UTC
+  // Right after the reboot: no TZ yet, timeSyncNowLocal() == time(nullptr).
+  TEST_ASSERT_TRUE(refreshSunToday(sun, true, utc, utc, home));
+  ASSERT_STR_EQ(sunriseAt(2026, 11, 8, 0), formatClockMinutes(sun.local.sunrise_min));
+  // A few seconds later configTzTime() has run: same local day, offset +60 (CET).
+  const std::time_t later = utc + 5;
+  refreshSunToday(sun, true, later, later + 3600, home);
+  ASSERT_STR_EQ(sunriseAt(2026, 11, 8, 60), formatClockMinutes(sun.local.sunrise_min));
+  ASSERT_STR_EQ(sunsetAt(2026, 11, 8, 60), formatClockMinutes(sun.local.sunset_min));
+  TEST_ASSERT_EQUAL_INT(60, sun.offset_min);
+}
+
+// Regression (same cause, one step off): on the autumn DST day the sun computed just after
+// midnight (CEST, +120) stayed cached after 03:00 when the offset became +60 (CET).
+static void test_sun_times_follow_the_dst_change_on_the_same_day(void) {
+  SunToday sun;
+  const Home home = warsawHome();
+  const std::time_t utcCest = 1792881000;  // 24.10.2026 22:30 UTC = 25.10 00:30 CEST
+  refreshSunToday(sun, true, utcCest, utcCest + 7200, home);
+  ASSERT_STR_EQ(sunriseAt(2026, 10, 25, 120), formatClockMinutes(sun.local.sunrise_min));
+  const std::time_t utcCet = utcCest + 4 * 3600;  // 25.10 02:30 UTC = 03:30 CET
+  refreshSunToday(sun, true, utcCet, utcCet + 3600, home);
+  ASSERT_STR_EQ(sunriseAt(2026, 10, 25, 60), formatClockMinutes(sun.local.sunrise_min));
+  ASSERT_STR_EQ(sunsetAt(2026, 10, 25, 60), formatClockMinutes(sun.local.sunset_min));
+}
+
+// The cache still holds: same local day, same home, same offset -> not recomputed (no log).
+static void test_sun_times_are_computed_once_per_day_and_offset(void) {
+  SunToday sun;
+  const Home home = warsawHome();
+  const std::time_t utc = k20261108_0000Utc + 10 * 3600;
+  TEST_ASSERT_TRUE(refreshSunToday(sun, true, utc, utc + 3600, home));
+  TEST_ASSERT_FALSE(refreshSunToday(sun, true, utc + 60, utc + 60 + 3600, home));
+  TEST_ASSERT_TRUE(sun.known);
+  ASSERT_STR_EQ(sunsetAt(2026, 11, 8, 60), formatClockMinutes(sun.local.sunset_min));
+  TEST_ASSERT_FALSE(refreshSunToday(sun, false, utc + 120, 0, home));  // clock lost -> unknown
+  TEST_ASSERT_FALSE(sun.known);
+}
+
 }  // namespace
 
 void run_backlight_tests() {
@@ -367,4 +436,7 @@ void run_backlight_tests() {
   RUN_TEST(test_wake_survives_millis_wrap);
   RUN_TEST(test_polling_pause);
   RUN_TEST(test_status_json);
+  RUN_TEST(test_sun_times_follow_the_utc_offset_once_the_zone_is_set);
+  RUN_TEST(test_sun_times_follow_the_dst_change_on_the_same_day);
+  RUN_TEST(test_sun_times_are_computed_once_per_day_and_offset);
 }
