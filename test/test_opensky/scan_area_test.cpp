@@ -5,6 +5,45 @@
 
 namespace {
 
+// ---- computeScanArea -------------------------------------------------
+
+static void test_bbox_default_radius_matches_config_portal_1_credit_tier(void) {
+  // radius 2.5 deg is defaultSettings()'s and web_server's default, sitting
+  // exactly at the 1-credit tier boundary (bbox area = 25 sq deg there).
+  ScanArea bbox = computeScanArea(51.5f, -0.1f, 2.5f);
+
+  TEST_ASSERT_EQUAL_FLOAT(49.0f, bbox.lamin);
+  TEST_ASSERT_EQUAL_FLOAT(54.0f, bbox.lamax);
+  TEST_ASSERT_EQUAL_FLOAT(-2.6f, bbox.lomin);
+  TEST_ASSERT_EQUAL_FLOAT(2.4f, bbox.lomax);
+}
+
+static void test_bbox_radius_past_1_credit_tier(void) {
+  // radius 5.0 deg crosses web_server's 1-credit threshold (bbox area
+  // there is 100 sq deg -> its 2-credit tier) — bbox math itself doesn't
+  // care about credits, but the box should scale accordingly.
+  ScanArea bbox = computeScanArea(0.0f, 0.0f, 5.0f);
+
+  TEST_ASSERT_EQUAL_FLOAT(-5.0f, bbox.lamin);
+  TEST_ASSERT_EQUAL_FLOAT(5.0f, bbox.lamax);
+  TEST_ASSERT_EQUAL_FLOAT(-5.0f, bbox.lomin);
+  TEST_ASSERT_EQUAL_FLOAT(5.0f, bbox.lomax);
+}
+
+static void test_bbox_clamps_near_north_pole(void) {
+  ScanArea bbox = computeScanArea(89.0f, 10.0f, 5.0f);
+
+  TEST_ASSERT_EQUAL_FLOAT(84.0f, bbox.lamin);
+  TEST_ASSERT_EQUAL_FLOAT(90.0f, bbox.lamax);  // clamped, not 94
+}
+
+static void test_bbox_clamps_near_antimeridian(void) {
+  ScanArea bbox = computeScanArea(0.0f, 179.0f, 5.0f);
+
+  TEST_ASSERT_EQUAL_FLOAT(174.0f, bbox.lomin);
+  TEST_ASSERT_EQUAL_FLOAT(180.0f, bbox.lomax);  // clamped, not 184
+}
+
 static void test_bbox_area_matches_radius(void) {
   TEST_ASSERT_EQUAL_FLOAT(25.0f, bboxAreaSqDeg(2.5f));
   TEST_ASSERT_EQUAL_FLOAT(100.0f, bboxAreaSqDeg(5.0f));
@@ -48,6 +87,10 @@ static void test_credit_cost_at_zero_radius(void) {
 void run_scan_area_tests() {
   UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
 
+  RUN_TEST(test_bbox_default_radius_matches_config_portal_1_credit_tier);
+  RUN_TEST(test_bbox_radius_past_1_credit_tier);
+  RUN_TEST(test_bbox_clamps_near_north_pole);
+  RUN_TEST(test_bbox_clamps_near_antimeridian);
   RUN_TEST(test_bbox_area_matches_radius);
   RUN_TEST(test_credit_cost_boundary_exactly_25_sq_deg);
   RUN_TEST(test_credit_cost_boundary_exactly_100_sq_deg);

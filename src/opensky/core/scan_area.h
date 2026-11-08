@@ -11,6 +11,22 @@
 // box), matching airspace's Home::radius_deg.
 float bboxAreaSqDeg(float radius_deg);
 
+struct ScanArea {
+  float lamin = 0.0f;
+  float lomin = 0.0f;
+  float lamax = 0.0f;
+  float lomax = 0.0f;
+};
+
+// Bounding box for a ±radius_deg half-width square around (lat, lon),
+// clamped to valid lat/lon ranges. Same half-width convention as
+// airspace's Home::radius_deg / bboxAreaSqDeg() — a
+// radius_deg that crosses the 1-credit threshold (2.5°)
+// produces a proportionally larger box here. Does not handle antimeridian
+// wraparound (a home point near ±180° longitude just gets clipped, not
+// wrapped) — an accepted limitation for a fixed home-location tracker.
+ScanArea computeScanArea(float lat, float lon, float radius_deg);
+
 // OpenSky /states/all credit cost per call for that bbox area, per
 // docs/data-sources.md "Rate limits / credits": <=25 sq deg = 1, <=100 = 2,
 // <=400 = 3, >400 = 4.

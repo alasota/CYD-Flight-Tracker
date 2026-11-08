@@ -16,25 +16,10 @@
 #include "opensky/core/opensky_auth.h"   // OpenSkyAuthState — openSkyAuthStatus()
 #include "opensky/core/opensky_quota.h"  // OpenSkyQuota — openSkyQuota()
 #include "opensky/core/opensky_settings.h"  // OpenSkyCredentials, PollSettings
+#include "opensky/core/scan_area.h"  // ScanArea, computeScanArea()
 
 // ---- Pure logic (no WiFi/HTTP dependency) — testable under
 // `pio test -e native`.
-
-struct ScanArea {
-  float lamin = 0.0f;
-  float lomin = 0.0f;
-  float lamax = 0.0f;
-  float lomax = 0.0f;
-};
-
-// Bounding box for a ±radius_deg half-width square around (lat, lon),
-// clamped to valid lat/lon ranges. Same half-width convention as
-// airspace's Home::radius_deg / scan_area's bboxAreaSqDeg() — a
-// radius_deg that crosses scan_area's 1-credit threshold (2.5°)
-// produces a proportionally larger box here. Does not handle antimeridian
-// wraparound (a home point near ±180° longitude just gets clipped, not
-// wrapped) — an accepted limitation for a fixed home-location tracker.
-ScanArea computeScanArea(float lat, float lon, float radius_deg);
 
 // Cached-token state as plain data, so tests can construct it directly
 // without performing any HTTP call.
