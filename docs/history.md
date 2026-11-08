@@ -340,7 +340,20 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   `__func__` / `typeid`, RTTI off), so with a fixed `FW_VERSION` each rename commit's sections
   were identical and `firmware.bin` differed only in the ELF and image hashes (≤ 65 B); the
   `config_store` → `settings` file rename only moved the link order (same sections and size).
+- **Layer rules enforced** (spec 12, stage 8, owner 2026-11-08). All 12 findings were removed
+  in the code, none legitimised by a new tick in the table.
+  **`shared/flight_info`:** `TrackedFlight` carries `AircraftInfo`, `RouteInfo` and `AirportInfo`
+  by value, so either `airspace/core` had to see `enrichment/core` (the core domain depending on
+  a supporting context) or the three types had to sit below both; the owner chose the shared
+  kernel. **`main/alert_sources`:** the file only joins data from OpenSky, the backlight and the
+  settings. Joining contexts is what the composition root is for, so it moved there and
+  `web_server` got the same inputs through the `panelLiveInputs()` port. **`screenshot` in
+  `admin/core`:** only the web route uses it. **The `[ota]` serial line writes `->`** so that
+  `web_server` needn't include the display's `service_screen.h`; the page after an upload still
+  shows `→`. **The migration tools were deleted** (owner; `git log` has them): the moves were done.
 - **`pio run -e cyd-ota -t upload` without a password** (found in stage 6, not fixed yet): with
   `$CYD_WEB_PASSWORD` empty, curl's `--digest` first sends an empty POST to probe for the
   challenge; the upload route answers it with HTTP 400 and nothing is uploaded. A plain
   `curl -F firmware=@….bin http://cyd-sky.local/update` works when the panel has no password.
+  Seen again in stage 8 (the page answers "Nie wybrano pliku"); `platformio.ini` still uses
+  `--digest`.
