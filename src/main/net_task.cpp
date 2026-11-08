@@ -2,9 +2,9 @@
 
 #include "main/net_enrichment.h"
 #include "main/net_perf.h"
+#include "main/net_rollback.h"
 
 #include <Arduino.h>
-#include <esp_ota_ops.h>
 
 #include <string>
 
@@ -29,7 +29,6 @@ namespace {
 std::shared_ptr<const Settings> cfg;  // the current settings, shared with the UI
 uint32_t cfgSeq = 0;
 uint32_t seenSaveCount = 0;
-bool appPendingVerify = false;
 
 NetState state;      // what the next publish will carry
 NetState published;  // what the UI has (for netStateDiffers())
@@ -124,28 +123,6 @@ CheckGate updateGate() {
   g.msUntilNextPoll = openSkyMsUntilNextPoll(millis(), cfg->poll);
   g.maxFreeBlock = ESP.getMaxAllocHeap();
   return g;
-}
-
-// ---- Rollback: mark the image valid once it has proven itself --------------
-
-void markAppValidWhenStable() {
-  if (!appPendingVerify) return;
-  const WifiStatus ws = wifiManagerStatus();
-  const bool reachable =
-      (ws == WifiStatus::Connected && webServerIsActive()) || ws == WifiStatus::PortalActive;
-  const bool uiAlive =
-      !heartbeatStale(millis(), core_link::uiBeatMs.load(), kUiAliveLimitMs);
-  if (shouldRestartForRollback(appPendingVerify, millis(), uiAlive)) {
-    Serial.println("[ota] the display loop has stopped on a new image: restarting to roll back");
-    Serial.flush();
-    ESP.restart();
-  }
-  if (shouldMarkAppValid(appPendingVerify, millis(), reachable, uiAlive)) {
-    esp_ota_mark_app_valid_cancel_rollback();
-    appPendingVerify = false;
-    Serial.printf("[ota] %s marked valid after %u s, rollback cancelled\n", firmwareVersion(),
-                  static_cast<unsigned>(millis() / 1000));
-  }
 }
 
 // ---- Commands from the UI ------------------------------------------------------
@@ -299,7 +276,7 @@ void netTask(void *) {
 
 void netTaskStart(std::shared_ptr<const Settings> bootCfg, bool pendingVerify) {
   cfg = std::move(bootCfg);
-  appPendingVerify = pendingVerify;
+  netRollbackBegin(pendingVerify);
   state.settings = cfg;
   xTaskCreatePinnedToCore(netTask, "net", kNetTaskStackBytes, nullptr, kNetTaskPriority, nullptr,
                           kNetTaskCore);
