@@ -1,4 +1,4 @@
-Feature: Reorganizacja kodu według DDD — etapy 1–7: katalogi kontekstów i warstw (core / services / adapters, korzenie w main/), include'y z pełną ścieżką, raport zależności, źle położone typy w swoich kontekstach, podział czyste / sprzętowe, przepływy UI i formularz ustawień w services/ i core/ z testami, ustawienia per kontekst i zasoby panelu WWW jako pliki, nazwy ze słownika (§3) w kodzie
+Feature: Reorganizacja kodu według DDD — etapy 1–8: katalogi kontekstów i warstw (core / services / adapters, korzenie w main/), include'y z pełną ścieżką, raport zależności, źle położone typy w swoich kontekstach, podział czyste / sprzętowe, przepływy UI i formularz ustawień w services/ i core/ z testami, ustawienia per kontekst i zasoby panelu WWW jako pliki, nazwy ze słownika (§3) w kodzie, a na koniec raport warstw bez zgłoszeń i blokujący CI
   Etap 1 przeniósł pliki z płaskiego src/ (git mv, bez dzielenia) do katalogów kontekstów i warstw
   z §4; każdy #include "…" podaje ścieżkę od src/ (flaga -I src), środowisko native nie kompiluje
   korzeni kompozycji ani adapterów, a tools/check_layers.py raportuje naruszenia tabeli z §5
@@ -27,8 +27,10 @@ Feature: Reorganizacja kodu według DDD — etapy 1–7: katalogi kontekstów i 
   Settings z funkcjami i plikiem config_store → settings, configPortal*() → webServer*()), po jednej
   na commit, narzędziem tools/rename_symbols.py, które zmienia tylko identyfikatory w kodzie — napisy
   (klucze NVS, klucze JSON, trasy WWW) i kod wynikowy zostają te same. Scenariusze etapów 3–6 używają
-  już nazw po etapie 7. Wyniki płytki z etapów 1–6 są w specyfikacji (§8 „Wynik etapu N”); etap 8
-  dostanie swoje scenariusze w tym pliku, gdy przyjdzie jego kolej.
+  już nazw po etapie 7. Etap 8 usuwa ostatnie naruszenia tabeli z §5 (typy i stałe do kontekstów z §4,
+  składanie danych z kilku kontekstów w main/), dzieli net_task.cpp, config_page.cpp i web_server.cpp
+  (§10 pkt 3) i włącza python tools/check_layers.py --strict w CI.
+  Wyniki płytki z etapów 1–7 są w specyfikacji (§8 „Wynik etapu N”).
 
   # ---- etap 1 (aktualne po etapie 2): układ katalogów i include'y
 
@@ -216,12 +218,14 @@ Feature: Reorganizacja kodu według DDD — etapy 1–7: katalogi kontekstów i 
     When uruchamiam python tools/check_layers.py --strict na każdym
     Then pierwsze kończy się kodem 1, drugie kodem 0
 
-  @test=tools/test_check_layers.py:WorkflowTest.test_firmware_workflow_reports_layers_before_native_tests
-  Scenario: CI uruchamia raport warstw przed testami natywnymi, bez blokowania, i testy narzędzi
+  # (zmienione w etapie 8: krok blokuje CI)
+  @test=tools/test_check_layers.py:WorkflowTest.test_firmware_workflow_blocks_on_layers_before_native_tests
+  Scenario: CI uruchamia sprawdzenie warstw przed testami natywnymi i blokuje build, a testy narzędzi idą razem
     Given .github/workflows/firmware.yml
     When czytam jego kroki
-    Then python tools/check_layers.py (bez --strict) jest w kroku przed pio test -e native
-    And tools/test_check_layers.py, tools/test_rewrite_includes.py i tools/test_subset_efont.py są uruchamiane razem z innymi testami narzędzi
+    Then python tools/check_layers.py --strict jest w kroku przed pio test -e native
+    And krok nie ma continue-on-error
+    And tools/test_check_layers.py i tools/test_subset_efont.py są uruchamiane razem z innymi testami narzędzi
 
   # ---- etap 1: wydanie etapu nie przenosi specyfikacji do done/
 
@@ -304,12 +308,12 @@ Feature: Reorganizacja kodu według DDD — etapy 1–7: katalogi kontekstów i 
     Then filtr to +<*> -<main/> -<*/adapters/> -<platform/*_esp32.cpp>
     And filtr nie przywraca żadnego pliku z adapters/ (od etapu 4 trasy WebServer są w admin/adapters/web_server.cpp bez czystych funkcji, a testy tych funkcji w admin/core/settings_form)
 
-  # (zmienione w etapie 3: limit to stan po ostatnim wydanym etapie — 51 po etapie 2, 47 po etapie 3; w etapie 4: 14; w etapie 6: 12)
+  # (zmienione w etapie 3: limit to stan po ostatnim wydanym etapie — 51 po etapie 2, 47 po etapie 3; w etapie 4: 14; w etapie 6: 12; w etapie 8: 0)
   @test=tools/test_check_layers.py:LayoutTest.test_layer_findings_do_not_exceed_the_stage_limit
   Scenario: Liczba naruszeń w raporcie warstw nie rośnie ponad stan po ostatnim etapie
-    Given limit naruszeń zapisany w teście: 12 (stan po etapie 6; po etapie 2 było 51, po etapie 3 47, po etapach 4 i 5 14)
+    Given limit naruszeń zapisany w teście: 0 (stan po etapie 8; po etapie 2 było 51, po etapie 3 47, po etapach 4 i 5 14, po etapach 6 i 7 12)
     When uruchamiam check_layers na drzewie repozytorium
-    Then łączna liczba naruszeń jest nie większa niż 12
+    Then łączna liczba naruszeń jest nie większa niż 0
     And nowe naruszenie powyżej limitu kończy test błędem, a lista naruszeń jest w komunikacie
 
   @test=tools/test_check_layers.py:LayoutTest.test_no_old_layer_paths_left_in_code_and_build_files
@@ -580,7 +584,7 @@ Feature: Reorganizacja kodu według DDD — etapy 1–7: katalogi kontekstów i 
       | otaFlashSession           | admin/adapters/ota_flash.cpp                    | admin/core/firmware/ota_update.cpp        |
       | releaseCheckLoop          | admin/adapters/github_http.cpp                  | admin/core/firmware/release_check.cpp     |
       | loadSettings              | admin/adapters/settings_nvs.cpp                 | admin/core/settings.cpp                   |
-      | deviceAlertInputs         | admin/adapters/alert_sources.cpp                | admin/core/device_alerts.cpp              |
+      | deviceAlertInputs         | main/alert_sources.cpp                          | admin/core/device_alerts.cpp              |
 
   @test=tools/test_check_layers.py:LayoutTest.test_stage_4_symbols_are_declared_in_their_new_home
   Scenario Outline: Typ lub funkcja wyniesiona przy podziale ma jedną deklarację, w swoim nowym nagłówku
@@ -1422,10 +1426,10 @@ Feature: Reorganizacja kodu według DDD — etapy 1–7: katalogi kontekstów i 
 
     Examples:
       | dawna                       | nowa                          | plik                                  |
-      | BoundingBox                 | ScanArea                      | src/opensky/core/opensky_client.h     |
-      | computeBoundingBox          | computeScanArea               | src/opensky/core/opensky_client.h     |
+      | BoundingBox                 | ScanArea                      | src/opensky/core/scan_area.h          |
+      | computeBoundingBox          | computeScanArea               | src/opensky/core/scan_area.h          |
       | OpenSkyHealth               | FeedHealth                    | src/airspace/core/feed_health.h       |
-      | DataSnapshot                | AirspaceSnapshot              | src/platform/core_link.h              |
+      | DataSnapshot                | AirspaceSnapshot              | src/airspace/core/airspace_snapshot.h |
       | buildDataSnapshot           | buildAirspaceSnapshot         | src/airspace/services/poll_pipeline.h |
       | LookupPorts                 | EnrichmentPort                | src/airspace/services/poll_pipeline.h |
       | AircraftRow                 | TrackedFlight                 | src/airspace/core/tracked_flight.h    |
@@ -1543,3 +1547,150 @@ Feature: Reorganizacja kodu według DDD — etapy 1–7: katalogi kontekstów i 
     Then log szeregowy nie pokazuje paniki ani restartu poza startem, a /backup.json różni się od tego sprzed wgrania tylko polem firmware
     And GET / różni się tylko wersją i wartościami na żywo; ekrany 0–2 pokazują LOTY, TERAZ i RADAR jak przed wgraniem; /perf.json w zakresie etapu 6 (przerwa pętli UI ok. 100 ms, 0 wolnych przejść, największy blok ≥ 50 KB); /light.json ten sam tryb i jasność
     And zapis formularza bez zmian daje tę samą kopię zapasową, a aktualizacja OTA przez WiFi (curl -F firmware=@… /update) kończy się restartem i obrazem oznaczonym jako ważny
+
+  # ---- etap 8: egzekwowanie — ostatnie naruszenia tabeli z §5 i blokada w CI
+
+  @test=tools/test_check_layers.py:LayoutTest.test_stage_8_symbols_are_declared_in_their_new_home
+  Scenario Outline: Typ lub stała, przez które zależności szły w złą stronę, leżą w swoim kontekście
+    Given nagłówki w src/ po etapie 8
+    When szukam deklaracji <symbol>
+    Then jest dokładnie jedna, w src/<nowy_nagłówek>
+    And src/<stary_nagłówek> jej nie ma
+
+    Examples:
+      | symbol                 | nowy_nagłówek                        | stary_nagłówek                      |
+      | Language               | shared/language.h                    | display/core/i18n.h                 |
+      | AirspaceSnapshot       | airspace/core/airspace_snapshot.h    | platform/core_link.h                |
+      | ScanArea               | opensky/core/scan_area.h             | opensky/core/opensky_client.h       |
+      | computeScanArea        | opensky/core/scan_area.h             | opensky/core/opensky_client.h       |
+      | kUpdatePromptTimeoutMs | display/core/screens/service_screen.h | admin/core/firmware/release_check.h |
+      | AircraftInfo           | shared/flight_info.h                 | enrichment/core/aircraft_lookup.h   |
+      | RouteInfo              | shared/flight_info.h                 | enrichment/core/route_lookup.h      |
+      | AirportInfo            | shared/flight_info.h                 | enrichment/core/route_lookup.h      |
+
+  @test=tools/test_check_layers.py:LayoutTest.test_screenshot_module_is_in_admin_core
+  @test=tools/test_rewrite_includes.py:MoveTableTest.test_stage_8_moves_screenshot_to_admin_core
+  Scenario: Pomocnicy /screenshot.bmp (BMP, ?screen=) należą do admin/core, bo używa ich panel WWW
+    Given src/ i test/ po etapie 8
+    When szukam plików i include'ów modułu screenshot
+    Then są src/admin/core/screenshot.h i screenshot.cpp, a w src/display/services/ zostaje tylko screenshot_bridge
+    And żaden plik z src/ ani test/ nie dołącza display/services/screenshot.h
+
+  @test=tools/test_check_layers.py:LayoutTest.test_web_server_includes_only_its_own_context
+  Scenario: Serwer WWW nie sięga po dane innych kontekstów
+    Given src/admin/adapters/web_server.cpp po etapie 8
+    When czytam jego dyrektywy #include "…"
+    Then każda wskazuje admin/, shared/ albo platform/
+    And kredyty OpenSky, stan logowania i podświetlenie przychodzą przez panelLiveInputs() z admin/core/config_page.h
+
+  @test=tools/test_check_layers.py:LayoutTest.test_foreign_device_inputs_are_wired_in_the_composition_root
+  Scenario: Dane z urządzenia z kilku kontekstów składa korzeń kompozycji
+    Given drzewo src/ po etapie 8
+    When szukam definicji deviceAlertInputs() i panelLiveInputs()
+    Then obie są w src/main/alert_sources.cpp
+    And src/admin/adapters/alert_sources.cpp już nie istnieje
+
+  @test=tools/test_check_layers.py:LayoutTest.test_layers_are_decoupled_in_the_named_headers
+  Scenario Outline: Plik, który łamał tabelę z §5, dołącza już tylko dozwolone warstwy
+    Given src/<plik> po etapie 8
+    When czytam jego dyrektywy #include "…"
+    Then żadna nie wskazuje <zakazany_cel>
+
+    Examples:
+      | plik                                              | zakazany_cel    |
+      | enrichment/core/place_names.h                     | display/core    |
+      | opensky/core/opensky_quota.h                      | display/core    |
+      | airspace/services/poll_pipeline.h                 | platform        |
+      | airspace/core/tracked_flight.h                    | enrichment/core |
+      | display/adapters/lgfx/service_screen_draw.cpp     | admin/core      |
+
+  @test=test_enrichment/place_names_test.cpp:test_place_name_prefers_city_table
+  @test=test_enrichment/place_names_test.cpp:test_city_table_polish_and_english
+  @test=test_opensky/opensky_quota_test.cpp:test_format_wait
+  Scenario: Tekst zależny od języka działa tak samo z Language ze shared/
+    Given miasto „Monachium” / „Munich” w tabeli IATA i oczekiwanie 6 godz. 57 min
+    When proszę o nazwę miejsca i o czas oczekiwania po polsku i po angielsku
+    Then wyniki są takie same jak przed etapem 8
+
+  @test=test_airspace/poll_pipeline_test.cpp:test_now_pick_points_at_the_sorted_row
+  @test=test_platform/core_link_test.cpp:test_diff_health_with_rows_is_header_only
+  Scenario: Obraz nieba z airspace/core dalej przechodzi przez NetState
+    Given AirspaceSnapshot zbudowany przez poll_pipeline
+    When NetState przenosi go do interfejsu
+    Then wybór TERAZ wskazuje właściwy wiersz, a zmiana stanu przy tych samych lotach odświeża tylko nagłówek
+
+  @test=tools/test_check_layers.py:LayoutTest.test_source_files_stay_under_the_section_10_limits
+  Scenario Outline: Pliki w src/ mieszczą się w limitach z §10 pkt 3
+    Given <pliki> po etapie 8, licząc linie z pustymi włącznie (jak wc -l)
+    When liczę ich linie
+    Then każdy ma <limit> linii
+
+    Examples:
+      | pliki                 | limit           |
+      | src/main/main.cpp     | mniej niż 250   |
+      | src/main/net_task.cpp | mniej niż 300   |
+      | każdy plik w src/     | najwyżej 600    |
+
+  @test=tools/test_check_layers.py:LayoutTest.test_net_task_parts_live_in_the_composition_root
+  Scenario: Pomiar, porty hexdb.io i oznaczanie obrazu jako ważnego są w osobnych modułach korzenia kompozycji
+    Given src/main/ po etapie 8
+    When szukam definicji productionPorts(), funkcji pomiaru net_perf i funkcji wycofania net_rollback
+    Then są w src/main/net_enrichment.cpp, src/main/net_perf.cpp i src/main/net_rollback.cpp, a net_task.cpp ich nie definiuje
+    And python tools/check_comments.py traktuje te moduły jak kod rdzenia 0 (NET_MODULES)
+
+  @test=tools/test_check_layers.py:LayoutTest.test_config_page_is_split_by_tab
+  Scenario: Strona ustawień jest podzielona według zakładek
+    Given src/admin/core/ po etapie 8
+    When szukam kodu pięciu zakładek i klasy Writer
+    Then zakładki są w config_page_tabs.cpp, po jednej funkcji na zakładkę, a Writer w config_page_writer.h
+    And web_assets.h dołącza dalej tylko config_page.cpp
+
+  @test=tools/test_check_layers.py:LayoutTest.test_web_server_routes_keep_their_guards
+  Scenario: Po podziale serwera WWW każda trasa ma dalej swoje zabezpieczenia
+    Given src/admin/adapters/web_server.cpp i web_server_firmware.cpp po etapie 8
+    When czytam obsługę tras POST i wywołania zwrotne wysyłania plików
+    Then każda obsługa POST zaczyna się od requireSameOrigin(), przed authorize()
+    And każde wywołanie zwrotne wysyłania zaczyna się od if (!isMultipartRequest()) return;
+    And każda trasa jest zarejestrowana przez secured<>
+
+  @test=tools/test_check_layers.py:LayoutTest.test_strict_layer_check_passes_on_the_repository
+  Scenario: python tools/check_layers.py --strict przechodzi na repozytorium
+    Given drzewo repozytorium po etapie 8
+    When uruchamiam python tools/check_layers.py --strict
+    Then kończy się kodem 0 i wypisuje „0 layer finding(s) in total”
+    But include dopisany wbrew tabeli z §5 (scenariusz „Z --strict naruszenie kończy się kodem 1”) wywraca build
+
+  @test=tools/test_check_layers.py:LayoutTest.test_architecture_doc_carries_the_rules_and_claude_md_points_to_it
+  Scenario: Reguły i słownik są w docs/architecture.md, a CLAUDE.md tylko do nich odsyła
+    Given docs/architecture.md i CLAUDE.md po etapie 8
+    When czytam „Source layout” i „Code conventions”
+    Then docs/architecture.md ma konteksty, tabelę zależności z §5 i słownik z §3
+    And sekcja „Code conventions” w CLAUDE.md odsyła do docs/architecture.md "Source layout" i nie ma już listy modułów
+    And nagłówek „Code conventions” zostaje (cytują go komentarze), a CLAUDE.md ma mniej niż 250 linii
+
+  @test=tools/test_check_layers.py:LayoutTest.test_one_off_migration_tools_are_gone
+  Scenario: Jednorazowe narzędzia migracji są usunięte
+    Given tools/ i .github/workflows/firmware.yml po etapie 8
+    When szukam rewrite_includes i rename_symbols
+    Then plików narzędzi ani ich testów nie ma, a CI ich nie uruchamia
+    And tools/check_layers.py, tools/check_comments.py (z RENAMED_SYMBOLS) i tools/embed_assets.py zostają
+
+  # ---- etap 8: rozmiar, liczby testów, płytka
+
+  @manual
+  Scenario: Etap 8 nie zmienia liczby testów ani zachowania, a firmware mieści się w granicy
+    Given na gałęzi przed etapem 8 (591fac0): przypadki w 6 grupach pio test -e native (admin 257, airspace 71, display 408, enrichment 80, opensky 74, platform 84 = 974), RUN_TEST( (974), firmware.bin i sekcje z size -A zbudowane z FW_VERSION=v0.0.0-stage8 po usunięciu .pio/build/cyd, „Flash: used” / „RAM: used”, lista bibliotek i 5 stron panelu z SCREENSHOT_OUT
+    When mierzę to samo po każdym commicie etapu (ten sam FW_VERSION)
+    Then wszystkie grupy są zielone, a przypadków i RUN_TEST( jest 974 (testy tylko idą za kodem)
+    And przy przeniesieniu samych typów i stałych sekcje są te same, a cały etap (z podziałem plików, który zmienia kolejność linkowania) dokłada do firmware.bin najwyżej 4 096 bajtów i zmienia RAM statyczny o najwyżej ± 64 bajty względem stanu przed etapem
+    And strony panelu z SCREENSHOT_OUT są bajt w bajt takie same po każdym kroku podziału config_page, python tools/check_layers.py --strict kończy się kodem 0, a check_comments.py --strict, check_bdd.py i embed_assets.py --check są czyste
+
+  @manual
+  Scenario: Płytka z firmware'em etapu 8 działa jak przedtem
+    Given z płytki przed wgraniem: /backup.json bez sekretów, GET /, /perf.json, /light.json i /screenshot.bmp?screen=0, 1, 2; potem obraz końcowy etapu 8 wgrany przez USB (pio run -e cyd -t upload, za zgodą właściciela) i pio device monitor -b 115200 przez 3 minuty
+    When płytka startuje, łączy się z WiFi i odbiera kilka pollów
+    Then log szeregowy nie pokazuje paniki ani restartu poza startem, a /backup.json różni się tylko polem firmware
+    And ekrany 0–2 pokazują LOTY, TERAZ i RADAR jak przed wgraniem, a zakładki OpenSky i Ogólne w panelu pokazują kredyty, stan logowania i jasność, które zwraca panelLiveInputs()
+    And /light.json ma ten sam tryb i jasność, ostrzeżenia („!”) działają jak przed wgraniem, /perf.json w zakresie etapu 7 (przerwa pętli UI ok. 100 ms, 0 wolnych przejść, największy blok ≥ 50 KB)
+    And aktualizacja OTA przez WiFi (curl -F firmware=@… /update) kończy się restartem i obrazem oznaczonym jako ważny, a pytanie o aktualizację (zrzut screen=3) ma ten sam pasek 30 s
+    And §10 pkt 5: „Sprawdź teraz” odpowiada przez weryfikowany TLS, noc i ostrzeżenia działają jak przed wgraniem, wolny stos net w /perf.json nie jest mniejszy o więcej niż 1 KB od 9 388 B, a instalacja z GitHuba (wersja -dev tej gałęzi, za zgodą właściciela) kończy się obrazem oznaczonym jako ważny
