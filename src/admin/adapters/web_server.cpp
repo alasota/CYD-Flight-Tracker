@@ -19,7 +19,7 @@
 #include "opensky/core/opensky_client.h"  // openSkyQuota() — credits left, shown on the OpenSky tab
 #include "admin/core/firmware/ota_update.h"
 #include "admin/core/firmware/release_check.h"  // updates from GitHub (Firmware tab)
-#include "display/services/screenshot.h"
+#include "admin/core/screenshot.h"
 #include "display/core/screens/service_screen.h"  // otaVersionLine()
 #include "platform/time_sync.h"       // timeSyncNowLocal() — "since" in the login warning
 #include "admin/core/firmware/version.h"

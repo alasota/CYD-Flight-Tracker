@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "display/core/screen_nav.h"    // kScreenCount
-#include "display/services/screenshot.h"  // bmpRowStride(), screenshotBand()
+#include "admin/core/screenshot.h"  // bmpRowStride(), screenshotBand()
 #include "test_support.h"
 
 namespace {

@@ -18,7 +18,8 @@ Two src/ headers with the same file name make the short form ambiguous: the scri
 both paths and writes nothing; so does a renamed header's old file name that another live header
 still has. One move table per stage (MOVES_STAGE_1: flat src/ into <context>/<layer>/;
 MOVES_STAGE_2: layers renamed to core / services, roots into main/; MOVES_STAGE_4: config_portal
-renamed web_server; MOVES_STAGE_7: config_store renamed settings), kept side by side so
+renamed web_server; MOVES_STAGE_7: config_store renamed settings; MOVES_STAGE_8: screenshot
+to admin/core), kept side by side so
 final_path() can follow a file from stage 0 to today. A later stage that moves files adds its
 table to STAGES. Stage 4 also moved two headers from include/ by hand (git mv); the default
 rewrite fixed their includes.
@@ -119,7 +120,13 @@ MOVES_STAGE_7 = {
     "admin/core/config_store.cpp": "admin/core/settings.cpp",
 }
 
-STAGES = (MOVES_STAGE_1, MOVES_STAGE_2, MOVES_STAGE_4, MOVES_STAGE_7)
+# Stage 8 moves the BMP / ?screen= helpers to the web panel that uses them.
+MOVES_STAGE_8 = {
+    "display/services/screenshot.h": "admin/core/screenshot.h",
+    "display/services/screenshot.cpp": "admin/core/screenshot.cpp",
+}
+
+STAGES = (MOVES_STAGE_1, MOVES_STAGE_2, MOVES_STAGE_4, MOVES_STAGE_7, MOVES_STAGE_8)
 MOVES = STAGES[-1]  # what --move applies: the newest stage
 
 

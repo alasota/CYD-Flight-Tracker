@@ -1,4 +1,4 @@
-#include "display/services/screenshot.h"
+#include "admin/core/screenshot.h"
 
 namespace {
 
