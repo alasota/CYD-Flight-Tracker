@@ -90,8 +90,9 @@ enum class OtaResult : uint8_t {
   ChecksumMismatch,  // the file's SHA-256 isn't the one GitHub lists for it
   VersionMismatch,   // the marker's version isn't the release's tag
   DownloadFailed,    // connection / HTTP error, or the size GitHub gave didn't match
+  InstallNotStarted,  // asked for, but no network / memory to start it in time
 };
-constexpr int kOtaResultCount = 16;
+constexpr int kOtaResultCount = 17;
 WebStr otaResultMessage(OtaResult r);
 // HTTP status for the /update response.
 int otaResultHttpStatus(OtaResult r);

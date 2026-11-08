@@ -104,6 +104,8 @@ WebStr otaResultMessage(OtaResult r) {
       return WebStr::OtaVersionMismatch;
     case OtaResult::DownloadFailed:
       return WebStr::OtaDownloadFailed;
+    case OtaResult::InstallNotStarted:
+      return WebStr::OtaInstallNotStarted;
     case OtaResult::Aborted:
     default:
       return WebStr::OtaAborted;
@@ -123,6 +125,8 @@ int otaResultHttpStatus(OtaResult r) {
       return 401;
     case OtaResult::DownloadFailed:
       return 502;
+    case OtaResult::InstallNotStarted:
+      return 503;
     default:
       return 400;
   }

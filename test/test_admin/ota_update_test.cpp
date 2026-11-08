@@ -180,6 +180,8 @@ static void test_every_result_has_a_message_and_status(void) {
   TEST_ASSERT_EQUAL_INT(413, otaResultHttpStatus(OtaResult::TooLarge));
   TEST_ASSERT_EQUAL_INT(401, otaResultHttpStatus(OtaResult::Unauthorized));
   ASSERT_ENUM_EQ(WebStr::OtaFullImage, otaResultMessage(OtaResult::LooksLikeFull));
+  TEST_ASSERT_EQUAL_INT(503, otaResultHttpStatus(OtaResult::InstallNotStarted));
+  ASSERT_ENUM_EQ(WebStr::OtaInstallNotStarted, otaResultMessage(OtaResult::InstallNotStarted));
 }
 
 // ---- OtaSession

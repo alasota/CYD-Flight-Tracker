@@ -196,6 +196,9 @@
     "Not updated: the downloaded file has a different version than the release.")                   \
   X(OtaDownloadFailed, "Nie zaktualizowano: pobieranie z GitHuba nie powiodło się.",                \
     "Not updated: the download from GitHub failed.")                                                \
+  X(OtaInstallNotStarted,                                                                           \
+    "Nie zaktualizowano: instalacja nie ruszyła w ciągu minuty (brak sieci lub pamięci). Spróbuj ponownie.", \
+    "Not updated: the install could not start within a minute (no network or memory). Try again.")  \
   /* Firmware tab: updates from GitHub (release_check) */                                           \
   X(UpdCardTitle, "Aktualizacje z GitHuba", "Updates from GitHub")                                  \
   X(UpdLatest, "Najnowsze wydanie", "Latest release")                                               \
