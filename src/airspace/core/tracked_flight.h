@@ -13,8 +13,7 @@
 
 #include "airspace/core/aircraft_state.h"     // AircraftState
 #include "airspace/core/flight_phase.h"       // Phase
-#include "enrichment/core/aircraft_lookup.h"  // AircraftInfo
-#include "enrichment/core/route_lookup.h"     // RouteInfo, AirportInfo
+#include "shared/flight_info.h"               // AircraftInfo, RouteInfo, AirportInfo
 
 // One tracked flight (a table row on Screen 1): an aircraft state joined
 // with its hexdb.io aircraft lookup (by icao24) and route lookup (by

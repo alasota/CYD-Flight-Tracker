@@ -10,17 +10,7 @@
 #include <cstddef>
 #include <string>
 
-struct AircraftInfo {
-  bool found = false;
-  std::string airline;        // hexdb.io "RegisteredOwners"
-  std::string aircraft_type;  // hexdb.io "Type", e.g. "A319 111" / "737MAX 8"
-  std::string icao_type;      // hexdb.io "ICAOTypeCode", e.g. "A319" / "B38M"
-  std::string registration;   // hexdb.io "Registration"
-
-  // Defined (= default) in aircraft_lookup.cpp, not inline: four strings to
-  // construct, and inlining that into every function that makes one costs flash.
-  AircraftInfo();
-};
+#include "shared/flight_info.h"  // AircraftInfo
 
 // Hard ceiling on how large a hexdb.io response body
 // parseAircraftLookupResponse() will attempt to parse. A real response is

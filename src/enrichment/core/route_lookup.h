@@ -16,15 +16,7 @@
 #include <cstddef>
 #include <string>
 
-// Origin/destination airport for a flight, by callsign. hexdb.io's
-// GET /api/v1/route/icao/{callsign} returns a single "route" string like
-// "EIDW-EGLL" — both ends are ICAO (4-letter) airport codes, matching the
-// callsign format used to look it up.
-struct RouteInfo {
-  bool found = false;
-  std::string origin_icao;
-  std::string dest_icao;
-};
+#include "shared/flight_info.h"  // RouteInfo, AirportInfo
 
 // Hard ceiling on how large a route-lookup response body
 // parseRouteLookupResponse() will attempt to parse — a real response is a
@@ -40,19 +32,6 @@ constexpr size_t kMaxRouteResponseBytes = 4096;
 // erroring. Pure — uses ArduinoJson but no HTTP dependency — tested under
 // `pio test -e native`.
 RouteInfo parseRouteLookupResponse(const std::string &json);
-
-// Country (+ IATA code, for display) for an airport, by **ICAO** code —
-// this project uses hexdb.io's GET /api/v1/airport/icao/{code} endpoint,
-// not /iata/, so it chains directly off RouteInfo::origin_icao/dest_icao
-// above without needing an ICAO->IATA conversion this project doesn't
-// have. hexdb.io's airport response carries both codes, so the IATA one
-// is still available for display (e.g. featured_panel's "WAW (PL)").
-struct AirportInfo {
-  bool found = false;
-  std::string iata_code;     // hexdb.io "iata", e.g. "LHR" — for display
-  std::string country_code;  // hexdb.io "country_code", e.g. "GB"
-  std::string name;          // hexdb.io "airport", ASCII-folded, e.g. "Heathrow Airport"
-};
 
 // Same defensive size cap as kMaxRouteResponseBytes, for airport responses.
 constexpr size_t kMaxAirportResponseBytes = 4096;
