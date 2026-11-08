@@ -1640,7 +1640,7 @@ class LayoutTest(unittest.TestCase):
                 self.assertEqual(1, len(tab_function_names(tabs_text, tab)),
                                  f"functions for the {tab} tab: "
                                  f"{tab_function_names(tabs_text, tab)}")
-        includers = sorted(p for p, t in repo_sources("src", "test").items()
+        includers = sorted(p for p, t in repo_sources("src").items()
                            for i in check_layers.find_includes(t)
                            if i.name == "admin/core/web_assets.h")
         self.assertEqual(["src/admin/core/config_page.cpp"], includers,
