@@ -20,7 +20,6 @@
 #include "admin/core/firmware/ota_update.h"
 #include "admin/core/firmware/release_check.h"  // updates from GitHub (Firmware tab)
 #include "admin/core/screenshot.h"
-#include "display/core/screens/service_screen.h"  // otaVersionLine()
 #include "platform/time_sync.h"       // timeSyncNowLocal() — "since" in the login warning
 #include "admin/core/firmware/version.h"
 #include "admin/core/web_auth.h"
@@ -129,6 +128,14 @@ bool authorize() {
       server.requestAuthentication(DIGEST_AUTH, kWebAuthRealm, "Password required");
       return false;
   }
+}
+
+// "<from> <arrow> <to>": the version change after an upload, for the answer
+// page and the serial log. Just `to` while `from` is unknown, "" while `to` is.
+std::string versionChangeText(const std::string &from, const std::string &to, const char *arrow) {
+  if (to.empty()) return "";
+  if (from.empty()) return to;
+  return from + " " + arrow + " " + to;
 }
 
 // ---- Firmware update (POST /update): the shared flash session (ota_update).
@@ -508,15 +515,18 @@ void handleUpdateDone() {
   const OtaResult r = started ? ota->finish() : OtaResult::NoFile;
   otaAuthorized = false;
 
-  std::string detail;
+  std::string detail;     // for the answer page
+  std::string logDetail;  // the same, for the serial log (ASCII arrow)
   if (r == OtaResult::Ok) {
-    detail = otaVersionLine(firmwareVersion(), ota->marker().version());
+    detail = versionChangeText(firmwareVersion(), ota->marker().version(), "â");  // →
+    logDetail = versionChangeText(firmwareVersion(), ota->marker().version(), "->");
   } else if (r == OtaResult::WriteFailed || r == OtaResult::VerifyFailed) {
     detail = otaFlashError();
+    logDetail = detail;
   }
   Serial.printf("[ota] result=%d received=%u new=%s %s\n", static_cast<int>(r),
                 static_cast<unsigned>(ota->received()), ota->marker().version().c_str(),
-                detail.c_str());
+                logDetail.c_str());
   if (started && otaObserver.onEnd != nullptr) otaObserver.onEnd(r == OtaResult::Ok);
 
   ConfigPageModel model;
