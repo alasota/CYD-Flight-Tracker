@@ -1,5 +1,7 @@
 #include "admin/adapters/web_server.h"
 
+#include "admin/adapters/web_server_internal.h"
+
 #include <ESPmDNS.h>
 #include <Update.h>
 #include <WebServer.h>
@@ -24,13 +26,25 @@
 
 #include <vector>
 
-namespace {
+namespace web_server_detail {
 
 WebServer server(80);
-bool active = false;
 uint32_t saveCount = 0;  // see webServerSaveCount()
+OtaObserver otaObserver;  // see webServerSetOtaObserver()
+OtaSession *ota = nullptr;  // set in webServerBegin()
+bool restartPending = false;
+uint32_t restartAtMs = 0;
+
+}  // namespace web_server_detail
+
+using namespace web_server_detail;
+
+namespace {
+
+constexpr uint32_t kRestartDelayMs = 1500;  // lets the answer page reach the browser
+
+bool active = false;
 ScreenshotSource screenshotSource;  // see webServerSetScreenshotSource()
-OtaObserver otaObserver;            // see webServerSetOtaObserver()
 
 // ---- Panel password (web_auth). A copy of the settings' web.password, refreshed
 // whenever this module saves the settings (the only writer besides the
@@ -41,6 +55,24 @@ AuthThrottle authThrottle;
 void refreshPassword() { webPassword = loadSettings().web.password; }
 
 bool sentCredentials() { return server.header("Authorization").length() > 0; }
+
+// Queued before every response of the panel (WebServer sends them with the
+// next send()): the page may not be shown in a frame on another site.
+void sendSecurityHeaders() {
+  for (const SecurityHeader &h : kSecurityHeaders) server.sendHeader(h.name, h.value);
+}
+
+// Route wrapper: every handler's response — 401 / 429 / 403 included —
+// carries the security headers, without each handler having to remember.
+template <void (*Handler)()>
+void secured() {
+  sendSecurityHeaders();
+  Handler();
+}
+
+}  // namespace
+
+namespace web_server_detail {
 
 // WebServer (arduino-esp32 2.x) calls a route's upload callback for *any*
 // POST body: a multipart one as an upload (server.upload()), anything else —
@@ -76,20 +108,6 @@ bool requireSameOrigin() {
                      .c_str());
   server.send(403, "text/plain", "Cross-site request refused");
   return false;
-}
-
-// Queued before every response of the panel (WebServer sends them with the
-// next send()): the page may not be shown in a frame on another site.
-void sendSecurityHeaders() {
-  for (const SecurityHeader &h : kSecurityHeaders) server.sendHeader(h.name, h.value);
-}
-
-// Route wrapper: every handler's response — 401 / 429 / 403 included —
-// carries the security headers, without each handler having to remember.
-template <void (*Handler)()>
-void secured() {
-  sendSecurityHeaders();
-  Handler();
 }
 
 // Every handler starts with this: true = go on; false = a 401 Digest
@@ -128,27 +146,11 @@ bool authorize() {
   }
 }
 
-// "<from> <arrow> <to>": the version change after an upload, for the answer
-// page and the serial log. Just `to` while `from` is unknown, "" while `to` is.
-std::string versionChangeText(const std::string &from, const std::string &to, const char *arrow) {
-  if (to.empty()) return "";
-  if (from.empty()) return to;
-  return from + " " + arrow + " " + to;
-}
-
-// ---- Firmware update (POST /update): the shared flash session (ota_update).
-OtaSession *ota = nullptr;  // set in webServerBegin()
-bool otaAuthorized = false;
-size_t otaLastNotified = 0;
-bool restartPending = false;
-uint32_t restartAtMs = 0;
-constexpr uint32_t kRestartDelayMs = 1500;  // lets the answer page reach the browser
-
 // Streams the config page (config_page's renderer) straight to the client as
 // a chunked response instead of building one large String (see
 // docs/review-notes-2026.md 4.1). renderConfigPage() never emits an empty
 // chunk — a zero-length sendContent() would end the chunked stream early.
-void sendPage(ConfigPageModel model, int status = 200) {
+void sendPage(ConfigPageModel model, int status) {
   const PanelLiveInputs live = panelLiveInputs(model.cfg);
   // The OpenSky tab shows what OpenSky last said about the day's credits.
   model.quota = live.quota;
@@ -188,6 +190,10 @@ void sendPage(ConfigPageModel model, int status = 200) {
   if (!pending.empty()) server.sendContent(pending.data(), pending.size());
   server.sendContent("");  // 0-length chunk closes the chunked response
 }
+
+}  // namespace web_server_detail
+
+namespace {
 
 void sendConfigPage(const Settings &cfg, SettingsTab tab) {
   ConfigPageModel model;
@@ -456,155 +462,6 @@ void handleRestore() {
     }
     sendConfigPage(saved, SettingsTab::Backup, WebStr::RestoreWithInvalid, true, fields);
   }
-}
-
-// POST /update — upload callback: streams the file into the spare app slot
-// (OtaSession checks header, size and the Sky Tracker marker first). Without
-// a valid login, or sent from another site, nothing at all is written;
-// handleUpdateDone() answers 401 / 403.
-void handleUpdateChunk() {
-  if (!isMultipartRequest()) return;  // see isMultipartRequest()
-  HTTPUpload &upload = server.upload();
-  switch (upload.status) {
-    case UPLOAD_FILE_START: {
-      otaAuthorized =
-          decideUploadStart(requestOrigin(), credentialsOk()) == UploadStart::Accept;
-      if (!otaAuthorized) return;
-      const size_t declared =
-          static_cast<size_t>(std::strtoul(server.arg("size").c_str(), nullptr, 10));
-      ota->start(declared);
-      otaLastNotified = 0;
-      Serial.printf("[ota] upload '%s', %u bytes declared, free heap %u\n", upload.filename.c_str(),
-                    static_cast<unsigned>(declared), static_cast<unsigned>(ESP.getFreeHeap()));
-      if (!ota->failed() && otaObserver.onStart != nullptr) otaObserver.onStart(declared);
-      break;
-    }
-    case UPLOAD_FILE_WRITE:
-      if (!otaAuthorized) return;
-      ota->feed(upload.buf, upload.currentSize);
-      // Repaint every 16 KB — often enough to look live, rare enough not to slow the upload.
-      if (!ota->failed() && otaObserver.onProgress != nullptr &&
-          ota->received() - otaLastNotified >= 16 * 1024) {
-        otaLastNotified = ota->received();
-        otaObserver.onProgress(ota->received(), ota->declaredBytes(),
-                               ota->marker().version().c_str());
-      }
-      break;
-    case UPLOAD_FILE_END:
-      if (!otaAuthorized) return;
-      ota->finish();
-      break;
-    case UPLOAD_FILE_ABORTED:
-      if (!otaAuthorized) return;
-      ota->abort();
-      break;
-    default:
-      break;
-  }
-}
-
-void handleUpdateDone() {
-  // A refused upload (origin or password) wrote nothing; answer without
-  // touching the OTA session, so the display shows no "update failed".
-  if (!requireSameOrigin() || !authorize()) {
-    otaAuthorized = false;
-    return;
-  }
-  const bool started = ota->started() && otaAuthorized;
-  const OtaResult r = started ? ota->finish() : OtaResult::NoFile;
-  otaAuthorized = false;
-
-  std::string detail;     // for the answer page
-  std::string logDetail;  // the same, for the serial log (ASCII arrow)
-  if (r == OtaResult::Ok) {
-    detail = versionChangeText(firmwareVersion(), ota->marker().version(), "â");  // →
-    logDetail = versionChangeText(firmwareVersion(), ota->marker().version(), "->");
-  } else if (r == OtaResult::WriteFailed || r == OtaResult::VerifyFailed) {
-    detail = otaFlashError();
-    logDetail = detail;
-  }
-  Serial.printf("[ota] result=%d received=%u new=%s %s\n", static_cast<int>(r),
-                static_cast<unsigned>(ota->received()), ota->marker().version().c_str(),
-                logDetail.c_str());
-  if (started && otaObserver.onEnd != nullptr) otaObserver.onEnd(r == OtaResult::Ok);
-
-  ConfigPageModel model;
-  model.cfg = loadSettings();
-  model.tab = SettingsTab::Firmware;
-  model.hasMessage = true;
-  model.message = otaResultMessage(r);
-  model.isError = r != OtaResult::Ok;
-  model.messageDetail = detail;
-  model.restarting = r == OtaResult::Ok;
-  sendPage(model, otaResultHttpStatus(r));
-
-  if (r == OtaResult::Ok) {
-    restartPending = true;
-    restartAtMs = millis();
-  }
-}
-
-// ---- Updates from GitHub (release_check)
-
-// "Check now" only queues the check: release_check runs it in net_task's loop
-// after the poll. This handler may run inside phase B (betweenFetches), where
-// the hexdb.io TLS session still holds its heap. Back to the Firmware tab,
-// which says "checking…" and reloads until the answer is in — or why not.
-void requestCheckAndAnswer() {
-  if (releaseCheckRequest() == ManualCheckAsk::TooSoon) {
-    ConfigPageModel model;
-    model.cfg = loadSettings();
-    model.tab = SettingsTab::Firmware;
-    model.hasMessage = true;
-    model.message = WebStr::UpdCheckTooSoon;
-    sendPage(model);
-    return;
-  }
-  server.sendHeader("Location", "/?tab=firmware");
-  server.send(303, "text/plain", "");
-}
-
-// POST /update/check — "check now".
-void handleUpdateCheck() {
-  if (!requireSameOrigin() || !authorize()) return;
-  requestCheckAndAnswer();
-}
-
-// POST /update/install (tag=...) — queues the install; the download starts in
-// the next loop() pass, after this page has reached the browser.
-void handleUpdateInstall() {
-  if (!requireSameOrigin() || !authorize()) return;
-  const std::string tag = server.arg("tag").c_str();
-  if (!releaseInstallRequest(tag)) {
-    ConfigPageModel model;
-    model.cfg = loadSettings();
-    model.tab = SettingsTab::Firmware;
-    model.hasMessage = true;
-    model.message = WebStr::UpdInstallRefused;
-    model.isError = true;
-    sendPage(model, 409);
-    return;
-  }
-  Serial.printf("[update] install %s asked for on the config page\n", tag.c_str());
-  ConfigPageModel model;
-  model.cfg = loadSettings();
-  model.tab = SettingsTab::Firmware;
-  model.hasMessage = true;
-  model.message = WebStr::UpdDownloading;
-  model.messageDetail = tag;
-  model.restarting = true;  // the page waits for the board and reloads itself
-  sendPage(model);
-}
-
-// POST /update/prerelease (on=0|1) — "show development versions", saved on
-// its own and followed by a fresh check.
-void handleUpdatePrerelease() {
-  if (!requireSameOrigin() || !authorize()) return;
-  const bool on = server.arg("on") == "1";
-  saveUpdateShowPrerelease(on);
-  ++saveCount;  // net_task reloads the config (and the UI gets it via NetState)
-  releaseCheckBegin(loadSettings().update);
-  requestCheckAndAnswer();
 }
 
 }  // namespace
