@@ -253,3 +253,21 @@ bool shouldMarkAppValid(bool pendingVerify, uint32_t uptimeMs, bool reachable, b
 bool shouldRestartForRollback(bool pendingVerify, uint32_t uptimeMs, bool uiAlive) {
   return pendingVerify && !uiAlive && uptimeMs >= kOtaValidAfterMs;
 }
+
+namespace {
+
+std::string versionChangeText(const std::string &from, const std::string &to, const char *arrow) {
+  if (to.empty()) return "";
+  if (from.empty()) return to;
+  return from + " " + arrow + " " + to;
+}
+
+}  // namespace
+
+std::string otaVersionChangePageText(const std::string &from, const std::string &to) {
+  return versionChangeText(from, to, "\xE2\x86\x92");
+}
+
+std::string otaVersionChangeLogText(const std::string &from, const std::string &to) {
+  return versionChangeText(from, to, "->");
+}

@@ -19,14 +19,6 @@ namespace {
 bool otaAuthorized = false;
 size_t otaLastNotified = 0;
 
-// "<from> <arrow> <to>": the version change after an upload, for the answer
-// page and the serial log. Just `to` while `from` is unknown, "" while `to` is.
-std::string versionChangeText(const std::string &from, const std::string &to, const char *arrow) {
-  if (to.empty()) return "";
-  if (from.empty()) return to;
-  return from + " " + arrow + " " + to;
-}
-
 }  // namespace
 
 // POST /update — upload callback: streams the file into the spare app slot
@@ -88,8 +80,8 @@ void handleUpdateDone() {
   std::string detail;     // for the answer page
   std::string logDetail;  // the same, for the serial log (ASCII arrow)
   if (r == OtaResult::Ok) {
-    detail = versionChangeText(firmwareVersion(), ota->marker().version(), "â");  // →
-    logDetail = versionChangeText(firmwareVersion(), ota->marker().version(), "->");
+    detail = otaVersionChangePageText(firmwareVersion(), ota->marker().version());
+    logDetail = otaVersionChangeLogText(firmwareVersion(), ota->marker().version());
   } else if (r == OtaResult::WriteFailed || r == OtaResult::VerifyFailed) {
     detail = otaFlashError();
     logDetail = detail;

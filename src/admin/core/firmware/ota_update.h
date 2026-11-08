@@ -14,6 +14,12 @@
 
 #include "admin/core/web_i18n.h"  // WebStr
 
+// The version change after an upload, "<from> <arrow> <to>": just `to` while
+// `from` is unknown, "" while `to` is. The page text has the UTF-8 arrow, the
+// serial log an ASCII one.
+std::string otaVersionChangePageText(const std::string &from, const std::string &to);
+std::string otaVersionChangeLogText(const std::string &from, const std::string &to);
+
 // ---- The image header (esp_image_header_t, first 24 bytes of an app .bin)
 constexpr size_t kOtaImageHeaderBytes = 24;
 constexpr uint8_t kOtaImageMagic = 0xE9;
