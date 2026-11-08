@@ -56,6 +56,19 @@ std::string lightStateText(const BacklightStatus &s, Language lang);
 // &, <, >, " escaped — for user-entered values put into attributes.
 std::string htmlEscape(const std::string &in);
 
+// What the page shows from other contexts, as of now: OpenSky's last word on
+// the credits and the login, and the light sensor / backlight. Declared here,
+// wired in the composition root (src/main/alert_sources.cpp), so the admin
+// context doesn't include them.
+struct PanelLiveInputs {
+  OpenSkyQuota quota;
+  OpenSkyAuthState auth;
+  BacklightStatus light;
+};
+
+// Core 0 (web_server), like the calls it wraps; no I/O.
+PanelLiveInputs panelLiveInputs(const Settings &cfg);
+
 struct ConfigPageModel {
   Settings cfg;
   SettingsTab tab = SettingsTab::Location;  // tab shown on load

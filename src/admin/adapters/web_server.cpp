@@ -10,13 +10,11 @@
 #include <cstring>
 #include <string>
 
-#include "display/core/backlight.h"  // backlightStatus() — General tab, GET /light.json
 #include "admin/core/device_alerts.h"  // deviceAlertInputs() — the alert card above the tabs
 #include "admin/core/config_backup.h"
 #include "admin/core/config_page.h"
 #include "admin/core/settings.h"
 #include "admin/core/settings_form.h"  // form checks, credentials file
-#include "opensky/core/opensky_client.h"  // openSkyQuota() — credits left, shown on the OpenSky tab
 #include "admin/core/firmware/ota_update.h"
 #include "admin/core/firmware/release_check.h"  // updates from GitHub (Firmware tab)
 #include "admin/core/screenshot.h"
@@ -151,13 +149,14 @@ constexpr uint32_t kRestartDelayMs = 1500;  // lets the answer page reach the br
 // docs/review-notes-2026.md 4.1). renderConfigPage() never emits an empty
 // chunk — a zero-length sendContent() would end the chunked stream early.
 void sendPage(ConfigPageModel model, int status = 200) {
+  const PanelLiveInputs live = panelLiveInputs(model.cfg);
   // The OpenSky tab shows what OpenSky last said about the day's credits.
-  model.quota = openSkyQuota();
+  model.quota = live.quota;
   model.quotaResetInS = quotaSecondsUntilReset(model.quota, millis());
   model.update = releaseUpdateState();
   model.updateCheckPending = releaseCheckPending();
   model.installedVersion = firmwareVersion();
-  model.light = backlightStatus(model.cfg.backlight);
+  model.light = live.light;
   // The same alerts as the display's "!" (net_task computes them the same way).
   const AlertInputs alertIn = deviceAlertInputs(model.cfg);
   model.alerts = collectAlerts(alertIn);
@@ -165,7 +164,7 @@ void sendPage(ConfigPageModel model, int status = 200) {
   model.nowMs = millis();
   // OpenSky login state (spec 06): the OpenSky tab's pill, warning and limit.
   // Same core as opensky_client (net_task), so no lock — like openSkyQuota().
-  model.auth = openSkyAuthStatus(model.cfg.opensky);
+  model.auth = live.auth;
   model.nowEpoch = timeSyncNowLocal();  // local time, 0 until NTP synced
 
   server.sendHeader("Cache-Control", "no-store");
@@ -336,7 +335,7 @@ void handlePerf() {
 void handleLight() {
   if (!authorize()) return;
   server.sendHeader("Cache-Control", "no-store");
-  const BacklightStatus light = backlightStatus(loadSettings().backlight);
+  const BacklightStatus light = panelLiveInputs(loadSettings()).light;
   server.send(200, "application/json", lightStatusJson(light).c_str());
 }
 

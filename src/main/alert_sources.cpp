@@ -1,6 +1,6 @@
-// alert_sources — where the device-alert inputs come from on the board: the
-// OpenSky login and credits (opensky_client), tonight's night window
-// (backlight) and the settings. Joins data from three contexts, so it lives in
+// alert_sources — where the inputs of the device alerts and the settings page
+// come from on the board: the OpenSky login and credits (opensky_client),
+// tonight's night window and the light sensor (backlight) and the settings. Joins data from three contexts, so it lives in
 // the composition root; not covered by Unity (CLAUDE.md "Testing"),
 // collectAlerts() and the rest of device_alerts are pure.
 #include "admin/core/device_alerts.h"
@@ -20,5 +20,13 @@ AlertInputs deviceAlertInputs(const Settings &cfg) {
   in.dailyLimit = openSkyDailyLimit(in.auth);
   in.estimatedDailyCredits =
       openSkyDailyCredits(in.radiusDeg, in.pollIntervalS, in.pausedMinutesPerDay);
+  return in;
+}
+
+PanelLiveInputs panelLiveInputs(const Settings &cfg) {
+  PanelLiveInputs in;
+  in.quota = openSkyQuota();
+  in.auth = openSkyAuthStatus(cfg.opensky);
+  in.light = backlightStatus(cfg.backlight);
   return in;
 }
