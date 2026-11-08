@@ -449,8 +449,8 @@ two cores"; this is how it works.
   41 KB within minutes of boot, cut by small long-lived allocations (docs/history.md
   "Concurrency and resources"). The NOW countdown sprite (39 360 B: 320 × 123 at 8 bit) is
   created in `setup()` (`flightScreenReserveSprite()`) before WiFi and `net_task` allocate. On
-  the board a verified GitHub session ran from a block of ~43 KB and took ~13 KB of it; a full
-  download from ~41 KB is unproven. Thresholds: "New versions from GitHub (release_check)".
+  the board a verified GitHub session completed from a block of ~43 KB, its peak not measured; a
+  full download from ~41 KB is unproven. Thresholds: "New versions from GitHub (release_check)".
 - **Perf** (`perf_stats`, pure): the UI (`ui_perf`'s `UiPerfMeter`) measures how much later
   than planned each pass starts (drawing time + oversleep) and hands each 60 s window to
   `core_link::uiPerf` with its stack high-water mark; `net_task` logs once a minute
@@ -645,7 +645,8 @@ Spec: `spec/done/02-github-release-check.md`.
   clock=… ota busy=…, largest block N (needs 32768)`. After `kUpdateInstallWaitMs` (60 s) it is
   dropped: `… gave up, it could not start: …`, `OtaResult::InstallNotStarted`
   (`WebStr::OtaInstallNotStarted`) in `lastInstall`. The Firmware tab shows it on its next load;
-  the page's own reload comes ~5 s after the click, so that takes a manual reload.
+  the page's own reload comes ~5 s after the click, so that takes a manual reload. After a YES on
+  the display a give-up shows nothing there, and the question doesn't return that boot.
 - **Display question:** `shouldShowUpdatePrompt()` — only `Available` (a release newer than a
   plain release build), once per boot, not for a development build, not over the NOW countdown,
   not under a finger, not while the screen is dark or the alert screen is open (`PromptGate`).
