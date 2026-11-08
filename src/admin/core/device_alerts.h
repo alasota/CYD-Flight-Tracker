@@ -132,5 +132,5 @@ AlertDemo alertDemoState();
 struct Settings;
 // The inputs as of now, from opensky_client (auth, quota), the backlight's
 // night window and `cfg`. Core 0 (net_task, web_server); defined in
-// admin/adapters/alert_sources.cpp.
+// main/alert_sources.cpp.
 AlertInputs deviceAlertInputs(const Settings &cfg);
