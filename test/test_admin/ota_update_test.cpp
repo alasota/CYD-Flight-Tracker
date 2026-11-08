@@ -428,10 +428,29 @@ static void test_mark_valid_only_when_pending_reachable_and_up_long_enough(void)
   TEST_ASSERT_FALSE(shouldRestartForRollback(false, 60000, false)); // already valid
 }
 
+// The exact bytes: U+2192 in UTF-8 on the page, not the same bytes encoded twice.
+static void test_version_change_page_text_has_the_utf8_arrow(void) {
+  ASSERT_STR_EQ("v1.2.0 \xE2\x86\x92 v1.3.0", otaVersionChangePageText("v1.2.0", "v1.3.0"));
+}
+
+static void test_version_change_log_text_has_the_ascii_arrow(void) {
+  ASSERT_STR_EQ("v1.2.0 -> v1.3.0", otaVersionChangeLogText("v1.2.0", "v1.3.0"));
+}
+
+static void test_version_change_text_with_an_unknown_version(void) {
+  ASSERT_STR_EQ("v1.3.0", otaVersionChangePageText("", "v1.3.0"));
+  ASSERT_STR_EQ("v1.3.0", otaVersionChangeLogText("", "v1.3.0"));
+  ASSERT_STR_EQ("", otaVersionChangePageText("v1.2.0", ""));
+  ASSERT_STR_EQ("", otaVersionChangeLogText("v1.2.0", ""));
+}
+
 }  // namespace
 
 void run_ota_update_tests() {
   UnitySetTestFile(__FILE__);  // failures point at this file, not main.cpp
+  RUN_TEST(test_version_change_page_text_has_the_utf8_arrow);
+  RUN_TEST(test_version_change_log_text_has_the_ascii_arrow);
+  RUN_TEST(test_version_change_text_with_an_unknown_version);
   RUN_TEST(test_header_ok_for_esp32_app);
   RUN_TEST(test_header_recognises_the_full_image);
   RUN_TEST(test_header_rejects_other_chips_and_junk);
