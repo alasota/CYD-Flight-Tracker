@@ -169,10 +169,10 @@ bool manualCheckPending(const ManualCheck &m, uint32_t nowMs);
 // kUpdateInstallWaitMs it is dropped and reported (UpdateState::lastInstall).
 constexpr uint32_t kUpdateInstallWaitMs = 60000;  // then the owner is told it did not start
 // Below kUpdateMinFreeBlock on purpose. Small long-lived allocations settle the
-// largest block near 41 KB, so 50 KB could hold an install back for good, and
-// on the board a verified TLS session ran from a 43 KB block taking ~13 KB of
-// it. Background checks keep the wider margin; here someone is waiting and a
-// failure is reported.
+// largest block near 41 KB, so 50 KB could hold an install back for good. On
+// the board a verified TLS session completed from a block of about 43 KB; its
+// peak wasn't measured. Background checks keep the wider margin; here someone
+// is waiting and a failure is reported.
 constexpr uint32_t kUpdateInstallMinFreeBlock = 32 * 1024;
 enum class InstallStep : uint8_t { Wait, Start, GiveUp };
 // From releaseCheckLoop(), each pass while an install is queued. Doesn't look

@@ -325,8 +325,12 @@ void runInstall(const std::string &tag) {
   } else if (settings.show_prerelease && tag == state.latestPre.tag) {
     r = state.latestPre;
   } else {
-    Serial.printf("[update] %s is no longer on offer (latest %s), not installing\n", tag.c_str(),
-                  state.latest.tag.c_str());
+    Serial.printf("[update] %s is no longer on offer (latest %s, status %d, error %d), "
+                  "not installing\n",
+                  tag.c_str(), state.latest.tag.c_str(), static_cast<int>(state.status),
+                  state.lastError);
+    state.lastInstall = OtaResult::DownloadFailed;
+    state.lastInstallTag = tag;
     return;
   }
 
