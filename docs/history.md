@@ -161,15 +161,18 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
     after an early GitHub check, and never recovered. The region held 100 636 B free in 38 blocks,
     with 80 live blocks of only 11 040 B: fragmentation by small long-lived allocations, no single
     holder. The cut's window is proven (one pass); the cache inserts in it are inferred, as the
-    only retained allocations found by reading the code, not observed. Polling alone did not
-    reproduce it in a 10-minute run. One earlier recovery above 51 200 B is still unexplained.
+    only retained allocations found by reading the code, not observed. Polling plus the
+    scheduled GitHub check did not reproduce it in a ~10-minute run (one run). One earlier recovery above 51 200 B is still unexplained.
   - **The 50 KB was a total taken for a block size:** specs 02 and 04 estimated one TLS session at
     ~40–50 KB, and the gate compared that with one contiguous block. On the board a verified
-    session ran from a ~43 KB block and took ~13 KB of it, ~29 KB staying contiguous. Not
-    measured: exactly 40 948 B, and the download itself.
+    session completed from a ~43 KB block. Not measured: its peak (no mark inside a verified
+    session), exactly 40 948 B, and the download itself. For scale, one open unverified hexdb.io
+    session cut the largest block from 59 380 to 25 588 B.
   - **Decided:** asked-for installs start from 32 KB (`kUpdateInstallMinFreeBlock`) and give up
-    visibly after 60 s; background checks keep 50 KB, nobody is waiting on them. A failure at the
-    lower block is reported, and `Update.end()` runs only after the hash matches.
+    after 60 s; background checks keep 50 KB, nobody is waiting on them, and below it they stay
+    shut. The give-up and a failed fresh check are reported on the page; after a YES on the
+    display a give-up shows nothing there and the question doesn't return that boot.
+    `Update.end()` runs only after the hash matches.
   - **Not done: pooling the cache entries.** The sprite and the RAM caches were each fixed by
     moving or bounding one allocation, and the block still got cut. Here ~80 small blocks do it,
     so removing one would only move the cut, and pooling is a much larger change.

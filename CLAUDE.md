@@ -145,9 +145,10 @@ Details: docs/architecture.md "Concurrency — two cores". Spec: `spec/done/04-d
 - ⚠️ Flash writes (OTA, NVS: `lookup_store`, `saveLastScreen`) stall both cores for ms to tens of
   ms — visible in `[perf]`.
 - ⚠️ Heap: ~144 KB free, largest block measured 41–69 KB (small long-lived allocations cut it). A
-  verified GitHub session ran from a ~43 KB block using ~13 KB; a full download at ~41 KB is unproven.
+  verified GitHub session completed from a ~43 KB block, its peak not measured; a full download at
+  ~41 KB is unproven.
   Background checks keep 50 KB (`kUpdateMinFreeBlock`), an install asked for by hand starts from
-  32 KB (`kUpdateInstallMinFreeBlock`) and fails visibly after 60 s. Allocate long-lived buffers
+  32 KB (`kUpdateInstallMinFreeBlock`) and gives up after 60 s, reported on the page. Allocate long-lived buffers
   at boot (`flightScreenReserveSprite()` in `setup()`). Watch `[perf] stack net=` — the web handler runs nested inside a poll.
 - Liveness: no net heartbeat for 60 s → the header shows a network error; no UI heartbeat for
   2 s → a new OTA image isn't marked valid and is restarted (rollback).
