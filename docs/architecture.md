@@ -3,10 +3,10 @@
 The current architecture in detail: the source layout, the two cores, the settings page,
 updates, brightness, the "!" alerts, CI and the agent harness. The rules a session must follow
 are in CLAUDE.md; this file is the reference behind them. (Spec 12 reorganises the code into
-contexts in eight stages; stages 1–5 — folders, full-path includes, layer report, layer names,
+contexts in eight stages; stages 1–7 — folders, full-path includes, layer report, layer names,
 misplaced types moved to their contexts, pure / hardware halves split, the UI flows and the
-settings form as tested `services/` / `core/` code — are done. Stage 8 rewrites this file around
-the contexts.)
+settings form as tested `services/` / `core/` code, per-context settings, the glossary names —
+are done. Stage 8 rewrites this file around the contexts.)
 
 ## Source layout (spec 12)
 
@@ -15,8 +15,9 @@ table, §8 stages). Stage 1 moved the files with `git mv`, **unsplit and unrenam
 renamed the layer folders; stage 3 moved misplaced types into their contexts; stage 4 split
 every `#ifdef ARDUINO` half out into `adapters/`; stage 5 moved the UI's state machines out of
 `main.cpp` into `display/services/` and the form logic of `POST /save` into `settings_form`;
-stage 6 split `Config` into per-context settings objects and moved the settings page's CSS / JS /
-icon into files. Stages 7–8 rename to the glossary and make the layer check block CI.
+stage 6 split the settings into per-context objects and moved the settings page's CSS / JS /
+icon into files; stage 7 renamed the types to the glossary (spec §3). Stage 8 makes the layer
+check block CI. The stage bullets below use today's names.
 
 - **Folders:** `src/<context>/<layer>/` — contexts `airspace` (the sky model: aircraft state,
   tracked flights, their order, the NOW pick, feed health, flight phase, CPA; the poll pipeline),
@@ -41,7 +42,7 @@ icon into files. Stages 7–8 rename to the glossary and make the layer check bl
   `enrichment/adapters/` — `hexdb_sources` (aircraft / route / airport fetch + `lookup*()`),
   `lookup_store_nvs`, `hexdb_http`; `opensky/adapters/opensky_http` (token, `/states/all`
   HTTP/1.0 stream, 401 / 429, schedule); `admin/adapters/` — `web_server` (routes + mDNS, was
-  `config_portal`), `settings_nvs` (`loadConfig()` / `saveConfig()` …), `ota_flash` (`Update`,
+  `config_portal`), `settings_nvs` (`loadSettings()` / `saveSettings()` …), `ota_flash` (`Update`,
   SHA-256, `otaFlashSession()`), `github_http` (release check / install), `alert_sources`
   (`deviceAlertInputs()`), `github_ca.h`. `#ifdef ARDUINO` is left only in `platform/`
   (`core_link`, `time_sync`, `wifi_manager`) and `enrichment/adapters/hexdb_http`.
@@ -53,9 +54,9 @@ icon into files. Stages 7–8 rename to the glossary and make the layer check bl
 - **Stage 3** (symbols, not files — written by hand, no move table): each misplaced type left its
   old header in the same commit it appeared in the new one, and its tests moved with it into the
   suite of the new context (49 tests, names unchanged). `airspace/core/`: `aircraft_state`
-  (`Aircraft`, `kTaxiSpeedMps`, `inferOnGround()` — from `opensky_client`, which now includes
-  it and translates OpenSky's array into it), `feed_health.h` (`OpenSkyHealth`, from
-  `status_bar.h`), `tracked_flight` (`AircraftRow`, `buildEnrichedRecords()`,
+  (`AircraftState`, `kTaxiSpeedMps`, `inferOnGround()` — from `opensky_client`, which now
+  includes it and translates OpenSky's array into it), `feed_health.h` (`FeedHealth`, from
+  `status_bar.h`), `tracked_flight` (`TrackedFlight`, `buildEnrichedRecords()`,
   `annotateDistances()`, `classifyPhases()` — from `table_view`), `flight_ordering`
   (`sortRowsForDisplay()`, `sortRowsByDistance()`, `splitFeaturedAndRest()` — from
   `table_view`), `now_pick` (`pickNowAircraft()`, `kOverheadRadiusKm` — from `flight_screen`).
@@ -67,14 +68,14 @@ icon into files. Stages 7–8 rename to the glossary and make the layer check bl
   their partners (`DistanceBearing`, `FeaturedSplit`, `NowPick`) so `poll_pipeline` includes no
   screen header. `core_link.h` now includes `tracked_flight.h` and `feed_health.h`, no
   `display/core/screens/` header (`LayoutTest.test_core_link_includes_no_screen_headers`).
-  `AircraftRow`'s copy / move constructors, assignments and destructor are declared in
+  `TrackedFlight`'s copy / move constructors, assignments and destructor are declared in
   `tracked_flight.h` and `= default` in `tracked_flight.cpp` — out of line on purpose, for
   firmware size (docs/history.md "Tooling and docs").
 - **Stage 4** (pure / hardware split, owner 2026-11-01): the whole `#ifdef ARDUINO` half of a
   `core/` file (definitions, its file-local helpers and globals, SDK includes) went to the adapter
-  `.cpp`; the pure part stayed as it was. Declarations with plain types (`Config`, `std::string`,
+  `.cpp`; the pure part stayed as it was. Declarations with plain types (`Settings`, `std::string`,
   core structs) **stay unguarded in the core header** — it is the port, the adapter implements it
-  (`config_store.h`, `lookup_store.h`, `opensky_client.h`, `release_check.h`, `ota_update.h`,
+  (`settings.h`, `lookup_store.h`, `opensky_client.h`, `release_check.h`, `ota_update.h`,
   `backlight.h`, `device_alerts.h`); a native caller would fail to link, which is the guard.
   Signatures with `LGFX &` / `LGFX_Sprite` / `lgfx::IFont` went to the adapter's own header.
   Constants both halves use moved to the core header as plain `constexpr` with a module prefix
@@ -82,19 +83,19 @@ icon into files. Stages 7–8 rename to the glossary and make the layer check bl
   env compiles as gnu++11, so no `inline` variables); the table's column array is
   `extern const TableColumn kTableColumns[]`, defined once in `table_view.cpp`. An adapter reaches
   other contexts' types through its own core header: `aircraft_summary.h`, `featured_panel.h` and
-  `flight_screen.h` include `tracked_flight.h` instead of declaring `struct AircraftRow;`. Draw
+  `flight_screen.h` include `tracked_flight.h` instead of declaring `struct TrackedFlight;`. Draw
   files were split callers first (status bar / service screens → radar → NOW → table + featured +
   identity block → theme), so no step added a `display/core -> display/adapters` include. Also:
   `extractAircraftFromStates()` is public in `opensky_client.h` (`opensky_http` calls it; one new
   test), `OtaObserver` moved from the web server's header to `ota_update.h`, `config_portal`'s
   pure functions went to `admin/core/settings_form` (the parsed credentials file, since stage 6
   `CredentialsFile`, `parseOpenSkyCredentialsJson()`, `isValidFloatString()`, `isValidUnsignedIntString()`), then
-  `config_portal` was renamed `web_server` (`MOVES_STAGE_4`; the `configPortal*()` functions keep
-  their names until stage 7), `time_sync`'s formatters (`formatDate()`, `formatTime()`,
+  `config_portal` was renamed `web_server` (`MOVES_STAGE_4`; its `configPortal*()` functions became
+  `webServer*()` in stage 7), `time_sync`'s formatters (`formatDate()`, `formatTime()`,
   `minuteOf()`) went to `shared/clock`, `main/net_task` lost its whole-file guard, and
   `include/LGFX_CYD.hpp` / `include/touch_calibration.h` moved to `display/adapters/lgfx/` /
   `display/core/` (`include/` holds only PlatformIO's README). `AircraftInfo`'s constructor is
-  declared in `aircraft_lookup.h` and `= default` in the `.cpp`, like `AircraftRow`'s copies
+  declared in `aircraft_lookup.h` and `= default` in the `.cpp`, like `TrackedFlight`'s copies
   (docs/history.md "Tooling and docs").
 - **Stage 5** (the `services/` layer, spec 12 §6; owner 2026-11-05: the plan's defaults, then the
   `ServiceScreens` driver + `UiFlow` aggregate when `main.cpp` stopped at 327 lines). The state
@@ -136,12 +137,12 @@ icon into files. Stages 7–8 rename to the glossary and make the layer check bl
   `test_web_server_save_route_has_no_form_logic`, `test_stage_5_services_have_their_tests`,
   `test_stage_5_moved_tests_follow_their_code`.
 - **Stage 6** (settings per context, spec 12 §7, and the page assets as files, §4.5; owner
-  2026-11-07: the plan's defaults). `Config` (`admin/core/config_store.h`) has no flat field left;
+  2026-11-07: the plan's defaults). `Settings` (`admin/core/settings.h`) has no flat field left;
   it is the aggregate of nine value objects, each declared in its context, header-only, with the
   old defaults as member initializers (⚠️ gnu++11 on `cyd`: not aggregates there — assign
   members, never `X{…}`):
 
-  | `Config::` | Type | Header |
+  | `Settings::` | Type | Header |
   |---|---|---|
   | `home` | `Home {lat, lon, radius_deg, configured}` | `airspace/core/home.h` |
   | `phase` | `PhaseThresholds {near_airport_km, climb_rate_threshold_mps}` | `airspace/core/flight_phase.h` |
@@ -150,12 +151,12 @@ icon into files. Stages 7–8 rename to the glossary and make the layer check bl
   | `display` | `DisplaySettings {language, last_screen}` | `display/core/display_settings.h` |
   | `auto_cycle` | `AutoCycleSettings {enabled, interval_s}` | `display/core/display_settings.h` |
   | `backlight` | `BacklightSettings {brightness_*, night_*, night_pause_polling}` | `display/core/backlight.h` |
-  | `update` | `UpdateSettings {check_enabled, show_prerelease, skipped_tag}` | `admin/core/config_store.h` |
-  | `web` | `WebSettings {language, password}` | `admin/core/config_store.h` |
+  | `update` | `UpdateSettings {check_enabled, show_prerelease, skipped_tag}` | `admin/core/settings.h` |
+  | `web` | `WebSettings {language, password}` | `admin/core/settings.h` |
 
   The radius is in `Home` (not §7's `PollSettings`): the radar rings, the `NetState` diff and the
   alerts read it too, and the display never sees `opensky` (docs/history.md "Tooling and docs").
-  `sanitizeConfig()`, the clamps, `defaultConfig()`, `loadConfig()` / `saveConfig()` and the
+  `sanitizeSettings()`, the clamps, `defaultSettings()`, `loadSettings()` / `saveSettings()` and the
   backup stay in `admin`; the NVS keys and the backup JSON are flat and unchanged. Code outside
   `admin/` takes only its objects: `fetchAircraftStates(creds, home)`,
   `openSkyClientPoll(now, creds, home, poll)`, `openSkyAuthStatus(creds)`,
@@ -164,15 +165,51 @@ icon into files. Stages 7–8 rename to the glossary and make the layer check bl
   home; PhaseThresholds phase; …}`, `releaseCheckBegin(const UpdateSettings &)`,
   `nightMinutesToday()` / `pausedMinutesPerDay(const BacklightSettings &, …)`. `backlight.h` and
   `opensky_client.h` include `home.h` (core → `airspace/core` is allowed), so their adapters get
-  `Home` without a new finding; `config_store.h` is included only by `admin/`, the roots and
+  `Home` without a new finding; `settings.h` is included only by `admin/`, the roots and
   `core_link.h`. `settings_form.h`'s parsed credentials file is `CredentialsFile {ok, creds}`.
-  The name `Config` stays until stage 7. `LayoutTest` keeps it so:
+  `LayoutTest` keeps it so:
   `test_config_is_built_from_context_objects`, `test_settings_nvs_keys_and_types_unchanged` (28
   keys, their `Preferences` types), `test_only_admin_roots_and_core_link_include_settings`,
   `test_config_type_named_only_in_admin_roots_and_core_link`,
   `test_context_functions_take_their_settings_objects`,
   `test_display_reads_only_its_settings_from_net_state`. Page assets: `src/admin/assets/` +
   `tools/embed_assets.py` → `admin/core/web_assets.h` (see "Settings page").
+- **Stage 7** (glossary names, spec 12 §3; owner 2026-11-07: the plan's defaults). Renames only,
+  one glossary entry per commit, each done by `tools/rename_symbols.py` (below):
+
+  | Was | Now | Where |
+  |---|---|---|
+  | `BoundingBox`, `computeBoundingBox()` | `ScanArea`, `computeScanArea()` | `opensky/core/opensky_client.h` |
+  | `OpenSkyHealth` | `FeedHealth` | `airspace/core/feed_health.h` |
+  | `DataSnapshot`, `buildDataSnapshot()` | `AirspaceSnapshot`, `buildAirspaceSnapshot()` | `platform/core_link.h`, `poll_pipeline` |
+  | `LookupPorts` (§4.1) | `EnrichmentPort` | `airspace/services/poll_pipeline.h` |
+  | `AircraftRow` | `TrackedFlight` | `airspace/core/tracked_flight.h` |
+  | `Aircraft` | `AircraftState` | `airspace/core/aircraft_state.h` |
+  | `configPortal*()` (8) | `webServer*()` (`Begin`, `Loop`, `IsActive`, `SaveCount`, `SetScreenshotSource`, `SetOtaObserver`, `SetPerfSource`, `RestartPending`) | `admin/adapters/web_server.h` |
+  | `Config` | `Settings` | `admin/core/settings.h` |
+  | `defaultConfig()`, `sanitizeConfig()`, `loadConfig()`, `saveConfig()`, `reloadConfig()`, `configToBackupJson()`, `restoreConfigFromBackupJson()`, `makeConfig()` | `…Settings()`, `settingsToBackupJson()`, `restoreSettingsFromBackupJson()`, `makeSettings()` | `settings`, `config_backup`, `net_task`, `fixtures.h` |
+  | `NetState::cfg`, `cfgSeq` | `NetState::settings`, `settingsSeq` | `platform/core_link.h` |
+  | file `admin/core/config_store.{h,cpp}`, `config_store_test.cpp` | `admin/core/settings.{h,cpp}`, `settings_test.cpp` (`run_settings_tests()`) | `MOVES_STAGE_7` |
+
+  Kept on purpose: locals and parameters named `cfg` (`const Settings &cfg`), `ConfigPageModel`
+  and the `config_page` / `config_backup` modules (the page's established name), `CpaPrediction`
+  (§3's "Overflight" concept), `RouteInfo` / `AirportInfo` (symmetric with `AircraftInfo`),
+  `openSkyCreditCost()` and `AlertId` / `AlertSet` (no single type behind §3's "CreditCost" /
+  "Alert"), names derived from "aircraft" / "row" (`makeAircraft()`, `fetchAircraftStates()`,
+  `pickNowAircraft()`, `sortRowsForDisplay()`, `makeRow()`, `TrackedFlight::aircraft`), the "bbox"
+  of OpenSky's query (`bboxAreaSqDeg()`), and the §4 file names that differ (`cpa_predictor`,
+  `poll_pipeline`, `screen_nav`, `touch_input`, `backlight`, `opensky_client`) — stage 8 makes §4
+  match the code. WiFiManager's `setConfigPortalBlocking()` / `getConfigPortalActive()` /
+  `setConfigPortalTimeout()` and the SDK's `configTzTime()` are library names. Strings never
+  changed: NVS keys, backup JSON keys, routes, log text, hexdb.io's `"Aircraft not found."` and
+  the `docs/data-sources.md "Aircraft identification"` references. Proof: built with a fixed
+  `FW_VERSION`, every rename commit's sections were identical to the step before and
+  `firmware.bin` differed only in the image hashes (≤ 65 B); the file rename only moved the
+  link order (same sections, same 1 348 224 B, RAM unchanged). `check_comments.py`'s
+  `RENAMED_SYMBOLS` reports a compound old name that comes back in code or a comment (outside
+  `"quoted text"`: "X was renamed Y in spec 12 stage 7"); `test_rename_symbols.py`'s `RepoTest.test_old_names_are_gone_from_code`
+  fails on any old name in code tokens. `LayoutTest`: `test_settings_module_is_admin_core_settings`,
+  `test_net_state_carries_settings`, `test_web_server_functions_are_named_after_the_module`.
 - **Includes** are full paths from `src/` (`#include "display/core/i18n.h"`), in `src/` and
   `test/` alike; `-I src` is in `env:cyd` and `env:native` (`cyd-ota`, `native-asan` inherit).
   `test/support/` headers and test-local headers (`github_fixtures.h`) stay short.
@@ -205,7 +242,7 @@ icon into files. Stages 7–8 rename to the glossary and make the layer check bl
   `table_view.h -> opensky/core` (`opensky_client.h`, now `aircraft_state.h`), and
   `config_page.cpp` / `device_alerts.cpp -> admin/adapters` (`config_portal.h`, now
   `scan_area.h`); new are 2 × `airspace/core -> enrichment/core` — `tracked_flight.h` includes
-  `aircraft_lookup.h` and `route_lookup.h` because `AircraftRow` carries `AircraftInfo`,
+  `aircraft_lookup.h` and `route_lookup.h` because `TrackedFlight` carries `AircraftInfo`,
   `RouteInfo`, `AirportInfo` by value (§4.1 puts it in `airspace/core`, §5 lets that layer see
   only `shared/`; owner 2026-11-01: accepted for now, decided before stage 8).
   **14 after stage 4** (47 − 38 + 5): gone are every SDK include in `core/`, every
@@ -241,7 +278,19 @@ icon into files. Stages 7–8 rename to the glossary and make the layer check bl
   index also maps the old basename of every renamed header to its final path (`"config_portal.h"`
   → `"admin/adapters/web_server.h"`) and refuses one that a live header still uses. The new
   adapter files were written by hand, and the two `include/` headers were `git mv`ed by hand,
-  their includes fixed by the default rewrite. The tool stays until stage 8.
+  their includes fixed by the default rewrite. `MOVES_STAGE_7` renames
+  `admin/core/config_store.{h,cpp}` → `settings.{h,cpp}` (`STAGES` = stages 1, 2, 4, 7). The tool
+  stays until stage 8.
+- **`tools/rename_symbols.py`** (stage 7) — renames C/C++ identifiers in `src/` and `test/` by
+  the table `RENAMES_STAGE_7` (one entry per commit: `python tools/rename_symbols.py
+  AircraftRow`; `--list`, `--check KEY` lists leftovers and writes nothing, `--report` lists the
+  old name's hits in docs / tools / the `.feature`). A small lexer: code identifiers are replaced
+  as whole tokens; `"strings"`, `'chars'`, raw strings and `#include` paths never change. Kinds:
+  `compound` (code + comments outside `"quoted text"`), `word` (`Aircraft`, `Config` — also
+  English words: code only, comment hits listed for a hand edit), `prefix` (`configPortal` +
+  upper-case letter, so `setConfigPortalBlocking()` stays). Skips the generated `web_assets.h`
+  and `fonts/`; keeps CRLF / LF; a second run changes nothing. Why not `sed`: docs/history.md
+  "Tooling and docs". Stays until stage 8, like `rewrite_includes.py`.
 
 ## Concurrency — two cores (core_link, net_task)
 
@@ -251,8 +300,8 @@ two cores"; this is how it works.
 - **Core 0 — `net_task`** (FreeRTOS task, 16 KB stack, priority 1, next to WiFi and lwIP):
   `wifi_manager`, `time_sync` (NTP), `web_server` (WebServer + mDNS), `opensky_client`,
   the hexdb.io lookups with their caches, `poll_pipeline`, `release_check`, both OTA paths,
-  marking the image valid. It owns the in-memory `Config` and reloads it after a settings save
-  (`configPortalSaveCount()`); it hands each module only its settings objects (`PipelineParams`
+  marking the image valid. It owns the in-memory `Settings` and reloads it after a settings save
+  (`webServerSaveCount()`); it hands each module only its settings objects (`PipelineParams`
   gets `home` + `phase`, OpenSky `opensky` + `home` + `poll`, the release check `update`). Each pass ends with `vTaskDelay(kNetIdleSleepMs = 5)`.
 - **Core 1 — `loop()` in `main.cpp`** (Arduino loopTask, default 8 KB stack): `tft`, touch,
   `screen_nav`, redraw, `backlight`, the update question, service screens. `main.cpp` only wires:
@@ -274,10 +323,10 @@ two cores"; this is how it works.
 - **Three channels, nothing else shared** (`core_link`):
   1. `NetState` net → UI: an immutable snapshot (`shared_ptr<const NetState>`) in a
      `LatestBox` — latest wins, the lock only swaps a pointer, the old value is freed *after*
-     unlocking (tested). Rows live in a `DataSnapshot` shared between consecutive NetStates, so
+     unlocking (tested). Rows live in an `AirspaceSnapshot` shared between consecutive NetStates, so
      a health / update / OTA change never copies them. `net_task` publishes only when
      `netStateDiffers()`; the UI turns a new one into redraw events with `diffNetState()`.
-     The settings ride along as one `shared_ptr<const Config> cfg` (a new one per save, no
+     The settings ride along as one `shared_ptr<const Settings> settings` (a new one per save, no
      per-object copies); the UI reads only `home`, `display`, `auto_cycle`, `backlight` and
      `update.skipped_tag` from it (`LayoutTest.test_display_reads_only_its_settings_from_net_state`).
   2. `NetCommand` UI → net: a FreeRTOS queue of 8 POD commands (`None` by default,
@@ -289,16 +338,16 @@ two cores"; this is how it works.
   3. Atomics / `Guarded<T>` (a POD copied under a spinlock): `uiBeatMs`, `netBeatMs`,
      `pollingAllowed` (the night pause, decided by the UI), UI perf numbers, and the backlight
      status `/light.json` reads.
-- **Poll → two snapshots** (`poll_pipeline`, pure, `buildDataSnapshot()`): phase A right after
+- **Poll → two snapshots** (`poll_pipeline`, pure, `buildAirspaceSnapshot()`): phase A right after
   `/states/all` with no lookup budget (cache only, the rest `...`), phase B with the budgets;
-  B is published only if it fetched something (`DataSnapshot::fetches`). Results are memoised
+  B is published only if it fetched something (`AirspaceSnapshot::fetches`). Results are memoised
   per poll so B doesn't repeat A's lookups.
-- **Settings page between phase-B lookups:** `LookupPorts::betweenFetches` is called after
+- **Settings page between phase-B lookups:** `EnrichmentPort::betweenFetches` is called after
   every *uncached* lookup (a real hexdb.io request; never in phase A). `net_task` serves the web
-  page there (`serveBetweenFetches(busy, configPortalLoop, updateStarted)` — no nesting; false
-  when `configPortalRestartPending()` or an OTA is in progress). False = stop: no more uncached
+  page there (`serveBetweenFetches(busy, webServerLoop, updateStarted)` — no nesting; false
+  when `webServerRestartPending()` or an OTA is in progress). False = stop: no more uncached
   lookups in this snapshot (cached keys still resolve, the rest stays `...`); a stopped B is
-  still published if it fetched anything. A save made there reaches `cfg` only after the poll
+  still published if it fetched anything. A save made there reaches the in-memory `Settings` only after the poll
   (`seenSaveCount`). The web handler runs nested inside `pollOpenSky()` — watch
   `[perf] stack net=` against the 16 KB stack.
 - **hexdb.io keep-alive** (`hexdb_http`): one TLS session per phase B (`hexdbSessionEnd()`
@@ -349,9 +398,9 @@ two cores"; this is how it works.
   two cores": send in large pieces).
 - **Save** (`POST /save`, `handleSave()`): origin check, `authorize()`, the request's args into a
   `FormArgs` (the first value of a name counts, like `WebServer::arg()`; query-string args are in
-  it too), `applySettingsForm(cfg, args)` — changes the `Config` **in place** (no second copy on
+  it too), `applySettingsForm(cfg, args)` — changes the `Settings` **in place** (no second copy on
   core 0's stack, the handler runs nested in a poll) and returns `SettingsFormOutcome {rejected,
-  password, message}` — then `saveConfig()` and the page again. One table `kNumberFields[]`
+  password, message}` — then `saveSettings()` and the page again. One table `kNumberFields[]`
   (`{name, label, apply}`, form order; plain functions, not lambdas, so it stays
   constant-initialized in .rodata under gnu++11) covers the 14 fields that can be rejected (7
   numbers, 5 clamped brightness / night fields, 2 clock times): a value that doesn't parse keeps
@@ -399,7 +448,7 @@ two cores"; this is how it works.
   `node` isn't on PATH; CI has it). So: end every JS statement with `;`, no regex or template
   literal that needs a newline. Text strings belong in `web_i18n`, not in the JS. The SVG
   becomes `data:image/svg+xml,` + the markup with `"` → `'`, `#` → `%23`.
-- **Page language** (`Config::web.language`, NVS `wlang`, default PL), independent of the
+- **Page language** (`Settings::web.language`, NVS `wlang`, default PL), independent of the
   display's: PL/EN switch in the header — two small `<form method="post" action="/lang">`
   (hidden `l` + `tab`), and a select on the General tab. Strings: the `web_i18n` X-macro table
   (`WEB_I18N_STRINGS`, `webTr()`); they go into HTML/JS raw, so `web_i18n_test.cpp` forbids
@@ -409,7 +458,7 @@ two cores"; this is how it works.
   `format_version` 1; OpenSky credentials and the panel password (`"security":
   {"web_password"}`) only with `secrets=1`). `POST /restore` (multipart `backup_file`) applies
   such a file on top of the current settings — missing keys keep their value, wrong-typed keys
-  are skipped and listed, other JSON is rejected; then `saveConfig()` (sanitizes) and a reload.
+  are skipped and listed, other JSON is rejected; then `saveSettings()` (sanitizes) and a reload.
 - Other routes: `GET /screenshot.bmp[?screen=N]` (24-bit BMP of the panel, see "Concurrency —
   two cores"), `GET /perf.json`, `GET /light.json`.
 
@@ -438,7 +487,7 @@ Spec: `spec/done/01-ota-updates.md`. Released in v1.1.0.
   decides from it what to draw — frame, bar or result — and `runOtaScreen()` (`service_flows`)
   draws `service_screen`. The
   16 KB callback also does `vTaskDelay(1)` (core 0's watchdog). Success: answer page, ~1.5 s,
-  `ESP.restart()` (`configPortalRestartPending()` keeps `net_task` off the network meanwhile;
+  `ESP.restart()` (`webServerRestartPending()` keeps `net_task` off the network meanwhile;
   the UI keeps the OTA screen via `NetState::restartPending`). Failure: "update failed" for 5 s,
   then a full redraw.
 - **Rollback:** `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y` in this arduino-esp32 (2.0.17).
@@ -449,7 +498,7 @@ Spec: `spec/done/01-ota-updates.md`. Released in v1.1.0.
   restarted (`shouldRestartForRollback()`), so the bootloader goes back to the previous slot.
   OpenSky trouble never rolls back. Verified with an image that `abort()`s after 8 s and one
   whose UI loop hangs after 8 s: both came back on the previous slot.
-- **Password:** `Config::web.password` (NVS `wpass`), optional (default none);
+- **Password:** `Settings::web.password` (NVS `wpass`), optional (default none);
   `validateWebPassword()` accepts 8–64 printable ASCII characters, `""` = no password.
   When set, every
   route calls `authorize()` first: HTTP Digest (`WebServer::authenticate`, realm
@@ -655,7 +704,8 @@ green dot, red "!").
     only, before the tests — "Source layout"), `pio test -e native`, `pio test -e native-asan`,
     the Python tool tests (`tools/test_check_bdd.py`, `test_release_plan.py`,
     `test_build_site.py`, `test_check_comments.py`, `test_check_layers.py`,
-    `test_rewrite_includes.py`, `test_subset_efont.py`, `test_embed_assets.py` — its `RepoTest`
+    `test_rewrite_includes.py`, `test_rename_symbols.py`, `test_subset_efont.py`,
+    `test_embed_assets.py` — its `RepoTest`
     fails on a stale `web_assets.h`), the BDD check (`tools/check_bdd.py`),
     the comment check (`tools/check_comments.py`, warnings only),
     builds, uploads artifact `cyd-sky-tracker-<version>` with `cyd-sky-tracker-<version>.bin`
