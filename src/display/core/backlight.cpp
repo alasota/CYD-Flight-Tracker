@@ -156,21 +156,23 @@ std::string formatClockMinutes(int minutes) {
 
 // ---- Today's sun ----------------------------------------------------------------
 
-// TODO(fix fix-sun-times-utc-after-boot): stub from bug-investigator — today's
-// refreshSun() from display/adapters/backlight_ldr.cpp moved here as it is (the
-// cache ignores the UTC offset), so the regression tests reproduce the bug.
 bool refreshSunToday(SunToday &sun, bool synced, std::time_t utc, std::time_t local,
                      const Home &home) {
   if (!synced || !home.configured) {
     sun.known = false;
     return false;
   }
-  const std::tm t = *std::gmtime(&local);  // local wall-clock fields (pre-shifted)
+  // Local wall-clock fields (`local` is pre-shifted). Copied out at once; on the
+  // ESP32 newlib's gmtime() buffer is per task, and only the UI core calls this.
+  const std::tm t = *std::gmtime(&local);
   const int dayKey = (t.tm_year + 1900) * 400 + t.tm_yday;
-  if (sun.known && dayKey == sun.day_key && home.lat == sun.lat && home.lon == sun.lon) {
+  // The offset is part of the key: the DST change moves it mid-day, and a zone
+  // set after the first call must not leave UTC times cached for the day.
+  const int offsetMin = static_cast<int>((local - utc) / 60);
+  if (sun.known && dayKey == sun.day_key && offsetMin == sun.offset_min &&
+      home.lat == sun.lat && home.lon == sun.lon) {
     return false;
   }
-  const int offsetMin = static_cast<int>((local - utc) / 60);
   sun.local = shiftSunTimes(
       computeSunTimes(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, home.lat, home.lon), offsetMin);
   sun.known = true;

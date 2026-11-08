@@ -32,35 +32,18 @@ uint32_t wokenUntilMs = 0;
 uint32_t rampMs = kDayRampMs;  // kNightRampMs while crossing into / out of the night
 bool lastNight = false;
 
-// Today's sun, recomputed when the local date or the home location changes.
-SunTimes sunLocal;
-bool sunKnown = false;
-int sunDayKey = -1;
-float sunLat = 0.0f, sunLon = 0.0f;
+// Today's sun (refreshSunToday(): recomputed when the local date, the UTC
+// offset or the home location changes).
+SunToday sunToday;
 
 void refreshSun(const Home &home) {
-  if (!isTimeSynced() || !home.configured) {
-    sunKnown = false;
+  if (!refreshSunToday(sunToday, isTimeSynced(), time(nullptr), timeSyncNowLocal(), home)) {
     return;
   }
-  const std::time_t utc = time(nullptr);
-  const std::time_t local = timeSyncNowLocal();
-  std::tm t;
-  gmtime_r(&local, &t);  // local wall-clock fields (timeSyncNowLocal() is pre-shifted)
-  const int dayKey = (t.tm_year + 1900) * 400 + t.tm_yday;
-  if (sunKnown && dayKey == sunDayKey && home.lat == sunLat && home.lon == sunLon) return;
-  const int offsetMin = static_cast<int>((local - utc) / 60);
-  sunLocal = shiftSunTimes(
-      computeSunTimes(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, home.lat, home.lon),
-      offsetMin);
-  sunKnown = true;
-  sunDayKey = dayKey;
-  sunLat = home.lat;
-  sunLon = home.lon;
-  if (sunLocal.kind == SunTimes::Kind::Normal) {
+  if (sunToday.local.kind == SunTimes::Kind::Normal) {
     Serial.printf("[light] sun today: sunrise %s, sunset %s\n",
-                  formatClockMinutes(sunLocal.sunrise_min).c_str(),
-                  formatClockMinutes(sunLocal.sunset_min).c_str());
+                  formatClockMinutes(sunToday.local.sunrise_min).c_str(),
+                  formatClockMinutes(sunToday.local.sunset_min).c_str());
   }
 }
 
@@ -73,7 +56,7 @@ int nowLocalMinutes() {
 
 NightWindow windowFor(const BacklightSettings &settings) {
   return nightWindowFor(settings.night_mode, settings.night_from_min, settings.night_to_min,
-                        sunLocal, sunKnown);
+                        sunToday.local, sunToday.known);
 }
 
 }  // namespace
@@ -144,8 +127,8 @@ void backlightLoop(LGFX &tft, const BacklightSettings &settings, const Home &hom
   snap.status.woken = decision.woken;
   snap.status.screen_off = decision.screen_off;
   snap.status.synced = in.time_synced;
-  snap.status.sun_known = sunKnown;
-  snap.status.sun_local = sunLocal;
+  snap.status.sun_known = sunToday.known;
+  snap.status.sun_local = sunToday.local;
   snap.decision = decision;
   shared.set(snap);
 
