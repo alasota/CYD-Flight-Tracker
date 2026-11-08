@@ -744,7 +744,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   974, jak przed etapem; `check_layers.py` te same 12 naruszeń; `check_bdd.py` 0 problemów (282
   scenariusze); `check_comments.py --strict`, `rewrite_includes.py --check`,
   `embed_assets.py --check` czyste; wszystkie testy narzędzi zielone; `main.cpp` 249 linii.
-  `@manual` „Płytka z firmware'em etapu 7…” — **spełniony** (2026-11-08): obraz `fe5aed3`
+  `@manual` „Płytka z firmware'em etapu 7…” — **spełniony poza zapisem formularza** (2026-11-08): obraz `fe5aed3`
   (1 348 240 B — dłuższy napis wersji z `git describe`) wgrany przez USB (COM3); 3 min logu bez
   paniki, WDT i restartu poza startem, logowanie OpenSky (konto), pierwszy poll 8 samolotów,
   hexdb.io 200. `/backup.json`: 25 kluczy równych kopii sprzed wgrania poza `firmware` (sekrety
@@ -754,8 +754,10 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   firmware=@… /update`): 200, 1 348 460 B w 15,2 s, nowy obraz działa i nie został wycofany
   (perf 92 ms / 0 wolnych, blok 59 380 B). Ekrany 0–2 po OTA: LOTY, TERAZ, RADAR z samolotami,
   licznik i zegar jak przedtem. Zrzutów nie odświeżano (nic widocznego się nie zmieniło).
-  Niesprawdzone z planu: zapis formularza bez zmian → ta sama kopia (zamiast tego porównanie
-  kopii przed / po wgraniu i złoty test kopii).
+  `/light.json`: tryb i jasność zgodne z porą dnia (przed: wieczór, noc 10 %; po: dzień, 100 %),
+  wschód / zachód — patrz znany problem niżej. Niesprawdzone z planu, zostaje dla właściciela:
+  zapis formularza bez zmian → ta sama kopia (na razie porównanie kopii przed / po wgraniu
+  i złoty test kopii).
 - **Odstępstwa od planu:** narzędzie zamiast `sed` (§8 pkt 7 mówił `sed`); §3 poprawiony do nazw
   z kodu (Q1) zamiast zmieniać `CpaPrediction`, `RouteInfo`, `AirportInfo`; `LookupPorts` z §4.1
   zmieniony razem ze słownikiem (Q3). Firmware ze stałym `FW_VERSION` ma ten sam rozmiar także po
