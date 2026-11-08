@@ -19,9 +19,14 @@ constexpr const char *TZ_WARSAW = "CET-1CEST,M3.5.0,M10.5.0/3";
 // (see CLAUDE.md "Testing").
 #ifdef ARDUINO
 
-// Kicks off SNTP with the Europe/Warsaw TZ rule. Call once, right after
-// WiFi connects. Non-blocking — the first sync lands a few seconds later;
-// until then isTimeSynced() stays false.
+// Sets the Europe/Warsaw TZ rule. Call first thing in setup(), before any
+// local time is read: a software reset (OTA, restore) keeps the system clock,
+// so isTimeSynced() can be true from boot, long before timeSyncBegin().
+void timeSyncSetZone();
+
+// Kicks off SNTP with the Europe/Warsaw TZ rule (the same one again). Call
+// once, right after WiFi connects. Non-blocking — the first sync lands a few
+// seconds later; after a power-on isTimeSynced() stays false until then.
 void timeSyncBegin();
 
 // True once at least one SNTP sync has completed (heuristic: the system

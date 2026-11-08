@@ -179,6 +179,7 @@ static void sleepUntilNextDeadline() {
 
 void setup() {
   Serial.begin(115200);
+  timeSyncSetZone();    // before any local time is read (a software reset keeps the clock)
   tft.init();           // also brings up the XPT2046 touch controller (LGFX_CYD.hpp)
   backlightBegin(tft);  // full brightness until the light sensor has settled
   tft.setRotation(1);   // landscape, 320x240

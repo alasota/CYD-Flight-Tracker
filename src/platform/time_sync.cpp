@@ -5,6 +5,11 @@
 #include <Arduino.h>
 #include <time.h>
 
+void timeSyncSetZone() {
+  setenv("TZ", TZ_WARSAW, 1);
+  tzset();
+}
+
 void timeSyncBegin() {
   configTzTime(TZ_WARSAW, "pool.ntp.org", "time.nist.gov");
 }
