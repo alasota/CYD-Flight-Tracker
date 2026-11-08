@@ -167,8 +167,9 @@ bool refreshSunToday(SunToday &sun, bool synced, std::time_t utc, std::time_t lo
   const std::tm t = *std::gmtime(&local);
   const int dayKey = (t.tm_year + 1900) * 400 + t.tm_yday;
   // The offset is part of the key: the DST change moves it mid-day, and a zone
-  // set after the first call must not leave UTC times cached for the day.
-  const int offsetMin = static_cast<int>((local - utc) / 60);
+  // set after the first call must not leave UTC times cached for the day. Rounded,
+  // not truncated: `utc` and `local` are two clock reads, a second apart at worst.
+  const int offsetMin = static_cast<int>(std::lround(static_cast<double>(local - utc) / 60.0));
   if (sun.known && dayKey == sun.day_key && offsetMin == sun.offset_min &&
       home.lat == sun.lat && home.lon == sun.lon) {
     return false;
