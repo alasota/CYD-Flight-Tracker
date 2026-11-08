@@ -834,3 +834,7 @@ ekranie (logika pokryta testami `acceptPromptTap`, `confirmHit`, `shouldShowUpda
 kanał deweloperski z prawdziwym pre-release (wymaga tagu `v…-rc.N` na GitHubie), zerwanie WiFi
 w trakcie pobierania, kroki `release.yml` / CI (zadziałają przy następnym tagu / pushu; krok CA
 sprawdzony lokalnie). `pio test -e native`: 638 testów zielonych + 1 pominięty (render zrzutu).
+
+Poprawione w vNEXT: instalacja zlecona ręcznie czekała w kolejce bez końca i bez komunikatu —
+próg 50 KB jednego bloku, gdy największy blok sterty ustala się przy ~41 KB; teraz startuje od
+32 KB (`kUpdateInstallMinFreeBlock`), a po 60 s bez startu zgłasza błąd na stronie ustawień.

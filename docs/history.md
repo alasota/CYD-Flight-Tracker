@@ -151,7 +151,28 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   chunks (0.3 s per page).
 - **Countdown sprite.** Created on the first visit to NOW, it split the largest heap block to
   41 KB, below the 50 KB verified TLS needs — update checks stopped until reboot. Now reserved
-  in `setup()`.
+  in `setup()`. (The same 41 KB came back later with a different cause: next entry.)
+- **GitHub install that never started** (fixed in vNEXT). Since 395cba3 (v1.2.0) an install
+  asked for by hand went through the 50 KB gate of `canStartNetworkTask()`; with the gate shut it
+  stayed queued with no log, no time limit and no message, while the page said it was
+  downloading. It showed once the largest block settled at 40 948 B, measured on v1.11.4 too.
+  - **Evidence** (a diagnostic build that logged each change of the largest block, not kept):
+    the 63 476 B block was cut to 45 044 B in the first poll whose phase B fetched from hexdb.io
+    after an early GitHub check, and never recovered. The region held 100 636 B free in 38 blocks,
+    with 80 live blocks of only 11 040 B: fragmentation by small long-lived allocations, no single
+    holder. The cut's window is proven (one pass); the cache inserts in it are inferred, as the
+    only retained allocations found by reading the code, not observed. Polling alone did not
+    reproduce it in a 10-minute run. One earlier recovery above 51 200 B is still unexplained.
+  - **The 50 KB was a total taken for a block size:** specs 02 and 04 estimated one TLS session at
+    ~40–50 KB, and the gate compared that with one contiguous block. On the board a verified
+    session ran from a ~43 KB block and took ~13 KB of it, ~29 KB staying contiguous. Not
+    measured: exactly 40 948 B, and the download itself.
+  - **Decided:** asked-for installs start from 32 KB (`kUpdateInstallMinFreeBlock`) and give up
+    visibly after 60 s; background checks keep 50 KB, nobody is waiting on them. A failure at the
+    lower block is reported, and `Update.end()` runs only after the hash matches.
+  - **Not done: pooling the cache entries.** The sprite and the RAM caches were each fixed by
+    moving or bounding one allocation, and the block still got cut. Here ~80 small blocks do it,
+    so removing one would only move the cut, and pooling is a much larger change.
 - **Lost commands.** Before spec 09 a NO on the update question that met a full command queue
   was simply lost, and the question came back after a reboot. `NetCommandType::RefreshNow` was
   never sent; spec 11 removed it and made `None` the default.
