@@ -114,7 +114,7 @@ on black, left-aligned.
 - Every cell is cut to its column (`fitToWidth()`, UTF-8 safe; `.` / `...` when there's room,
   hard cut otherwise) with 2 px padding (`kTableCellPadPx`). Callsign and phase icon always fit.
 - **Placeholders:** `...` = still loading (the per-poll lookup budget hasn't reached it —
-  `AircraftRow::info_pending` / `route_pending` / `*_airport_pending`), `--` = looked up,
+  `TrackedFlight::info_pending` / `route_pending` / `*_airport_pending`), `--` = looked up,
   nothing known. Airport codes: IATA from hexdb.io's airport record, the ICAO code when hexdb.io
   has no record (`rowAirportCode()`).
 - **Order** (`sortRowsForDisplay()`): aircraft in the air, nearest first; then aircraft on the
@@ -123,7 +123,7 @@ on black, left-aligned.
   table lists the rest in the same order, without the featured one. The lookup budget follows
   this order too.
 - **On the ground** is inferred (`aircraft_state::inferOnGround()`, folded into
-  `Aircraft::on_ground`): OpenSky's flag, OR speed below `kTaxiSpeedMps` (15 m/s), OR neither
+  `AircraftState::on_ground`): OpenSky's flag, OR speed below `kTaxiSpeedMps` (15 m/s), OR neither
   altitude nor speed reported. Null altitude / speed are tracked (`has_altitude` /
   `has_velocity`) and shown as `--`. Ground rows get the top-view plane in FAZA.
 - **Paging:** more than 5 aircraft → tap the first data row to page back, the row-tall strip
@@ -137,7 +137,7 @@ on black, left-aligned.
 One aircraft, one number that matters: when will it be overhead. In code it's `kScreenFlight` /
 `flight_screen`; on screen it's called `TERAZ` / `NOW`.
 
-- **Which aircraft** (`pickNowAircraft()`, poll_pipeline puts it in `DataSnapshot` as
+- **Which aircraft** (`pickNowAircraft()`, poll_pipeline puts it in `AirspaceSnapshot` as
   `nowRowIndex`): every aircraft's CPA is predicted (`cpa_predictor`, including
   `CpaPrediction::miss_distance_km`, how far from home the closest point is); shown is the
   airborne one whose CPA passes within `kOverheadRadiusKm` (5 km) and comes soonest (not more

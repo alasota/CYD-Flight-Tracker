@@ -305,6 +305,27 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   The generator refuses a comment after code and a line break between two word characters
   rather than guessing — joining lines with nothing in between is what keeps the bytes equal,
   and a glued `return` + `x` would break the script silently.
+- **Glossary names** (spec 12, stage 7, owner 2026-11-07). The types took the spec's glossary
+  names (`AircraftRow` → `TrackedFlight`, `Config` → `Settings` … — docs/architecture.md "Source
+  layout (spec 12)"), one entry per commit. **A lexer tool, not `sed`:** `\bX\b` doesn't know
+  strings, so it would have rewritten NVS / backup JSON keys, log text, hexdb.io's `"Aircraft
+  not found."` body and the `docs/data-sources.md "Aircraft identification"` references, and
+  turned prose "Aircraft" into "AircraftState". `tools/rename_symbols.py` replaces code tokens
+  only and never touches a string. **Plain words code-only:** `Aircraft` and `Config` are English
+  words too, so their comment hits were listed and edited by hand (24 and 18: the type
+  references changed, the doc heading, the hexdb.io body and prose stayed). **Kept:** locals and
+  parameters named `cfg` (~400, a `const Settings &cfg` reads fine and a token tool can't tell
+  them from `NetState::cfg`, which was renamed compiler-guided); `ConfigPageModel` and the
+  `config_page` / `config_backup` modules ("config page" is the page's established name);
+  `CpaPrediction` (§3 already named it next to "Overflight"); `RouteInfo` / `AirportInfo`
+  (symmetric with `AircraftInfo`, the three hexdb.io lookup results; `Route` is prose in
+  comments too); `openSkyCreditCost()` and `AlertId` / `AlertSet` (no one type is §3's
+  "CreditCost" / "Alert"); the §4 file names that differ — renaming them churns `.feature` tags
+  in `spec/done/`, `git log --follow` and the docs, so §4 follows the code in stage 8 instead.
+  **Proof that nothing else changed:** symbol names don't reach the binary (no `assert` /
+  `__func__` / `typeid`, RTTI off), so with a fixed `FW_VERSION` each rename commit's sections
+  were identical and `firmware.bin` differed only in the ELF and image hashes (≤ 65 B); the
+  `config_store` → `settings` file rename only moved the link order (same sections and size).
 - **`pio run -e cyd-ota -t upload` without a password** (found in stage 6, not fixed yet): with
   `$CYD_WEB_PASSWORD` empty, curl's `--digest` first sends an empty POST to probe for the
   challenge; the upload route answers it with HTTP 400 and nothing is uploaded. A plain

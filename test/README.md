@@ -49,7 +49,7 @@ with their code; stage 5 moved the 19 screenshot hand-over tests (`ScreenshotBri
 | `test_enrichment` | aircraft / route / airport data (hexdb.io, caches, NVS) | aircraft_lookup, route_lookup, lookup_cache, lookup_store, lookup_budget, aircraft_names, place_names |
 | `test_opensky` | the OpenSky data source | opensky_client, opensky_quota, opensky_auth, scan_area |
 | `test_display` | screens, theme, navigation, touch, brightness, display texts; the UI flows (`display/services`) | table_view, featured_panel, flight_screen, radar_view, radar_geometry, aircraft_summary, status_bar, service_screen, screen_nav, redraw_policy, touch_input, lcars_theme, utf8, fit_to_width, font_set, fonts, backlight, i18n, ui_flow, update_prompt_flow, ota_screen_flow, alert_screen_flow, service_screen_flows, password_reset_flow, screenshot_bridge, ui_perf |
-| `test_admin` | settings, web panel, backups, password, updates | config_page, settings_form, config_backup, config_store, web_auth, web_i18n, ota_update, release_check, version, screenshot¹, device_alerts |
+| `test_admin` | settings, web panel, backups, password, updates | config_page, settings_form, config_backup, settings, web_auth, web_i18n, ota_update, release_check, version, screenshot¹, device_alerts |
 | `test_platform` | concurrency, perf, WiFi, time; the shared kernel (`src/shared/`) | core_link, perf_stats, wifi_manager, clock, sun_times, geo |
 
 ¹ `screenshot` (the BMP header / band / `?screen=` helpers `web_server` uses) lives in
@@ -62,7 +62,7 @@ Cases per suite (spec 12 stage 6): admin 257 (3 skipped), airspace 71, display 4
 
 Settings are guarded against a silent change of format: `config_backup_test.cpp` compares the
 whole backup JSON (with and without secrets) to a golden string and restores a pre-stage-6
-backup field by field, `config_store_test.cpp` pins every default, and
+backup field by field, `settings_test.cpp` pins every default, and
 `tools/test_check_layers.py` pins the NVS keys and their types. Settings are nested objects
 (`c.home.lat`, `c.backlight.night_mode`, `c.web.password` — docs/architecture.md "Source
 layout (spec 12)"); members are assigned, never `{…}`-initialized (gnu++11 on `cyd`).
@@ -76,7 +76,7 @@ injects a fake command queue as the `CommandSender`; `screenshot_bridge_test.cpp
 `support/` (on the include path via `-I test/support`, header-only):
 
 - `test_support.h` — the assertions below and `resetAllForTesting()`.
-- `fixtures.h` — `makeAircraft()`, `makeRow()`, `makeConfig()` (defaults + `home` in Warsaw,
+- `fixtures.h` — `makeAircraft()`, `makeRow()`, `makeSettings()` (defaults + `home` in Warsaw,
   `home.configured`),
   `stubPorts()` (stub hexdb.io for `poll_pipeline`; `stubHexdb()` holds what is "cached" and
   records every fetch).
@@ -96,6 +96,9 @@ injects a fake command queue as the `CommandSender`; `screenshot_bridge_test.cpp
   language back to Polish. A module with new global state adds its reset there.
 - New module: add `<module>_test.cpp` to the suite of its context, declare and call its
   `run_<module>_tests()` in that suite's `main.cpp` (`if (RUN_MODULE(<module>)) …`).
+- Test **function** names are not renamed with the code (spec 12 stage 7: `tools/rename_symbols.py`
+  changes identifiers in `src/` and `test/` but `test_sanitize_config_clamps_all_fields` keeps its
+  name), so the `.feature` tags that point at them keep resolving.
 - Built with `-Wall -Wextra -Werror` (tests and `src/`). Unused stub parameters:
   `const std::string & /*icao24*/`.
 - Native `SpinLock` is a no-op (the tests are single-threaded), so code shared between the

@@ -57,14 +57,14 @@ functions with plain types too, an adapter defines them (`LGFX &` ones: in the a
 `#ifdef ARDUINO` only in `platform/` and adapters. Layers: docs/architecture.md "Source layout".
 
 - **Data, core 0:** `wifi_manager` (connect + captive portal) · `opensky_client` (JSON of
-  `/states/all` → `Aircraft`, **no drawing**) · `opensky_settings` · `opensky_auth` (login, 30-min
+  `/states/all` → `AircraftState`, **no drawing**) · `opensky_settings` · `opensky_auth` (login, 30-min
   retry, Bearer / refresh / anonymous) · `opensky_quota` (credits left) · `scan_area` (credit cost)
   · `aircraft_lookup` (icao24 → airline / type) · `route_lookup` (callsign → route, airport → IATA /
   country) · `aircraft_names` (airline by callsign, type names) · `place_names` (IATA → city,
   `asciiFold()`) · `lookup_cache` (LRU) · `lookup_store` (NVS copy) · `lookup_budget` (lookups per
-  poll) · `hexdb_http` (HTTPS GET) · `poll_pipeline` (one answer → `DataSnapshot`: sort, lookups,
+  poll) · `hexdb_http` (HTTPS GET) · `poll_pipeline` (one answer → `AirspaceSnapshot`: sort, lookups,
   phases, CPA, NOW pick) · `net_task` (the core-0 task) · `net_config` (HTTP timeouts).
-- **Settings and maintenance:** `config_store` (settings: aggregate of context objects) ·
+- **Settings and maintenance:** `settings` (`Settings`: aggregate of context objects) ·
   `settings_form` (`/save` form, checks, credentials file) · `config_page` (page HTML; CSS / JS in
   `admin/assets/`) · `config_backup` (JSON backup / restore) · `web_auth` (password, throttle, origin)
   · `web_i18n` (page strings) · `ota_update` (image checks, `OtaSession`) · `release_check` (GitHub
@@ -77,9 +77,9 @@ functions with plain types too, an adapter defines them (`LGFX &` ones: in the a
   `ota_flash` (`Update`) · `github_http` (check / install) · `alert_sources` (alert inputs) ·
   `backlight_ldr` (LDR, PWM) · `touch_xpt2046` · `service_flows` (service-screen drivers) ·
   `lgfx/<module>_draw` (screens, theme, fonts) · `lgfx/ui_draw` · `lgfx/screenshot_panel`.
-- **Sky model (`airspace/core`):** `aircraft_state` (`Aircraft`, `inferOnGround()`) · `home` ·
-  `tracked_flight` (`AircraftRow`) · `flight_ordering` (order, featured split) · `now_pick` (NOW
-  aircraft) · `feed_health` (`OpenSkyHealth`) · `flight_phase` · `cpa_predictor`.
+- **Sky model (`airspace/core`):** `aircraft_state` (`AircraftState`, `inferOnGround()`) · `home`
+  · `tracked_flight` (`TrackedFlight`) · `flight_ordering` (order, featured split) · `now_pick`
+  (NOW aircraft) · `feed_health` (`FeedHealth`) · `flight_phase` · `cpa_predictor`.
 - **Display, core 1:** `lcars_theme` (palette roles, font metrics, icon / arrow shapes) ·
   `text/` (`utf8`, `fit_to_width`, `font_set` = the character set) · `status_bar` (header) ·
   `screen_nav` (screen, hit tests, auto-cycle) · `redraw_policy` (events → redraw mask) ·
@@ -118,7 +118,7 @@ Rules:
   reset there). One module: `PLATFORMIO_BUILD_FLAGS="-DTEST_MODULE=<module>"`.
 - **Assertions that print values** (`test/support/test_support.h`): `ASSERT_ENUM_EQ`, `ASSERT_STR_EQ`,
   `ASSERT_CONTAINS` / `ASSERT_NOT_CONTAINS`, JSON via `json_assert.h`; never `TEST_ASSERT_TRUE(a == b)`.
-  Fixtures: `fixtures.h` (`makeAircraft()`, `makeRow()`, `makeConfig()`, `stubPorts()`).
+  Fixtures: `fixtures.h` (`makeAircraft()`, `makeRow()`, `makeSettings()`, `stubPorts()`).
 - `native` builds with `-Wall -Wextra -Werror` (tests and `src/`); CI also runs `native-asan`
   (AddressSanitizer + UBSan, Linux only).
 - Python tooling (`tools/*.py`) has `unittest` tests next to it (`tools/test_*.py`).
@@ -163,7 +163,7 @@ A full `fillScreen()` flashes visibly on the ILI9341 over SPI (why: docs/history
 
 Details: docs/architecture.md "Concurrency — two cores". Spec: `spec/done/04-dual-core.md`.
 - **Core 0, `net_task`** (16 KB stack): WiFi, NTP, settings page, OpenSky, hexdb.io, GitHub,
-  OTA, the in-memory `Config`. **Core 1, `loop()` in `main.cpp`** (8 KB): `tft`, touch,
+  OTA, the in-memory `Settings`. **Core 1, `loop()` in `main.cpp`** (8 KB): `tft`, touch,
   navigation, redraw, backlight, update question, service screens; sleeps between passes.
 - Code on core 0 never calls LovyanGFX; code on core 1 never does network I/O. They share only
   `core_link`: the `NetState` snapshot (net → UI, pointer swap), the `NetCommand` queue
@@ -235,7 +235,7 @@ Details: docs/architecture.md "Concurrency — two cores". Spec: `spec/done/04-d
   references, removed symbols, `main.cpp` in core-0 modules, CLAUDE.md size),
   `python tools/check_layers.py [--strict]` (spec 12 layer rules; report only in CI)
 - Tool tests (CI): `python tools/test_<name>.py` for check_bdd, release_plan, build_site,
-  check_comments, check_layers, rewrite_includes, subset_efont, embed_assets
+  check_comments, check_layers, rewrite_includes, rename_symbols, subset_efont, embed_assets
 - Project page: `python tools/build_site.py --out _site` (`--firmware DIR` adds the installer)
 - Settings page / update question screenshots: `python tools/screenshots.py [--device cyd-sky.local]`
 - Spec / issue → PR: `/implement 05`, `/implement #12`; bug → PR: `/fix <description>`,

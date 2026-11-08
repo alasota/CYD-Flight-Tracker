@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **w trakcie — etap 7 z 8** (etap 6 zrobiony w vNEXT) 2026-11-07, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 w vNEXT, etapy 7–8 do zrobienia. Jedna specyfikacja dla całej
+Status: **etap 7 z 8 zrobiony (vNEXT)** 2026-11-08, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 i 7 w vNEXT, etap 8 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -56,21 +56,23 @@ testami i tym samym firmware'em (poza etapem 5, który dodaje testy wyciągnięt
 | Pojęcie (PL) | W kodzie | Znaczenie |
 |---|---|---|
 | Dom | `Home` (`lat`, `lon`) | miejsce, nad którym urządzenie patrzy w niebo |
-| Zasięg | `ScanArea` | prostokąt ±`radius_deg` wokół domu (dziś `BoundingBox`) |
-| Stan samolotu | `AircraftState` | jedna obserwacja: pozycja, wysokość, prędkość, kurs, „na ziemi” (dziś `Aircraft`) |
-| Lot | `TrackedFlight` | samolot w zasięgu z ustaleniami: odległość, kierunek, faza, linia, typ, trasa (dziś `AircraftRow`) |
-| Obraz nieba | `AirspaceSnapshot` | niezmienna lista lotów z jednego pollu + przewidywanie przelotu (dziś `DataSnapshot`) |
+| Zasięg | `ScanArea` | prostokąt ±`radius_deg` wokół domu (do etapu 7 `BoundingBox`) |
+| Stan samolotu | `AircraftState` | jedna obserwacja: pozycja, wysokość, prędkość, kurs, „na ziemi” (do etapu 7 `Aircraft`) |
+| Lot | `TrackedFlight` | samolot w zasięgu z ustaleniami: odległość, kierunek, faza, linia, typ, trasa (do etapu 7 `AircraftRow`) |
+| Obraz nieba | `AirspaceSnapshot` | niezmienna lista lotów z jednego pollu + przewidywanie przelotu (do etapu 7 `DataSnapshot`) |
 | Faza | `Phase` | start / lądowanie / przelot / brak |
-| Przelot nad domem | `Overflight` (`CpaPrediction`) | kiedy i jak blisko domu samolot przeleci (CPA) |
+| Przelot nad domem | `CpaPrediction` | kiedy i jak blisko domu samolot przeleci (CPA); pojęcie „przelot” (*overflight*), typ zostaje `CpaPrediction` |
 | Dane o samolocie | `AircraftInfo` | linia, typ, rejestracja (hexdb.io) |
-| Trasa, lotnisko | `Route`, `Airport` | skąd–dokąd, kody IATA/ICAO, kraj |
-| Kredyty | `OpenSkyQuota`, `CreditCost` | limit zapytań OpenSky |
-| Stan źródła | `FeedHealth` | czy dane płyną (dziś `OpenSkyHealth`) |
-| Ostrzeżenie | `Alert` | coś wymaga uwagi właściciela (spec 08) |
-| Ustawienia | `Settings` | wszystko, co zapisane w NVS (dziś `Config`) |
+| Trasa, lotnisko | `RouteInfo`, `AirportInfo` | skąd–dokąd, kody IATA/ICAO, kraj (hexdb.io, symetrycznie do `AircraftInfo`) |
+| Kredyty | `OpenSkyQuota`, `openSkyCreditCost()` | limit zapytań OpenSky; koszt zapytania to funkcja, nie typ |
+| Stan źródła | `FeedHealth` | czy dane płyną (do etapu 7 `OpenSkyHealth`) |
+| Ostrzeżenie | `AlertId`, `AlertSet` | coś wymaga uwagi właściciela (spec 08); jedno ostrzeżenie to `AlertId`, aktywne razem `AlertSet` |
+| Ustawienia | `Settings` | wszystko, co zapisane w NVS (do etapu 7 `Config`, moduł `config_store`) |
 
-Zmiany nazw (prawa kolumna „dziś”) robi się w **osobnym etapie** (§8, etap 7), po
-przeniesieniu plików — żeby diff przeniesienia był czysto mechaniczny.
+Zmiany nazw (dawne nazwy „do etapu 7”) zrobiono w **osobnym etapie** (§8, etap 7), po
+przeniesieniu plików — żeby diff przeniesienia był czysto mechaniczny. Kolumna „W kodzie” to
+nazwy, które są w kodzie; `CpaPrediction`, `RouteInfo` / `AirportInfo`, `openSkyCreditCost()`
+i `AlertId` / `AlertSet` zostały celowo (decyzja Q1 etapu 7).
 
 ## 4. Konteksty
 
@@ -81,11 +83,11 @@ o OpenSky, hexdb.io ani ekranie.
 
 - `core/`: `aircraft_state.h` (`AircraftState`, wnioskowanie „na ziemi” — dziś
   `inferOnGround()` w `opensky_client`), `tracked_flight.h` (`TrackedFlight` — dziś
-  `AircraftRow` z `table_view.h`), `flight_phase`, `overflight` (dziś `cpa_predictor`),
+  do etapu 7 `AircraftRow` w `table_view.h`), `flight_phase`, `overflight` (dziś `cpa_predictor`),
   `flight_ordering` (dziś `sortRowsForDisplay()`, `splitFeaturedAndRest()`), `now_pick` (dziś
   `pickNowAircraft()` z `flight_screen`), `feed_health.h`, `airspace_snapshot.h`.
 - `services/`: `poll_airspace` (dziś `poll_pipeline`: stany samolotów → obraz nieba), port
-  `EnrichmentPort` (dziś `LookupPorts`).
+  `EnrichmentPort` (do etapu 7 `LookupPorts`).
 
 ### 4.2 `enrichment` — Dane o samolotach, trasach i lotniskach (**pomocniczy**)
 
@@ -129,7 +131,7 @@ Tłumaczy świat OpenSky (tablice `states` z polami po indeksach, OAuth, nagłó
 
 Ustawienia, panel WWW, kopie zapasowe, hasło, ostrzeżenia, aktualizacje.
 
-- `core/`: `settings` (agregat `Settings` + `sanitize` — dziś `config_store` bez NVS),
+- `core/`: `settings` (agregat `Settings` + `sanitize`, do etapu 7 `config_store`; NVS w `settings_nvs`),
   `settings_form` (**nowe**: dziś `handleSave()`, §6), `backup` (dziś `config_backup`),
   `web_auth`, `alerts` (spec 08), `firmware/` (`ota_update`, `release_check` — czyste
   części, `version`), `config_page` (renderer HTML), `web_i18n`.
@@ -216,7 +218,7 @@ czas, stan) i wykonuje wyjścia (rysuj, wyślij komendę, zapisz).
 
 ## 7. Ustawienia: agregat + ustawienia per kontekst
 
-`Settings` (dziś `Config`) zostaje jednym agregatem w `admin/core` — tylko on jest zapisywany,
+`Settings` (do etapu 7 `Config`) zostaje jednym agregatem w `admin/core` — tylko on jest zapisywany,
 sanityzowany i odtwarzany z kopii. Inne konteksty **nie dołączają `Settings`**; dostają małe,
 własne obiekty wartości, wycinane w korzeniach kompozycji:
 
@@ -234,7 +236,7 @@ widzi `opensky` (§5). Trzy pola, których tabela nie nazywała, trafiły do `Ho
 
 `Settings` składa się z tych obiektów (pola `settings.backlight.night_mode` zamiast
 `cfg.night_mode`). Klucze NVS i format kopii zapasowej **bez zmian** (testy `config_backup`
-i `config_store` pilnują zgodności wstecz). `NetState` niesie `shared_ptr<const Settings>`,
+i `settings` pilnują zgodności wstecz). `NetState` niesie `shared_ptr<const Settings>`,
 a ekran czyta z niego tylko swoje obiekty.
 
 ## 8. Etapy (każdy = osobny PR, testy zielone, firmware działa na płytce)
@@ -346,6 +348,24 @@ a ekran czyta z niego tylko swoje obiekty.
      obiekt ustawień `opensky`.
 7. **Nazwy ze słownika** (§3), po jednej zmianie nazwy na commit (`AircraftRow` →
    `TrackedFlight` itd.), automatycznie (`sed` + kompilacja), bez innych zmian w tym commicie.
+   Decyzje (plan etapu 7, właściciel 2026-11-07 — domyślne odpowiedzi na Q1–Q8):
+   - Q1: `CpaPrediction`, `RouteInfo` / `AirportInfo`, `openSkyCreditCost()` i `AlertId` /
+     `AlertSet` zostają; §3 poprawiony do nazw z kodu;
+   - Q2: `Config` → `Settings` obejmuje typ, 8 funkcji ustawień, `NetState::cfg` / `cfgSeq` →
+     `settings` / `settingsSeq` i plik `config_store` → `settings`; zmienne i parametry `cfg`,
+     `ConfigPageModel`, moduły `config_page` / `config_backup` zostają;
+   - Q3: `LookupPorts` → `EnrichmentPort` (nazwa z §4.1) — tak;
+   - Q4: tylko zmiany nazw, bez przenoszenia `ScanArea` do `scan_area.h` ani `AirspaceSnapshot`
+     do `airspace/core/airspace_snapshot.h` (to etap 8 albo PR przed nim);
+   - Q5: z nazw plików §4 tylko `config_store` → `settings`; reszta (`cpa_predictor`,
+     `poll_pipeline`, `config_backup`, `screen_nav`, `touch_input`, `backlight`,
+     `opensky_client`) zostaje, etap 8 dopasuje §4 do kodu;
+   - Q6: jeden wpis słownika na commit (typ razem z funkcjami nazwanymi od niego), `Config` w
+     czterech commitach (typ, funkcje, pola `NetState`, plik);
+   - Q7: jedno sprawdzenie na płytce na obrazie końcowym (USB + jedna OTA);
+   - Q8: `tools/rename_symbols.py` zostaje do etapu 8 (z testami w CI);
+   - zamiast `sed`: `tools/rename_symbols.py` (lekser C/C++, napisy i cytaty nietknięte), bo
+     `\bX\b` zmieniłby klucze NVS, tekst logów i cytowane nagłówki dokumentacji.
 8. **Egzekwowanie.** `check_layers.py` blokuje CI; `docs/architecture.md` (konteksty, tabela
    z §5, słownik z §3) i sekcja „Code conventions” w CLAUDE.md zastąpiona krótkim odsyłaczem.
 
@@ -686,6 +706,68 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   przeglądarce (zakładki, kredyty na żywo, linia „Teraz”, pasek postępu OTA, przeładowanie po
   restarcie), zapis → restart → ta sama kopia zapasowa.
 
+### Wynik etapu 7 (2026-11-08, wydany w vNEXT)
+
+- **Zmiany nazw (11 commitów, jeden wpis słownika na commit, każdy `python
+  tools/rename_symbols.py KLUCZ` + ręczne poprawki komentarzy):**
+
+  | Commit | Było → jest |
+  |---|---|
+  | A `403f965` | `BoundingBox` → `ScanArea`, `computeBoundingBox()` → `computeScanArea()` |
+  | B `4e308ae` | `OpenSkyHealth` → `FeedHealth` |
+  | C `0387f2c` | `DataSnapshot` → `AirspaceSnapshot`, `buildDataSnapshot()` → `buildAirspaceSnapshot()` |
+  | D `8d5b5d2` | `LookupPorts` → `EnrichmentPort` |
+  | E `0d0302e` | `AircraftRow` → `TrackedFlight` |
+  | F `1f46326` | `Aircraft` → `AircraftState` |
+  | G `89c24b8` | `configPortal*()` → `webServer*()` (8 funkcji) |
+  | H1 `ce28849` | `Config` → `Settings` |
+  | H2 `544db21` | `defaultConfig()`, `sanitizeConfig()`, `loadConfig()`, `saveConfig()`, `reloadConfig()`, `configToBackupJson()`, `restoreConfigFromBackupJson()`, `makeConfig()` → `…Settings()` / `settingsToBackupJson()` / `restoreSettingsFromBackupJson()` / `makeSettings()` |
+  | H3 `9ac5429` | `NetState::cfg`, `cfgSeq` → `settings`, `settingsSeq` (według kompilatora) |
+  | H4 `1218606` | pliki `admin/core/config_store.{h,cpp}` → `settings.{h,cpp}` (`MOVES_STAGE_7`), `config_store_test.cpp` → `settings_test.cpp`, `run_settings_tests()` |
+
+  Przed nimi `b78832d` — narzędzie `tools/rename_symbols.py` (tabela `RENAMES_STAGE_7`, rodzaje
+  `compound` / `word` / `prefix`, `--check`, `--report`, `--list`) z testami
+  `tools/test_rename_symbols.py` (w CI); po nich `fe5aed3` — `check_comments.py` zgłasza dawną
+  nazwę złożoną, która wraca do kodu albo komentarza (`RENAMED_SYMBOLS`, „X was renamed Y in
+  spec 12 stage 7”). Słowa `Aircraft` i `Config` narzędzie zmieniało tylko w kodzie; 24 i 18
+  trafień w komentarzach przejrzano ręcznie: odwołania do typu zmienione, nagłówek
+  `docs/data-sources.md "Aircraft identification"`, treść `"Aircraft not found."` z hexdb.io i
+  proza zostały. `wifi_manager.cpp` (WiFiManager `setConfigPortalBlocking()` …) bez zmian.
+- **Kryteria scenariuszy:** 10 scenariuszy `@test` zielonych (narzędzie, układ plików,
+  `NetState`, funkcje serwera WWW, strażnik w `check_comments`, klucze NVS i kopia zapasowa).
+  `@manual` „Etap 7 nie zmienia kodu wynikowego ani liczby testów” — **spełniony**: po każdym
+  commicie A–H4, zbudowanym z `FW_VERSION=v0.0.0-stage7`, sekcje z `size -A` są takie same jak
+  przed etapem, Flash used 1 341 641, RAM 61 908 B; `firmware.bin` 1 348 224 B, w A–H3 różni się
+  od poprzedniego tylko 64–65 bajtami skrótów (SHA-256 ELF w opisie aplikacji, suma kontrolna,
+  SHA-256 obrazu); H4 (zmiana nazwy plików) — ten sam rozmiar i sekcje, inna kolejność
+  linkowania. Testy: 974 przypadki (971 zielonych, 3 pominięte bez `SCREENSHOT_OUT`), `RUN_TEST(`
+  974, jak przed etapem; `check_layers.py` te same 12 naruszeń; `check_bdd.py` 0 problemów (282
+  scenariusze); `check_comments.py --strict`, `rewrite_includes.py --check`,
+  `embed_assets.py --check` czyste; wszystkie testy narzędzi zielone; `main.cpp` 249 linii.
+  `@manual` „Płytka z firmware'em etapu 7…” — **spełniony** (2026-11-08): obraz `fe5aed3`
+  (1 348 240 B — dłuższy napis wersji z `git describe`) wgrany przez USB (COM3); 3 min logu bez
+  paniki, WDT i restartu poza startem, logowanie OpenSky (konto), pierwszy poll 8 samolotów,
+  hexdb.io 200. `/backup.json`: 25 kluczy równych kopii sprzed wgrania poza `firmware` (sekrety
+  też porównane). `GET /` — te same znaczniki, różnią się wartości na żywo i wersja.
+  `/perf.json` po 85 s: przerwa pętli UI maks. 86 ms, 0 wolnych przejść, sterta 147 480 B,
+  największy blok 65 524 B, wolny stos UI 5 244 B / net 9 792 B. OTA przez WiFi (`curl -F
+  firmware=@… /update`): 200, 1 348 460 B w 15,2 s, nowy obraz działa i nie został wycofany
+  (perf 92 ms / 0 wolnych, blok 59 380 B). Ekrany 0–2 po OTA: LOTY, TERAZ, RADAR z samolotami,
+  licznik i zegar jak przedtem. Zrzutów nie odświeżano (nic widocznego się nie zmieniło).
+  Niesprawdzone z planu: zapis formularza bez zmian → ta sama kopia (zamiast tego porównanie
+  kopii przed / po wgraniu i złoty test kopii).
+- **Odstępstwa od planu:** narzędzie zamiast `sed` (§8 pkt 7 mówił `sed`); §3 poprawiony do nazw
+  z kodu (Q1) zamiast zmieniać `CpaPrediction`, `RouteInfo`, `AirportInfo`; `LookupPorts` z §4.1
+  zmieniony razem ze słownikiem (Q3). Firmware ze stałym `FW_VERSION` ma ten sam rozmiar także po
+  zmianie nazwy plików (plan dopuszczał ± 1 KB).
+- **Znany problem (nie z etapu 7, kod słońca i czasu bez zmian):** zaraz po starcie
+  `/light.json` pokazuje czasem wschód / zachód w UTC (05:44 / 14:57 po restarcie OTA, też
+  05:42 / 14:58 w zrzucie „przed” etapu 6) zamiast czasu lokalnego (06:44 / 15:57 po starcie z
+  USB). `refreshSun()` zapamiętuje czasy na cały dzień, więc okno nocy jest przesunięte o 1 h do
+  następnego dnia. Do osobnego `/fix`.
+- **Zostaje dla właściciela:** dotyk (zakładki, strony tabeli, „!”), auto-cycle, język ekranu
+  PL ↔ EN.
+
 ## 9. Testy
 
 - Grupy testów ze spec 07 odpowiadają kontekstom 1:1 (`test_airspace`, `test_enrichment`,
@@ -710,7 +792,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
 ## 11. Poza zakresem
 
 - Wirtualne interfejsy / dependency injection framework — porty to `std::function` albo
-  struktury funkcji, jak dziś `LookupPorts`.
+  struktury funkcji, jak `EnrichmentPort`.
 - Zmiana formatu NVS, kopii zapasowej, API WWW.
 - Biblioteki PlatformIO w `lib/` (zamiast katalogów w `src/`) — możliwe później, jeśli konteksty
   mają się budować osobno; dziś katalogi + `check_layers.py` dają to samo taniej.
