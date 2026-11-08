@@ -376,9 +376,12 @@ static void test_sun_times_follow_the_utc_offset_once_the_zone_is_set(void) {
   ASSERT_STR_EQ(sunriseAt(2026, 11, 8, 0), formatClockMinutes(sun.local.sunrise_min));
   // A few seconds later configTzTime() has run: same local day, offset +60 (CET).
   const std::time_t later = utc + 5;
-  refreshSunToday(sun, true, later, later + 3600, home);
+  TEST_ASSERT_TRUE(refreshSunToday(sun, true, later, later + 3600, home));  // logged again
   ASSERT_STR_EQ(sunriseAt(2026, 11, 8, 60), formatClockMinutes(sun.local.sunrise_min));
   ASSERT_STR_EQ(sunsetAt(2026, 11, 8, 60), formatClockMinutes(sun.local.sunset_min));
+  // Literal CET times for this home (the board's home, a few km away, read 06:44 / 15:57).
+  ASSERT_STR_EQ("06:44", formatClockMinutes(sun.local.sunrise_min));
+  ASSERT_STR_EQ("15:56", formatClockMinutes(sun.local.sunset_min));
   TEST_ASSERT_EQUAL_INT(60, sun.offset_min);
 }
 
@@ -407,6 +410,26 @@ static void test_sun_times_are_computed_once_per_day_and_offset(void) {
   ASSERT_STR_EQ(sunsetAt(2026, 11, 8, 60), formatClockMinutes(sun.local.sunset_min));
   TEST_ASSERT_FALSE(refreshSunToday(sun, false, utc + 120, 0, home));  // clock lost -> unknown
   TEST_ASSERT_FALSE(sun.known);
+}
+
+// The offset comes from two clock reads (time() and timeSyncNowLocal()); a second boundary
+// between them gives 3599 or 3601 s. That rounds to the same minute: no recompute, same sun.
+static void test_sun_offset_rounds_a_second_between_the_clock_reads(void) {
+  SunToday sun;
+  const Home home = warsawHome();
+  const std::time_t utc = k20261108_0000Utc + 10 * 3600;
+  TEST_ASSERT_TRUE(refreshSunToday(sun, true, utc, utc + 3600, home));
+  TEST_ASSERT_FALSE(refreshSunToday(sun, true, utc + 1, utc + 1 + 3599, home));
+  TEST_ASSERT_FALSE(refreshSunToday(sun, true, utc + 2, utc + 2 + 3601, home));
+  TEST_ASSERT_EQUAL_INT(60, sun.offset_min);
+  ASSERT_STR_EQ(sunriseAt(2026, 11, 8, 60), formatClockMinutes(sun.local.sunrise_min));
+  ASSERT_STR_EQ(sunsetAt(2026, 11, 8, 60), formatClockMinutes(sun.local.sunset_min));
+  // West of UTC too (-60): -3599 and -3601 s round to -60, not toward zero.
+  SunToday west;
+  TEST_ASSERT_TRUE(refreshSunToday(west, true, utc, utc - 3600, home));
+  TEST_ASSERT_FALSE(refreshSunToday(west, true, utc + 1, utc + 1 - 3599, home));
+  TEST_ASSERT_FALSE(refreshSunToday(west, true, utc + 2, utc + 2 - 3601, home));
+  TEST_ASSERT_EQUAL_INT(-60, west.offset_min);
 }
 
 }  // namespace
@@ -439,4 +462,5 @@ void run_backlight_tests() {
   RUN_TEST(test_sun_times_follow_the_utc_offset_once_the_zone_is_set);
   RUN_TEST(test_sun_times_follow_the_dst_change_on_the_same_day);
   RUN_TEST(test_sun_times_are_computed_once_per_day_and_offset);
+  RUN_TEST(test_sun_offset_rounds_a_second_between_the_clock_reads);
 }
