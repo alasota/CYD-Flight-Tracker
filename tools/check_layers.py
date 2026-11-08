@@ -13,7 +13,7 @@ reports what the §5 table doesn't allow:
     the test's own directory,
   * a source file outside any context and layer.
 Prints `path:line: <from> -> <to> ("<include>")`, a count per pair and a total; warns only
-(exit 0) unless --strict (stage 8 makes CI use it). tools/test_check_layers.py pins the rules
+(exit 0) unless --strict, which is what CI runs. tools/test_check_layers.py pins the rules
 and the repository's layout.
 """
 
