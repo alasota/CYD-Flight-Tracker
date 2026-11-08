@@ -1,7 +1,7 @@
 // screenshot: BMP header, band order and ?screen= of /screenshot.bmp (spec 09 §1; the handler <-> UI hand-over is test_display/screenshot_bridge_test.cpp). CLAUDE.md "Code conventions" (screenshot).
 #include <unity.h>
 
-#include "display/services/screenshot.h"
+#include "admin/core/screenshot.h"
 
 #include <cstdint>
 
