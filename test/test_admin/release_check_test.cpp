@@ -450,6 +450,45 @@ static void test_requested_install_waits_while_the_heap_is_really_too_small(void
   ASSERT_ENUM_EQ(InstallStep::Wait, stepPendingInstall(g, 1000, 1500));
 }
 
+static void test_requested_install_block_boundary(void) {
+  CheckGate g = installGate();
+  g.maxFreeBlock = kUpdateInstallMinFreeBlock;
+  ASSERT_ENUM_EQ(InstallStep::Start, stepPendingInstall(g, 1000, 1500));
+  g.maxFreeBlock = kUpdateInstallMinFreeBlock - 1;
+  ASSERT_ENUM_EQ(InstallStep::Wait, stepPendingInstall(g, 1000, 1500));
+}
+
+// The lower minimum is for an asked-for install only.
+static void test_background_check_keeps_its_own_block_minimum(void) {
+  CheckGate g = installGate();
+  g.msUntilNextPoll = UINT32_MAX;
+  g.maxFreeBlock = kUpdateMinFreeBlock - 1;
+  TEST_ASSERT_FALSE(canStartNetworkTask(g));
+  ASSERT_ENUM_EQ(InstallStep::Start, stepPendingInstall(g, 1000, 1500));
+}
+
+static void test_requested_install_ignores_the_check_switch_and_the_poll(void) {
+  CheckGate g = installGate();
+  g.enabled = false;
+  g.msUntilNextPoll = 0;
+  ASSERT_ENUM_EQ(InstallStep::Start, stepPendingInstall(g, 1000, 1500));
+}
+
+static void test_requested_install_waits_for_clock_and_a_running_update(void) {
+  CheckGate g = installGate();
+  g.timeSynced = false;
+  ASSERT_ENUM_EQ(InstallStep::Wait, stepPendingInstall(g, 1000, 1500));
+  g = installGate();
+  g.otaBusy = true;
+  ASSERT_ENUM_EQ(InstallStep::Wait, stepPendingInstall(g, 1000, 1500));
+}
+
+// A pass that comes late (a long poll) with the gate open still installs.
+static void test_requested_install_starts_when_possible_even_after_the_wait(void) {
+  CheckGate g = installGate();
+  ASSERT_ENUM_EQ(InstallStep::Start, stepPendingInstall(g, 1000, 1000 + kUpdateInstallWaitMs * 2));
+}
+
 static void test_every_status_has_a_message(void) {
   for (int i = 0; i < kUpdateStatusCount; ++i) {
     const WebStr id = updateStatusMessage(static_cast<UpdateStatus>(i));
@@ -600,6 +639,11 @@ void run_release_check_tests() {
   RUN_TEST(test_requested_install_that_cannot_start_gives_up_after_the_wait);
   RUN_TEST(test_requested_install_gives_up_across_millis_wrap);
   RUN_TEST(test_requested_install_waits_while_the_heap_is_really_too_small);
+  RUN_TEST(test_requested_install_block_boundary);
+  RUN_TEST(test_background_check_keeps_its_own_block_minimum);
+  RUN_TEST(test_requested_install_ignores_the_check_switch_and_the_poll);
+  RUN_TEST(test_requested_install_waits_for_clock_and_a_running_update);
+  RUN_TEST(test_requested_install_starts_when_possible_even_after_the_wait);
   RUN_TEST(test_every_status_has_a_message);
   RUN_TEST(test_status_for_release);
   RUN_TEST(test_prompt_only_for_an_available_release);

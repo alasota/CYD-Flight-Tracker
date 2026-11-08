@@ -165,10 +165,18 @@ bool takeManualCheck(ManualCheck &m, bool gateOpen, uint32_t nowMs);
 bool manualCheckPending(const ManualCheck &m, uint32_t nowMs);
 
 // ---- An install asked for by hand (config page / YES on the display)
-// TODO(fix fix-github-install-never-starts): stub from bug-investigator: says
-// what releaseCheckLoop() does today, never answers GiveUp.
+// It waits in the queue until it can start, but not for good: after
+// kUpdateInstallWaitMs it is dropped and reported (UpdateState::lastInstall).
 constexpr uint32_t kUpdateInstallWaitMs = 60000;  // then the owner is told it did not start
+// Below kUpdateMinFreeBlock on purpose. Small long-lived allocations settle the
+// largest block near 41 KB, so 50 KB could hold an install back for good, and
+// on the board a verified TLS session ran from a 43 KB block taking ~13 KB of
+// it. Background checks keep the wider margin; here someone is waiting and a
+// failure is reported.
+constexpr uint32_t kUpdateInstallMinFreeBlock = 32 * 1024;
 enum class InstallStep : uint8_t { Wait, Start, GiveUp };
+// From releaseCheckLoop(), each pass while an install is queued. Doesn't look
+// at CheckGate::enabled (asked for by hand) or msUntilNextPoll (OpenSky can wait).
 InstallStep stepPendingInstall(const CheckGate &g, uint32_t askedMs, uint32_t nowMs);
 
 // ---- What the config page and the display (via NetState) see

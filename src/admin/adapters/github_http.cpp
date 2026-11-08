@@ -25,6 +25,8 @@ ManualCheck manualCheck;  // "check now" / the development switch, run from rele
 std::string etagLatest;  // RAM only: a 304 answer doesn't count against GitHub's limit
 std::string etagList;
 std::string pendingInstallTag;
+uint32_t pendingInstallAskedMs = 0;
+bool pendingInstallHeldLogged = false;  // "held back" is logged once per request
 OtaObserver observer;
 bool otaScreenShown = false;  // observer.onStart() ran for the current install
 
@@ -350,6 +352,13 @@ void runInstall(const std::string &tag) {
   state.lastInstallTag = tag;
 }
 
+void logInstallBlocked(const char *what, const CheckGate &g) {
+  Serial.printf("[update] install %s %s: wifi=%d clock=%d ota busy=%d, largest block %u (needs %u)\n",
+                pendingInstallTag.c_str(), what, g.wifi, g.timeSynced, g.otaBusy,
+                static_cast<unsigned>(g.maxFreeBlock),
+                static_cast<unsigned>(kUpdateInstallMinFreeBlock));
+}
+
 }  // namespace
 
 void releaseCheckBegin(const UpdateSettings &update) {
@@ -374,13 +383,23 @@ void releaseCheckBegin(const UpdateSettings &update) {
 void releaseCheckLoop(const CheckGate &gate) {
   if (!begun) return;
   if (!pendingInstallTag.empty()) {
-    CheckGate g = gate;
-    g.enabled = true;               // asked for by hand
-    g.msUntilNextPoll = UINT32_MAX;  // the user is waiting; OpenSky can wait
-    if (canStartNetworkTask(g)) {
-      const std::string tag = pendingInstallTag;
-      pendingInstallTag.clear();
-      runInstall(tag);
+    switch (stepPendingInstall(gate, pendingInstallAskedMs, millis())) {
+      case InstallStep::Start: {
+        const std::string tag = pendingInstallTag;
+        pendingInstallTag.clear();
+        runInstall(tag);
+        break;
+      }
+      case InstallStep::GiveUp:
+        logInstallBlocked("gave up, it could not start", gate);
+        state.lastInstall = OtaResult::InstallNotStarted;
+        state.lastInstallTag = pendingInstallTag;
+        pendingInstallTag.clear();
+        break;
+      case InstallStep::Wait:
+        if (!pendingInstallHeldLogged) logInstallBlocked("held back", gate);
+        pendingInstallHeldLogged = true;
+        break;
     }
     return;
   }
@@ -408,6 +427,8 @@ bool releaseInstallRequest(const std::string &tag) {
                    preReleaseWorthShowing(state.latestPre, state.latest);
   if (!release && !pre) return false;
   pendingInstallTag = tag;
+  pendingInstallAskedMs = millis();
+  pendingInstallHeldLogged = false;
   return true;
 }
 
