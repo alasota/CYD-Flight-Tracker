@@ -4,8 +4,6 @@
 
 #include <ArduinoJson.h>
 
-AircraftInfo::AircraftInfo() = default;
-
 AircraftInfo parseAircraftLookupResponse(const std::string &json) {
   AircraftInfo info;
 
