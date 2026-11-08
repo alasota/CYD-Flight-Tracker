@@ -23,12 +23,7 @@
 
 #include <cstdint>
 
-enum class Language : uint8_t {
-  PL = 0,
-  EN = 1,
-};
-constexpr int kLanguageCount = 2;
-constexpr Language kDefaultLanguage = Language::PL;
+#include "shared/language.h"  // Language, kDefaultLanguage
 
 // X(id, polish, english)
 #define I18N_STRINGS(X)                                                     \
