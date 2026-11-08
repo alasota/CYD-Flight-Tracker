@@ -1,11 +1,14 @@
 // lookup_store: NVS record encode / decode of the lookup caches. CLAUDE.md "Code conventions" (lookup_store).
 #include <unity.h>
 
+#include <map>
 #include <string>
+#include <vector>
 
 #include "enrichment/core/aircraft_lookup.h"
 #include "enrichment/core/lookup_store.h"
 #include "enrichment/core/route_lookup.h"
+#include "test_support.h"
 
 namespace {
 
@@ -103,6 +106,98 @@ static void test_seeded_entries_count_as_cached(void) {
   TEST_ASSERT_TRUE(airportLookupIsCached("LTAI"));
 }
 
+// ---- a full NVS partition (docs/data-sources.md "Caching and the per-poll budget") ---
+
+// NVS as the store sees it: slots, not bytes. A string takes one header slot
+// plus one per started 32 bytes (with its NUL); a new value is written before
+// the old one is released.
+class FakeNvs : public LookupNvs {
+ public:
+  explicit FakeNvs(size_t capacity) : capacity_(capacity) {}
+
+  bool put(const char *ns, const std::string &key, const std::string &value) override {
+    if (slotsFor(value) > freeEntries()) return false;
+    data_[ns][key] = value;
+    return true;
+  }
+  void clear(const char *ns) override {
+    data_.erase(ns);
+    cleared_.push_back(ns);
+  }
+  size_t freeEntries() override { return capacity_ - used(); }
+
+  std::string get(const char *ns, const std::string &key) const {
+    const auto n = data_.find(ns);
+    if (n == data_.end()) return "";
+    const auto k = n->second.find(key);
+    return k == n->second.end() ? "" : k->second;
+  }
+  const std::vector<std::string> &cleared() const { return cleared_; }
+
+ private:
+  static size_t slotsFor(const std::string &value) { return 1 + (value.size() + 1 + 31) / 32; }
+  size_t used() const {
+    size_t total = 0;
+    for (const auto &n : data_) {
+      for (const auto &k : n.second) total += slotsFor(k.second);
+    }
+    return total;
+  }
+
+  size_t capacity_;
+  std::map<std::string, std::map<std::string, std::string>> data_;
+  std::vector<std::string> cleared_;
+};
+
+constexpr char kRecord[] = "a record of a few dozen characters, two data slots";
+
+// Fills `ns` with records until not one more fits.
+void fillUp(FakeNvs &nvs, const char *ns) {
+  for (int i = 0; nvs.freeEntries() > 0; ++i) {
+    if (!nvs.put(ns, "key" + std::to_string(i), "x")) break;
+  }
+}
+
+// Regression: an airport answer is lost when aircraft records fill NVS and the airport namespace has nothing to wipe
+static void test_full_nvs_stores_a_record_even_when_its_own_namespace_is_empty(void) {
+  FakeNvs nvs(100);
+  fillUp(nvs, "lk_ac");
+  TEST_ASSERT_EQUAL_UINT32(0, nvs.freeEntries());
+
+  storeSaveRecord(nvs, "lk_ap", "EKBI", kRecord);
+
+  ASSERT_STR_EQ(kRecord, nvs.get("lk_ap", "EKBI"));
+}
+
+// Regression: lookup records fill the partition to the last slot, so a settings or WiFi save finds no room
+static void test_lookup_records_always_leave_room_for_settings(void) {
+  FakeNvs nvs(400);
+  for (int i = 0; i < 400; ++i) {
+    storeSaveRecord(nvs, "lk_ac", "key" + std::to_string(i), kRecord);
+    TEST_ASSERT_GREATER_OR_EQUAL_UINT32(kLookupStoreReserveEntries, nvs.freeEntries());
+  }
+}
+
+// Whatever gets evicted to make room, the settings namespace never does.
+static void test_full_nvs_never_wipes_the_settings(void) {
+  FakeNvs nvs(100);
+  nvs.put("cydsky", "os_secret", "secret");
+  fillUp(nvs, "lk_ac");
+
+  storeSaveRecord(nvs, "lk_rt", "LOT282", kRecord);
+
+  ASSERT_NOT_CONTAINS(nvs.cleared(), "cydsky");
+  ASSERT_STR_EQ("secret", nvs.get("cydsky", "os_secret"));
+}
+
+// With only settings in the partition nothing can be evicted: the caller is told.
+static void test_save_reports_failure_when_nothing_can_be_evicted(void) {
+  FakeNvs nvs(10);
+  fillUp(nvs, "cydsky");
+
+  TEST_ASSERT_FALSE(storeSaveRecord(nvs, "lk_ap", "EKBI", kRecord));
+}
+
 }  // namespace
 
 void run_lookup_store_tests() {
@@ -115,5 +210,9 @@ void run_lookup_store_tests() {
   RUN_TEST(test_decode_rejects_garbage);
   RUN_TEST(test_separator_inside_a_value_does_not_break_the_record);
   RUN_TEST(test_seeded_entries_count_as_cached);
+  RUN_TEST(test_full_nvs_stores_a_record_even_when_its_own_namespace_is_empty);
+  RUN_TEST(test_lookup_records_always_leave_room_for_settings);
+  RUN_TEST(test_full_nvs_never_wipes_the_settings);
+  RUN_TEST(test_save_reports_failure_when_nothing_can_be_evicted);
 
 }

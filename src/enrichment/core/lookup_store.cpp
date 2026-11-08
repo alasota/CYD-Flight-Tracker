@@ -46,6 +46,15 @@ const char *flag(bool b) { return b ? "1" : "0"; }
 
 }  // namespace
 
+// TODO(fix fix-lookup-store-nvs-full): stub from bug-investigator: a copy of
+// save() in lookup_store_nvs.cpp, so the regression tests run today's behaviour.
+bool storeSaveRecord(LookupNvs &nvs, const char *ns, const std::string &key,
+                     const std::string &value) {
+  if (nvs.put(ns, key, value)) return true;
+  nvs.clear(ns);
+  return nvs.put(ns, key, value);
+}
+
 std::string encodeAircraftInfo(const AircraftInfo &info) {
   return join({flag(info.found), info.airline, info.aircraft_type, info.icao_type,
                info.registration});
