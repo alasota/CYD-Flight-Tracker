@@ -216,7 +216,6 @@ struct PromptGate {
   bool alertScreenOpen = false;    // the device-alert message is up (spec 08) — not over it
 };
 bool shouldShowUpdatePrompt(const PromptGate &g);
-constexpr uint32_t kUpdatePromptTimeoutMs = 30000;
 // A tap on the prompt counts only once the finger that may have been on the
 // screen when it appeared has been lifted, and the prompt has been up for
 // kUpdatePromptArmMs — so a tap meant for the screen below can't answer it.

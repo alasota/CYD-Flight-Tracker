@@ -2,7 +2,6 @@
 
 #include <vector>
 
-#include "admin/core/firmware/release_check.h"  // kUpdatePromptTimeoutMs
 #include "display/core/i18n.h"
 #include "display/core/text/fit_to_width.h"
 #include "display/adapters/lgfx/lcars_theme_draw.h"

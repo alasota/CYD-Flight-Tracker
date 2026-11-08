@@ -3,7 +3,7 @@
 #include <cstdio>
 
 #include "display/core/i18n.h"
-#include "admin/core/firmware/release_check.h"  // acceptPromptTap(), kUpdatePromptTimeoutMs
+#include "admin/core/firmware/release_check.h"  // acceptPromptTap()
 
 namespace {
 constexpr int16_t kBarW = 240;
