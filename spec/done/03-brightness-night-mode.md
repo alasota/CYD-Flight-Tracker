@@ -538,7 +538,7 @@ tłumienie × PWM 255 / 127 / 10 / 0, 100 próbek co 10 ms):
   (WinError 4551) blokował plik `.exe` testu, pomogło przebudowanie z inną flagą
   (`PLATFORMIO_BUILD_FLAGS=-DSHOT_NONCE=…`).
 
-Poprawione w vNEXT: wschód / zachód w UTC (o 1 h za wcześnie) przez cały dzień po restarcie
+Poprawione w v1.11.4: wschód / zachód w UTC (o 1 h za wcześnie) przez cały dzień po restarcie
 programowym (OTA, przywrócenie kopii), więc i okno nocy przesunięte o 1 h — restart programowy
 zachowuje zegar systemowy, więc `isTimeSynced()` było prawdą przed ustawieniem strefy przez
 `configTzTime()`, a pamięć czasów słońca na dzień nie uwzględniała przesunięcia UTC (ten sam

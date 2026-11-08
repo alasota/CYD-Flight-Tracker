@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **etap 7 z 8 zrobiony (vNEXT)** 2026-11-08, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 i 7 w vNEXT, etap 8 do zrobienia. Jedna specyfikacja dla całej
+Status: **etap 7 z 8 zrobiony (v1.11.4)** 2026-11-08, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 i 7 w v1.11.4, etap 8 do zrobienia. Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -630,7 +630,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   przetrwa restart). Na wersji `-dev` pytanie o aktualizację na żywo się nie pokaże
   (`installedIsDev`) — dowodem są testy natywne i demo `screen=3`.
 
-### Wynik etapu 6 (2026-11-07, wydany w vNEXT)
+### Wynik etapu 6 (2026-11-07, wydany w v1.11.4)
 
 - **§7 → obiekty.** `Config` nie ma już ani jednego płaskiego pola: to agregat dziewięciu
   obiektów wartości, każdy w nagłówku swojego kontekstu (bez `.cpp`, wartości domyślne te same
@@ -706,7 +706,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   przeglądarce (zakładki, kredyty na żywo, linia „Teraz”, pasek postępu OTA, przeładowanie po
   restarcie), zapis → restart → ta sama kopia zapasowa.
 
-### Wynik etapu 7 (2026-11-08, wydany w vNEXT)
+### Wynik etapu 7 (2026-11-08, wydany w v1.11.4)
 
 - **Zmiany nazw (11 commitów, jeden wpis słownika na commit, każdy `python
   tools/rename_symbols.py KLUCZ` + ręczne poprawki komentarzy):**
@@ -766,7 +766,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   `/light.json` pokazuje czasem wschód / zachód w UTC (05:44 / 14:57 po restarcie OTA, też
   05:42 / 14:58 w zrzucie „przed” etapu 6) zamiast czasu lokalnego (06:44 / 15:57 po starcie z
   USB). `refreshSun()` zapamiętuje czasy na cały dzień, więc okno nocy jest przesunięte o 1 h do
-  następnego dnia. Do osobnego `/fix`. **Poprawione w vNEXT (fix/sun-times-utc-after-boot).**
+  następnego dnia. Do osobnego `/fix`. **Poprawione w v1.11.4 (fix/sun-times-utc-after-boot).**
 - **Zostaje dla właściciela:** dotyk (zakładki, strony tabeli, „!”), auto-cycle, język ekranu
   PL ↔ EN.
 
