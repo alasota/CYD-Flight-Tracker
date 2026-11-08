@@ -608,7 +608,13 @@ Spec: `spec/done/03-brightness-night-mode.md`.
   midnight / sunset → sunrise, polar day = never, polar night = always), `decideBacklight()`,
   `onTouchWake()`, `shouldPollOpenSky()`, `lightStatusJson()`. `sun_times` = the sunrise
   equation (UTC minutes; `shiftSunTimes()` to local), tested against api.sunrise-sunset.org
-  (±3 min).
+  (±3 min). `refreshSunToday(SunToday &, synced, utc, local, home)` keeps today's times and
+  recomputes only when the local date, the **UTC offset** or home changes — so a change of
+  zone (set after boot, DST day) is picked up at once; the adapter (`backlight_ldr`) logs
+  `[light] sun today: …` when it returns true.
+- ⚠️ A software reset keeps the system clock, so `isTimeSynced()` is true before NTP;
+  `setup()` sets the zone first (`timeSyncSetZone()`, docs/screens.md "Time — the header
+  clock"), otherwise local time is UTC until `configTzTime()` runs.
 - **Rules:** a service screen (OTA progress / failed, update question, GitHub install) gets
   100 % at once (`backlightFullNow()` from the OTA observers). No night without a synced clock,
   and the night never brightens the screen (min of day and night level). At night with

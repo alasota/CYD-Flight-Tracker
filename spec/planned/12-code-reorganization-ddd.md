@@ -766,7 +766,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   `/light.json` pokazuje czasem wschód / zachód w UTC (05:44 / 14:57 po restarcie OTA, też
   05:42 / 14:58 w zrzucie „przed” etapu 6) zamiast czasu lokalnego (06:44 / 15:57 po starcie z
   USB). `refreshSun()` zapamiętuje czasy na cały dzień, więc okno nocy jest przesunięte o 1 h do
-  następnego dnia. Do osobnego `/fix`.
+  następnego dnia. Do osobnego `/fix`. **Poprawione w vNEXT (fix/sun-times-utc-after-boot).**
 - **Zostaje dla właściciela:** dotyk (zakładki, strony tabeli, „!”), auto-cycle, język ekranu
   PL ↔ EN.
 

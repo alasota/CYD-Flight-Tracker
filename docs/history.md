@@ -146,6 +146,20 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
 ## Brightness
 
 - Before spec 03 the board ran at half brightness all the time (LovyanGFX starts at 127).
+- **Sun times in UTC after a software reboot** (fixed in vNEXT, branch
+  `fix/sun-times-utc-after-boot`). From spec 03 until then, after an OTA install / restore
+  `/light.json` showed sunrise / sunset an hour early (05:44 / 14:57 instead of 06:44 / 15:57
+  CET) for the rest of the day, so the night window started and ended an hour early; a USB
+  power-on was fine. Two causes together: the ESP32 keeps the system time across a software
+  reset, so `isTimeSynced()` (`time() > 2021`) was true from boot while `TZ` was only set by
+  `configTzTime()` in `net_task` after WiFi connected — `mktime()` with no zone gave offset 0;
+  and `refreshSun()` cached the day's times keyed by (local date, home) only, so the UTC
+  values stuck until midnight. Same cache flaw: on the autumn DST day the times computed at
+  CEST stayed after 03:00 CET (an hour late; spring: early). Fix: the cache logic moved to the
+  pure, tested `refreshSunToday()` with the offset in its key, and `setup()` sets the zone
+  first (`timeSyncSetZone()`), which also fixes the header clock showing UTC for the
+  WiFi-connect seconds. Missed because the cache lived in the untested `#ifdef ARDUINO`
+  adapter — only `computeSunTimes()` / `shiftSunTimes()` were tested.
 
 ## Tooling and docs
 
