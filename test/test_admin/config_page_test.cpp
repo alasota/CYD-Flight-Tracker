@@ -323,6 +323,19 @@ static void test_message_and_detail(void) {
   ASSERT_NOT_CONTAINS(render(m), "class=\"msg");
 }
 
+// Regression: a save NVS refused was answered with "Saved."
+static void test_failed_save_is_reported_in_both_languages(void) {
+  ConfigPageModel m = baseModel();
+  m.hasMessage = true;
+  m.message = WebStr::SaveFailed;
+  m.isError = true;
+
+  m.cfg.web.language = Language::EN;
+  ASSERT_CONTAINS(render(m), "<div class=\"msg err\">Not saved");
+  m.cfg.web.language = Language::PL;
+  ASSERT_CONTAINS(render(m), "<div class=\"msg err\">Nie zapisano");
+}
+
 static void test_status_and_daily_credit_readout(void) {
   ConfigPageModel m = baseModel();
   m.cfg.web.language = Language::EN;
@@ -1113,6 +1126,7 @@ void run_config_page_tests() {
   RUN_TEST(test_selects_reflect_both_languages_independently);
   RUN_TEST(test_user_values_are_escaped);
   RUN_TEST(test_message_and_detail);
+  RUN_TEST(test_failed_save_is_reported_in_both_languages);
   RUN_TEST(test_status_and_daily_credit_readout);
   RUN_TEST(test_auto_cycle_checkbox_state);
   RUN_TEST(test_firmware_tab);
