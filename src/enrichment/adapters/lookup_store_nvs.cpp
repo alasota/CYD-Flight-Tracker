@@ -1,15 +1,16 @@
 // lookup_store_nvs — the Preferences (NVS) half of lookup_store: one namespace
-// per kind of record, the codec from lookup_store, a wipe-and-retry when NVS is
-// full. Hardware adapter, not covered by Unity (CLAUDE.md "Testing").
+// per kind of record, the codec and the eviction (storeSaveRecord()) from
+// lookup_store. Hardware adapter, not covered by Unity (CLAUDE.md "Testing").
 #include "enrichment/core/lookup_store.h"
 
+#include <Arduino.h>
 #include <Preferences.h>
 
 namespace {
 
-constexpr char kNsAircraft[] = "lk_ac";
-constexpr char kNsRoute[] = "lk_rt";
-constexpr char kNsAirport[] = "lk_ap";
+// Preferences::freeEntries() counts the page NVS keeps empty for its own
+// garbage collection; a write can't use those slots.
+constexpr size_t kSparePageEntries = 126;
 
 // NVS keys are limited to 15 characters; all our keys (icao24 = 6,
 // callsign <= 8, airport ICAO = 4) fit, anything longer is skipped.
@@ -30,43 +31,63 @@ bool has(const char *ns, const std::string &key) {
   return load(ns, key, ignored);
 }
 
+class PreferencesLookupNvs : public LookupNvs {
+ public:
+  bool put(const char *ns, const std::string &key, const std::string &value) override {
+    Preferences prefs;
+    if (!prefs.begin(ns, /*readOnly=*/false)) return false;
+    const size_t written = prefs.putString(key.c_str(), value.c_str());  // records are never empty
+    prefs.end();
+    return written > 0;
+  }
+
+  void clear(const char *ns) override {
+    Preferences prefs;
+    if (!prefs.begin(ns, /*readOnly=*/false)) return;
+    prefs.clear();
+    prefs.end();
+  }
+
+  size_t freeEntries() override {
+    Preferences prefs;
+    const size_t reported = prefs.freeEntries();
+    return reported > kSparePageEntries ? reported - kSparePageEntries : 0;
+  }
+};
+
 void save(const char *ns, const std::string &key, const std::string &value) {
   if (!validKey(key)) return;
-  Preferences prefs;
-  if (!prefs.begin(ns, /*readOnly=*/false)) return;
-  if (prefs.putString(key.c_str(), value.c_str()) == 0) {
-    // NVS full: drop this kind's whole cache and start over.
-    prefs.clear();
-    prefs.putString(key.c_str(), value.c_str());
+  PreferencesLookupNvs nvs;
+  if (!storeSaveRecord(nvs, ns, key, value)) {
+    Serial.printf("[lookup] could not store %s in %s: NVS full\n", key.c_str(), ns);
   }
-  prefs.end();
 }
 
 }  // namespace
 
 bool storeLoadAircraft(const std::string &icao24, AircraftInfo &out) {
   std::string s;
-  return load(kNsAircraft, icao24, s) && decodeAircraftInfo(s, out);
+  return load(kLookupNsAircraft, icao24, s) && decodeAircraftInfo(s, out);
 }
 void storeSaveAircraft(const std::string &icao24, const AircraftInfo &info) {
-  save(kNsAircraft, icao24, encodeAircraftInfo(info));
+  save(kLookupNsAircraft, icao24, encodeAircraftInfo(info));
 }
-bool storeHasAircraft(const std::string &icao24) { return has(kNsAircraft, icao24); }
+bool storeHasAircraft(const std::string &icao24) { return has(kLookupNsAircraft, icao24); }
 
 bool storeLoadRoute(const std::string &callsign, RouteInfo &out) {
   std::string s;
-  return load(kNsRoute, callsign, s) && decodeRouteInfo(s, out);
+  return load(kLookupNsRoute, callsign, s) && decodeRouteInfo(s, out);
 }
 void storeSaveRoute(const std::string &callsign, const RouteInfo &info) {
-  save(kNsRoute, callsign, encodeRouteInfo(info));
+  save(kLookupNsRoute, callsign, encodeRouteInfo(info));
 }
-bool storeHasRoute(const std::string &callsign) { return has(kNsRoute, callsign); }
+bool storeHasRoute(const std::string &callsign) { return has(kLookupNsRoute, callsign); }
 
 bool storeLoadAirport(const std::string &code, AirportInfo &out) {
   std::string s;
-  return load(kNsAirport, code, s) && decodeAirportInfo(s, out);
+  return load(kLookupNsAirport, code, s) && decodeAirportInfo(s, out);
 }
 void storeSaveAirport(const std::string &code, const AirportInfo &info) {
-  save(kNsAirport, code, encodeAirportInfo(info));
+  save(kLookupNsAirport, code, encodeAirportInfo(info));
 }
-bool storeHasAirport(const std::string &code) { return has(kNsAirport, code); }
+bool storeHasAirport(const std::string &code) { return has(kLookupNsAirport, code); }

@@ -198,6 +198,80 @@ static void test_save_reports_failure_when_nothing_can_be_evicted(void) {
   TEST_ASSERT_FALSE(storeSaveRecord(nvs, "lk_ap", "EKBI", kRecord));
 }
 
+// Exactly the reserve left after the record (kRecord takes 3 slots): no wipe.
+static void test_save_wipes_nothing_when_the_reserve_just_holds(void) {
+  FakeNvs nvs(kLookupStoreReserveEntries + 3);
+
+  TEST_ASSERT_TRUE(storeSaveRecord(nvs, "lk_ap", "EKBI", kRecord));
+
+  TEST_ASSERT_EQUAL_UINT32(0, nvs.cleared().size());
+}
+
+// Fills `count` two-slot records into `ns`.
+void addRecords(FakeNvs &nvs, const char *ns, int count) {
+  for (int i = 0; i < count; ++i) nvs.put(ns, "key" + std::to_string(i), "x");
+}
+
+// The other kinds' records survive when wiping the record's own kind is enough.
+static void test_save_stops_wiping_once_the_reserve_is_back(void) {
+  FakeNvs nvs(100);
+  addRecords(nvs, "lk_ap", 20);
+  addRecords(nvs, "lk_ac", 15);
+
+  TEST_ASSERT_TRUE(storeSaveRecord(nvs, "lk_ap", "EKBI", kRecord));
+
+  TEST_ASSERT_EQUAL_UINT32(1, nvs.cleared().size());
+  ASSERT_STR_EQ("lk_ap", nvs.cleared()[0]);
+  ASSERT_STR_EQ("x", nvs.get("lk_ac", "key0"));
+}
+
+static void test_save_wipes_its_own_kind_before_the_others(void) {
+  FakeNvs nvs(100);
+  addRecords(nvs, "lk_ap", 5);
+  addRecords(nvs, "lk_ac", 30);
+
+  TEST_ASSERT_TRUE(storeSaveRecord(nvs, "lk_ap", "EKBI", kRecord));
+
+  TEST_ASSERT_EQUAL_UINT32(2, nvs.cleared().size());
+  ASSERT_STR_EQ("lk_ap", nvs.cleared()[0]);
+  ASSERT_STR_EQ("lk_ac", nvs.cleared()[1]);
+}
+
+// NVS can refuse a write despite free slots (fragmented pages).
+class RefusingNvs : public FakeNvs {
+ public:
+  RefusingNvs(size_t capacity, int refusals) : FakeNvs(capacity), refusals_(refusals) {}
+  bool put(const char *ns, const std::string &key, const std::string &value) override {
+    if (refusals_ > 0) {
+      --refusals_;
+      return false;
+    }
+    return FakeNvs::put(ns, key, value);
+  }
+
+ private:
+  int refusals_;
+};
+
+static void test_save_wipes_the_next_kind_and_retries_after_a_refused_write(void) {
+  RefusingNvs nvs(200, 1);
+
+  TEST_ASSERT_TRUE(storeSaveRecord(nvs, "lk_rt", "LOT282", kRecord));
+
+  TEST_ASSERT_EQUAL_UINT32(1, nvs.cleared().size());
+  ASSERT_STR_EQ("lk_rt", nvs.cleared()[0]);
+  ASSERT_STR_EQ(kRecord, nvs.get("lk_rt", "LOT282"));
+}
+
+static void test_save_gives_up_after_wiping_every_lookup_kind(void) {
+  RefusingNvs nvs(200, 100);
+
+  TEST_ASSERT_FALSE(storeSaveRecord(nvs, "lk_rt", "LOT282", kRecord));
+
+  TEST_ASSERT_EQUAL_UINT32(3, nvs.cleared().size());
+  ASSERT_NOT_CONTAINS(nvs.cleared(), "cydsky");
+}
+
 }  // namespace
 
 void run_lookup_store_tests() {
@@ -214,5 +288,10 @@ void run_lookup_store_tests() {
   RUN_TEST(test_lookup_records_always_leave_room_for_settings);
   RUN_TEST(test_full_nvs_never_wipes_the_settings);
   RUN_TEST(test_save_reports_failure_when_nothing_can_be_evicted);
+  RUN_TEST(test_save_wipes_nothing_when_the_reserve_just_holds);
+  RUN_TEST(test_save_stops_wiping_once_the_reserve_is_back);
+  RUN_TEST(test_save_wipes_its_own_kind_before_the_others);
+  RUN_TEST(test_save_wipes_the_next_kind_and_retries_after_a_refused_write);
+  RUN_TEST(test_save_gives_up_after_wiping_every_lookup_kind);
 
 }
