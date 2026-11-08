@@ -24,7 +24,7 @@
 #include <vector>
 
 #include "enrichment/core/aircraft_lookup.h"
-#include "platform/core_link.h"  // AirspaceSnapshot
+#include "airspace/core/airspace_snapshot.h"  // AirspaceSnapshot
 #include "airspace/core/aircraft_state.h"  // AircraftState
 #include "airspace/core/flight_phase.h"    // PhaseThresholds
 #include "airspace/core/home.h"            // Home

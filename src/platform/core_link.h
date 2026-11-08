@@ -28,12 +28,11 @@
 #include <vector>
 
 #include "admin/core/settings.h"   // Settings
-#include "airspace/core/cpa_predictor.h"  // CpaPrediction
+#include "airspace/core/airspace_snapshot.h"  // AirspaceSnapshot
 #include "admin/core/device_alerts.h"  // AlertSet, AlertDetails
 #include "display/core/redraw_policy.h"  // RedrawEvents
 #include "admin/core/firmware/release_check.h"  // UpdateStatus
 #include "airspace/core/feed_health.h"  // FeedHealth
-#include "airspace/core/tracked_flight.h"  // TrackedFlight
 #include "platform/wifi_manager.h"   // WifiStatus
 
 #ifdef ARDUINO
@@ -127,15 +126,6 @@ class Guarded {
 };
 
 // ---- Net -> UI snapshot -----------------------------------------------------
-
-// One poll's processed data (poll_pipeline). Immutable once published.
-struct AirspaceSnapshot {
-  std::vector<TrackedFlight> rows;  // sorted, enriched, phases classified
-  int nowRowIndex = -1;             // pickNowAircraft(), -1 = none
-  CpaPrediction cpa;                // for nowRowIndex, as of polledAtMs
-  uint32_t polledAtMs = 0;          // millis() of the /states/all answer
-  uint32_t fetches = 0;             // new hexdb.io requests that went into it
-};
 
 // The firmware-update progress screen, drawn by the UI from this (the OTA
 // code on core 0 never touches the display).
