@@ -1,7 +1,8 @@
 // alert_sources — where the device-alert inputs come from on the board: the
 // OpenSky login and credits (opensky_client), tonight's night window
-// (backlight) and the settings. Adapter, not covered by Unity (CLAUDE.md
-// "Testing"); collectAlerts() and the rest of device_alerts are pure.
+// (backlight) and the settings. Joins data from three contexts, so it lives in
+// the composition root; not covered by Unity (CLAUDE.md "Testing"),
+// collectAlerts() and the rest of device_alerts are pure.
 #include "admin/core/device_alerts.h"
 
 #include "admin/core/config_page.h"       // openSkyDailyCredits(), pausedMinutesPerDay()
