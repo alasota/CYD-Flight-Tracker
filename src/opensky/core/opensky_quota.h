@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <string>
 
-#include "display/core/i18n.h"  // Language
+#include "shared/language.h"  // Language
 
 struct OpenSkyQuota {
   enum class State : uint8_t {

@@ -21,7 +21,7 @@
 
 #include <string>
 
-#include "display/core/i18n.h"          // Language
+#include "shared/language.h"             // Language
 #include "enrichment/core/route_lookup.h"  // AirportInfo
 
 // UTF-8 -> printable ASCII: accented Latin letters lose their accents
