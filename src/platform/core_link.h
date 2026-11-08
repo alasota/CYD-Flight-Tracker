@@ -29,6 +29,7 @@
 
 #include "admin/core/settings.h"   // Settings
 #include "airspace/core/airspace_snapshot.h"  // AirspaceSnapshot
+#include "airspace/core/tracked_flight.h"  // TrackedFlight, for the UI
 #include "admin/core/device_alerts.h"  // AlertSet, AlertDetails
 #include "display/core/redraw_policy.h"  // RedrawEvents
 #include "admin/core/firmware/release_check.h"  // UpdateStatus
