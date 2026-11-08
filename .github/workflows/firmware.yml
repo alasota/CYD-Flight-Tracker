@@ -67,10 +67,10 @@ jobs:
         # esptool pinned: v5 renamed merge_bin / --flash_mode to merge-bin / --flash-mode.
         run: pip install --upgrade platformio "esptool==4.11.0"
 
-      - name: Layer check (report only)
+      - name: Layer check
         # Includes that break spec 12's dependency table (context / layer), SDK headers
-        # outside adapters, short includes. Prints findings, exits 0 until stage 7 makes it blocking.
-        run: python tools/check_layers.py
+        # outside adapters, short includes. Any finding fails the build.
+        run: python tools/check_layers.py --strict
 
       - name: Unit tests (native)
         run: pio test -e native
