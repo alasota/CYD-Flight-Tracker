@@ -40,12 +40,12 @@ from test_check_layers import declaration_lines  # noqa: E402
 SOURCE_SUFFIXES = {".h", ".hpp", ".c", ".cpp"}
 
 # The .feature's Examples: (old, new, the file from the repository root that declares the new
-# name after stage 7).
+# name after stage 8, which moved ScanArea and AirspaceSnapshot to their own headers).
 GLOSSARY_EXAMPLES = [
-    ("BoundingBox", "ScanArea", "src/opensky/core/opensky_client.h"),
-    ("computeBoundingBox", "computeScanArea", "src/opensky/core/opensky_client.h"),
+    ("BoundingBox", "ScanArea", "src/opensky/core/scan_area.h"),
+    ("computeBoundingBox", "computeScanArea", "src/opensky/core/scan_area.h"),
     ("OpenSkyHealth", "FeedHealth", "src/airspace/core/feed_health.h"),
-    ("DataSnapshot", "AirspaceSnapshot", "src/platform/core_link.h"),
+    ("DataSnapshot", "AirspaceSnapshot", "src/airspace/core/airspace_snapshot.h"),
     ("buildDataSnapshot", "buildAirspaceSnapshot", "src/airspace/services/poll_pipeline.h"),
     ("LookupPorts", "EnrichmentPort", "src/airspace/services/poll_pipeline.h"),
     ("AircraftRow", "TrackedFlight", "src/airspace/core/tracked_flight.h"),

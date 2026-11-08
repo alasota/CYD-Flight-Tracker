@@ -35,6 +35,11 @@ STAGE_7_RENAMES = {
     "admin/core/config_store.h": "admin/core/settings.h",
     "admin/core/config_store.cpp": "admin/core/settings.cpp",
 }
+# Stage 8 moves the /screenshot.bmp helpers to the web panel's context (no rename).
+STAGE_8_MOVES = {
+    "display/services/screenshot.h": "admin/core/screenshot.h",
+    "display/services/screenshot.cpp": "admin/core/screenshot.cpp",
+}
 # A stage-1 path in a layer folder stage 2 renames: <ctx>/domain/, <ctx>/app/ or the root app/.
 _OLD_LAYER_RE = re.compile(r"^(?:(airspace|enrichment|opensky|display|admin)/(domain|app)/|app/)")
 
@@ -135,18 +140,18 @@ class MoveTableTest(unittest.TestCase):
         # Stages 1 and 2 only move files; stage 4 renames exactly config_portal -> web_server,
         # stage 7 exactly config_store -> settings.
         self.assertEqual(STAGE_0_FILE_COUNT, len(ri.MOVES_STAGE_1))
-        self.assertEqual(4, len(ri.STAGES), "STAGES = the stage 1, 2, 4 and 7 tables")
+        self.assertGreaterEqual(len(ri.STAGES), 4, "STAGES starts with the stage 1, 2, 4, 7 tables")
         self.assertIs(ri.MOVES_STAGE_1, ri.STAGES[0])
         self.assertIs(ri.MOVES_STAGE_2, ri.STAGES[1])
         self.assertIs(getattr(ri, "MOVES_STAGE_4", None), ri.STAGES[2])
         self.assertIs(getattr(ri, "MOVES_STAGE_7", None), ri.STAGES[3])
-        expected_renames = {1: {}, 2: {}, 3: STAGE_4_RENAMES, 4: STAGE_7_RENAMES}
+        expected_renames = {3: STAGE_4_RENAMES, 4: STAGE_7_RENAMES}  # the other tables: none
         for stage, table in enumerate(ri.STAGES, 1):
             with self.subTest(table=stage):
                 self.assertEqual(len(table), len(set(table.values())))
                 renamed = {o: n for o, n in table.items()
                            if posixpath.basename(o) != posixpath.basename(n)}
-                self.assertEqual(expected_renames[stage], renamed)
+                self.assertEqual(expected_renames.get(stage, {}), renamed)
         finals = [ri.final_path(old) for old in ri.MOVES_STAGE_1]
         self.assertEqual(len(finals), len(set(finals)), "two files share a final path")
 
@@ -161,7 +166,6 @@ class MoveTableTest(unittest.TestCase):
             "config_portal.h": "admin/adapters/web_server.h",
             "config_portal.cpp": "admin/adapters/web_server.cpp",
             "web_i18n.cpp": "admin/core/web_i18n.cpp",
-            "screenshot.cpp": "display/services/screenshot.cpp",
             "sun_times.h": "shared/sun_times.h",
             "core_link.cpp": "platform/core_link.cpp",
             "hexdb_http.h": "enrichment/adapters/hexdb_http.h",
@@ -192,8 +196,7 @@ class MoveTableTest(unittest.TestCase):
     def test_stage_7_renames_config_store_to_settings(self):
         table = getattr(ri, "MOVES_STAGE_7", None)
         self.assertIsNotNone(table, "rewrite_includes.py has no MOVES_STAGE_7")
-        self.assertIs(table, ri.STAGES[-1], "MOVES_STAGE_7 is the last table in STAGES")
-        self.assertIs(table, ri.MOVES)
+        self.assertIs(table, ri.STAGES[3], "MOVES_STAGE_7 is the fourth table in STAGES")
         self.assertEqual(STAGE_7_RENAMES, table)
         rows = [("config_store.h", "admin/core/settings.h"),
                 ("config_store.cpp", "admin/core/settings.cpp")]
@@ -206,6 +209,23 @@ class MoveTableTest(unittest.TestCase):
         # The stage-4 rename and the other settings modules keep their final paths.
         self.assertEqual("admin/adapters/web_server.h", ri.final_path("config_portal.h"))
         self.assertEqual("admin/core/config_backup.h", ri.final_path("config_backup.h"))
+
+    # Scenario: Pomocnicy /screenshot.bmp (BMP, ?screen=) należą do admin/core, bo używa ich
+    # panel WWW
+    def test_stage_8_moves_screenshot_to_admin_core(self):
+        table = getattr(ri, "MOVES_STAGE_8", None)
+        self.assertIsNotNone(table, "rewrite_includes.py has no MOVES_STAGE_8")
+        self.assertEqual(5, len(ri.STAGES), "STAGES = the stage 1, 2, 4, 7 and 8 tables")
+        self.assertIs(table, ri.STAGES[-1], "MOVES_STAGE_8 is the last table in STAGES")
+        self.assertIs(table, ri.MOVES)
+        self.assertEqual(STAGE_8_MOVES, table)
+        for name in ("screenshot.h", "screenshot.cpp"):
+            with self.subTest(file=name):
+                self.assertEqual("admin/core/" + name, ri.final_path(name))
+                self.assertTrue((ROOT / "src/admin/core" / name).is_file(),
+                                f"src/admin/core/{name}")
+                self.assertFalse((ROOT / "src/display/services" / name).exists(),
+                                 f"src/display/services/{name}")
 
     # Scenario Outline: Etap 2 zmienia tylko nazwę katalogu warstwy, nie plik
     def test_stage_2_renames_the_layer_folder(self):
@@ -303,17 +323,16 @@ class MoveCliTest(unittest.TestCase):
             with mock.patch.object(ri, "MOVES", ri.MOVES_STAGE_4):
                 self.assertEqual(0, ri.move_files(Path(tmp)))
 
-    # Edge case: --move applies the newest table, stage 7's config_store -> settings; the
-    # default rewrite then fixes the include, and a second --move moves nothing.
+    # Edge case: --move with the stage 7 table moves config_store -> settings; the default
+    # rewrite then fixes the include, and a second --move moves nothing.
     def test_move_applies_the_stage_7_rename(self):
         with tempfile.TemporaryDirectory() as tmp:
             git_tree(tmp, {"src/admin/core/config_store.h": "#pragma once\n",
                            "src/admin/core/config_store.cpp":
                                '#include "admin/core/config_store.h"\n',
                            "src/admin/core/config_backup.h": "#pragma once\n"})
-            code, out = run_cli(tmp, "--move")
-            self.assertEqual(0, code, out)
-            self.assertIn("moved 2 file(s)", out)
+            with mock.patch.object(ri, "MOVES", ri.MOVES_STAGE_7):
+                self.assertEqual(2, ri.move_files(Path(tmp)))
             core = Path(tmp) / "src/admin/core"
             self.assertTrue((core / "settings.h").is_file())
             self.assertTrue((core / "settings.cpp").is_file())
@@ -326,9 +345,8 @@ class MoveCliTest(unittest.TestCase):
             self.assertEqual(0, code, out)
             self.assertEqual(b'#include "admin/core/settings.h"\n',
                              (core / "settings.cpp").read_bytes())
-            code, out = run_cli(tmp, "--move")
-            self.assertEqual(0, code, out)
-            self.assertIn("moved 0 file(s)", out)
+            with mock.patch.object(ri, "MOVES", ri.MOVES_STAGE_7):
+                self.assertEqual(0, ri.move_files(Path(tmp)))
 
 
 class RewriteTest(unittest.TestCase):

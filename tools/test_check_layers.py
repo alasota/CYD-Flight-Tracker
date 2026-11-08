@@ -6,6 +6,8 @@ and pin the state spec 12 stages 2–6 leave behind.
 """
 
 import configparser
+import contextlib
+import io
 import re
 import subprocess
 import sys
@@ -14,6 +16,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import check_comments  # noqa: E402
 import check_layers  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,9 +31,10 @@ RUN_TEST_BASELINE = 874
 # tracked_flight.h -> enrichment/core), 14 after stage 4 (-38 SDK / adapter / platform includes
 # that left core/ with the hardware halves, +5 adapters reaching another context's core), 12
 # after stage 6 (-2: opensky_http.cpp and backlight_ldr.cpp take their settings objects instead
-# of including config_store.h). A limit, not a pin: a stage that lowers the count lowers this
-# number with it, so a new finding can't hide under the old limit.
-LAYER_FINDINGS_LIMIT = 12
+# of including config_store.h), 0 after stage 8 (all 12 removed in the code, section 5's table
+# unchanged). A limit, not a pin: a stage that lowers the count lowers this number with it, so a
+# new finding can't hide under the old limit.
+LAYER_FINDINGS_LIMIT = 0
 
 # Stage 3 (spec 12 section 8 item 3): symbol -> (new header, old header), both from src/. The
 # types carry their stage-7 glossary names (AircraftRow, OpenSkyHealth, Aircraft before).
@@ -170,7 +174,8 @@ STAGE_4_ADAPTERS = {
     "releaseCheckLoop": ("admin/adapters/github_http.cpp",
                          "admin/core/firmware/release_check.cpp"),
     "loadSettings": ("admin/adapters/settings_nvs.cpp", "admin/core/settings.cpp"),
-    "deviceAlertInputs": ("admin/adapters/alert_sources.cpp", "admin/core/device_alerts.cpp"),
+    # In the composition root since stage 8: it joins data from three contexts.
+    "deviceAlertInputs": ("main/alert_sources.cpp", "admin/core/device_alerts.cpp"),
 }
 
 # Stage 4: symbol -> (new header, old header), both from src/. The old home of the first five is
@@ -386,6 +391,58 @@ STAGE_6_GONE_FINDINGS = ["opensky/adapters/opensky_http.cpp", "display/adapters/
 # Stage 7 (spec 12 section 3, the glossary): the web server's functions, after webServer.
 WEB_SERVER_FUNCTIONS = ["Begin", "Loop", "IsActive", "SaveCount", "SetScreenshotSource",
                         "SetOtaObserver", "SetPerfSource", "RestartPending"]
+
+# Stage 8 (spec 12 section 8 item 8): symbol -> (new header, old header), both from src/ (the
+# .feature's Examples).
+STAGE_8_HOMES = {
+    "Language": ("shared/language.h", "display/core/i18n.h"),
+    "AirspaceSnapshot": ("airspace/core/airspace_snapshot.h", "platform/core_link.h"),
+    "ScanArea": ("opensky/core/scan_area.h", "opensky/core/opensky_client.h"),
+    "computeScanArea": ("opensky/core/scan_area.h", "opensky/core/opensky_client.h"),
+    "kUpdatePromptTimeoutMs": ("display/core/screens/service_screen.h",
+                               "admin/core/firmware/release_check.h"),
+    "AircraftInfo": ("shared/flight_info.h", "enrichment/core/aircraft_lookup.h"),
+    "RouteInfo": ("shared/flight_info.h", "enrichment/core/route_lookup.h"),
+    "AirportInfo": ("shared/flight_info.h", "enrichment/core/route_lookup.h"),
+}
+
+# Stage 8: (file from src/, layer it may no longer include) -- the .feature's Examples.
+STAGE_8_DECOUPLED = [
+    ("enrichment/core/place_names.h", "display/core"),
+    ("opensky/core/opensky_quota.h", "display/core"),
+    ("airspace/services/poll_pipeline.h", "platform"),
+    ("airspace/core/tracked_flight.h", "enrichment/core"),
+    ("display/adapters/lgfx/service_screen_draw.cpp", "admin/core"),
+]
+
+# Stage 8 (section 10 item 3): the limits next to MAIN_CPP_LINE_LIMIT.
+NET_TASK_LINE_LIMIT = 300
+SRC_FILE_LINE_LIMIT = 600
+
+# Stage 8: function net_task.cpp no longer defines -> its file in src/main/.
+STAGE_8_NET_TASK_PARTS = {
+    "productionPorts": "net_enrichment.cpp",
+    "buildReport": "net_perf.cpp",
+    "perfIteration": "net_perf.cpp",
+    "perfJsonNow": "net_perf.cpp",
+    "markAppValidWhenStable": "net_rollback.cpp",
+}
+
+# Stage 8: what docs/architecture.md "Source layout" carries from the spec -- the first column
+# of the section 5 table and the code names of the section 3 glossary. Written out here: the
+# spec moves to spec/done/ when stage 8 ships.
+STAGE_8_DEPENDENCY_ROWS = ["shared", "airspace/core", "enrichment/core", "opensky/core",
+                           "display/core", "admin/core", "airspace/services", "display/services",
+                           "admin/services", "platform", "*/adapters", "main/"]
+STAGE_8_GLOSSARY_TERMS = ["Home", "ScanArea", "AircraftState", "TrackedFlight",
+                          "AirspaceSnapshot", "Phase", "CpaPrediction", "AircraftInfo",
+                          "RouteInfo", "AirportInfo", "OpenSkyQuota", "FeedHealth", "AlertId",
+                          "Settings"]
+
+# Stage 8: the module list CLAUDE.md "Code conventions" no longer has (it moved to the docs).
+STAGE_8_MODULE_LIST_MARKERS = ["**Data, core 0:**", "**Settings and maintenance:**",
+                               "**Shared / platform:**", "**Adapters (device halves):**",
+                               "**Sky model", "**Display, core 1:**", "**UI flows"]
 
 # Old layer folder names in a path: <ctx>/domain, <ctx>/app, src/app/, the -<app/> filter.
 OLD_LAYER_PATH_RE = re.compile(r"\b(airspace|enrichment|opensky|display|admin)/(domain|app)\b"
@@ -867,6 +924,17 @@ class CliTest(unittest.TestCase):
         self.assertEqual(1, dirty, out)
         self.assertEqual(0, clean, out_clean)
 
+    # Edge case (plan "Test list"): what CI prints when there is nothing to report.
+    def test_strict_on_a_clean_tree_prints_a_zero_total(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_tree(tmp, {"src/platform/b.cpp": '#include "shared/s.h"\n',
+                             "src/shared/s.h": ""})
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = check_layers.main(["--strict", "--root", tmp])
+        self.assertEqual(0, code, out.getvalue())
+        self.assertEqual("0 layer finding(s) in total\n", out.getvalue())
+
     def test_summary_counts_per_pair_and_output_is_ascii(self):
         files = dict(TWO_VIOLATIONS)
         files["src/display/core/c.cpp"] = '#include "opensky/core/q.h"\n'
@@ -998,8 +1066,9 @@ class LayoutTest(unittest.TestCase):
     # Scenario Outline: Raport warstw nie zgłasza już include'ów, które były potrzebne tylko dla
     # przeniesionych typów
     def test_stage_3_removes_the_misplaced_type_findings(self):
-        findings = check_layers.check_files(check_layers.load_tree(ROOT))
-        self.assertGreater(len(findings), 0, "check_layers found nothing at all")
+        files = check_layers.load_tree(ROOT)
+        findings = check_layers.check_files(files)
+        self.assertGreater(len(files), 100, "check_layers loaded almost nothing")
         for path, layer in STAGE_3_GONE_FINDINGS:
             with self.subTest(path=path, layer=layer):
                 self.assertTrue((ROOT / "src" / path).is_file(), f"src/{path}")
@@ -1130,8 +1199,9 @@ class LayoutTest(unittest.TestCase):
     # Scenario Outline: Raport warstw nie zgłasza już SDK, adapterów ani platform/ dołączanych
     # z core/ i z testów
     def test_stage_4_removes_sdk_and_adapter_findings_from_core(self):
-        findings = check_layers.check_files(check_layers.load_tree(ROOT))
-        self.assertGreater(len(findings), 0, "check_layers found nothing at all")
+        files = check_layers.load_tree(ROOT)
+        findings = check_layers.check_files(files)
+        self.assertGreater(len(files), 100, "check_layers loaded almost nothing")
         for source, target in STAGE_4_GONE_PAIRS:
             with self.subTest(source=source, target=target):
                 hits = [f for f in findings if f.message.startswith(f"{source} -> {target} ")]
@@ -1355,7 +1425,7 @@ class LayoutTest(unittest.TestCase):
     def test_stage_6_removes_the_settings_findings_of_adapters(self):
         files = check_layers.load_tree(ROOT)
         findings = check_layers.check_files(files) + check_layers.full_path_findings(files)
-        self.assertGreater(len(findings), 0, "check_layers found nothing at all")
+        self.assertGreater(len(files), 100, "check_layers loaded almost nothing")
         for path in STAGE_6_GONE_FINDINGS:
             with self.subTest(path=path):
                 self.assertTrue((ROOT / "src" / path).is_file(), f"src/{path}")
@@ -1382,10 +1452,13 @@ class LayoutTest(unittest.TestCase):
             encoding="utf-8", errors="replace"))
         self.assertRegex(main, r"\bRUN_MODULE\(\s*settings\s*\)\s*\)\s*run_settings_tests\(\)")
         self.assertNotRegex(main, r"\bconfig_store\b")
-        proc = subprocess.run([sys.executable, str(TOOL.parent / "rewrite_includes.py"),
-                               "--root", str(ROOT), "--check"], capture_output=True)
-        self.assertEqual(0, proc.returncode,
-                         (proc.stdout + proc.stderr).decode("utf-8", "replace"))
+        # The migration tool leaves at the end of stage 8 (test_one_off_migration_tools_are_gone).
+        rewrite_tool = TOOL.parent / "rewrite_includes.py"
+        if rewrite_tool.is_file():
+            proc = subprocess.run([sys.executable, str(rewrite_tool), "--root", str(ROOT),
+                                   "--check"], capture_output=True)
+            self.assertEqual(0, proc.returncode,
+                             (proc.stdout + proc.stderr).decode("utf-8", "replace"))
 
     # Scenario: NetState niesie ustawienia pod nazwą settings
     def test_net_state_carries_settings(self):
@@ -1419,6 +1492,225 @@ class LayoutTest(unittest.TestCase):
         self.assertRegex(wifi, r"\.setConfigPortalBlocking\s*\(",
                          "wifi_manager.cpp no longer calls WiFiManager's setConfigPortalBlocking()")
 
+    # Scenario Outline: Typ lub stała, przez które zależności szły w złą stronę, leżą w swoim
+    # kontekście
+    def test_stage_8_symbols_are_declared_in_their_new_home(self):
+        self.assertEqual(8, len(STAGE_8_HOMES))
+        headers = {p: t for p, t in repo_sources("src").items() if p.endswith((".h", ".hpp"))}
+        self.assertGreater(len(headers), 30)
+        for symbol, (new, old) in STAGE_8_HOMES.items():
+            with self.subTest(symbol=symbol):
+                hits = [f"{p}:{n}" for p, t in headers.items()
+                        for n in declaration_lines(t, symbol) + constant_lines(t, symbol)]
+                self.assertFalse([h for h in hits if h.startswith(f"src/{old}:")],
+                                 f"{symbol} still declared in src/{old}: {hits}")
+                self.assertEqual([f"src/{new}"], [h.rsplit(":", 1)[0] for h in hits],
+                                 f"declarations of {symbol}: {hits or 'none'}")
+
+    # Edge case (plan "Test list"): shared/ sees only shared/, and these two headers hold plain
+    # types, so they need nothing but the standard library (spec 12 section 4.6).
+    def test_stage_8_shared_headers_include_only_the_standard_library(self):
+        for header in ("shared/language.h", "shared/flight_info.h"):
+            with self.subTest(header=header):
+                path = ROOT / "src" / header
+                self.assertTrue(path.is_file(), f"src/{header}")
+                includes = check_layers.find_includes(path.read_text(encoding="utf-8",
+                                                                     errors="replace"))
+                foreign = [i.name for i in includes
+                           if not i.angle or check_layers.is_sdk_header(i.name)
+                           or i.name in ("ArduinoJson.h", "unity.h")]
+                self.assertEqual([], foreign, f"src/{header} includes more than the standard "
+                                              "library")
+
+    # Scenario: Pomocnicy /screenshot.bmp (BMP, ?screen=) należą do admin/core, bo używa ich
+    # panel WWW
+    def test_screenshot_module_is_in_admin_core(self):
+        services = sorted(p.name for p in (ROOT / "src/display/services").glob("screenshot*"))
+        self.assertEqual(["screenshot_bridge.cpp", "screenshot_bridge.h"], services,
+                         "screenshot files in src/display/services/")
+        for name in ("screenshot.h", "screenshot.cpp"):
+            with self.subTest(file=name):
+                self.assertTrue((ROOT / "src/admin/core" / name).is_file(),
+                                f"src/admin/core/{name}")
+        sources = repo_sources("src", "test")
+        self.assertGreater(len(sources), 100)
+        old = [f"{p}:{i.line}" for p, t in sources.items() for i in check_layers.find_includes(t)
+               if i.name == "display/services/screenshot.h"]
+        self.assertEqual([], old, "includes of display/services/screenshot.h")
+
+    # Scenario: Serwer WWW nie sięga po dane innych kontekstów
+    def test_web_server_includes_only_its_own_context(self):
+        adapters = ROOT / "src/admin/adapters"
+        cpp_files = sorted(adapters.glob("web_server*.cpp"))
+        self.assertTrue(cpp_files, "no web_server*.cpp in src/admin/adapters/")
+        for path in cpp_files:
+            with self.subTest(file=path.name):
+                text = path.read_text(encoding="utf-8", errors="replace")
+                quoted = [i.name for i in check_layers.find_includes(text) if not i.angle]
+                self.assertGreater(len(quoted), 3, f"too few includes found in {path.name}")
+                foreign = [n for n in quoted
+                           if not n.startswith(("admin/", "shared/", "platform/"))]
+                self.assertEqual([], foreign, f"includes of other contexts in {path.name}")
+        web_server = strip_comments((adapters / "web_server.cpp").read_text(encoding="utf-8",
+                                                                             errors="replace"))
+        self.assertTrue(re.search(r"\bpanelLiveInputs\s*\(", web_server),
+                        "web_server.cpp doesn't call panelLiveInputs()")
+        page = (ROOT / "src/admin/core/config_page.h").read_text(encoding="utf-8",
+                                                                 errors="replace")
+        self.assertEqual([["const Settings &"]], parameter_types(page, "panelLiveInputs"),
+                         "panelLiveInputs() in src/admin/core/config_page.h")
+        members = struct_members(page, "PanelLiveInputs")
+        self.assertIsNotNone(members, "no struct PanelLiveInputs in admin/core/config_page.h")
+        self.assertCountEqual(["quota", "auth", "light"], [name for _, name in members],
+                              "the fields of PanelLiveInputs")
+
+    # Scenario: Dane z urządzenia z kilku kontekstów składa korzeń kompozycji
+    def test_foreign_device_inputs_are_wired_in_the_composition_root(self):
+        sources = {p: t for p, t in repo_sources("src").items() if p.endswith(".cpp")}
+        self.assertGreater(len(sources), 30)
+        for function in ("deviceAlertInputs", "panelLiveInputs"):
+            with self.subTest(function=function):
+                defs = [p for p, t in sources.items()
+                        for _ in declaration_lines(t, function, bodies_only=True)]
+                self.assertEqual(["src/main/alert_sources.cpp"], defs,
+                                 f"definitions of {function}()")
+        self.assertFalse((ROOT / "src/admin/adapters/alert_sources.cpp").exists(),
+                         "src/admin/adapters/alert_sources.cpp still exists")
+
+    # Scenario Outline: Plik, który łamał tabelę z §5, dołącza już tylko dozwolone warstwy
+    def test_layers_are_decoupled_in_the_named_headers(self):
+        self.assertEqual(5, len(STAGE_8_DECOUPLED))
+        files = check_layers.load_tree(ROOT)
+        known = set(files)
+        for name, forbidden in STAGE_8_DECOUPLED:
+            with self.subTest(file=name):
+                path = f"src/{name}"
+                self.assertIn(path, files)
+                quoted = [i.name for i in check_layers.find_includes(files[path]) if not i.angle]
+                self.assertTrue(quoted, f"no quoted include found in {path}")
+                layers = {n: check_layers.classify(check_layers.resolve_include(path, n, known)
+                                                   or "") for n in quoted}
+                hits = sorted(n for n, layer in layers.items() if layer == forbidden)
+                self.assertEqual([], hits, f"{path} includes {forbidden}")
+
+    # Scenario Outline: Pliki w src/ mieszczą się w limitach z §10 pkt 3
+    def test_source_files_stay_under_the_section_10_limits(self):
+        src = ROOT / "src"
+        files = [p for p in sorted(src.rglob("*")) if p.is_file()]
+        self.assertGreater(len(files), 100)
+        with self.subTest(limit="every file <= 600"):
+            over = [f"{p.relative_to(ROOT).as_posix()}: {wc_lines(p)}" for p in files
+                    if wc_lines(p) > SRC_FILE_LINE_LIMIT]
+            self.assertEqual([], over, "files in src/ over 600 lines")
+        for name, limit in (("main.cpp", MAIN_CPP_LINE_LIMIT), ("net_task.cpp", NET_TASK_LINE_LIMIT)):
+            with self.subTest(file=name):
+                lines = wc_lines(src / "main" / name)
+                self.assertGreater(lines, 50, f"src/main/{name} looks empty")
+                self.assertLess(lines, limit, f"src/main/{name} has {lines} lines")
+
+    # Scenario: Pomiar, porty hexdb.io i oznaczanie obrazu jako ważnego są w osobnych modułach
+    # korzenia kompozycji
+    def test_net_task_parts_live_in_the_composition_root(self):
+        sources = {p: t for p, t in repo_sources("src/main").items() if p.endswith(".cpp")}
+        self.assertIn("src/main/net_task.cpp", sources)
+        for function, home in STAGE_8_NET_TASK_PARTS.items():
+            with self.subTest(function=function):
+                defs = [p for p, t in sources.items()
+                        for _ in declaration_lines(t, function, bodies_only=True)]
+                self.assertEqual([f"src/main/{home}"], defs, f"definitions of {function}()")
+        for module in ("net_perf", "net_enrichment", "net_rollback", "web_server_firmware"):
+            with self.subTest(net_module=module):
+                self.assertIn(module, check_comments.NET_MODULES)
+
+    # Scenario: Strona ustawień jest podzielona według zakładek
+    def test_config_page_is_split_by_tab(self):
+        core = ROOT / "src/admin/core"
+        page = (core / "config_page.cpp").read_text(encoding="utf-8", errors="replace")
+        self.assertEqual([], declaration_lines(page, "Writer"), "Writer still in config_page.cpp")
+        writer = core / "config_page_writer.h"
+        self.assertTrue(writer.is_file(), "src/admin/core/config_page_writer.h")
+        self.assertEqual(1, len(declaration_lines(writer.read_text(encoding="utf-8",
+                                                                    errors="replace"), "Writer")),
+                         "class Writer in config_page_writer.h")
+        tabs = core / "config_page_tabs.cpp"
+        self.assertTrue(tabs.is_file(), "src/admin/core/config_page_tabs.cpp")
+        tabs_text = tabs.read_text(encoding="utf-8", errors="replace")
+        for tab in ("Location", "OpenSky", "General", "Backup", "Firmware"):
+            with self.subTest(tab=tab):
+                self.assertEqual(1, len(tab_function_names(tabs_text, tab)),
+                                 f"functions for the {tab} tab: "
+                                 f"{tab_function_names(tabs_text, tab)}")
+        includers = sorted(p for p, t in repo_sources("src", "test").items()
+                           for i in check_layers.find_includes(t)
+                           if i.name == "admin/core/web_assets.h")
+        self.assertEqual(["src/admin/core/config_page.cpp"], includers,
+                         "includers of admin/core/web_assets.h")
+
+    # Scenario: Po podziale serwera WWW każda trasa ma dalej swoje zabezpieczenia
+    def test_web_server_routes_keep_their_guards(self):
+        adapters = ROOT / "src/admin/adapters"
+        firmware = adapters / "web_server_firmware.cpp"
+        texts = [(adapters / "web_server.cpp").read_text(encoding="utf-8", errors="replace")]
+        if firmware.is_file():
+            texts.append(firmware.read_text(encoding="utf-8", errors="replace"))
+        code = strip_comments("\n".join(texts))
+        routes = route_registrations(code)
+        self.assertGreaterEqual(len(routes), 14, f"routes found: {routes}")
+        self.assertGreaterEqual(len([r for r in routes if r[1] == "HTTP_POST"]), 8)
+        self.assertGreaterEqual(len([r for r in routes if r[3]]), 3, "upload routes")
+        self.assertEqual([], route_guard_problems(code), "routes that lost a guard")
+        # Last, so that a failure here means only that the split hasn't happened.
+        self.assertTrue(firmware.is_file(), "src/admin/adapters/web_server_firmware.cpp")
+
+    # Scenario: python tools/check_layers.py --strict przechodzi na repozytorium
+    def test_strict_layer_check_passes_on_the_repository(self):
+        code, out, _ = run_cli(ROOT, "--strict")
+        self.assertIn("0 layer finding(s) in total", out)
+        self.assertEqual(0, code, out)
+
+    # Scenario: Reguły i słownik są w docs/architecture.md, a CLAUDE.md tylko do nich odsyła
+    def test_architecture_doc_carries_the_rules_and_claude_md_points_to_it(self):
+        doc = (ROOT / "docs/architecture.md").read_text(encoding="utf-8")
+        layout = markdown_section(doc, "## Source layout")
+        self.assertIsNotNone(layout, 'no "## Source layout" heading in docs/architecture.md')
+        for context in check_layers.CONTEXTS:
+            with self.subTest(context=context):
+                self.assertIn(f"`{context}`", layout)
+        rows = [line for line in layout.splitlines() if line.lstrip().startswith("|")]
+        first_cells = [line.strip().strip("|").split("|")[0].replace("`", "").strip()
+                       for line in rows]
+        for row in STAGE_8_DEPENDENCY_ROWS:
+            with self.subTest(dependency_row=row):
+                self.assertTrue([c for c in first_cells if c.startswith(row)],
+                                f"no row of the dependency table starts with {row}")
+        for term in STAGE_8_GLOSSARY_TERMS:
+            with self.subTest(glossary=term):
+                self.assertTrue([line for line in rows if f"`{term}" in line],
+                                f"no table row in Source layout names `{term}`")
+        path = ROOT / "CLAUDE.md"
+        claude = path.read_text(encoding="utf-8")
+        section = markdown_section(claude, "## Code conventions")
+        self.assertIsNotNone(section, 'no "## Code conventions" heading in CLAUDE.md')
+        self.assertIn('docs/architecture.md "Source layout', section)
+        for marker in STAGE_8_MODULE_LIST_MARKERS:
+            with self.subTest(module_list=marker):
+                self.assertNotIn(marker, section)
+        self.assertLess(wc_lines(path), 250, "CLAUDE.md")
+
+    # Scenario: Jednorazowe narzędzia migracji są usunięte
+    def test_one_off_migration_tools_are_gone(self):
+        tools = ROOT / "tools"
+        workflow = (ROOT / ".github/workflows/firmware.yml").read_text(encoding="utf-8")
+        for name in ("rewrite_includes", "rename_symbols"):
+            with self.subTest(tool=name):
+                self.assertFalse((tools / f"{name}.py").exists(), f"tools/{name}.py")
+                self.assertFalse((tools / f"test_{name}.py").exists(), f"tools/test_{name}.py")
+                self.assertNotIn(name, workflow, ".github/workflows/firmware.yml")
+        for name in ("check_layers.py", "check_comments.py", "embed_assets.py"):
+            with self.subTest(kept=name):
+                self.assertTrue((tools / name).is_file(), f"tools/{name}")
+        self.assertTrue(check_comments.RENAMED_SYMBOLS, "check_comments.RENAMED_SYMBOLS")
+
 
 def strip_comments(text):
     """`text` with // and /* */ comments blanked (newlines kept, so line numbers stay); string
@@ -1446,6 +1738,92 @@ def strip_comments(text):
     return "".join(out)
 
 
+def wc_lines(path):
+    """Lines of the file as `wc -l` counts them: its newlines, blank lines included."""
+    return Path(path).read_bytes().count(b"\n")
+
+
+def constant_lines(text, symbol):
+    """Line numbers where `text` defines the constant `symbol` (`constexpr uint32_t kX = 1;`,
+    `static const int kX{1};`). Comments are ignored; a use of the name doesn't count."""
+    code = strip_comments(text)
+    return [code.count("\n", 0, m.start()) + 1 for m in
+            re.finditer(r"(?m)^[ \t]*(?:(?:static|inline)\s+)*(?:constexpr|const)\s+[\w:]+\s+"
+                        + re.escape(symbol) + r"\s*[={]", code)]
+
+
+def markdown_section(text, heading):
+    """The text under the first line of `text` starting with `heading`, up to the next heading
+    of the same level, or None."""
+    level = heading.split(" ", 1)[0]
+    out, inside = [], False
+    for line in text.splitlines():
+        if inside and line.startswith(level + " "):
+            break
+        if inside:
+            out.append(line)
+        elif line.startswith(heading):
+            inside = True
+    return "\n".join(out) if inside else None
+
+
+def tab_function_names(text, tab):
+    """Names of the functions defined in `text` that are about the settings tab `tab`: the name
+    holds both the tab's name and "tab", in any case (`locationTab`, `renderOpenSkyTab`)."""
+    names = re.findall(r"(?m)^[ \t]*(?:[\w:<>]+[\s*&]+)+(\w+)\s*\([^;{}]*\)\s*(?:const\s*)?\{",
+                       strip_comments(text))
+    return [n for n in names if tab.lower() in n.lower() and "tab" in n.lower()]
+
+
+_ROUTE_RE = re.compile(r'\bserver\.on\s*\(\s*"([^"]+)"\s*,\s*(HTTP_\w+)\s*,\s*([^;]*?)\)\s*;')
+
+
+def route_registrations(code):
+    """[(url, method, handler expression, upload callback or None)] of the `server.on(...)`
+    calls in `code` (comments already blanked)."""
+    out = []
+    for m in _ROUTE_RE.finditer(code):
+        handler, _, upload = m.group(3).partition(",")
+        out.append((m.group(1), m.group(2), handler.strip(), upload.strip() or None))
+    return out
+
+
+def route_guard_problems(code):
+    """What breaks the web rules in `code`, the routes' source with comments blanked (CLAUDE.md
+    "Pitfalls"): a `server.on` this parser can't read or without secured<>, a POST handler
+    that doesn't start with requireSameOrigin() before authorize(), an upload callback that
+    doesn't start with the multipart check, a not-found handler without secured<>."""
+    problems = []
+    routes = route_registrations(code)
+    calls = len(re.findall(r"\bserver\.on\s*\(", code))
+    if calls != len(routes):
+        problems.append(f"{calls} server.on() calls, {len(routes)} readable")
+    for url, method, handler, upload in routes:
+        m = re.fullmatch(r"secured<\s*(\w+)\s*>", handler)
+        if m is None:
+            problems.append(f"{url}: {handler} without secured<>")
+            continue
+        if method == "HTTP_POST":
+            body = function_body(code, m.group(1))
+            if body is None:
+                problems.append(f"{url}: no definition of {m.group(1)}()")
+            elif (not re.match(r"\s*if\s*\(\s*!\s*requireSameOrigin\s*\(\s*\)", body)
+                  or "authorize(" not in body
+                  or body.find("authorize(") < body.find("requireSameOrigin(")):
+                problems.append(f"{url}: {m.group(1)}() doesn't start with requireSameOrigin() "
+                                "before authorize()")
+        if upload is not None:
+            body = function_body(code, upload)
+            if body is None:
+                problems.append(f"{url}: no definition of {upload}()")
+            elif not re.match(r"\s*if\s*\(\s*!\s*isMultipartRequest\s*\(\s*\)\s*\)\s*return\s*;",
+                              body):
+                problems.append(f"{url}: {upload}() doesn't start with the multipart check")
+    if re.search(r"\bserver\.onNotFound\s*\((?!\s*secured<)", code):
+        problems.append("onNotFound without secured<>")
+    return problems
+
+
 _STATIC_STATE_RE = re.compile(
     r"\bstatic\s+(?:(?:unsigned|signed|long|short)\s+)*"
     r"(?:bool|int|long|unsigned|short|u?int\d+_t|size_t|std::string)\s+(\w+)\s*(?:=|;|\{|\[)")
@@ -1462,7 +1840,7 @@ def function_body(text, name):
     """The body (between its braces, comments blanked) of the first definition `void
     <name>()` in `text`, or None."""
     code = strip_comments(text)
-    m = re.search(r"(?m)^[ \t]*void\s+" + re.escape(name) + r"\s*\(\s*\)\s*\{", code)
+    m = re.search(r"(?m)^[ \t]*void\s+(?:\w+::)*" + re.escape(name) + r"\s*\(\s*\)\s*\{", code)
     if m is None:
         return None
     depth, i = 1, m.end()
@@ -1720,6 +2098,57 @@ class DeclarationMatchTest(unittest.TestCase):
         self.assertTrue(is_settings_type("const Settings &"))
         self.assertFalse(is_settings_type("const ConfigPageModel &"))
 
+    def test_constant_lines_finds_definitions_only(self):
+        text = ("constexpr uint32_t kX = 30000;\n"
+                "// constexpr uint32_t kX = 1;\n"
+                "static const int kXY = 2;\n"
+                "const int b = kX;\n"
+                "  static constexpr int kX{4};\n")
+        self.assertEqual([1, 5], constant_lines(text, "kX"))
+        self.assertEqual([], constant_lines(text, "b2"))
+
+    def test_markdown_section_stops_at_the_next_heading_of_its_level(self):
+        text = "# t\n## A b\none\n### sub\ntwo\n## C\nthree\n"
+        self.assertEqual("one\n### sub\ntwo", markdown_section(text, "## A"))
+        self.assertIsNone(markdown_section(text, "## Z"))
+
+    def test_tab_function_names_needs_the_tab_and_its_name(self):
+        text = ("void locationTab(Writer &w,\n                 int a) {\n}\n"
+                "static void renderOpenSkyTab(Writer &w) {}\n"
+                "void locationCard(Writer &w) {}\n"
+                "void settingsTabLabel(int t);\n"
+                "// void generalTab(Writer &w) {}\n")
+        self.assertEqual(["locationTab"], tab_function_names(text, "Location"))
+        self.assertEqual(["renderOpenSkyTab"], tab_function_names(text, "OpenSky"))
+        self.assertEqual([], tab_function_names(text, "General"))
+
+    GOOD_ROUTES = ("void h() {\n  if (!requireSameOrigin() || !authorize()) return;\n}\n"
+                   "void up() {\n  if (!isMultipartRequest()) return;\n}\n"
+                   'void b() {\n  server.on("/x", HTTP_POST, secured<h>, up);\n'
+                   '  server.on("/g", HTTP_GET, secured<g>);\n  server.onNotFound(secured<n>);\n}\n')
+
+    def test_route_guards_accept_a_route_with_every_guard(self):
+        self.assertEqual([("/x", "HTTP_POST", "secured<h>", "up"),
+                          ("/g", "HTTP_GET", "secured<g>", None)],
+                         route_registrations(self.GOOD_ROUTES))
+        self.assertEqual([], route_guard_problems(self.GOOD_ROUTES))
+
+    def test_route_guards_report_each_lost_guard(self):
+        cases = {
+            "secured<>": ("secured<h>, up", "h, up"),
+            "requireSameOrigin": ("!requireSameOrigin() || !authorize()",
+                                  "!authorize() || !requireSameOrigin()"),
+            "multipart": ("if (!isMultipartRequest()) return;", "int a = 1;"),
+            "onNotFound": ("onNotFound(secured<n>)", "onNotFound(n)"),
+            "readable": ('server.on("/g", HTTP_GET, secured<g>);', "server.on(url, secured<g>);"),
+        }
+        for word, (old, new) in cases.items():
+            with self.subTest(word=word):
+                self.assertIn(old, self.GOOD_ROUTES)
+                problems = route_guard_problems(self.GOOD_ROUTES.replace(old, new))
+                self.assertEqual(1, len(problems), problems)
+                self.assertIn(word, problems[0])
+
     def test_lovyangfx_names_in_code_but_not_comments_or_include_names(self):
         text = ('#include "display/adapters/lgfx/LGFX_CYD.hpp"\n'
                 "// draws on an LGFX & with lgfx::fonts\n"
@@ -1780,22 +2209,23 @@ def workflow_steps(text):
 
 
 class WorkflowTest(unittest.TestCase):
-    # Scenario: CI uruchamia raport warstw przed testami natywnymi, bez blokowania, i testy narzędzi
-    def test_firmware_workflow_reports_layers_before_native_tests(self):
+    # Scenario: CI uruchamia sprawdzenie warstw przed testami natywnymi i blokuje build, a testy
+    # narzędzi idą razem
+    def test_firmware_workflow_blocks_on_layers_before_native_tests(self):
         text = (ROOT / ".github" / "workflows" / "firmware.yml").read_text(encoding="utf-8")
         steps = workflow_steps(text)
         self.assertGreater(len(steps), 5)
         layers = [i for i, (_, b) in enumerate(steps)
-                  if re.search(r"python tools/check_layers\.py(?!\S)", b)]
+                  if re.search(r"python tools/check_layers\.py --strict(?!\S)", b)]
         native = [i for i, (_, b) in enumerate(steps)
                   if re.search(r"pio test -e native(\s|$)", b)]
         self.assertTrue(layers, "no step runs python tools/check_layers.py")
         self.assertTrue(native, "no step runs pio test -e native")
         self.assertLess(layers[0], native[0])
-        self.assertNotIn("--strict", steps[layers[0]][1])
+        self.assertNotIn("continue-on-error", steps[layers[0]][1])
         tool_tests = [b for _, b in steps if "python tools/test_check_bdd.py" in b]
         self.assertEqual(1, len(tool_tests))
-        for t in ("test_check_layers.py", "test_rewrite_includes.py", "test_subset_efont.py"):
+        for t in ("test_check_layers.py", "test_subset_efont.py"):
             self.assertIn(f"python tools/{t}", tool_tests[0])
 
 
