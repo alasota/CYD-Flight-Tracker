@@ -408,6 +408,48 @@ static void test_manual_check_across_millis_wrap(void) {
   ASSERT_ENUM_EQ(ManualCheckAsk::Queued, askManualCheck(m, t + 2000u + kUpdateManualMinGapMs));
 }
 
+CheckGate installGate() {
+  CheckGate g;
+  g.enabled = true;
+  g.wifi = true;
+  g.timeSynced = true;
+  g.otaBusy = false;
+  g.msUntilNextPoll = 0;  // an asked-for install does not wait for the poll
+  g.maxFreeBlock = 60 * 1024;
+  return g;
+}
+
+// Regression: "Zainstaluj" stayed queued for good at the block measured on the board (40 948 B).
+static void test_requested_install_starts_at_the_block_the_board_settles_at(void) {
+  CheckGate g = installGate();
+  g.maxFreeBlock = 40948;
+  ASSERT_ENUM_EQ(InstallStep::Start, stepPendingInstall(g, 1000, 1500));
+}
+
+// Regression: an install that cannot start waited forever while the page promised a restart.
+static void test_requested_install_that_cannot_start_gives_up_after_the_wait(void) {
+  CheckGate g = installGate();
+  g.wifi = false;
+  ASSERT_ENUM_EQ(InstallStep::Wait, stepPendingInstall(g, 1000, 1000 + kUpdateInstallWaitMs - 1));
+  ASSERT_ENUM_EQ(InstallStep::GiveUp, stepPendingInstall(g, 1000, 1000 + kUpdateInstallWaitMs));
+}
+
+// Regression: the same wait, measured across the millis() wrap.
+static void test_requested_install_gives_up_across_millis_wrap(void) {
+  CheckGate g = installGate();
+  g.wifi = false;
+  const uint32_t asked = 0xFFFFFFFFu - 1000u;
+  ASSERT_ENUM_EQ(InstallStep::Wait, stepPendingInstall(g, asked, asked + 2000u));
+  ASSERT_ENUM_EQ(InstallStep::GiveUp, stepPendingInstall(g, asked, asked + kUpdateInstallWaitMs));
+}
+
+// A heap that really cannot hold a TLS session still keeps the install back.
+static void test_requested_install_waits_while_the_heap_is_really_too_small(void) {
+  CheckGate g = installGate();
+  g.maxFreeBlock = 10 * 1024;
+  ASSERT_ENUM_EQ(InstallStep::Wait, stepPendingInstall(g, 1000, 1500));
+}
+
 static void test_every_status_has_a_message(void) {
   for (int i = 0; i < kUpdateStatusCount; ++i) {
     const WebStr id = updateStatusMessage(static_cast<UpdateStatus>(i));
@@ -554,6 +596,10 @@ void run_release_check_tests() {
   RUN_TEST(test_manual_check_at_most_once_a_minute);
   RUN_TEST(test_manual_check_request_expires);
   RUN_TEST(test_manual_check_across_millis_wrap);
+  RUN_TEST(test_requested_install_starts_at_the_block_the_board_settles_at);
+  RUN_TEST(test_requested_install_that_cannot_start_gives_up_after_the_wait);
+  RUN_TEST(test_requested_install_gives_up_across_millis_wrap);
+  RUN_TEST(test_requested_install_waits_while_the_heap_is_really_too_small);
   RUN_TEST(test_every_status_has_a_message);
   RUN_TEST(test_status_for_release);
   RUN_TEST(test_prompt_only_for_an_available_release);
