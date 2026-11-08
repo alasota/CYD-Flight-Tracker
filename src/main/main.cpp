@@ -9,7 +9,6 @@
 // sleep until the next deadline. docs/architecture.md "Concurrency — two cores".
 
 #include <Arduino.h>
-
 #include <memory>
 
 #include "admin/adapters/web_server.h"
