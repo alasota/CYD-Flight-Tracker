@@ -1020,9 +1020,9 @@ class LayoutTest(unittest.TestCase):
                  if p.is_file()]
         paths.append(ROOT / "platformio.ini")
         paths += sorted((ROOT / ".github" / "workflows").glob("*.yml"))
-        # The stage-1 move table and the tool tests name the old paths on purpose.
+        # The tool tests name the old paths on purpose.
         paths += [p for p in sorted((ROOT / "tools").glob("*.py"))
-                  if p.name != "rewrite_includes.py" and not p.name.startswith("test_")]
+                  if not p.name.startswith("test_")]
         self.assertGreater(len(paths), 100)
         hits = []
         for p in paths:
@@ -1452,13 +1452,6 @@ class LayoutTest(unittest.TestCase):
             encoding="utf-8", errors="replace"))
         self.assertRegex(main, r"\bRUN_MODULE\(\s*settings\s*\)\s*\)\s*run_settings_tests\(\)")
         self.assertNotRegex(main, r"\bconfig_store\b")
-        # The migration tool leaves at the end of stage 8 (test_one_off_migration_tools_are_gone).
-        rewrite_tool = TOOL.parent / "rewrite_includes.py"
-        if rewrite_tool.is_file():
-            proc = subprocess.run([sys.executable, str(rewrite_tool), "--root", str(ROOT),
-                                   "--check"], capture_output=True)
-            self.assertEqual(0, proc.returncode,
-                             (proc.stdout + proc.stderr).decode("utf-8", "replace"))
 
     # Scenario: NetState niesie ustawienia pod nazwą settings
     def test_net_state_carries_settings(self):
