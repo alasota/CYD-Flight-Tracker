@@ -41,30 +41,6 @@ Feature: Reorganizacja kodu według DDD — etapy 1–8: katalogi kontekstów i 
     Then każdy należy do shared/, platform/, main/ albo <kontekst>/<warstwa>/ (airspace, enrichment, opensky, display, admin × core, services, adapters)
     And w samym src/ nie ma żadnego pliku
 
-  @test=tools/test_rewrite_includes.py:MoveTableTest.test_mixed_files_land_with_their_pure_half
-  Scenario Outline: Plik z czystą i sprzętową połową trafia tam, gdzie będzie jego czysta część
-    Given plik <plik> ma dziś część czystą i część pod #ifdef ARDUINO
-    When tabela przeniesień etapu 1 (z nazwami warstw sprzed etapu 2) wskazuje jego nowe miejsce
-    Then plik leży w <katalog>, a podział na adapter czeka na etap 4
-
-    Examples:
-      | plik               | katalog                       |
-      | opensky_client.cpp | opensky/domain/               |
-      | lookup_store.cpp   | enrichment/domain/            |
-      | table_view.cpp     | display/domain/screens/       |
-      | backlight.cpp      | display/domain/               |
-      | config_portal.cpp  | admin/app/                    |
-      | release_check.cpp  | admin/domain/firmware/        |
-      | time_sync.cpp      | platform/                     |
-
-  # (zmienione w etapie 4: doszła tabela etapu 4)
-  @test=tools/test_rewrite_includes.py:MoveTableTest.test_move_table_matches_the_tree
-  Scenario: Tabele przeniesień etapów 1, 2 i 4 zgadzają się z drzewem
-    Given tabele przeniesień etapów 1, 2 i 4 w tools/rewrite_includes.py
-    When dla każdego z 94 plików sprzed etapu 1 składam jego ścieżkę przez wszystkie tabele po kolei
-    Then każda ścieżka końcowa istnieje w src/
-    And żadna ścieżka sprzed etapu 1 ani pośrednia (sprzed ostatniej tabeli, która ją zmienia) już nie istnieje
-
   @test=tools/test_check_layers.py:LayoutTest.test_includes_in_src_and_test_use_full_paths
   Scenario: Include'y w src/ i test/ podają pełną ścieżkę od src/
     Given wszystkie dyrektywy #include "…" w src/ i test/
@@ -92,36 +68,6 @@ Feature: Reorganizacja kodu według DDD — etapy 1–8: katalogi kontekstów i 
     And wstawia #include "display/core/theme/fonts/lcars_efont.h" — ten sam co w pliku w repozytorium
 
   # ---- etap 1: tools/rewrite_includes.py
-
-  @test=tools/test_rewrite_includes.py:RewriteTest.test_short_include_becomes_full_path
-  Scenario: Krótki include przeniesionego nagłówka dostaje pełną ścieżkę
-    Given plik z linią #include "table_view.h", a nagłówek leży w src/display/core/screens/
-    When skrypt przepisuje include'y
-    Then linia brzmi #include "display/core/screens/table_view.h"
-
-  @test=tools/test_rewrite_includes.py:RewriteTest.test_system_support_and_include_dir_headers_unchanged
-  Scenario: Include'y systemowe, z test/support/, z include/ i lokalne nagłówki testu zostają bez zmian
-    Given plik z #include <vector>, <ArduinoJson.h>, "test_support.h", "LGFX_CYD.hpp" i "github_fixtures.h"
-    When skrypt przepisuje include'y
-    Then żadna z tych linii się nie zmienia
-
-  @test=tools/test_rewrite_includes.py:RewriteTest.test_second_run_changes_nothing
-  Scenario: Drugie uruchomienie niczego nie zmienia
-    Given drzewo, w którym include'y już mają pełne ścieżki
-    When skrypt przepisuje include'y jeszcze raz
-    Then żaden plik się nie zmienia, a tryb --check kończy się kodem 0
-
-  @test=tools/test_rewrite_includes.py:RewriteTest.test_duplicate_header_name_is_an_error
-  Scenario: Dwa nagłówki o tej samej nazwie w src/ to błąd, a nie zgadywanie
-    Given src/a/core/x.h i src/b/core/x.h oraz plik z #include "x.h"
-    When skrypt buduje indeks nagłówków
-    Then kończy się błędem z obiema ścieżkami i nie zmienia żadnego pliku
-
-  @test=tools/test_rewrite_includes.py:RewriteTest.test_trailing_comment_and_crlf_preserved
-  Scenario: Komentarz za include'em i końce linii CRLF zostają
-    Given plik z końcami linii CRLF i linią #include "core_link.h"  // Guarded<T>
-    When skrypt przepisuje include'y
-    Then linia brzmi #include "platform/core_link.h"  // Guarded<T>, a plik ma dalej CRLF
 
   # ---- etap 1 (nazwy warstw po etapie 2): tools/check_layers.py (tryb raportu)
 
@@ -244,54 +190,6 @@ Feature: Reorganizacja kodu według DDD — etapy 1–8: katalogi kontekstów i 
     When szukam katalogów src/<kontekst>/domain/, src/<kontekst>/app/ i src/app/
     Then żaden nie istnieje
     And src/main/ zawiera main.cpp, net_task.h i net_task.cpp
-
-  @test=tools/test_rewrite_includes.py:MoveTableTest.test_stage_2_renames_the_layer_folder
-  Scenario Outline: Etap 2 zmienia tylko nazwę katalogu warstwy, nie plik
-    Given plik <po_etapie_1> (ścieżka od src/ po etapie 1)
-    When tabela przeniesień etapu 2 wskazuje jego nowe miejsce
-    Then plik leży w <po_etapie_2>, z tą samą nazwą i tym samym podkatalogiem
-
-    Examples:
-      | po_etapie_1                                | po_etapie_2                              |
-      | display/domain/screens/table_view.cpp      | display/core/screens/table_view.cpp      |
-      | display/domain/theme/fonts/lcars_efont.c   | display/core/theme/fonts/lcars_efont.c   |
-      | enrichment/domain/lookup_cache.h           | enrichment/core/lookup_cache.h           |
-      | admin/domain/firmware/version.cpp          | admin/core/firmware/version.cpp          |
-      | airspace/app/poll_pipeline.cpp             | airspace/services/poll_pipeline.cpp      |
-      | display/app/screenshot.cpp                 | display/services/screenshot.cpp          |
-      | app/main.cpp                               | main/main.cpp                            |
-      | app/net_task.h                             | main/net_task.h                          |
-
-  @test=tools/test_rewrite_includes.py:MoveTableTest.test_admin_app_splits_into_core_and_adapters
-  Scenario Outline: admin/app/ rozdziela się: czyste moduły do admin/core/, trasy WebServer do admin/adapters/
-    Given plik <plik> z admin/app/ po etapie 1
-    When tabela przeniesień etapu 2 wskazuje jego nowe miejsce
-    Then plik leży w <katalog>
-
-    Examples:
-      | plik              | katalog          |
-      | config_page.cpp   | admin/core/      |
-      | config_page.h     | admin/core/      |
-      | web_i18n.cpp      | admin/core/      |
-      | web_i18n.h        | admin/core/      |
-      | config_portal.cpp | admin/adapters/  |
-      | config_portal.h   | admin/adapters/  |
-
-  @test=tools/test_rewrite_includes.py:MoveTableTest.test_stage_2_leaves_shared_platform_and_adapters_alone
-  Scenario: Etap 2 nie rusza shared/, platform/ ani plików, które już leżą w adapters/
-    Given tabela przeniesień etapu 2
-    When sprawdzam jej wpisy
-    Then ma 80 wpisów, każdy kluczem jest ścieżka docelowa etapu 1
-    And żaden klucz nie leży w shared/, platform/ ani <kontekst>/adapters/
-    And żaden wpis nie zmienia nazwy pliku
-
-  @test=tools/test_rewrite_includes.py:RewriteTest.test_old_layer_path_becomes_the_new_full_path
-  Scenario: Include ze starą nazwą warstwy dostaje nową pełną ścieżkę
-    Given drzewo po git mv etapu 2 z plikiem, w którym są linie #include "display/domain/i18n.h"  // Language i #include "app/net_task.h"
-    When uruchamiam python tools/rewrite_includes.py --check, potem bez --check, potem znów --check
-    Then pierwsze --check kończy się kodem 1 i niczego nie zapisuje
-    And po przepisaniu linie brzmią #include "display/core/i18n.h"  // Language i #include "main/net_task.h"
-    And drugie --check kończy się kodem 0
 
   @test=tools/test_check_layers.py:RuleTableTest.test_old_layer_names_are_outside_any_layer
   Scenario: Plik w katalogu o starej nazwie warstwy jest zgłaszany jako leżący poza warstwą
@@ -625,26 +523,6 @@ Feature: Reorganizacja kodu według DDD — etapy 1–8: katalogi kontekstów i 
       | test_format_date_leap_year_after_feb29             | test_platform/clock_test.cpp      | test_platform/time_sync_test.cpp  |
       | test_format_time_pads_single_digits                | test_platform/clock_test.cpp      | test_platform/time_sync_test.cpp  |
       | test_minute_of_changes_at_minute_boundary          | test_platform/clock_test.cpp      | test_platform/time_sync_test.cpp  |
-
-  @test=tools/test_rewrite_includes.py:MoveTableTest.test_stage_4_renames_config_portal_to_web_server
-  Scenario Outline: Tabela etapu 4 zmienia nazwę config_portal na web_server (§4.5) i nic więcej
-    Given MOVES_STAGE_4 w tools/rewrite_includes.py, ostatnia tabela w STAGES
-    When składam ścieżkę pliku <plik_sprzed_etapu_1> przez wszystkie tabele
-    Then final_path() daje <ścieżka_końcowa>, plik istnieje w src/, a admin/adapters/<stara_nazwa> nie istnieje
-    And tabela etapu 4 ma dokładnie te dwa wpisy; hexdb_http zostaje, bo §4.2 nazywa go tak samo
-
-    Examples:
-      | plik_sprzed_etapu_1 | stara_nazwa       | ścieżka_końcowa                |
-      | config_portal.h     | config_portal.h   | admin/adapters/web_server.h    |
-      | config_portal.cpp   | config_portal.cpp | admin/adapters/web_server.cpp  |
-
-  @test=tools/test_rewrite_includes.py:RewriteTest.test_renamed_header_include_becomes_the_new_full_path
-  Scenario: Include pliku o zmienionej nazwie dostaje nową pełną ścieżkę
-    Given plik z #include "admin/adapters/config_portal.h" i drugi z #include "config_portal.h", a w src/ jest już tylko admin/adapters/web_server.h
-    When uruchamiam python tools/rewrite_includes.py --check, potem bez --check, potem znów --check
-    Then pierwsze --check kończy się kodem 1 i niczego nie zapisuje
-    And oba include'y wskazują "admin/adapters/web_server.h", a komentarz za include'em i końce linii zostają
-    And drugie --check kończy się kodem 0
 
   @test=tools/test_check_comments.py:MainCppCommentsTest.test_net_modules_include_the_core0_modules
   Scenario: Nowe adaptery rdzenia 0 są sprawdzane jak moduły, z których wyszły
@@ -1417,87 +1295,12 @@ Feature: Reorganizacja kodu według DDD — etapy 1–8: katalogi kontekstów i 
 
   # ---- etap 7: nazwy ze słownika (§3) — tools/rename_symbols.py, jedna zmiana nazwy na commit
 
-  @test=tools/test_rename_symbols.py:RepoTest.test_old_names_are_gone_from_code
-  Scenario Outline: Nazwa ze słownika zastępuje dawną w całym kodzie src/ i test/
-    Given src/ i test/ po etapie 7
-    When szukam <dawna> jako całego identyfikatora w kodzie (poza napisami i komentarzami)
-    Then nie ma żadnego trafienia
-    And <nowa> jest zadeklarowana albo zdefiniowana w <plik>
-
-    Examples:
-      | dawna                       | nowa                          | plik                                  |
-      | BoundingBox                 | ScanArea                      | src/opensky/core/scan_area.h          |
-      | computeBoundingBox          | computeScanArea               | src/opensky/core/scan_area.h          |
-      | OpenSkyHealth               | FeedHealth                    | src/airspace/core/feed_health.h       |
-      | DataSnapshot                | AirspaceSnapshot              | src/airspace/core/airspace_snapshot.h |
-      | buildDataSnapshot           | buildAirspaceSnapshot         | src/airspace/services/poll_pipeline.h |
-      | LookupPorts                 | EnrichmentPort                | src/airspace/services/poll_pipeline.h |
-      | AircraftRow                 | TrackedFlight                 | src/airspace/core/tracked_flight.h    |
-      | Aircraft                    | AircraftState                 | src/airspace/core/aircraft_state.h    |
-      | configPortalBegin           | webServerBegin                | src/admin/adapters/web_server.h       |
-      | configPortalRestartPending  | webServerRestartPending       | src/admin/adapters/web_server.h       |
-      | Config                      | Settings                      | src/admin/core/settings.h             |
-      | defaultConfig               | defaultSettings               | src/admin/core/settings.h             |
-      | sanitizeConfig              | sanitizeSettings              | src/admin/core/settings.h             |
-      | loadConfig                  | loadSettings                  | src/admin/core/settings.h             |
-      | saveConfig                  | saveSettings                  | src/admin/core/settings.h             |
-      | configToBackupJson          | settingsToBackupJson          | src/admin/core/config_backup.h        |
-      | restoreConfigFromBackupJson | restoreSettingsFromBackupJson | src/admin/core/config_backup.h        |
-      | reloadConfig                | reloadSettings                | src/main/net_task.cpp                 |
-      | makeConfig                  | makeSettings                  | test/support/fixtures.h               |
-
-  @test=tools/test_rename_symbols.py:RenameTextTest.test_only_whole_identifiers_are_renamed
-  Scenario: Zmiana nazwy dotyka tylko całego identyfikatora, nie jego części
-    Given kod z Aircraft &ac, AircraftRow row, makeAircraft(), extractAircraftFromStates(states) i kAircraftCacheCapacity
-    When narzędzie zmienia nazwę Aircraft na AircraftState
-    Then zmienia się tylko Aircraft &ac
-    And pozostałe identyfikatory są bajt w bajt takie same
-
-  @test=tools/test_rename_symbols.py:RenameTextTest.test_string_literals_and_quoted_doc_headings_are_kept
-  Scenario: Napisy w kodzie i cytowane nagłówki dokumentacji w komentarzach się nie zmieniają
-    Given kod z napisem "Config", surowym napisem R"({"error":"Aircraft not found."})", znakiem '"' i komentarzem // docs/data-sources.md "Aircraft identification"
-    When narzędzie zmienia nazwy Aircraft i Config
-    Then każdy napis, surowy napis, znak i tekst w cudzysłowie w komentarzu jest taki sam jak przed zmianą
-    And kod między dwoma napisami w jednej linii (np. {"web.password", [](Config &c) {…}}) dostaje nową nazwę
-
-  @test=tools/test_rename_symbols.py:RenameTextTest.test_plain_word_in_a_comment_is_reported_not_renamed
-  Scenario: Słowo z prozy w komentarzu jest zgłaszane do decyzji, a nie zmieniane
-    Given wpis tabeli dla nazwy, która jest też zwykłym słowem (Aircraft, Config), i komentarze „// Aircraft past the budget render as --” oraz „// returns an Aircraft list”
-    When narzędzie zmienia nazwę
-    Then oba komentarze zostają bez zmian, a raport wymienia je jako plik:linia do ręcznej decyzji
-    But dla nazwy złożonej (AircraftRow, DataSnapshot, OpenSkyHealth…) komentarz poza cudzysłowem dostaje nową nazwę
-
-  @test=tools/test_rename_symbols.py:RenameTextTest.test_prefix_rename_keeps_library_names
-  Scenario: Zmiana przedrostka configPortal na webServer nie dotyka nazw z bibliotek
-    Given kod z configPortalBegin(), configPortalSetOtaObserver(obs), wm.setConfigPortalBlocking(false), wm.getConfigPortalActive(), wm.setConfigPortalTimeout(180) i configTzTime(tz, ntp)
-    When narzędzie stosuje wpis przedrostka configPortal → webServer
-    Then są webServerBegin() i webServerSetOtaObserver(obs)
-    And wywołania WiFiManagera i configTzTime() są takie same jak przed zmianą
-
-  @test=tools/test_rename_symbols.py:CliTest.test_check_lists_leftovers_without_writing
-  @test=tools/test_rename_symbols.py:CliTest.test_second_run_changes_nothing
-  @test=tools/test_rename_symbols.py:CliTest.test_line_endings_and_generated_files_are_kept
-  Scenario: Tryb --check tylko raportuje, drugi przebieg nic nie zmienia, końce linii zostają
-    Given drzewo src/ i test/ w katalogu tymczasowym, z plikami CRLF i LF oraz wygenerowanymi web_assets.h i lcars_efont.c
-    When uruchamiam python tools/rename_symbols.py --check <wpis>, potem bez --check, potem drugi raz
-    Then --check kończy się kodem 1, wypisuje plik:linia każdego trafienia i niczego nie zapisuje
-    And pierwszy przebieg zmienia pliki, drugi nie zmienia żadnego bajtu
-    And każdy plik zachowuje swoje końce linii, a pliki wygenerowane nie są zmieniane
-
-  @test=tools/test_rename_symbols.py:RepoTest.test_ci_runs_the_rename_symbols_tests
-  Scenario: CI uruchamia testy narzędzia zmiany nazw
-    Given .github/workflows/firmware.yml
-    When czytam krok testów narzędzi
-    Then jest w nim python tools/test_rename_symbols.py
-
   @test=tools/test_check_layers.py:LayoutTest.test_settings_module_is_admin_core_settings
-  @test=tools/test_rewrite_includes.py:MoveTableTest.test_stage_7_renames_config_store_to_settings
   Scenario: Moduł ustawień nazywa się settings, a jego testy settings_test.cpp
     Given src/ i test/ po etapie 7
     When szukam plików i include'ów modułu ustawień
     Then są src/admin/core/settings.h i settings.cpp (git mv z config_store.*, tabela MOVES_STAGE_7 w rewrite_includes.py), a żaden plik ani #include nie nazywa się już config_store
     And testy są w test/test_admin/settings_test.cpp z run_settings_tests(), a -DTEST_MODULE=settings uruchamia tylko je
-    And python tools/rewrite_includes.py --check kończy się kodem 0
 
   @test=tools/test_check_layers.py:LayoutTest.test_net_state_carries_settings
   Scenario: NetState niesie ustawienia pod nazwą settings
@@ -1569,7 +1372,6 @@ Feature: Reorganizacja kodu według DDD — etapy 1–8: katalogi kontekstów i 
       | AirportInfo            | shared/flight_info.h                 | enrichment/core/route_lookup.h      |
 
   @test=tools/test_check_layers.py:LayoutTest.test_screenshot_module_is_in_admin_core
-  @test=tools/test_rewrite_includes.py:MoveTableTest.test_stage_8_moves_screenshot_to_admin_core
   Scenario: Pomocnicy /screenshot.bmp (BMP, ?screen=) należą do admin/core, bo używa ich panel WWW
     Given src/ i test/ po etapie 8
     When szukam plików i include'ów modułu screenshot
