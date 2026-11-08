@@ -1483,7 +1483,7 @@ Feature: Reorganizacja kodu według DDD — etapy 1–8: katalogi kontekstów i 
   Scenario: Etap 8 nie zmienia liczby testów ani zachowania, a firmware mieści się w granicy
     Given na gałęzi przed etapem 8 (591fac0): przypadki w 6 grupach pio test -e native (admin 257, airspace 71, display 412, enrichment 80, opensky 74, platform 84 = 978), RUN_TEST( (978), firmware.bin i sekcje z size -A zbudowane z FW_VERSION=v0.0.0-stage8 po usunięciu .pio/build/cyd, „Flash: used” / „RAM: used”, lista bibliotek i 5 stron panelu z SCREENSHOT_OUT
     When mierzę to samo po każdym commicie etapu (ten sam FW_VERSION)
-    Then wszystkie grupy są zielone, a przypadków i RUN_TEST( jest 978 (testy tylko idą za kodem)
+    Then wszystkie grupy są zielone, a przypadków i RUN_TEST( jest 981 (978 sprzed etapu, które tylko idą za kodem, + 3 nowe testy strzałki w tekstach wersji po uploadzie)
     And przy przeniesieniu samych typów i stałych sekcje są te same, a cały etap (z podziałem plików, który zmienia kolejność linkowania) dokłada do firmware.bin najwyżej 4 096 bajtów i zmienia RAM statyczny o najwyżej ± 64 bajty względem stanu przed etapem
     And strony panelu z SCREENSHOT_OUT są bajt w bajt takie same po każdym kroku podziału config_page, python tools/check_layers.py --strict kończy się kodem 0, a check_comments.py --strict, check_bdd.py i embed_assets.py --check są czyste
 

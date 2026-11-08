@@ -350,7 +350,8 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   `web_server` got the same inputs through the `panelLiveInputs()` port. **`screenshot` in
   `admin/core`:** only the web route uses it. **The `[ota]` serial line writes `->`** so that
   `web_server` needn't include the display's `service_screen.h`; the page after an upload still
-  shows `→`. **The migration tools were deleted** (owner; `git log` has them): the moves were done.
+  shows `→`. Moving that string first double-encoded the page's arrow (`C3 A2 C2 86 C2 92`, never
+  released, found by review), so both texts now live in `ota_update`, native-tested. **The migration tools were deleted** (owner; `git log` has them): the moves were done.
 - **`pio run -e cyd-ota -t upload` without a password** (found in stage 6, not fixed yet): with
   `$CYD_WEB_PASSWORD` empty, curl's `--digest` first sends an empty POST to probe for the
   challenge; the upload route answers it with HTTP 400 and nothing is uploaded. A plain

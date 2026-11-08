@@ -56,8 +56,8 @@ with their code; stage 5 moved the 19 screenshot hand-over tests (`ScreenshotBri
 `src/admin/core/`, with its 9 tests in `test_admin` (the settings page serves the
 screenshot); the hand-over between the cores is `screenshot_bridge`, tested in `test_display`.
 
-Cases per suite (spec 12 stage 8): admin 257 (3 skipped), airspace 71, display 412, enrichment
-80, opensky 74, platform 84 — 978, the same as the `RUN_TEST(` count (`LayoutTest` keeps it
+Cases per suite (spec 12 stage 8): admin 260 (3 skipped), airspace 71, display 412, enrichment
+80, opensky 74, platform 84 — 981, the same as the `RUN_TEST(` count (`LayoutTest` keeps it
 ≥ 874).
 
 Settings are guarded against a silent change of format: `config_backup_test.cpp` compares the

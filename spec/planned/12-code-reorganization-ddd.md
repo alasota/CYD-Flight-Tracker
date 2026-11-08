@@ -782,11 +782,12 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   `net_rollback`), `config_page.cpp` 897 → 355 (`config_page_tabs`, `config_page_writer.h`),
   `web_server.cpp` 659 → 525 (`web_server_firmware.cpp`, `web_server_internal.h`), `main.cpp` 249.
   Największy plik w `src/` ma 525 linii. Pięć stron panelu (`SCREENSHOT_OUT`) `cmp` identycznych.
-- **Testy:** 978 przypadków (975 zielonych, 3 pominięte bez `SCREENSHOT_OUT`; 257 / 71 / 412 /
-  80 / 74 / 84), `RUN_TEST(` 978, jak przed etapem. `check_comments.py --strict`,
+- **Testy:** 981 przypadków (978 zielonych, 3 pominięte bez `SCREENSHOT_OUT`; 260 / 71 / 412 /
+  80 / 74 / 84), `RUN_TEST(` 981: 978 sprzed etapu + 3 nowe testy strzałki w `ota_update_test.cpp`. `check_comments.py --strict`,
   `embed_assets.py --check` czyste, `check_bdd.py` 0 problemów (278 scenariuszy).
-- **Firmware** (`FW_VERSION=v0.0.0-stage8`): `firmware.bin` 1 348 256 → 1 348 624 B (**+368 B**,
-  budżet +4 096 B), `.dram0.bss` −8 B (budżet ± 64 B), RAM statyczny 61 908 B.
+- **Firmware** (`FW_VERSION=v0.0.0-stage8`): `firmware.bin` 1 348 256 → 1 348 672 B (**+416 B**,
+  budżet +4 096 B) na `730e577`, `.dram0.bss` −8 B, `.dram0.data` 0 (budżet ± 64 B), RAM statyczny
+  61 908 B. Obraz na płytkę (`730e577`, wersja z `git describe`): 1 348 688 B.
 - **Odstępstwa od planu:** tekst wersji po uploadzie jest też w `model.messageDetail`, więc strona
   zachowuje `→`, a `->` ma tylko linia `[ota]` na porcie szeregowym (Q4 bez zmiany strony);
   `test_config_page_is_split_by_tab` poprawiony, bo `config_page_test.cpp` dołącza `web_assets.h` od
@@ -795,7 +796,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
 - **`@manual` „Etap 8 nie zmienia liczby testów ani zachowania…”** — spełniony (wyżej).
 - **`@manual` „Płytka z firmware'em etapu 8 działa jak przedtem”** — częściowo (2026-11-08), obraz
   `v1.11.4-22-g2ff29a8-dirty` przez USB COM3 (`-dirty` od niezwiązanej zmiany `.vscode`),
-  `firmware.bin` 1 348 656 B:
+  `firmware.bin` 1 348 656 B (obraz sprzed poprawki strzałki, patrz niżej):
   - 3 min logu szeregowego: bez paniki, jedyny restart to włączenie zasilania. `/backup.json` różni
     się tylko polem `firmware`; `/light.json` identyczny (noc, 10 %).
   - Ekrany 0–2 i pytanie o aktualizację (`screen=3`): ten sam układ co przed wgraniem, inne dane na żywo.
@@ -803,9 +804,18 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
     największy blok 69 620 B, wolny stos net 9 568 B (punkt odniesienia 9 388 B).
   - OTA przez WiFi (`curl -F firmware=@… /update`): 200 w 14,6 s, restart `SW_CPU_RESET`, „running
     from app1, pending verify (rollback armed)”, „marked valid after 30 s, rollback cancelled”.
-    Strona pokazuje strzałkę `→`, linia `[ota]` `->`. Po OTA: stos net 9 484 B, sterta 147 220 B,
+    Linia `[ota]` `->`; strzałka na stronie była w tym obrazie uszkodzona (niżej). Po OTA: stos net 9 484 B, sterta 147 220 B,
     największy blok 59 380 B.
   - „Sprawdź teraz”: `[update] check: http=200 latest=v1.11.4`, zweryfikowane TLS, 4071 ms.
+  - **Poprawka z przeglądu (`83d721a`):** obrazy od `96739ad` do `2ff29a8` pokazywały na stronie po
+    uploadzie podwójnie zakodowaną strzałkę (`C3 A2 C2 86 C2 92`). Znalazł to przegląd. Teksty
+    wersji są teraz w `otaVersionChangePageText()` / `otaVersionChangeLogText()`
+    (`admin/core/firmware/ota_update`), pilnują ich 3 testy native. Na płytce: `730e577` wgrany
+    przez OTA po WiFi (obraz oznaczony jako ważny), potem wysłany drugi raz, żeby poprawiony
+    firmware wyrenderował własną stronę wyniku: komunikat ma `E2 86 92`, 0 sekwencji podwójnie
+    zakodowanych; linia `[ota]` `->`; „marked valid after 30 s” za oba razy. `/perf.json` po 89 s:
+    przerwa pętli UI maks. 101 ms, 0 wolnych przejść, sterta 140 488 B, największy blok 59 380 B,
+    wolny stos net 9 836 B.
   - Niesprawdzone: instalacja buildu `-dev` z GitHuba (po utworzeniu PR), zapis formularza bez
     zmian, dotyk i fizyczne zachowanie ostrzeżeń.
 - **Kryteria §10:** pkt 1–4 spełnione. Pkt 5 — częściowo, do czasu instalacji z GitHuba i

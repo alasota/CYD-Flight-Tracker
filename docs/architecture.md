@@ -110,7 +110,7 @@ The same names in the code, these docs and the spec (§3).
   texts; `PanelLiveInputs`) · `config_page_tabs` (one function per tab) · `config_page_writer`
   (the HTML `Writer`) · `config_backup` (JSON backup / restore) · `web_auth` (password, throttle,
   origin) · `web_i18n` (page strings) · `device_alerts` (the "!") · `screenshot` (BMP, `?screen=`)
-  · `firmware/` (`ota_update`: image checks, `OtaSession`; `release_check`: GitHub releases;
+  · `firmware/` (`ota_update`: image checks, `OtaSession`, version-change texts; `release_check`: GitHub releases;
   `version`). **`admin/assets`:** CSS / JS / icon, embedded into `admin/core/web_assets.h`.
 - **`admin/adapters`:** `web_server` (WebServer + mDNS, the server, its checks, page and settings
   routes) · `web_server_firmware` (`POST /update`, the GitHub routes) · `web_server_internal.h`
@@ -327,8 +327,8 @@ The stage bullets use today's names.
   `panelLiveInputs()`. Split, behaviour unchanged (the five page renders are `cmp` identical):
   `net_task.cpp` 419 → 283 lines (`net_perf`, `net_enrichment`, `net_rollback`), `config_page.cpp`
   897 → 355 (`config_page_tabs`, `config_page_writer.h`), `web_server.cpp` 659 → 525
-  (`web_server_firmware.cpp`). Page text after an upload keeps `→`; the `[ota]` serial line
-  writes `->`. `LayoutTest` pins it: `test_source_files_stay_under_the_section_10_limits`,
+  (`web_server_firmware.cpp`). After an upload the page text has `→` (`otaVersionChangePageText()`), the `[ota]` serial
+  line `->` (`otaVersionChangeLogText()`), both in `ota_update`. `LayoutTest` pins it: `test_source_files_stay_under_the_section_10_limits`,
   `test_web_server_routes_keep_their_guards` (every POST: `requireSameOrigin()`, then
   `authorize()`; every upload callback: `isMultipartRequest()`; every route `secured<>`),
   `test_web_server_includes_only_its_own_context`, `test_net_task_parts_live_in_the_composition_root`,
