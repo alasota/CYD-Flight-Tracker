@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cstdint>
+#include <ctime>
 #include <string>
 
 #include "airspace/core/home.h"  // Home — backlightLoop()'s sun times (backlight_ldr.h)
@@ -113,6 +114,25 @@ int nightWindowMinutes(const NightWindow &w);  // per day: 0 / 1440 / its length
 // "HH:MM" <-> minutes (00:00..23:59). parseClockMinutes() is strict.
 bool parseClockMinutes(const std::string &s, int *minutes);
 std::string formatClockMinutes(int minutes);
+
+// ---- Today's sun (the "sunset to sunrise" window) ---------------------------
+
+// Today's sunrise / sunset in local time and what they were computed for.
+struct SunToday {
+  SunTimes local;       // today's, local time
+  bool known = false;   // home location set and clock synced
+  int day_key = -1;     // local date it was computed for
+  float lat = 0.0f;
+  float lon = 0.0f;
+  int offset_min = 0;   // UTC offset it was shifted by
+};
+
+// Brings `sun` up to date for this instant: `utc` = time(nullptr), `local` =
+// timeSyncNowLocal() (pre-shifted local wall clock). Recomputes when the
+// local date, the home location or the UTC offset changed; true = recomputed
+// (the adapter logs "[light] sun today: ..."). Unsynced or no home -> unknown.
+bool refreshSunToday(SunToday &sun, bool synced, std::time_t utc, std::time_t local,
+                     const Home &home);
 
 // ---- Decision ---------------------------------------------------------------
 
