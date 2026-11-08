@@ -445,9 +445,12 @@ two cores"; this is how it works.
 - **Liveness:** no `netBeatMs` for 60 s → the header shows a network error (stale data isn't
   presented as fresh); no `uiBeatMs` for 2 s → a new image isn't marked valid and is restarted
   (see "Firmware updates (OTA)").
-- **Heap:** ~143 KB free, largest block 57 KB (with ~8 aircraft). The NOW countdown sprite
-  (~30 KB) is created in `setup()` (`flightScreenReserveSprite()`) before WiFi and `net_task`
-  allocate, so the largest block stays above the 50 KB verified TLS (`release_check`) needs.
+- **Heap:** ~143 KB free; largest block measured from 40 948 to 69 620 B, and it can settle near
+  41 KB within minutes of boot, cut by small long-lived allocations (docs/history.md
+  "Concurrency and resources"). The NOW countdown sprite (39 360 B: 320 × 123 at 8 bit) is
+  created in `setup()` (`flightScreenReserveSprite()`) before WiFi and `net_task` allocate. On
+  the board a verified GitHub session ran from a block of ~43 KB and took ~13 KB of it; a full
+  download from ~41 KB is unproven. Thresholds: "New versions from GitHub (release_check)".
 - **Perf** (`perf_stats`, pure): the UI (`ui_perf`'s `UiPerfMeter`) measures how much later
   than planned each pass starts (drawing time + oversleep) and hands each 60 s window to
   `core_link::uiPerf` with its stack high-water mark; `net_task` logs once a minute
@@ -620,8 +623,9 @@ Spec: `spec/done/02-github-release-check.md`.
 - **Check:** `GET api.github.com/repos/<FW_UPDATE_REPO>/releases/latest` 2 min after boot, then
   daily (`If-None-Match` ETag → a 304 doesn't count against GitHub's 60/h). Only between OpenSky
   polls and with heap to spare (`canStartNetworkTask()`: WiFi, clock synced, ≥ 5 s to the next
-  poll, ≥ 50 KB free block). Setting `update.check_enabled` (NVS `updchk`, default on) only
-  *checks*; installing always needs a YES. A failed connect is retried once.
+  poll, largest free block ≥ `kUpdateMinFreeBlock`, 50 KB). With the block settled below that,
+  scheduled checks and *Check now* don't run. Setting `update.check_enabled` (NVS `updchk`,
+  default on) only *checks*; installing always needs a YES. A failed connect is retried once.
 - **TLS is verified here** (unlike OpenSky / hexdb.io): `src/admin/adapters/github_ca.h` holds
   the *root* CAs (Sectigo E46/R46 + USERTrust ECC/RSA for github.com / api.github.com, ISRG
   X1/X2 for release-assets.githubusercontent.com). `firmware.yml` warns when a host stops verifying
@@ -634,6 +638,14 @@ Spec: `spec/done/02-github-release-check.md`.
   else SHA256SUMS.txt), version (= tag, checked against the marker)}`; `Update.end()` only when
   all match. No hash = no install. Runs in `net_task`'s loop (not inside the HTTP handler),
   ~20 s for 1.36 MB, OTA screen titled "POBIERANIE Z GITHUBA".
+- **An install asked for by hand has its own gate** (`stepPendingInstall()`, each pass of
+  `releaseCheckLoop()`; page and YES on the display share the queue): WiFi, clock synced, no OTA
+  running, largest block ≥ `kUpdateInstallMinFreeBlock` (32 KB). `enabled` and the time to the
+  next poll don't count. Held back: one log line `[update] install <tag> held back: wifi=…
+  clock=… ota busy=…, largest block N (needs 32768)`. After `kUpdateInstallWaitMs` (60 s) it is
+  dropped: `… gave up, it could not start: …`, `OtaResult::InstallNotStarted`
+  (`WebStr::OtaInstallNotStarted`) in `lastInstall`. The Firmware tab shows it on its next load;
+  the page's own reload comes ~5 s after the click, so that takes a manual reload.
 - **Display question:** `shouldShowUpdatePrompt()` — only `Available` (a release newer than a
   plain release build), once per boot, not for a development build, not over the NOW countdown,
   not under a finger, not while the screen is dark or the alert screen is open (`PromptGate`).
