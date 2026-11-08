@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **etap 7 z 8 zrobiony (v1.11.4)** 2026-11-08, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 i 7 w v1.11.4, etap 8 do zrobienia. Jedna specyfikacja dla całej
+Status: **etap 7 z 8 zrobiony (v1.11.4)** 2026-11-08, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 i 7 w v1.11.4, etap 8 na gałęzi `spec/12-code-reorganization-ddd-stage8`, czeka na sprawdzenie instalacji z GitHuba (build `-dev` tego PR). Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -76,77 +76,74 @@ i `AlertId` / `AlertSet` zostały celowo (decyzja Q1 etapu 7).
 
 ## 4. Konteksty
 
+Nazwy plików poniżej to nazwy z kodu (etap 8 dopasował ten rozdział do kodu).
+
 ### 4.1 `airspace` — Niebo nad domem (**dziedzina główna**)
 
 Odpowiada na pytania „co leci, gdzie, w którą stronę i kiedy będzie nade mną”. Nie wie nic
 o OpenSky, hexdb.io ani ekranie.
 
-- `core/`: `aircraft_state.h` (`AircraftState`, wnioskowanie „na ziemi” — dziś
-  `inferOnGround()` w `opensky_client`), `tracked_flight.h` (`TrackedFlight` — dziś
-  do etapu 7 `AircraftRow` w `table_view.h`), `flight_phase`, `overflight` (dziś `cpa_predictor`),
-  `flight_ordering` (dziś `sortRowsForDisplay()`, `splitFeaturedAndRest()`), `now_pick` (dziś
-  `pickNowAircraft()` z `flight_screen`), `feed_health.h`, `airspace_snapshot.h`.
-- `services/`: `poll_airspace` (dziś `poll_pipeline`: stany samolotów → obraz nieba), port
-  `EnrichmentPort` (do etapu 7 `LookupPorts`).
+- `core/`: `aircraft_state` (`AircraftState`, `inferOnGround()`), `home.h`, `tracked_flight`
+  (`TrackedFlight`), `flight_phase`, `cpa_predictor` (przelot nad domem), `flight_ordering`
+  (`sortRowsForDisplay()`, `splitFeaturedAndRest()`), `now_pick` (`pickNowAircraft()`),
+  `feed_health.h`, `airspace_snapshot.h`.
+- `services/`: `poll_pipeline` (stany samolotów → obraz nieba), port `EnrichmentPort`.
 
 ### 4.2 `enrichment` — Dane o samolotach, trasach i lotniskach (**pomocniczy**)
 
-- `core/`: `aircraft_info`, `route`, `airport` (typy + parsowanie JSON hexdb.io —
-  `parse*LookupResponse`), `aircraft_names`, `place_names`, `lookup_budget`, `lookup_cache`
-  (spec 05), `lookup_codec` (kodowanie rekordów NVS — dziś czysta część `lookup_store`).
-- `services/`: `enrichment_service` (RAM → NVS → sieć, nie cache'uje błędów transportu — dziś
-  `lookup*WithFetcher`), implementuje `airspace::EnrichmentPort`.
-- `adapters/`: `hexdb_http` (HTTPS, keep-alive), `hexdb_sources` (dziś `httpFetch*`),
-  `lookup_store_nvs`.
+- `core/`: `aircraft_lookup`, `route_lookup` (parsowanie JSON hexdb.io, `lookup*WithFetcher`:
+  RAM → NVS → sieć, bez cache'owania błędów transportu; typy wyników w `shared/flight_info`),
+  `aircraft_names`, `place_names`, `lookup_budget`, `lookup_cache.h` (spec 05), `lookup_store`
+  (kodowanie rekordów NVS).
+- `adapters/`: `hexdb_http` (HTTPS, keep-alive), `hexdb_sources`, `lookup_store_nvs`.
+- `EnrichmentPort` składa korzeń kompozycji (`main/net_enrichment`).
 
 ### 4.3 `opensky` — Źródło danych OpenSky (**warstwa antykorupcyjna**)
 
 Tłumaczy świat OpenSky (tablice `states` z polami po indeksach, OAuth, nagłówki limitów) na
-`airspace::AircraftState`. **Nic z formatu OpenSky nie wychodzi poza ten katalog.**
+`AircraftState` z `airspace`. **Nic z formatu OpenSky nie wychodzi poza ten katalog.**
 
-- `core/`: `states_parser` (dziś `parseStatesResponse`, `extractAircraftFromStates`),
-  `scan_area` (bbox + `openSkyCreditCost()` + `bboxAreaSqDeg()` — dziś w `config_portal`),
-  `credits` (`openSkyDailyCredits`, `openSkyDailyRequests` — dziś w `config_page`),
-  `opensky_quota`, `opensky_auth` (spec 06), `poll_schedule` (`shouldPollNow`,
-  `tokenNeedsRefresh`, `isBeforeDeadline`).
-- `adapters/`: `opensky_http` (token + `/states/all`, dziś adapterowa połowa `opensky_client`).
+- `core/`: `opensky_client` (`parseStatesResponse()`, `extractAircraftFromStates()`,
+  `shouldPollNow()`, `tokenNeedsRefresh()`, `isBeforeDeadline()`), `scan_area` (`ScanArea`,
+  `computeScanArea()`, `openSkyCreditCost()`, `bboxAreaSqDeg()`), `opensky_quota`, `opensky_auth`
+  (spec 06), `opensky_settings.h`. `openSkyDailyCredits()` i `openSkyDailyRequests()` są w
+  `admin/core/config_page`, bo liczą wartości do panelu.
+- `adapters/`: `opensky_http` (token + `/states/all`).
 
 ### 4.4 `display` — Wyświetlacz i dotyk (**prezentacja**)
 
 - `core/` (czysta logika widoków — układy, teksty, kolory, bez LovyanGFX):
-  `screens/` (`table_layout`, `featured_panel`, `flight_screen`, `radar_layout` + dziś
-  `radar_geometry`, `aircraft_summary`, `status_bar`, `service_screen`), `theme/`
-  (`palette`, `phase_icons`, `nav_tabs`), `text/` (`utf8`, `fit_to_width`, `font_set` —
-  dziś w `lcars_theme`), `navigation` (dziś `screen_nav`), `redraw_policy`,
-  `touch_mapping` (dziś czysta część `touch_input`), `backlight_policy` (dziś czysta część
-  `backlight`), `i18n` (teksty ekranu).
+  `screens/` (`table_view`, `featured_panel`, `flight_screen`, `radar_view`, `radar_geometry`,
+  `aircraft_summary`, `status_bar`, `service_screen`), `theme/` (`lcars_theme`, `fonts/`),
+  `text/` (`utf8`, `fit_to_width`, `font_set`), `screen_nav`, `redraw_policy`, `touch_input`,
+  `touch_calibration.h`, `backlight`, `i18n` (teksty ekranu), `display_settings.h`. Wygenerowane
+  fonty (`lcars_efont.c`) to czyste dane czytane przez `fonts_test`.
 - `services/` (automaty stanów wyciągnięte z `main.cpp`, §6): `ui_flow` (dispatch dotyku,
   stronicowanie tabeli), `update_prompt_flow`, `ota_screen_flow`, `alert_screen_flow`
-  (spec 08), `password_reset_flow`, `screenshot_bridge` (spec 09), `ui_perf`.
-- `adapters/`: `lgfx/` (wszystkie `draw*()`, `LGFX_CYD.hpp` z `include/`), `touch_xpt2046`,
-  `backlight_ldr` (ADC + PWM). Wygenerowane fonty (`lcars_efont.c`) to czyste dane czytane przez
-  `fonts_test` — leżą w `display/core/theme/fonts/`.
+  (spec 08), `service_screen_flows`, `password_reset_flow`, `screenshot_bridge` (spec 09),
+  `ui_perf`.
+- `adapters/`: `lgfx/` (`LGFX_CYD.hpp`, `<moduł>_draw`, `ui_draw`, `screenshot_panel`),
+  `touch_xpt2046`, `backlight_ldr` (ADC + PWM), `service_flows`.
 
 ### 4.5 `admin` — Administracja urządzeniem (**pomocniczy**)
 
 Ustawienia, panel WWW, kopie zapasowe, hasło, ostrzeżenia, aktualizacje.
 
-- `core/`: `settings` (agregat `Settings` + `sanitize`, do etapu 7 `config_store`; NVS w `settings_nvs`),
-  `settings_form` (**nowe**: dziś `handleSave()`, §6), `backup` (dziś `config_backup`),
-  `web_auth`, `alerts` (spec 08), `firmware/` (`ota_update`, `release_check` — czyste
-  części, `version`), `config_page` (renderer HTML), `web_i18n`.
-- `adapters/`: `web_server` (dziś `config_portal`: trasy `WebServer`), `settings_nvs`,
-  `ota_flash` (`Update`), `github_http` (dziś adapter `release_check` + `github_ca.h`).
-- `assets/`: `style.css`, `app.js`, `favicon.svg` — dziś literały w `config_page.cpp`;
+- `core/`: `settings` (agregat `Settings` + `sanitize`; NVS w `settings_nvs`), `settings_form`
+  (§6), `config_backup`, `web_auth`, `device_alerts` (spec 08), `firmware/` (`ota_update`,
+  `release_check`, `version`), `config_page` + `config_page_tabs` + `config_page_writer.h`
+  (renderer HTML), `web_i18n`, `screenshot` (BMP i `?screen=` dla trasy WWW).
+- `adapters/`: `web_server` + `web_server_firmware` + `web_server_internal.h` (trasy
+  `WebServer`), `settings_nvs`, `ota_flash` (`Update`), `github_http`, `github_ca.h`.
+- `assets/`: `style.css`, `app.js`, `favicon.svg`, `restart.js`, `check_pending.js`;
   osadzane przy budowaniu przez `tools/embed_assets.py` (pre-skrypt jak `pio_version.py`)
   do wygenerowanego `admin/core/web_assets.h`.
 
 ### 4.6 `shared` — Wspólne jądro (shared kernel)
 
 Małe, stabilne typy i funkcje używane przez wiele kontekstów: `geo` (odległość, namiar,
-kierunek świata — dziś `computeDistanceBearing()` z `table_view`, `compassPoint()` z
-`lcars_theme`), `language.h` (`Language`), `clock` (formatowanie daty/czasu — czysta część
-`time_sync`), `sun_times`, `wrap_time` (porównania `millis()` odporne na przekręcenie).
+kierunek świata), `language.h` (`Language`), `flight_info` (`AircraftInfo`, `RouteInfo`,
+`AirportInfo`), `clock` (formatowanie daty/czasu), `sun_times`.
 Zmiana w `shared/` wymaga uzasadnienia w opisie commita — to kontrakt dla wszystkich.
 
 ### 4.7 `platform` — Infrastruktura urządzenia
@@ -158,8 +155,10 @@ język** między rdzeniami), `perf_stats`, `wifi_manager`, `time_sync` (adapter 
 ### 4.8 `main/` w katalogu głównym — korzenie kompozycji
 
 `main.cpp` (rdzeń 1: tworzy LGFX, składa przepływy z `display/services`, pętla) i `net_task.cpp`
-(rdzeń 0: składa OpenSky + enrichment + admin, pętla). **Tylko tu** wolno znać wszystkie
-konteksty naraz. Cel: `main.cpp` < 250 linii, bez własnych automatów stanów.
+(rdzeń 0: składa OpenSky + enrichment + admin, pętla), a przy nim `net_perf`, `net_enrichment`,
+`net_rollback` i `alert_sources` (`deviceAlertInputs()`, `panelLiveInputs()`: dane z kilku
+kontekstów). **Tylko tu** wolno znać wszystkie konteksty naraz. `main.cpp` < 250 linii, bez
+własnych automatów stanów.
 
 ## 5. Reguły zależności
 
@@ -190,13 +189,13 @@ Zasady wynikające z tabeli:
   Znika `#ifdef ARDUINO` z plików czystych; zostaje tylko w `platform/` (np. globalne obiekty
   `core_link`).
 - `display` nigdy nie widzi `opensky` (ekran nie wie, skąd są dane); widzi `FeedHealth`.
-- `opensky` i `enrichment` nie znają się nawzajem; łączy je `airspace/services/poll_airspace`
+- `opensky` i `enrichment` nie znają się nawzajem; łączy je `airspace/services/poll_pipeline`
   przez porty.
 - Konteksty nie dołączają cudzych `adapters/`.
 
 **Strażnik:** `tools/check_layers.py` — czyta `#include "…"` z `src/` i `test/`, sprawdza tabelę
 (zapisaną w skrypcie jako dane), wypisuje naruszenia `plik:linia: display/core → opensky`.
-W CI w `firmware.yml` przed testami; od etapu 8 błąd = czerwony build.
+W CI w `firmware.yml` przed testami; błąd = czerwony build (`--strict`).
 
 ## 6. Logika wyciągnięta z adapterów (warstwa `services/`)
 
@@ -769,6 +768,51 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   następnego dnia. Do osobnego `/fix`. **Poprawione w v1.11.4 (fix/sun-times-utc-after-boot).**
 - **Zostaje dla właściciela:** dotyk (zakładki, strony tabeli, „!”), auto-cycle, język ekranu
   PL ↔ EN.
+
+### Wynik etapu 8 (2026-11-08, na gałęzi, czeka na instalację z GitHuba)
+
+- **`check_layers.py`: 12 → 0**, wszystkie usunięte w kodzie, tabela §5 bez nowego ptaszka i wyjątku:
+  `Language` → `shared/language.h`; `AircraftInfo`, `RouteInfo`, `AirportInfo` →
+  `shared/flight_info` (Q1); `AirspaceSnapshot` → `airspace/core/airspace_snapshot.h`;
+  `kUpdatePromptTimeoutMs` → `service_screen.h`; `screenshot` → `admin/core/`;
+  `alert_sources.cpp` → `main/`; `panelLiveInputs()` zamiast dwóch obcych include'ów w
+  `web_server.cpp`; `otaVersionLine()` poza `web_server.cpp`. Poza listą naruszeń: `ScanArea` →
+  `scan_area` (Q5). `firmware.yml` uruchamia `check_layers.py --strict` przed testami native.
+- **Podział (§10 pkt 3):** `net_task.cpp` 419 → 283 linie (`net_perf`, `net_enrichment`,
+  `net_rollback`), `config_page.cpp` 897 → 355 (`config_page_tabs`, `config_page_writer.h`),
+  `web_server.cpp` 659 → 525 (`web_server_firmware.cpp`, `web_server_internal.h`), `main.cpp` 249.
+  Największy plik w `src/` ma 525 linii. Pięć stron panelu (`SCREENSHOT_OUT`) `cmp` identycznych.
+- **Testy:** 978 przypadków (975 zielonych, 3 pominięte bez `SCREENSHOT_OUT`; 257 / 71 / 412 /
+  80 / 74 / 84), `RUN_TEST(` 978, jak przed etapem. `check_comments.py --strict`,
+  `embed_assets.py --check` czyste, `check_bdd.py` 0 problemów (278 scenariuszy).
+- **Firmware** (`FW_VERSION=v0.0.0-stage8`): `firmware.bin` 1 348 256 → 1 348 624 B (**+368 B**,
+  budżet +4 096 B), `.dram0.bss` −8 B (budżet ± 64 B), RAM statyczny 61 908 B.
+- **Odstępstwa od planu:** tekst wersji po uploadzie jest też w `model.messageDetail`, więc strona
+  zachowuje `→`, a `->` ma tylko linia `[ota]` na porcie szeregowym (Q4 bez zmiany strony);
+  `test_config_page_is_split_by_tab` poprawiony, bo `config_page_test.cpp` dołącza `web_assets.h` od
+  etapu 6 (scenariusz mówi o firmware); przy usuwaniu narzędzi z `.feature` zeszły 24 linie
+  tagów (plan: 25), 20 scenariuszy usuniętych. Wzmianki w środku zdań starszych scenariuszy zostały.
+- **`@manual` „Etap 8 nie zmienia liczby testów ani zachowania…”** — spełniony (wyżej).
+- **`@manual` „Płytka z firmware'em etapu 8 działa jak przedtem”** — częściowo (2026-11-08), obraz
+  `v1.11.4-22-g2ff29a8-dirty` przez USB COM3 (`-dirty` od niezwiązanej zmiany `.vscode`),
+  `firmware.bin` 1 348 656 B:
+  - 3 min logu szeregowego: bez paniki, jedyny restart to włączenie zasilania. `/backup.json` różni
+    się tylko polem `firmware`; `/light.json` identyczny (noc, 10 %).
+  - Ekrany 0–2 i pytanie o aktualizację (`screen=3`): ten sam układ co przed wgraniem, inne dane na żywo.
+  - `/perf.json` po 181 s: przerwa pętli UI maks. 93 ms, 0 wolnych przejść, sterta 144 992 B,
+    największy blok 69 620 B, wolny stos net 9 568 B (punkt odniesienia 9 388 B).
+  - OTA przez WiFi (`curl -F firmware=@… /update`): 200 w 14,6 s, restart `SW_CPU_RESET`, „running
+    from app1, pending verify (rollback armed)”, „marked valid after 30 s, rollback cancelled”.
+    Strona pokazuje strzałkę `→`, linia `[ota]` `->`. Po OTA: stos net 9 484 B, sterta 147 220 B,
+    największy blok 59 380 B.
+  - „Sprawdź teraz”: `[update] check: http=200 latest=v1.11.4`, zweryfikowane TLS, 4071 ms.
+  - Niesprawdzone: instalacja buildu `-dev` z GitHuba (po utworzeniu PR), zapis formularza bez
+    zmian, dotyk i fizyczne zachowanie ostrzeżeń.
+- **Kryteria §10:** pkt 1–4 spełnione. Pkt 5 — częściowo, do czasu instalacji z GitHuba i
+  sprawdzeń ręcznych wyżej; dlatego status zostaje „etap 7 z 8”.
+- **Obserwacja (bez zmian w tym etapie):** na panelu bez hasła `curl --digest` wysyła puste
+  żądanie próbne i dostaje 400 („Nie wybrano pliku”); bez `--digest` upload działa. Środowisko
+  `cyd-ota` w `platformio.ini` używa `--digest`, więc przy płytce bez hasła nie zadziała.
 
 ## 9. Testy
 

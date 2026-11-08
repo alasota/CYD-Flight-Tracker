@@ -2,22 +2,133 @@
 
 The current architecture in detail: the source layout, the two cores, the settings page,
 updates, brightness, the "!" alerts, CI and the agent harness. The rules a session must follow
-are in CLAUDE.md; this file is the reference behind them. (Spec 12 reorganises the code into
-contexts in eight stages; stages 1–7 — folders, full-path includes, layer report, layer names,
-misplaced types moved to their contexts, pure / hardware halves split, the UI flows and the
-settings form as tested `services/` / `core/` code, per-context settings, the glossary names —
-are done. Stage 8 rewrites this file around the contexts.)
+are in CLAUDE.md; this file is the reference behind them.
 
 ## Source layout (spec 12)
 
 Spec: `spec/planned/12-code-reorganization-ddd.md` (§2 layer names, §4 contexts, §5 dependency
-table, §8 stages). Stage 1 moved the files with `git mv`, **unsplit and unrenamed**; stage 2
-renamed the layer folders; stage 3 moved misplaced types into their contexts; stage 4 split
-every `#ifdef ARDUINO` half out into `adapters/`; stage 5 moved the UI's state machines out of
-`main.cpp` into `display/services/` and the form logic of `POST /save` into `settings_form`;
-stage 6 split the settings into per-context objects and moved the settings page's CSS / JS /
-icon into files; stage 7 renamed the types to the glossary (spec §3). Stage 8 makes the layer
-check block CI. The stage bullets below use today's names.
+table, §8 stages and their results).
+
+### Contexts and layers
+
+| Context | What it answers | Layers |
+|---|---|---|
+| `airspace` | what flies over home and when it will be overhead (the core domain) | `core`, `services` |
+| `enrichment` | which airline, type and route a flight has (hexdb.io, caches) | `core`, `adapters` |
+| `opensky` | OpenSky as a data source; nothing of its format leaves this folder | `core`, `adapters` |
+| `display` | screens, theme, fonts, touch, backlight, display texts | `core`, `services`, `adapters` |
+| `admin` | settings, web panel, backups, password, alerts, updates | `core`, `adapters`, `assets` |
+
+Layers: `core/` (pure logic, native, tested), `services/` (state machines and pipelines over
+`core` and ports, native, tested), `adapters/` (SDK calls, not native). Outside the contexts:
+`shared/` (the shared kernel: a change needs a reason in its commit message), `platform/` (what
+connects the contexts on the ESP32) and `main/` (composition roots).
+
+### Dependency rules
+
+Who (row) may include what (column). `tools/check_layers.py` holds this table as data
+(`ALLOWED`); `--strict` runs in CI before the native tests and fails the build.
+
+| Who | `shared` | `airspace/core` | `enrichment/core` | `opensky/core` | `display/core` | `admin/core` | `*/services` | `platform` | `*/adapters` | SDK |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `shared` | yes | | | | | | | | | |
+| `airspace/core` | yes | yes | | | | | | | | |
+| `enrichment/core` | yes | | yes | | | | | | | |
+| `opensky/core` | yes | yes | | yes | | | | | | |
+| `display/core` | yes | yes | yes | | yes | yes¹ | | | | |
+| `admin/core` | yes | yes² | | yes² | yes² | yes | | | | |
+| `airspace/services` | yes | yes | yes | | | | own | | | |
+| `display/services` | yes | yes | yes | | yes | yes¹ | own | yes | | |
+| `admin/services` | yes | yes | | yes | yes² | yes | own | | | |
+| `platform` | yes | yes | yes | yes | yes | yes | | yes | | only `#ifdef ARDUINO` |
+| `*/adapters` | yes | own context | own | own | own | own | own | yes | own | yes |
+| `main/` | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+
+¹ read-only types: `AlertSet`, display settings. ² value types for composing settings and alerts
+(`NightMode`, `PhaseThresholds`, `OpenSkyQuota` …). The check treats both footnotes as allowed
+(an include can't show them). Tests may include anything except `adapters/`, `main/` and SDK
+headers.
+
+- `display` never sees `opensky`; it sees `FeedHealth`. `opensky` and `enrichment` don't know each
+  other; `airspace/services/poll_pipeline` joins them through ports.
+- No context includes another context's `adapters/`. A function that needs several contexts goes
+  to `main/`: `deviceAlertInputs()` and `panelLiveInputs()` in `main/alert_sources.cpp`, declared
+  in `admin/core` (the core header is the port).
+
+### Glossary
+
+The same names in the code, these docs and the spec (§3).
+
+| Term | In the code | Meaning |
+|---|---|---|
+| Home | `Home` (`lat`, `lon`, `radius_deg`, `configured`) | the place the device watches the sky over |
+| Scan area | `ScanArea` | the rectangle around home sent to OpenSky |
+| Aircraft state | `AircraftState` | one observation: position, altitude, speed, heading, on ground |
+| Flight | `TrackedFlight` | an aircraft in range with distance, bearing, phase, airline, type, route |
+| Sky snapshot | `AirspaceSnapshot` | the flights of one poll plus the overhead prediction |
+| Phase | `Phase` | takeoff / landing / overflight / none |
+| Overflight | `CpaPrediction` | when and how close to home an aircraft will pass (CPA) |
+| Aircraft data | `AircraftInfo` | airline, type, registration (hexdb.io) |
+| Route | `RouteInfo` | origin and destination (hexdb.io) |
+| Airport | `AirportInfo` | IATA / ICAO codes, country (hexdb.io) |
+| Credits | `OpenSkyQuota`, `openSkyCreditCost()` | OpenSky's limit; the cost of a query is a function, not a type |
+| Feed health | `FeedHealth` | whether data is flowing |
+| Alert | `AlertId`, `AlertSet` | something needs the owner's attention: one alert, the active ones |
+| Settings | `Settings` | everything stored in NVS, an aggregate of per-context objects |
+
+### Modules
+
+- **`airspace/core`:** `aircraft_state` (`AircraftState`, `inferOnGround()`) · `home` ·
+  `tracked_flight` (`TrackedFlight`) · `airspace_snapshot` (`AirspaceSnapshot`) · `flight_ordering`
+  (order, featured split) · `now_pick` (NOW aircraft) · `feed_health` (`FeedHealth`) ·
+  `flight_phase` · `cpa_predictor`. **`airspace/services`:** `poll_pipeline` (one answer →
+  `AirspaceSnapshot`: sort, lookups, phases, CPA, NOW pick).
+- **`enrichment/core`:** `aircraft_lookup` (icao24 → airline / type) · `route_lookup` (callsign →
+  route, airport → IATA / country) · `aircraft_names` (airline by callsign, type names) ·
+  `place_names` (IATA → city, `asciiFold()`) · `lookup_cache` (LRU) · `lookup_store` (NVS copy) ·
+  `lookup_budget` (lookups per poll). **`enrichment/adapters`:** `hexdb_http` (HTTPS GET) ·
+  `hexdb_sources` (hexdb.io lookups) · `lookup_store_nvs`.
+- **`opensky/core`:** `opensky_client` (JSON of `/states/all` → `AircraftState`, **no drawing**) ·
+  `opensky_settings` · `opensky_auth` (login, 30-min retry, Bearer / refresh / anonymous) ·
+  `opensky_quota` (credits left) · `scan_area` (`ScanArea`, credit cost). **`opensky/adapters`:**
+  `opensky_http` (token, `/states/all`).
+- **`display/core`:** `lcars_theme` (palette roles, font metrics, icon / arrow shapes) · `text/`
+  (`utf8`, `fit_to_width`, `font_set` = the character set) · `status_bar` (header) · `screen_nav`
+  (screen, hit tests, auto-cycle) · `redraw_policy` (events → redraw mask) · `aircraft_summary`
+  (identity block of all screens) · `featured_panel` · `table_view` · `flight_screen` ·
+  `radar_view` · `radar_geometry` (polar → screen) · `service_screen` (OTA, password reset, alert
+  screen, `kUpdatePromptTimeoutMs`) · `display_settings` (+ auto-cycle) · `backlight` (brightness,
+  night mode) · `i18n` (display strings) · `touch_input` (raw → screen).
+- **`display/services`:** `ui_flow` (taps, table page, screen changes, ticks, auto-cycle, health,
+  `UiView`) · `service_screen_flows` (`ota_screen_flow`, `update_prompt_flow`,
+  `alert_screen_flow` as one step) · `password_reset_flow` · `screenshot_bridge` · `ui_perf`.
+- **`display/adapters`:** `backlight_ldr` (LDR, PWM) · `touch_xpt2046` · `service_flows`
+  (service-screen drivers) · `lgfx/<module>_draw` (screens, theme, fonts) · `lgfx/ui_draw` ·
+  `lgfx/screenshot_panel`.
+- **`admin/core`:** `settings` (`Settings`: aggregate of context objects) · `settings_form`
+  (`/save` form, checks, credentials file) · `config_page` (page head, tab bar, footer, status
+  texts; `PanelLiveInputs`) · `config_page_tabs` (one function per tab) · `config_page_writer`
+  (the HTML `Writer`) · `config_backup` (JSON backup / restore) · `web_auth` (password, throttle,
+  origin) · `web_i18n` (page strings) · `device_alerts` (the "!") · `screenshot` (BMP, `?screen=`)
+  · `firmware/` (`ota_update`: image checks, `OtaSession`; `release_check`: GitHub releases;
+  `version`). **`admin/assets`:** CSS / JS / icon, embedded into `admin/core/web_assets.h`.
+- **`admin/adapters`:** `web_server` (WebServer + mDNS, the server, its checks, page and settings
+  routes) · `web_server_firmware` (`POST /update`, the GitHub routes) · `web_server_internal.h`
+  (what those two share, `namespace web_server_detail`) · `settings_nvs` · `ota_flash` (`Update`)
+  · `github_http` (check / install) · `github_ca.h`.
+- **`shared/`:** `geo` (distance, bearing, compass point) · `language.h` (`Language`) ·
+  `flight_info` (`AircraftInfo`, `RouteInfo`, `AirportInfo`) · `clock` (date / time text) ·
+  `sun_times` (sunrise / sunset).
+- **`platform/`:** `core_link` (what crosses the cores) · `time_sync` (NTP) · `wifi_manager`
+  (connect + captive portal) · `perf_stats` · `net_config` (HTTP timeouts).
+- **`main/`, core 1:** `main.cpp` (wiring only: `setup()`, the UI `loop()`). **`main/`, core 0:**
+  `net_task` (the core-0 task) · `net_perf` (its share of `/perf.json` and `[perf]`) ·
+  `net_enrichment` (`productionPorts()`, per-poll memos) · `net_rollback` (marks a new image valid
+  or restarts it) · `alert_sources` (`deviceAlertInputs()`, `panelLiveInputs()`).
+
+### How the layout works, and how it got here
+
+The stage bullets use today's names.
 
 - **Folders:** `src/<context>/<layer>/` — contexts `airspace` (the sky model: aircraft state,
   tracked flights, their order, the NOW pick, feed health, flight phase, CPA; the poll pipeline),
@@ -27,9 +138,9 @@ check block CI. The stage bullets below use today's names.
   `core/` (pure logic of the context: types, rules, maths, screen layouts, texts — native, tested),
   `services/` (state machines, pipelines, use cases that combine `core` parts and ports — native,
   tested), `adapters/` (SDK calls: ESP32, LovyanGFX, HTTP, NVS, `WebServer` — not native). Plus
-  `shared/` (`sun_times`, `geo`, `clock`), `platform/` (`core_link`, `time_sync`, `wifi_manager`,
+  `shared/` (`sun_times`, `geo`, `clock`, `language`, `flight_info`), `platform/` (`core_link`, `time_sync`, `wifi_manager`,
   `perf_stats`, `net_config`) and `src/main/` (`main.cpp`, `net_task` — composition roots, one
-  per core). Subfolders: `display/core/screens/`, `display/core/theme/` (+ `fonts/`),
+  per core — and the parts of `net_task`). Subfolders: `display/core/screens/`, `display/core/theme/` (+ `fonts/`),
   `display/core/text/` (`utf8`, `fit_to_width`, `font_set`), `display/adapters/lgfx/` (the
   `LGFX_CYD.hpp` device class and one `<module>_draw.{h,cpp}` per screen / the theme).
 - **Adapters** (stage 4, names from spec 12 §4): `display/adapters/` — `lgfx/status_bar_draw`,
@@ -41,10 +152,9 @@ check block CI. The stage bullets below use today's names.
   `lgfx/ui_draw` and `lgfx/screenshot_panel` (see the stage 5 bullet);
   `enrichment/adapters/` — `hexdb_sources` (aircraft / route / airport fetch + `lookup*()`),
   `lookup_store_nvs`, `hexdb_http`; `opensky/adapters/opensky_http` (token, `/states/all`
-  HTTP/1.0 stream, 401 / 429, schedule); `admin/adapters/` — `web_server` (routes + mDNS, was
+  HTTP/1.0 stream, 401 / 429, schedule); `admin/adapters/` — `web_server` + `web_server_firmware` (routes + mDNS, was
   `config_portal`), `settings_nvs` (`loadSettings()` / `saveSettings()` …), `ota_flash` (`Update`,
-  SHA-256, `otaFlashSession()`), `github_http` (release check / install), `alert_sources`
-  (`deviceAlertInputs()`), `github_ca.h`. `#ifdef ARDUINO` is left only in `platform/`
+  SHA-256, `otaFlashSession()`), `github_http` (release check / install), `github_ca.h`. `#ifdef ARDUINO` is left only in `platform/`
   (`core_link`, `time_sync`, `wifi_manager`) and `enrichment/adapters/hexdb_http`.
 - **Stage 2** (`git mv` of 80 files, include lines only): `<ctx>/domain/` → `<ctx>/core/`,
   `<ctx>/app/` → `<ctx>/services/`, `src/app/` → `src/main/`; `admin/app/` split —
@@ -90,7 +200,7 @@ check block CI. The stage bullets below use today's names.
   test), `OtaObserver` moved from the web server's header to `ota_update.h`, `config_portal`'s
   pure functions went to `admin/core/settings_form` (the parsed credentials file, since stage 6
   `CredentialsFile`, `parseOpenSkyCredentialsJson()`, `isValidFloatString()`, `isValidUnsignedIntString()`), then
-  `config_portal` was renamed `web_server` (`MOVES_STAGE_4`; its `configPortal*()` functions became
+  `config_portal` was renamed `web_server` (its `configPortal*()` functions became
   `webServer*()` in stage 7), `time_sync`'s formatters (`formatDate()`, `formatTime()`,
   `minuteOf()`) went to `shared/clock`, `main/net_task` lost its whole-file guard, and
   `include/LGFX_CYD.hpp` / `include/touch_calibration.h` moved to `display/adapters/lgfx/` /
@@ -118,7 +228,7 @@ check block CI. The stage bullets below use today's names.
     → Confirm → Finished, `sleepMs` 30 / 20 / 1500), `ui_perf` (`UiPerfMeter`), `screenshot_bridge`
     (`ScreenshotBridge<Lock>` and `ScreenshotReturn` split out of `screenshot.h`, plus
     `screenshotPrepareTarget()` and `screenshotUiPass()`; `screenshot.h` keeps the BMP / band /
-    `?screen=` helpers `web_server` uses).
+    `?screen=` helpers `web_server` uses, in `admin/core/` since stage 8).
   - `admin/core/settings_form` — `FormArgs`, `applySettingsForm()`, `passwordProblem()`,
     `rejectedFieldsText()` (see "Settings page"); `handleSave()` is 22 lines of HTTP.
 
@@ -175,13 +285,13 @@ check block CI. The stage bullets below use today's names.
   `test_display_reads_only_its_settings_from_net_state`. Page assets: `src/admin/assets/` +
   `tools/embed_assets.py` → `admin/core/web_assets.h` (see "Settings page").
 - **Stage 7** (glossary names, spec 12 §3; owner 2026-11-07: the plan's defaults). Renames only,
-  one glossary entry per commit, each done by `tools/rename_symbols.py` (below):
+  one glossary entry per commit, each done by a one-off lexer tool (docs/history.md "Tooling and docs"):
 
   | Was | Now | Where |
   |---|---|---|
-  | `BoundingBox`, `computeBoundingBox()` | `ScanArea`, `computeScanArea()` | `opensky/core/opensky_client.h` |
+  | `BoundingBox`, `computeBoundingBox()` | `ScanArea`, `computeScanArea()` | `opensky/core/scan_area.h` |
   | `OpenSkyHealth` | `FeedHealth` | `airspace/core/feed_health.h` |
-  | `DataSnapshot`, `buildDataSnapshot()` | `AirspaceSnapshot`, `buildAirspaceSnapshot()` | `platform/core_link.h`, `poll_pipeline` |
+  | `DataSnapshot`, `buildDataSnapshot()` | `AirspaceSnapshot`, `buildAirspaceSnapshot()` | `airspace/core/airspace_snapshot.h`, `poll_pipeline` |
   | `LookupPorts` (§4.1) | `EnrichmentPort` | `airspace/services/poll_pipeline.h` |
   | `AircraftRow` | `TrackedFlight` | `airspace/core/tracked_flight.h` |
   | `Aircraft` | `AircraftState` | `airspace/core/aircraft_state.h` |
@@ -189,7 +299,7 @@ check block CI. The stage bullets below use today's names.
   | `Config` | `Settings` | `admin/core/settings.h` |
   | `defaultConfig()`, `sanitizeConfig()`, `loadConfig()`, `saveConfig()`, `reloadConfig()`, `configToBackupJson()`, `restoreConfigFromBackupJson()`, `makeConfig()` | `…Settings()`, `settingsToBackupJson()`, `restoreSettingsFromBackupJson()`, `makeSettings()` | `settings`, `config_backup`, `net_task`, `fixtures.h` |
   | `NetState::cfg`, `cfgSeq` | `NetState::settings`, `settingsSeq` | `platform/core_link.h` |
-  | file `admin/core/config_store.{h,cpp}`, `config_store_test.cpp` | `admin/core/settings.{h,cpp}`, `settings_test.cpp` (`run_settings_tests()`) | `MOVES_STAGE_7` |
+  | file `admin/core/config_store.{h,cpp}`, `config_store_test.cpp` | `admin/core/settings.{h,cpp}`, `settings_test.cpp` (`run_settings_tests()`) | file rename |
 
   Kept on purpose: locals and parameters named `cfg` (`const Settings &cfg`), `ConfigPageModel`
   and the `config_page` / `config_backup` modules (the page's established name), `CpaPrediction`
@@ -198,8 +308,7 @@ check block CI. The stage bullets below use today's names.
   "Alert"), names derived from "aircraft" / "row" (`makeAircraft()`, `fetchAircraftStates()`,
   `pickNowAircraft()`, `sortRowsForDisplay()`, `makeRow()`, `TrackedFlight::aircraft`), the "bbox"
   of OpenSky's query (`bboxAreaSqDeg()`), and the §4 file names that differ (`cpa_predictor`,
-  `poll_pipeline`, `screen_nav`, `touch_input`, `backlight`, `opensky_client`) — stage 8 makes §4
-  match the code. WiFiManager's `setConfigPortalBlocking()` / `getConfigPortalActive()` /
+  `poll_pipeline`, `screen_nav`, `touch_input`, `backlight`, `opensky_client`; §4 follows the code). WiFiManager's `setConfigPortalBlocking()` / `getConfigPortalActive()` /
   `setConfigPortalTimeout()` and the SDK's `configTzTime()` are library names. Strings never
   changed: NVS keys, backup JSON keys, routes, log text, hexdb.io's `"Aircraft not found."` and
   the `docs/data-sources.md "Aircraft identification"` references. Proof: built with a fixed
@@ -207,9 +316,23 @@ check block CI. The stage bullets below use today's names.
   `firmware.bin` differed only in the image hashes (≤ 65 B); the file rename only moved the
   link order (same sections, same 1 348 224 B, RAM unchanged). `check_comments.py`'s
   `RENAMED_SYMBOLS` reports a compound old name that comes back in code or a comment (outside
-  `"quoted text"`: "X was renamed Y in spec 12 stage 7"); `test_rename_symbols.py`'s `RepoTest.test_old_names_are_gone_from_code`
-  fails on any old name in code tokens. `LayoutTest`: `test_settings_module_is_admin_core_settings`,
+  `"quoted text"`: "X was renamed Y in spec 12 stage 7"). `LayoutTest`: `test_settings_module_is_admin_core_settings`,
   `test_net_state_carries_settings`, `test_web_server_functions_are_named_after_the_module`.
+- **Stage 8** (enforcement; owner 2026-11-08). The 12 remaining findings were removed in the code;
+  the dependency table gained no tick and no exception. Moved: `Language` → `shared/language.h`,
+  `AircraftInfo` / `RouteInfo` / `AirportInfo` → `shared/flight_info`, `AirspaceSnapshot` →
+  `airspace/core/airspace_snapshot.h`, `ScanArea` / `computeScanArea()` → `opensky/core/scan_area`,
+  `kUpdatePromptTimeoutMs` → `service_screen.h`, `screenshot` → `admin/core/`,
+  `alert_sources.cpp` → `main/`. `web_server` reads quota, login state and light through
+  `panelLiveInputs()`. Split, behaviour unchanged (the five page renders are `cmp` identical):
+  `net_task.cpp` 419 → 283 lines (`net_perf`, `net_enrichment`, `net_rollback`), `config_page.cpp`
+  897 → 355 (`config_page_tabs`, `config_page_writer.h`), `web_server.cpp` 659 → 525
+  (`web_server_firmware.cpp`). Page text after an upload keeps `→`; the `[ota]` serial line
+  writes `->`. `LayoutTest` pins it: `test_source_files_stay_under_the_section_10_limits`,
+  `test_web_server_routes_keep_their_guards` (every POST: `requireSameOrigin()`, then
+  `authorize()`; every upload callback: `isMultipartRequest()`; every route `secured<>`),
+  `test_web_server_includes_only_its_own_context`, `test_net_task_parts_live_in_the_composition_root`,
+  `test_config_page_is_split_by_tab`.
 - **Includes** are full paths from `src/` (`#include "display/core/i18n.h"`), in `src/` and
   `test/` alike; `-I src` is in `env:cyd` and `env:native` (`cyd-ota`, `native-asan` inherit).
   `test/support/` headers and test-local headers (`github_fixtures.h`) stay short.
@@ -228,69 +351,14 @@ check block CI. The stage bullets below use today's names.
   Stage-1 decisions: the §5 footnotes count as allowed; the table's missing rows were filled in
   (`enrichment/services` may see `airspace` core / services — it implements its port;
   `opensky/services` only its own context). Output `path:line: from -> to ("include")`, a count
-  per pair and a total; exit 0, `--strict` exits 1 (stage 8 turns that on in CI).
-- **Findings:** 55 after stage 1, **51 after stage 2** (55 − 9 + 5): `config_page` / `web_i18n`
-  in `admin/core/` make 4 × `admin/domain -> admin/app` legal, and `config_portal` as an adapter
-  may include the SDK and `platform/` (−5); new are `config_page.cpp -> admin/adapters`
-  (`config_portal.h`, for `openSkyCreditCost`), `config_portal_test.cpp -> admin/adapters` and
-  three of `config_portal.cpp`'s includes of other contexts (`backlight.h`, `service_screen.h`,
-  `opensky_client.h` — an adapter sees only its own context). The rest: SDK includes inside
-  `#ifdef` in `core/` files, `core -> adapters` (`hexdb_http.h`, `github_ca.h`, `config_portal.h`,
-  `LGFX_CYD.hpp`), `core` / `services` → `platform` (`time_sync.h`, `core_link.h`,
-  `net_config.h`). **47 after stage 3** (51 − 6 + 2): gone are `poll_pipeline.cpp -> display/core`
-  (×2: `flight_screen.h`, `table_view.h`), `poll_pipeline.h -> opensky/core` and
-  `table_view.h -> opensky/core` (`opensky_client.h`, now `aircraft_state.h`), and
-  `config_page.cpp` / `device_alerts.cpp -> admin/adapters` (`config_portal.h`, now
-  `scan_area.h`); new are 2 × `airspace/core -> enrichment/core` — `tracked_flight.h` includes
-  `aircraft_lookup.h` and `route_lookup.h` because `TrackedFlight` carries `AircraftInfo`,
-  `RouteInfo`, `AirportInfo` by value (§4.1 puts it in `airspace/core`, §5 lets that layer see
-  only `shared/`; owner 2026-11-01: accepted for now, decided before stage 8).
-  **14 after stage 4** (47 − 38 + 5): gone are every SDK include in `core/`, every
-  `core -> adapters` include (10 × `display/core -> display/adapters` through `LGFX_CYD.hpp`,
-  `github_ca.h`, `config_portal.h`, `hexdb_http.h`), `core -> platform` from `release_check`,
-  `backlight`, `opensky_client`, `config_page` / `status_bar` (`time_sync.h`, now
-  `shared/clock.h`), `opensky/core -> admin/core` and `test -> admin/adapters`. New, because an
-  adapter sees only its own context (§5 kept as is, owner): `service_screen_draw.cpp ->
-  admin/core` (`release_check.h`, `kUpdatePromptTimeoutMs`), `backlight_ldr.cpp` and
-  `opensky_http.cpp -> admin/core` (`config_store.h`), `alert_sources.cpp -> display/core`
-  (`backlight.h`) and `-> opensky/core` (`opensky_client.h`). The 14: those 5, `web_server.cpp`
-  × 4 (`backlight.h`, `service_screen.h`, `opensky_client.h`, `screenshot.h`),
-  `tracked_flight.h -> enrichment/core` × 2, `poll_pipeline.h -> platform` (`core_link.h`),
-  `place_names.h` / `opensky_quota.h -> display/core` (`Language`). `tools/test_check_layers.py`'s
-  `LayoutTest.test_layer_findings_do_not_exceed_the_stage_limit` fails above
-  `LAYER_FINDINGS_LIMIT = 12`; each stage that lowers the count lowers the limit with it (51 → 47
-  → 14 → 12), so progress can't slip back unnoticed. **Still 14 after stage 5** — the same list (the
-  new modules include only what §5 allows). **12 after stage 6**: `opensky_http.cpp` and
-  `backlight_ldr.cpp -> admin/core` (`config_store.h`) are gone — they take their settings
-  objects now (`LayoutTest.test_stage_6_removes_the_settings_findings_of_adapters`).
-  A short include (resolving only from the file's own folder) and a file outside any context are
-  findings too; `LayoutTest` keeps the tree free of them, of old `domain/` / `app/` paths in code,
-  build files and tools, and keeps the `RUN_TEST(` count ≥ 874.
-- **`tools/rewrite_includes.py`** — the move tables and the include rewriter. `MOVES_STAGE_1`
-  (94 files, stage 0 → stage 1) and `MOVES_STAGE_2` (80 files, stage 1 → stage 2) sit side by
-  side in `STAGES`; `MOVES = STAGES[-1]` is what `--move` applies (`git mv` per entry, skips done
-  ones, removes emptied folders); `final_path()` follows a stage-0 path through all stages. The
-  default run rewrites any quoted include that doesn't resolve from `src/` to its full path in
-  place, `--check` exits 1 if anything would change. A later stage that moves files adds its
-  table to `STAGES`; stage 3 moved symbols, not files, so it has none (its new includes were
-  written as full paths by hand, `--check` = 0). Stage 4's `MOVES_STAGE_4` is the one rename,
-  `admin/adapters/config_portal.{h,cpp}` → `web_server.{h,cpp}` (`STAGES` = stages 1, 2, 4); the
-  index also maps the old basename of every renamed header to its final path (`"config_portal.h"`
-  → `"admin/adapters/web_server.h"`) and refuses one that a live header still uses. The new
-  adapter files were written by hand, and the two `include/` headers were `git mv`ed by hand,
-  their includes fixed by the default rewrite. `MOVES_STAGE_7` renames
-  `admin/core/config_store.{h,cpp}` → `settings.{h,cpp}` (`STAGES` = stages 1, 2, 4, 7). The tool
-  stays until stage 8.
-- **`tools/rename_symbols.py`** (stage 7) — renames C/C++ identifiers in `src/` and `test/` by
-  the table `RENAMES_STAGE_7` (one entry per commit: `python tools/rename_symbols.py
-  AircraftRow`; `--list`, `--check KEY` lists leftovers and writes nothing, `--report` lists the
-  old name's hits in docs / tools / the `.feature`). A small lexer: code identifiers are replaced
-  as whole tokens; `"strings"`, `'chars'`, raw strings and `#include` paths never change. Kinds:
-  `compound` (code + comments outside `"quoted text"`), `word` (`Aircraft`, `Config` — also
-  English words: code only, comment hits listed for a hand edit), `prefix` (`configPortal` +
-  upper-case letter, so `setConfigPortalBlocking()` stays). Skips the generated `web_assets.h`
-  and `fonts/`; keeps CRLF / LF; a second run changes nothing. Why not `sed`: docs/history.md
-  "Tooling and docs". Stays until stage 8, like `rewrite_includes.py`.
+  per pair and a total; exit 0, `--strict` exits 1 on any finding (the CI step).
+- **Findings: 0.** They went 55, 51, 47, 14, 14, 12, 12, 0 over stages 1–8 (per stage: spec 12
+  §8 "Wynik etapu N"). `LayoutTest.test_layer_findings_do_not_exceed_the_stage_limit` has
+  `LAYER_FINDINGS_LIMIT = 0`. A short include (resolving only from the file's own folder) and a
+  file outside any context are findings too; `LayoutTest` keeps the tree free of them, of old
+  `domain/` / `app/` paths in code, build files and tools, and keeps the `RUN_TEST(` count ≥ 874.
+- **The one-off migration tools** (`rewrite_includes.py`, `rename_symbols.py`) were deleted in
+  stage 8 with their tests and CI lines; git has them.
 
 ## Concurrency — two cores (core_link, net_task)
 
@@ -706,11 +774,11 @@ green dot, red "!").
   bump).
 - **GitHub Actions — four workflows** (`.github/workflows/`):
   - `firmware.yml` — push to main / manual, and reusable (`workflow_call`, inputs `version` =
-    forced `FW_VERSION`, `ref` = commit): the layer report (`tools/check_layers.py`, report
-    only, before the tests — "Source layout"), `pio test -e native`, `pio test -e native-asan`,
+    forced `FW_VERSION`, `ref` = commit): the blocking layer check (`tools/check_layers.py --strict`,
+    before the tests — "Source layout"), `pio test -e native`, `pio test -e native-asan`,
     the Python tool tests (`tools/test_check_bdd.py`, `test_release_plan.py`,
     `test_build_site.py`, `test_check_comments.py`, `test_check_layers.py`,
-    `test_rewrite_includes.py`, `test_rename_symbols.py`, `test_subset_efont.py`,
+    `test_subset_efont.py`,
     `test_embed_assets.py` — its `RepoTest`
     fails on a stale `web_assets.h`), the BDD check (`tools/check_bdd.py`),
     the comment check (`tools/check_comments.py`, warnings only),

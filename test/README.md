@@ -31,8 +31,8 @@ The six suites follow the contexts of [spec 12](../spec/planned/12-code-reorgani
 so they stayed put when `src/` moved into `src/<context>/<layer>/` (stage 1). Each suite is one
 executable. Test files include `src/` headers by **full path** (`#include
 "enrichment/core/lookup_cache.h"`, `-I src`) and never an `adapters/`, `main/` (the roots) or
-SDK header — `tools/check_layers.py` reports it, `tools/test_check_layers.py`'s `LayoutTest`
-fails on a short include. `native` links everything in `src/` except `main/`, `*/adapters/`
+SDK header — `tools/check_layers.py --strict` fails CI on it, and `tools/test_check_layers.py`'s
+`LayoutTest` fails on a short include. `native` links everything in `src/` except `main/`, `*/adapters/`
 and `platform/*_esp32.cpp`, with no exception (since spec 12 stage 4 split the pure halves out:
 a device function declared in a core header and defined in an adapter can't be called from a
 test — it wouldn't link; docs/architecture.md "Source layout"). Tests follow their code: when
@@ -53,11 +53,11 @@ with their code; stage 5 moved the 19 screenshot hand-over tests (`ScreenshotBri
 | `test_platform` | concurrency, perf, WiFi, time; the shared kernel (`src/shared/`) | core_link, perf_stats, wifi_manager, clock, sun_times, geo |
 
 ¹ `screenshot` (the BMP header / band / `?screen=` helpers `web_server` uses) lives in
-`src/display/services/` but its 9 tests stay in `test_admin` (the settings page serves the
+`src/admin/core/`, with its 9 tests in `test_admin` (the settings page serves the
 screenshot); the hand-over between the cores is `screenshot_bridge`, tested in `test_display`.
 
-Cases per suite (spec 12 stage 6): admin 257 (3 skipped), airspace 71, display 408, enrichment
-80, opensky 74, platform 84 — 974, the same as the `RUN_TEST(` count (`LayoutTest` keeps it
+Cases per suite (spec 12 stage 8): admin 257 (3 skipped), airspace 71, display 412, enrichment
+80, opensky 74, platform 84 — 978, the same as the `RUN_TEST(` count (`LayoutTest` keeps it
 ≥ 874).
 
 Settings are guarded against a silent change of format: `config_backup_test.cpp` compares the
@@ -96,9 +96,8 @@ injects a fake command queue as the `CommandSender`; `screenshot_bridge_test.cpp
   language back to Polish. A module with new global state adds its reset there.
 - New module: add `<module>_test.cpp` to the suite of its context, declare and call its
   `run_<module>_tests()` in that suite's `main.cpp` (`if (RUN_MODULE(<module>)) …`).
-- Test **function** names are not renamed with the code (spec 12 stage 7: `tools/rename_symbols.py`
-  changes identifiers in `src/` and `test/` but `test_sanitize_config_clamps_all_fields` keeps its
-  name), so the `.feature` tags that point at them keep resolving.
+- Test **function** names are not renamed with the code (spec 12 stage 7 changed identifiers in
+  `src/` and `test/`, but `test_sanitize_config_clamps_all_fields` kept its name), so the `.feature` tags that point at them keep resolving.
 - Built with `-Wall -Wextra -Werror` (tests and `src/`). Unused stub parameters:
   `const std::string & /*icao24*/`.
 - Native `SpinLock` is a no-op (the tests are single-threaded), so code shared between the

@@ -16,7 +16,7 @@ LCARS-inspired console. Three screens: Flights (table), NOW (overhead countdown)
 | this file | rules: hardware, modules, testing, redraw, i18n, two cores, pitfalls, commands |
 | [docs/screens.md](docs/screens.md) | what each screen, the header and the tab bar show, coordinates, colours, phase icons, CPA math, clock |
 | [docs/data-sources.md](docs/data-sources.md) | OpenSky (OAuth2, credits, login fallback), hexdb.io (endpoints, caches, budgets) |
-| [docs/architecture.md](docs/architecture.md) | source layout + layer check, two cores in detail, settings page, OTA + password + web security, GitHub updates, brightness / night, device alerts, CI, project page, harness |
+| [docs/architecture.md](docs/architecture.md) | source layout (contexts, dependency table, glossary, module list) + layer check, two cores in detail, settings page, OTA + password + web security, GitHub updates, brightness / night, device alerts, CI, project page, harness |
 | [docs/history.md](docs/history.md) | what was tried and why it changed — read before "simplifying" something back |
 | [docs/review-notes-2026.md](docs/review-notes-2026.md) | the 2026 code review (comments cite it as `docs/review-notes-2026.md X.Y`) |
 | `spec/` | specs (`planned/`, `done/`) + BDD `.feature` files; `spec/README.md` lists them |
@@ -56,40 +56,10 @@ HTTP / NVS / touch calls (`adapters/`, never built by `native`): a core header d
 functions with plain types too, an adapter defines them (`LGFX &` ones: in the adapter's header).
 `#ifdef ARDUINO` only in `platform/` and adapters. Layers: docs/architecture.md "Source layout".
 
-- **Data, core 0:** `wifi_manager` (connect + captive portal) · `opensky_client` (JSON of
-  `/states/all` → `AircraftState`, **no drawing**) · `opensky_settings` · `opensky_auth` (login, 30-min
-  retry, Bearer / refresh / anonymous) · `opensky_quota` (credits left) · `scan_area` (credit cost)
-  · `aircraft_lookup` (icao24 → airline / type) · `route_lookup` (callsign → route, airport → IATA /
-  country) · `aircraft_names` (airline by callsign, type names) · `place_names` (IATA → city,
-  `asciiFold()`) · `lookup_cache` (LRU) · `lookup_store` (NVS copy) · `lookup_budget` (lookups per
-  poll) · `hexdb_http` (HTTPS GET) · `poll_pipeline` (one answer → `AirspaceSnapshot`: sort, lookups,
-  phases, CPA, NOW pick) · `net_task` (the core-0 task) · `net_config` (HTTP timeouts).
-- **Settings and maintenance:** `settings` (`Settings`: aggregate of context objects) ·
-  `settings_form` (`/save` form, checks, credentials file) · `config_page` (page HTML; CSS / JS in
-  `admin/assets/`) · `config_backup` (JSON backup / restore) · `web_auth` (password, throttle, origin)
-  · `web_i18n` (page strings) · `ota_update` (image checks, `OtaSession`) · `release_check` (GitHub
-  releases) · `version` · `device_alerts` (the "!") · `screenshot` (BMP, `?screen=`) · `perf_stats`.
-- **Shared / platform:** `core_link` (what crosses the cores) · `time_sync` (NTP) · `clock` (date
-  / time text) · `sun_times` (sunrise / sunset) · `geo` (distance, bearing, compass point) ·
-  `backlight` (brightness, night mode) · `i18n` (display strings) · `touch_input` (raw → screen).
-- **Adapters (device halves):** `opensky_http` (token, `/states/all`) · `hexdb_sources` (hexdb.io
-  lookups) · `lookup_store_nvs` · `settings_nvs` · `web_server` (WebServer + mDNS, routes) ·
-  `ota_flash` (`Update`) · `github_http` (check / install) · `alert_sources` (alert inputs) ·
-  `backlight_ldr` (LDR, PWM) · `touch_xpt2046` · `service_flows` (service-screen drivers) ·
-  `lgfx/<module>_draw` (screens, theme, fonts) · `lgfx/ui_draw` · `lgfx/screenshot_panel`.
-- **Sky model (`airspace/core`):** `aircraft_state` (`AircraftState`, `inferOnGround()`) · `home`
-  · `tracked_flight` (`TrackedFlight`) · `flight_ordering` (order, featured split) · `now_pick`
-  (NOW aircraft) · `feed_health` (`FeedHealth`) · `flight_phase` · `cpa_predictor`.
-- **Display, core 1:** `lcars_theme` (palette roles, font metrics, icon / arrow shapes) ·
-  `text/` (`utf8`, `fit_to_width`, `font_set` = the character set) · `status_bar` (header) ·
-  `screen_nav` (screen, hit tests, auto-cycle) · `redraw_policy` (events → redraw mask) ·
-  `aircraft_summary` (identity block of all screens) · `featured_panel` · `table_view` ·
-  `flight_screen` · `radar_view` · `radar_geometry` (polar → screen) · `service_screen` (OTA,
-  password reset, alert screen) · `display_settings` (+ auto-cycle).
-- **UI flows (`display/services`):** `ui_flow` (taps, table page, screen changes, ticks,
-  auto-cycle, health, `UiView`) · `service_screen_flows` (`ota_screen_flow`, `update_prompt_flow`,
-  `alert_screen_flow` as one step) · `password_reset_flow` · `screenshot_bridge` · `ui_perf` ·
-  `main.cpp` (wiring only: `setup()`, the UI `loop()`).
+Which module does what, the dependency table and the glossary: docs/architecture.md "Source
+layout". `python tools/check_layers.py --strict` enforces the table and blocks CI (0 findings);
+only `main/` may join several contexts. Limits: `main.cpp` < 250 lines, `net_task.cpp` < 300,
+no file in `src/` over 600 (`tools/test_check_layers.py`).
 
 Rules:
 - Never hardcode WiFi / OpenSky secrets. `millis()`-based timing, no `delay()` in the UI.
@@ -205,8 +175,8 @@ Details: docs/architecture.md "Concurrency — two cores". Spec: `spec/done/04-d
 ## Versioning, CI and the harness
 
 - Version = git tag (`tools/pio_version.py` → `FW_VERSION`, only in `admin/core/firmware/version.cpp`),
-  shown in the settings page footer. Workflows: `firmware.yml` (tests, checks + layer report,
-  build, artifacts), `site.yml` (project page), `release.yml` (tag `v*` → GitHub Release + page),
+  shown in the settings page footer. Workflows: `firmware.yml` (tests, checks, blocking layer
+  check, build, artifacts), `site.yml` (project page), `release.yml` (tag `v*` → GitHub Release + page),
   `pr.yml` (a `-dev.N` pre-release per PR). Details: docs/architecture.md "Versioning & CI".
 - Project page source `site/` (PL/EN pairs), built by `tools/build_site.py`; "What's next" comes
   from `ROADMAP.md`, the changelog from git — so every released feature needs a ROADMAP Done row
@@ -233,9 +203,9 @@ Details: docs/architecture.md "Concurrency — two cores". Spec: `spec/done/04-d
 - Tests: `pio test -e native` (one suite: `-f test_display`; Linux sanitizers: `-e native-asan`)
 - Checks: `python tools/check_bdd.py`, `python tools/check_comments.py [--strict]` (comment doc
   references, removed symbols, `main.cpp` in core-0 modules, CLAUDE.md size),
-  `python tools/check_layers.py [--strict]` (spec 12 layer rules; report only in CI)
+  `python tools/check_layers.py [--strict]` (spec 12 layer rules; `--strict` blocks CI)
 - Tool tests (CI): `python tools/test_<name>.py` for check_bdd, release_plan, build_site,
-  check_comments, check_layers, rewrite_includes, rename_symbols, subset_efont, embed_assets
+  check_comments, check_layers, subset_efont, embed_assets
 - Project page: `python tools/build_site.py --out _site` (`--firmware DIR` adds the installer)
 - Settings page / update question screenshots: `python tools/screenshots.py [--device cyd-sky.local]`
 - Spec / issue → PR: `/implement 05`, `/implement #12`; bug → PR: `/fix <description>`,
