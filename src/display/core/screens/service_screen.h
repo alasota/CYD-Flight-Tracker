@@ -27,6 +27,9 @@ Rect serviceProgressBarRect(int16_t screenW, int16_t screenH);
 // (unknown) fills nothing.
 int16_t serviceProgressFillPx(int percent, int16_t barW);
 
+// How long the update prompt stays up before it closes by itself.
+constexpr uint32_t kUpdatePromptTimeoutMs = 30000;
+
 // Width of the update prompt's countdown strip, `barW` wide when the full
 // `timeoutMs` remains, 0 once it has run out.
 int16_t promptTimerFillPx(uint32_t remainingMs, uint32_t timeoutMs, int16_t barW);
