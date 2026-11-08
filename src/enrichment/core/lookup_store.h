@@ -15,6 +15,7 @@
 // and are never touched here).
 #pragma once
 
+#include <cstddef>
 #include <string>
 
 #include "enrichment/core/aircraft_lookup.h"  // AircraftInfo
@@ -28,6 +29,24 @@ bool decodeRouteInfo(const std::string &text, RouteInfo &out);
 
 std::string encodeAirportInfo(const AirportInfo &info);
 bool decodeAirportInfo(const std::string &text, AirportInfo &out);
+
+// Slots the lookup records must leave free in the NVS partition they share
+// with the settings and the WiFi credentials.
+constexpr size_t kLookupStoreReserveEntries = 64;
+
+// What storeSaveRecord() needs from NVS. freeEntries() counts only the slots a
+// write can use (not the spare page NVS keeps for its own garbage collection).
+class LookupNvs {
+ public:
+  virtual ~LookupNvs() = default;
+  virtual bool put(const char *ns, const std::string &key, const std::string &value) = 0;
+  virtual void clear(const char *ns) = 0;
+  virtual size_t freeEntries() = 0;
+};
+
+// Writes one record into namespace `ns`; true when it is stored.
+bool storeSaveRecord(LookupNvs &nvs, const char *ns, const std::string &key,
+                     const std::string &value);
 
 // ---- Hardware adapter: ESP32 Preferences (NVS), defined in
 // enrichment/adapters/lookup_store_nvs.cpp. Not covered by Unity.
