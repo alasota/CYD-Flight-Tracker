@@ -163,9 +163,13 @@ citizen, cache everything, don't re-fetch a key that is still cached.
     0): the IDF figure includes the page NVS keeps empty for garbage collection.
   - Wiped answers are fetched from hexdb.io again when the aircraft / route / airport next shows
     up, so "looked up once" holds only until a wipe. A record is saved once, on the fresh answer.
-  - Size (computed from `min_spiffs.csv`, not measured): 504 usable slots, a string takes
-    1 + ceil((len + 1) / 32); about 150-170 records of all kinds without the reserve, about 25
-    fewer with it, and fewer than the RAM caches' 256.
+  - Size (computed from `min_spiffs.csv`; `freeEntries()` hasn't been read on a board): 504
+    usable slots, a string takes 1 + ceil((len + 1) / 32). Upper bound, leaving out WiFi and PHY
+    calibration data (`cal_data`, about 62 slots): about 150-170 records of all kinds without the
+    reserve, about 25 fewer with it. Real capacity is likely nearer 100 records (estimate), well
+    under the RAM caches' 256.
+  - A rewrite of the PHY calibration data could take nearly the whole reserve. If it then doesn't
+    fit, the only sign is a log line.
   - If all three kinds are wiped and the reserve still isn't there, the record is written anyway.
     A record that can't be stored at all logs `[lookup] could not store <key> in <ns>: NVS full`
     and stays in the RAM LRU.

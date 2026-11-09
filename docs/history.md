@@ -126,9 +126,14 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   and a refused save is logged and reported.
   - The reserve had to subtract the spare page: `nvs_get_stats` counts it, so without the 126 the
     reserve would be an illusion. Size of the reserve is a judgement call, WiFi's use is unmeasured.
-  - Computed, not measured on the board (`/perf.json` has no NVS statistics; the native fake counts
-    slots but not page boundaries): capacity about 150-170 records without the reserve, about 25
-    fewer with it; settings need 36 slots with all 28 keys changed at realistic credential lengths.
+  - All computed; `freeEntries()` hasn't been read on a board (`/perf.json` has no NVS statistics;
+    the native fake counts slots but not page boundaries). Capacity about 150-170 records without
+    the reserve and about 25 fewer with it, as an upper bound that leaves out WiFi and PHY
+    calibration data (`cal_data`, about 62 slots); real capacity is likely nearer 100 records
+    (estimate). Settings need about 46 slots in the worst case at realistic credential lengths
+    (floats go through `nvs_set_blob` at about 3 slots each), which fits the reserve.
+  - A rewrite of the PHY calibration data could take nearly the whole reserve; if it doesn't fit,
+    it fails with a log line only.
   - Still open: `os_id` / `os_secret` have no length cap. A 4096-byte credentials file needs about
     160 slots, which doesn't fit the reserve; that save can still fail, but is now reported instead
     of silently partial. A cap would close it (validation change, left out of the fix).
