@@ -477,6 +477,14 @@ two cores"; this is how it works.
   pola były błędne …"). The clamped five are clamped even when not sent; a missing checkbox =
   unchecked, a missing text field = unchanged, an empty `client_secret` keeps the saved one; a
   refused password is listed under `passwordProblem()`'s label. Sets `home.configured`.
+- **A save NVS refuses** is reported, not answered as saved. `saveSettings()` and the single-key
+  saves return `bool` (`NvsWriteCheck` counts the refused values; a failed open counts too) and
+  log `[settings] saving <what> failed: N value(s) not stored (NVS full?)`. `/save`, `/lang`, the
+  credentials upload and `/restore` then answer `WebStr::SaveFailed` (PL + EN) as an error, ahead
+  of every other message; the values may be partly old, because keys are written one by one. No
+  answer to change, so log only: `saveLastScreen`, `/update/prerelease`, "skip this version". The
+  room for a save is the lookup store's reserve (docs/data-sources.md "Caching and the per-poll
+  budget").
 - **Five tabs:** **Location** (lat/lon, radius + credits per request), **OpenSky client**
   (account pill, client id/secret, credentials-file upload, poll interval + credits per day vs.
   the limit), **General** (display + web-panel language, display brightness / night mode,

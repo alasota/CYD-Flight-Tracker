@@ -158,8 +158,8 @@ Details: docs/architecture.md "Concurrency — two cores". Spec: `spec/done/04-d
   encoding broke it (docs/history.md).
 - ⚠️ Credits: 15 s polls exceed even an account's 4000/day; never poll faster than the interval;
   back off on 429 (docs/data-sources.md "Rate limits").
-- ⚠️ hexdb.io is a free hobby service: every answer cached (RAM LRU → NVS), never re-fetched,
-  never block a row on it; RAM caches must stay bounded.
+- ⚠️ hexdb.io is a free hobby service: every answer cached (RAM LRU → NVS), re-fetched only after
+  an NVS wipe (docs/data-sources.md), never block a row on it; RAM caches must stay bounded.
 - ⚠️ arduino-esp32 2.x `WebServer`: an upload route gets non-multipart POSTs too and crashes in
   `server.upload()` — every upload callback starts with `if (!isMultipartRequest()) return;`,
   and `collectHeaders()` must keep `Content-Type` (docs/architecture.md "Firmware updates").

@@ -116,6 +116,22 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
   50 KB `release_check` needs and update checks silently stopped. Now an LRU over NVS.
 - **Lookup budget.** An ad-hoc `kMaxNewLookupsPerPoll = 5` lived untested in `main.cpp`; now
   `lookup_budget` / `poll_pipeline`, pure and tested.
+- **NVS filled by lookups** (bug from the store's first commit up to v1.11.4; `EKBI
+  NOT_ENOUGH_SPACE` on the serial log). The store had no bound and reacted only after a write had
+  failed, by wiping the namespace being written, even if that kind held nothing. The partition
+  is shared with `cydsky` and WiFi, and every `prefs.put*` in `saveSettings()` ignored its result,
+  so a save on a full partition could keep some old values while the page said "saved". Worst
+  case, deduced from the code and IDF sources and not reproduced: WiFi changed, no polling, so no
+  wipe can run while new credentials are entered. Now a 64-slot reserve checked before writing,
+  and a refused save is logged and reported.
+  - The reserve had to subtract the spare page: `nvs_get_stats` counts it, so without the 126 the
+    reserve would be an illusion. Size of the reserve is a judgement call, WiFi's use is unmeasured.
+  - Computed, not measured on the board (`/perf.json` has no NVS statistics; the native fake counts
+    slots but not page boundaries): capacity about 150-170 records without the reserve, about 25
+    fewer with it; settings need 36 slots with all 28 keys changed at realistic credential lengths.
+  - Still open: `os_id` / `os_secret` have no length cap. A 4096-byte credentials file needs about
+    160 slots, which doesn't fit the reserve; that save can still fail, but is now reported instead
+    of silently partial. A cap would close it (validation change, left out of the fix).
 
 ## Concurrency and resources
 
