@@ -144,15 +144,31 @@ uses **ICAO**: OpenSky callsigns (`DLH9LH`) are ICAO-style, and the route answer
 ## Caching and the per-poll budget
 
 hexdb.io is a hobby service with no SLA (informal limit ~1000 requests / 5 min) — be a good
-citizen, cache everything, never re-fetch a known key.
+citizen, cache everything, don't re-fetch a key that is still cached.
 
 - **Keys:** aircraft by `icao24` (an airframe's airline / type never changes), routes by
-  callsign, airports by code. Each is looked up once, ever.
+  callsign, airports by code. Each is looked up once, and again only if the NVS copy lost it
+  ("NVS is bounded" below).
 - **Three levels:** RAM (`lookup_cache`, LRU — 96 aircraft, 96 routes, 64 airports), then NVS
   (`lookup_store`, namespaces `lk_ac`, `lk_rt`, `lk_ap`; record = version + fields joined by
   0x1F; confirmed misses stored too), then hexdb.io. An entry that falls out of RAM comes back
-  from NVS, not from hexdb.io. A RAM capacity must hold one poll's working set. When NVS is
-  full, that kind's namespace is wiped (settings live in their own namespace).
+  from NVS, not from hexdb.io. A RAM capacity must hold one poll's working set.
+- **NVS is bounded** (`storeSaveRecord()`, pure, native-tested): the `nvs` partition is shared
+  with the settings (`cydsky`) and the WiFi credentials, so a record may not leave fewer than
+  `kLookupStoreReserveEntries` (64) slots free. The check runs before the write: while it would
+  eat into the reserve, whole lookup namespaces are wiped, the record's own kind first, then the
+  other two, stopping as soon as the reserve is back. A write NVS still refuses wipes the next
+  kind and is retried. `cydsky` is never wiped.
+  - `freeEntries()` in `lookup_store_nvs` is `Preferences::freeEntries()` minus 126 (clamped at
+    0): the IDF figure includes the page NVS keeps empty for garbage collection.
+  - Wiped answers are fetched from hexdb.io again when the aircraft / route / airport next shows
+    up, so "looked up once" holds only until a wipe. A record is saved once, on the fresh answer.
+  - Size (computed from `min_spiffs.csv`, not measured): 504 usable slots, a string takes
+    1 + ceil((len + 1) / 32); about 150-170 records of all kinds without the reserve, about 25
+    fewer with it, and fewer than the RAM caches' 256.
+  - If all three kinds are wiped and the reserve still isn't there, the record is written anyway.
+    A record that can't be stored at all logs `[lookup] could not store <key> in <ns>: NVS full`
+    and stays in the RAM LRU.
 - **LRU detail:** `LookupCache::find()` refreshes an entry, `contains()` doesn't — the per-poll
   budget asks about every aircraft, and asking isn't using. `put()` drops the least recently
   used when full.
