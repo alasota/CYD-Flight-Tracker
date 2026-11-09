@@ -2196,6 +2196,17 @@ class BuildConfigTest(unittest.TestCase):
         self.assertNotIn("build_flags", ini["env:cyd-ota"])
         self.assertIn("${env:native.build_flags}", ini["env:native-asan"].get("build_flags"))
 
+    def test_library_logs_are_switched_by_one_option_per_env(self):
+        ini = platformio_ini()
+        self.assertIn("-DCORE_DEBUG_LEVEL=${this.custom_core_debug_level}",
+                      ini["env:cyd"].get("build_flags", ""))
+        self.assertEqual("0", ini["env:cyd"].get("custom_core_debug_level"))
+        debug = ini["env:cyd-debug"]
+        self.assertEqual("env:cyd", debug.get("extends"))
+        self.assertEqual("1", debug.get("custom_core_debug_level"))
+        self.assertNotIn("build_flags", debug)
+        self.assertNotIn("custom_core_debug_level", ini["env:cyd-ota"])
+
 
 def workflow_steps(text):
     """[(name, body)] of the `- name:` steps in a workflow file."""

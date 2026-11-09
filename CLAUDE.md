@@ -43,7 +43,7 @@ heading only together with its references.
   coordinates (follows `setRotation()`); calibration in `display/core/touch_calibration.h`,
   mapping explained in docs/screens.md "Screen navigation".
 - `platformio.ini`: board `esp32dev`, partitions `min_spiffs.csv` (two 1.875 MB OTA slots — the
-  firmware must stay under one), envs `cyd`, `cyd-ota`, `native`, `native-asan`. `cyd` builds with
+  firmware must stay under one), envs `cyd`, `cyd-debug` (+ library `[E]` logs), `cyd-ota`, `native`, `native-asan`. `cyd` builds with
   `-fno-exceptions -fno-unwind-tables`: no `try` / `throw` (docs/history.md "Tooling and docs").
 
 ## Code conventions
