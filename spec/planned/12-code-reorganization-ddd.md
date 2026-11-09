@@ -769,7 +769,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
 - **Zostaje dla właściciela:** dotyk (zakładki, strony tabeli, „!”), auto-cycle, język ekranu
   PL ↔ EN.
 
-### Wynik etapu 8 (2026-11-08, na gałęzi, czeka na instalację z GitHuba)
+### Wynik etapu 8 (2026-11-08, scalony w PR #33, czeka na instalację z GitHuba)
 
 - **`check_layers.py`: 12 → 0**, wszystkie usunięte w kodzie, tabela §5 bez nowego ptaszka i wyjątku:
   `Language` → `shared/language.h`; `AircraftInfo`, `RouteInfo`, `AirportInfo` →
@@ -816,8 +816,29 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
     zakodowanych; linia `[ota]` `->`; „marked valid after 30 s” za oba razy. `/perf.json` po 89 s:
     przerwa pętli UI maks. 101 ms, 0 wolnych przejść, sterta 140 488 B, największy blok 59 380 B,
     wolny stos net 9 836 B.
-  - Niesprawdzone: instalacja buildu `-dev` z GitHuba (po utworzeniu PR), zapis formularza bez
-    zmian, dotyk i fizyczne zachowanie ostrzeżeń.
+  - **Po scaleniu (2026-11-09),** main na `effad46` (`v1.11.4-39-geffad46-dirty`, `-dirty` od
+    niezwiązanej zmiany `.vscode`): cały etap 8 i trzy późniejsze poprawki z main. `firmware.bin`
+    1 319 072 B — mniej niż 1 348 672 B z etapu 8 przez późniejsze przeniesienie logów bibliotek
+    do builda `cyd-debug`, nie przez spec 12. Ta sama płytka (ESP32-2432S028R, USB COM3):
+    - Wgrany przez USB; po starcie `[ota] running from app0, valid`, bez paniki, jedyny restart to
+      samo wgranie; ok. 15 min pracy bez restartu.
+    - `/backup.json` przed (płytka miała `v1.11.4-27-g486302f`) i po różni się tylko polem
+      `firmware`; `/light.json` identyczny (noc, 10 %).
+    - `/perf.json` w 912–965 s pracy: przerwa pętli UI maks. 100 ms (najwięcej od startu 101 ms),
+      p99 20 ms, 0 wolnych przejść; sterta 134 472–144 412 B, największy blok 55 284–59 380 B;
+      wolny stos ui 5 244 B, net 9 524–9 928 B (punkt odniesienia 9 388 B); net zajęty 42,6 %.
+    - **Zapis formularza bez zmian — sprawdzony:** wszystkie 24 pola `/save` odesłane tak, jak je
+      wyrenderowała strona (pola sekretów i hasła puste, nagłówek `Origin` ustawiony): HTTP 200 w
+      2,8 s, komunikat „Zapisano.”, `/backup.json` i `/backup.json?secrets=1` bajt w bajt takie
+      same przed i po (ten z sekretami porównany przez SHA-256).
+    - Testy native na `effad46`: 1 006 przypadków (1 003 zielone, 3 pominięte bez
+      `SCREENSHOT_OUT`), `RUN_TEST(` w `test/**/*.cpp` 1 006; `check_layers.py --strict`
+      0 naruszeń, `check_bdd.py` 0 problemów (278 scenariuszy), `check_comments.py --strict` czysty.
+      `RUN_TEST(` trzeba liczyć tak jak `LayoutTest` albo przez `git grep -a`: zwykły `git grep`
+      bierze `version_test.cpp` za plik binarny i jego 3 wywołania liczy jako 1 linię (979
+      zamiast 981 na `730e577`).
+  - Niesprawdzone: instalacja buildu `-dev` z GitHuba (wymaga builda `-dev` z PR), dotyk i
+    fizyczne zachowanie ostrzeżeń (potrzebny człowiek przy płytce, zostaje dla właściciela).
 - **Kryteria §10:** pkt 1–4 spełnione. Pkt 5 — częściowo, do czasu instalacji z GitHuba i
   sprawdzeń ręcznych wyżej; dlatego status zostaje „etap 7 z 8”.
 - **Obserwacja (bez zmian w tym etapie):** na panelu bez hasła `curl --digest` wysyła puste
