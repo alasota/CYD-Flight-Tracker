@@ -286,7 +286,11 @@
   /* Save + messages */                                                                            \
   X(Save, "Zapisz", "Save")                                                                        \
   X(Saved, "Zapisano.", "Saved.")                                                                  \
-  X(SaveFailed, "", "")                                                                            \
+  X(SaveFailed,                                                                                    \
+    "Nie zapisano: pamięć urządzenia odrzuciła zapis, część ustawień może mieć stare wartości. "   \
+    "Spróbuj ponownie.",                                                                           \
+    "Not saved: the device's memory refused the write, so some settings may keep their old "       \
+    "values. Try again.")                                                                          \
   X(SavedWithInvalid, "Zapisano, ale te pola były błędne i zostały poprzednie wartości:",          \
     "Saved, but these fields were invalid and kept their previous values:")                        \
   X(UploadTooLarge, "Nie wczytano: plik jest za duży.", "Not loaded: the file is too large.")      \
