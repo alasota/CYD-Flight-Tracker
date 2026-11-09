@@ -128,16 +128,18 @@ class NvsWriteCheck {
 // --- Hardware adapter: reads/writes ESP32 NVS via the Preferences library.
 // Thin wrapper around a hardware/SDK API — see CLAUDE.md "Testing" — not
 // covered by Unity. Both always sanitize before returning/persisting.
+// Every save returns whether all its values reached NVS (a failure is logged);
+// after a false some keys may hold new values and others the old ones.
 Settings loadSettings();
-void saveSettings(const Settings &cfg);
+bool saveSettings(const Settings &cfg);
 
 // Persists just the last-active screen index (0/1/2), clamped via
 // clampLastScreen(). A targeted single-key write for the frequently-
 // changing nav state — a screen change (especially under auto-cycle,
 // which fires every few seconds) shouldn't rewrite lat/lon/credentials/
 // every other setting the way saveSettings() does.
-void saveLastScreen(int screen);
+bool saveLastScreen(int screen);
 
 // Single-key writes for release_check's state (same reason as above).
-void saveUpdateSkippedTag(const std::string &tag);
-void saveUpdateShowPrerelease(bool show);
+bool saveUpdateSkippedTag(const std::string &tag);
+bool saveUpdateShowPrerelease(bool show);

@@ -32,10 +32,13 @@ int clampLastScreen(int raw) {
 
 Settings defaultSettings() { return Settings{}; }
 
-// TODO(fix fix-lookup-store-nvs-full): stub from the red step: ignores every
-// result, which is what saveSettings() does today.
-void NvsWriteCheck::note(size_t) {}
-void NvsWriteCheck::noteText(size_t, size_t, size_t) {}
+void NvsWriteCheck::note(size_t written) {
+  if (written == 0) ++failures_;
+}
+
+void NvsWriteCheck::noteText(size_t length, size_t written, size_t storedLength) {
+  if (length == 0 ? storedLength != 0 : written != length) ++failures_;
+}
 
 float clampRadiusDeg(float radius_deg) {
   return std::min(std::max(radius_deg, kMinRadiusDeg), kMaxRadiusDeg);

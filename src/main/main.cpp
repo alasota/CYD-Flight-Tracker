@@ -197,9 +197,9 @@ void setup() {
   // net_task exists — the blocking delay() steps are fine here).
   runPasswordReset(tft, !bootCfg.web.password.empty(), [&bootCfg] {
     bootCfg.web.password.clear();
-    saveSettings(bootCfg);
+    const bool stored = saveSettings(bootCfg);
     bootCfg = loadSettings();
-    Serial.println("[auth] web password cleared from the touchscreen");
+    if (stored) Serial.println("[auth] web password cleared from the touchscreen");
   });
   nav.set(bootCfg.display.last_screen);  // restore the last-active screen
   ui.screenChanges.begin(nav.current(), millis());

@@ -227,7 +227,10 @@ void handleLang() {
   if (!requireSameOrigin() || !authorize()) return;
   Settings cfg = loadSettings();
   cfg.web.language = languageFromCode(server.arg("l").c_str());
-  saveSettings(cfg);
+  if (!saveSettings(cfg)) {
+    sendConfigPage(loadSettings(), requestedTab(), WebStr::SaveFailed, true);
+    return;
+  }
   server.sendHeader("Location", String("/?tab=") + settingsTabId(requestedTab()));
   server.send(303, "text/plain", "");
 }
@@ -247,17 +250,19 @@ void handleSave() {
   for (int i = 0; i < server.args(); ++i) args.add(server.argName(i).c_str(), server.arg(i).c_str());
   Settings cfg = loadSettings();
   const SettingsFormOutcome out = applySettingsForm(cfg, args);
-  saveSettings(cfg);  // sanitizes internally (see settings.h)
+  const bool stored = saveSettings(cfg);  // sanitizes internally (see settings.h)
   ++saveCount;
   refreshPassword();
-  if (out.password.outcome == PasswordChange::Outcome::Set ||
-      out.password.outcome == PasswordChange::Outcome::Cleared) {
+  if (stored && (out.password.outcome == PasswordChange::Outcome::Set ||
+                 out.password.outcome == PasswordChange::Outcome::Cleared)) {
     Serial.println(webPassword.empty() ? "[auth] web password removed" : "[auth] web password changed");
   }
 
   const Settings saved = loadSettings();
   const SettingsTab tab = requestedTab();
-  if (!out.rejected.empty()) {
+  if (!stored) {
+    sendConfigPage(saved, tab, WebStr::SaveFailed, true);
+  } else if (!out.rejected.empty()) {
     sendConfigPage(saved, tab, WebStr::SavedWithInvalid, true,
                    rejectedFieldsText(out.rejected, saved.web.language));
   } else {
@@ -411,11 +416,11 @@ void handleCredentialsUpload() {
   }
 
   cfg.opensky = file.creds;
-  saveSettings(cfg);  // sanitizes internally (see settings.h)
+  const bool stored = saveSettings(cfg);  // sanitizes internally (see settings.h)
   ++saveCount;
 
   Settings saved = loadSettings();
-  sendConfigPage(saved, SettingsTab::OpenSky, WebStr::UploadOk, false);
+  sendConfigPage(saved, SettingsTab::OpenSky, stored ? WebStr::UploadOk : WebStr::SaveFailed, !stored);
 }
 
 // GET /backup.json[?secrets=1] — all settings as a downloadable JSON file
@@ -447,12 +452,14 @@ void handleRestore() {
     return;
   }
 
-  saveSettings(r.config);  // sanitizes internally (see settings.h)
-  ++saveCount;             // net_task reloads: language, home location, ...
-  refreshPassword();       // a backup with secrets carries the panel password
+  const bool stored = saveSettings(r.config);  // sanitizes internally (see settings.h)
+  ++saveCount;                                 // net_task reloads: language, home location, ...
+  refreshPassword();                           // a backup with secrets carries the panel password
 
   Settings saved = loadSettings();  // its web.language may just have changed
-  if (r.invalidFields.empty()) {
+  if (!stored) {
+    sendConfigPage(saved, SettingsTab::Backup, WebStr::SaveFailed, true);
+  } else if (r.invalidFields.empty()) {
     sendConfigPage(saved, SettingsTab::Backup, WebStr::RestoreOk, false);
   } else {
     std::string fields;
