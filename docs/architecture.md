@@ -785,6 +785,10 @@ green dot, red "!").
 - **Partitions:** `min_spiffs.csv` — two 1.875 MB OTA slots, NVS at the same offset as before.
   The firmware (~1.35 MB) must stay under one slot; the efont subset (CLAUDE.md "Language") and
   the build without exceptions help it fit.
+- **Library logs:** `custom_core_debug_level` sets `CORE_DEBUG_LEVEL`: 0 in `env:cyd` and `cyd-ota`
+  (no Arduino library `[E]` lines on serial, −32 576 B measured), 1 in `env:cyd-debug`. The
+  firmware's own `Serial.printf` lines don't depend on it. Reach for `cyd-debug` when a library
+  fails with no line of our own: the NVS `NOT_ENOUGH_SPACE` was first seen in such a log.
 - **Build flags:** `env:cyd` (and `cyd-ota`, which extends it) has `build_unflags = -fexceptions`
   and `-fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables` — no `.eh_frame`, no
   exception tables (−133 408 B, why: docs/history.md "Tooling and docs"). Nothing may use `try` /
