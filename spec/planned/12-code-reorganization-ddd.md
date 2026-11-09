@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **etap 7 z 8 zrobiony (v1.11.4)** 2026-11-08, etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 i 7 w v1.11.4, etap 8 na gałęzi `spec/12-code-reorganization-ddd-stage8`, czeka na sprawdzenie instalacji z GitHuba (build `-dev` tego PR). Jedna specyfikacja dla całej
+Status: **zrobione** 2026-11-09, wydane w vNEXT (etap 8 z 8; etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 i 7 w v1.11.4). Dotyk i fizyczne zachowanie ostrzeżeń zostają do sprawdzenia przez właściciela przy płytce (§8 „Wynik etapu 8”). Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -769,7 +769,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
 - **Zostaje dla właściciela:** dotyk (zakładki, strony tabeli, „!”), auto-cycle, język ekranu
   PL ↔ EN.
 
-### Wynik etapu 8 (2026-11-08, scalony w PR #33, czeka na instalację z GitHuba)
+### Wynik etapu 8 (2026-11-08, scalony w PR #33; sprawdzenia na płytce do 2026-11-09)
 
 - **`check_layers.py`: 12 → 0**, wszystkie usunięte w kodzie, tabela §5 bez nowego ptaszka i wyjątku:
   `Language` → `shared/language.h`; `AircraftInfo`, `RouteInfo`, `AirportInfo` →
@@ -837,10 +837,38 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
       `RUN_TEST(` trzeba liczyć tak jak `LayoutTest` albo przez `git grep -a`: zwykły `git grep`
       bierze `version_test.cpp` za plik binarny i jego 3 wywołania liczy jako 1 linię (979
       zamiast 981 na `730e577`).
-  - Niesprawdzone: instalacja buildu `-dev` z GitHuba (wymaga builda `-dev` z PR), dotyk i
-    fizyczne zachowanie ostrzeżeń (potrzebny człowiek przy płytce, zostaje dla właściciela).
-- **Kryteria §10:** pkt 1–4 spełnione. Pkt 5 — częściowo, do czasu instalacji z GitHuba i
-  sprawdzeń ręcznych wyżej; dlatego status zostaje „etap 7 z 8”.
+    - Ekrany 0–2 i pytanie o aktualizację (`/screenshot.bmp?screen=0..3`) na `effad46`: ten sam
+      układ co przedtem, tekst mieści się w swoich polach.
+  - **Instalacja z GitHuba — sprawdzona (2026-11-09),** PR #37, build `v1.11.5-dev.74` z CI
+    (wszystkie sprawdzenia CI zielone: wersja, firmware z testami, `native-asan` i BDD,
+    dev-release), płytka startowała z `v1.11.4-39-geffad46-dirty`:
+    - `POST /update/prerelease on=1` → 200; zakładka Firmware po 19,6 s proponuje `v1.11.4` i
+      `v1.11.5-dev.74`. Log: `[update] check: http=200 latest=v1.11.4 … pre=v1.11.5-dev.74,
+      8773 ms … stack left 8820`.
+    - `POST /update/install tag=v1.11.5-dev.74` → 200. Log: `installing v1.11.5-dev.74, free heap
+      133184, largest block 40948`; `install v1.11.5-dev.74: 1318944 B in 16 s -> result 0 (stack
+      left 8820)`; `installed (sha256 7eedef047bef…), restarting`; `rst:0xc (SW_CPU_RESET)`;
+      `[ota] running from app1, pending verify (rollback armed)`; `[ota] v1.11.5-dev.74 marked
+      valid after 30 s, rollback cancelled`. Płytka odpowiada nową wersją 44 s po żądaniu
+      instalacji; bez paniki i innych restartów. Obserwacja: instalacja ruszyła przy największym
+      bloku 40 948 B (poniżej 50 KB, których chce weryfikowany TLS) i się udała — to ścieżka z
+      poprawki `fix/github-install-never-starts`, która jest już na main.
+    - Potem „pokazuj wersje rozwojowe” z powrotem wyłączone, jak przed testem
+      (`POST /update/prerelease on=0` → 303; `check: http=200 latest=v1.11.4 (installed
+      v1.11.5-dev.74) status=3`, 3952 ms). `/backup.json` względem tego sprzed dzisiejszych testów
+      różni się tylko polem `firmware`; `/light.json` identyczny.
+    - `[perf]` na buildzie `-dev` w 128–197 s pracy: przerwa pętli UI maks. 100–102 ms, p99
+      < 20 ms, 0 wolnych przejść; sterta 139 156–141 548 B, największy blok 63 476 B; wolny stos
+      ui 5 244 B, net 9 600 B (punkt odniesienia 9 388 B); net zajęty 38–57 % (pierwsze okno
+      obejmuje sprawdzenie aktualizacji).
+  - **Niesprawdzone, zostaje dla właściciela:** dotyk (zakładki, strony tabeli, „!”) i fizyczne
+    zachowanie ostrzeżeń — potrzebny człowiek przy płytce. Wszystko wyżej sprawdzono zdalnie
+    (port szeregowy, panel WWW, zrzuty ekranu).
+- **Kryteria §10:** pkt 1–4 spełnione. Pkt 5 — spełniony w tym, co da się sprawdzić zdalnie: OTA z
+  panelu i z GitHuba, noc (`/light.json`), dwa rdzenie i `[perf]` bez pogorszenia, ekrany na
+  zrzutach bez zmian. Ostrzeżenia mają zielone testy native (`device_alerts`,
+  `alert_screen_flow`), ale ich fizycznego zachowania i dotyku nikt nie sprawdził ręką — to jedyne,
+  co zostaje, u właściciela. Z tym zastrzeżeniem specyfikacja jest zamknięta (status „zrobione”).
 - **Obserwacja (bez zmian w tym etapie):** na panelu bez hasła `curl --digest` wysyła puste
   żądanie próbne i dostaje 400 („Nie wybrano pliku”); bez `--digest` upload działa. Środowisko
   `cyd-ota` w `platformio.ini` używa `--digest`, więc przy płytce bez hasła nie zadziała.
