@@ -343,6 +343,9 @@ STAGE_6_NVS_KEYS = {
     "nt_pct": "UChar", "nt_wake": "UShort", "nt_poll": "Bool",
 }
 
+# settings_nvs.cpp's checked string write: putText(prefs, check, "key", value).
+PUT_TEXT_KEY = r'\bputText\(\s*prefs\s*,\s*check\s*,\s*"(\w+)"'
+
 # Stage 6: the Settings field each NVS key loads into and saves from (settings_nvs.cpp). The keys
 # kept their pre-stage-6 meaning: `lang` is the display's language, `wlang` the page's.
 STAGE_6_NVS_FIELDS = {
@@ -1328,6 +1331,13 @@ class LayoutTest(unittest.TestCase):
         seen = {}
         for m in re.finditer(r'\bprefs\.(get|put)(\w+)\(\s*"(\w+)"', code):
             seen.setdefault(m.group(3), set()).add((m.group(1), m.group(2)))
+        # putText() is the checked form of prefs.putString(), so its keys are String puts.
+        self.assertRegex(definition_body(code, "void putText(Preferences &prefs, "
+                                               "NvsWriteCheck &check, const char *key, "
+                                               "const std::string &value)"),
+                         r"\bprefs\.putString\(\s*key\s*,\s*value\.c_str\(\)\s*\)")
+        for m in re.finditer(PUT_TEXT_KEY, code):
+            seen.setdefault(m.group(1), set()).add(("put", "String"))
         self.assertEqual(sorted(STAGE_6_NVS_KEYS), sorted(seen), "the NVS keys")
         for key, type_ in STAGE_6_NVS_KEYS.items():
             with self.subTest(key=key):
@@ -1343,15 +1353,17 @@ class LayoutTest(unittest.TestCase):
         code = strip_comments((ROOT / "src" / "admin" / "adapters" / "settings_nvs.cpp")
                               .read_text(encoding="utf-8", errors="replace"))
         load = definition_body(code, "Settings loadSettings()")
-        save = definition_body(code, "void saveSettings(const Settings &cfg)")
+        save = definition_body(code, "bool saveSettings(const Settings &cfg)")
         loaded, saved = {}, {}
         for statement in load.split(";"):
             for key in re.findall(r'\bprefs\.get\w+\(\s*"(\w+)"', statement):
                 loaded.setdefault(key, []).extend(
                     re.findall(r"\bcfg\.(\w+\.\w+)\s*=(?!=)", statement))
         for statement in save.split(";"):
-            for key in re.findall(r'\bprefs\.put\w+\(\s*"(\w+)"', statement):
-                saved.setdefault(key, []).extend(re.findall(r"\bsanitized\.(\w+\.\w+)", statement))
+            for plain, text in re.findall(r'\bprefs\.put\w+\(\s*"(\w+)"|' + PUT_TEXT_KEY,
+                                          statement):
+                saved.setdefault(plain or text, []).extend(
+                    re.findall(r"\bsanitized\.(\w+\.\w+)", statement))
         self.assertEqual(sorted(STAGE_6_NVS_FIELDS), sorted(loaded), "keys loadSettings() reads")
         self.assertEqual(sorted(STAGE_6_NVS_FIELDS), sorted(saved), "keys saveSettings() writes")
         for key, field in STAGE_6_NVS_FIELDS.items():
