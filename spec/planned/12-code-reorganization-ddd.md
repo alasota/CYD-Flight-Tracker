@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **zrobione** 2026-11-09, wydane w vNEXT (etap 8 z 8; etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 i 7 w v1.11.4). Dotyk i fizyczne zachowanie ostrzeżeń zostają do sprawdzenia przez właściciela przy płytce (§8 „Wynik etapu 8”). Jedna specyfikacja dla całej
+Status: **zrobione** 2026-11-09, wydane w vNEXT (etap 8 z 8; etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 i 7 w v1.11.4). Do sprawdzenia przez właściciela przy płytce zostają: dotyk (w tym ostatni ekran po restarcie i reset hasła przy starcie), fizyczne zachowanie ostrzeżeń i panel w prawdziwej przeglądarce (§8 „Wynik etapu 8”). Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 
@@ -627,7 +627,9 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   „!” → ZAMKNIJ / 15 s), auto-cycle i ostatni ekran po restarcie, OTA z dobrym i złym plikiem,
   reset hasła przy starcie (NIE), formularz („abc” / „x” odrzucone w tej kolejności, zmiana
   przetrwa restart). Na wersji `-dev` pytanie o aktualizację na żywo się nie pokaże
-  (`installedIsDev`) — dowodem są testy natywne i demo `screen=3`.
+  (`installedIsDev`) — dowodem są testy natywne i demo `screen=3`. Auto-cycle, OTA ze złym
+  plikiem, formularz i „zmiana przetrwa restart” sprawdzone zdalnie 2026-11-10 (patrz „Wynik
+  etapu 8”); dotyk, ostatni ekran po restarcie i reset hasła przy starcie zostają.
 
 ### Wynik etapu 6 (2026-11-07, wydany w v1.11.4)
 
@@ -703,7 +705,9 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   **Zostaje dla właściciela:** dotyk, zmiana zasięgu → pierścienie RADARU, język ekranu PL ↔ EN,
   auto-cycle, ostatni ekran po restarcie, „Sprawdź teraz” (TLS, blok ≥ 50 KB), panel w
   przeglądarce (zakładki, kredyty na żywo, linia „Teraz”, pasek postępu OTA, przeładowanie po
-  restarcie), zapis → restart → ta sama kopia zapasowa.
+  restarcie), zapis → restart → ta sama kopia zapasowa. Zasięg, język ekranu, auto-cycle,
+  „Sprawdź teraz” i zapis → restart → kopia sprawdzone zdalnie 2026-11-09 / 10 (patrz „Wynik
+  etapu 8”); dotyk, ostatni ekran po restarcie i panel w przeglądarce zostają.
 
 ### Wynik etapu 7 (2026-11-08, wydany w v1.11.4)
 
@@ -756,7 +760,7 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   `/light.json`: tryb i jasność zgodne z porą dnia (przed: wieczór, noc 10 %; po: dzień, 100 %),
   wschód / zachód — patrz znany problem niżej. Niesprawdzone z planu, zostaje dla właściciela:
   zapis formularza bez zmian → ta sama kopia (na razie porównanie kopii przed / po wgraniu
-  i złoty test kopii).
+  i złoty test kopii). Sprawdzone 2026-11-09 (patrz „Wynik etapu 8”).
 - **Odstępstwa od planu:** narzędzie zamiast `sed` (§8 pkt 7 mówił `sed`); §3 poprawiony do nazw
   z kodu (Q1) zamiast zmieniać `CpaPrediction`, `RouteInfo`, `AirportInfo`; `LookupPorts` z §4.1
   zmieniony razem ze słownikiem (Q3). Firmware ze stałym `FW_VERSION` ma ten sam rozmiar także po
@@ -767,9 +771,9 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   USB). `refreshSun()` zapamiętuje czasy na cały dzień, więc okno nocy jest przesunięte o 1 h do
   następnego dnia. Do osobnego `/fix`. **Poprawione w v1.11.4 (fix/sun-times-utc-after-boot).**
 - **Zostaje dla właściciela:** dotyk (zakładki, strony tabeli, „!”), auto-cycle, język ekranu
-  PL ↔ EN.
+  PL ↔ EN. Auto-cycle i język sprawdzone zdalnie 2026-11-10 (patrz „Wynik etapu 8”); dotyk zostaje.
 
-### Wynik etapu 8 (2026-11-08, scalony w PR #33; sprawdzenia na płytce do 2026-11-09)
+### Wynik etapu 8 (2026-11-08, scalony w PR #33; sprawdzenia na płytce do 2026-11-10)
 
 - **`check_layers.py`: 12 → 0**, wszystkie usunięte w kodzie, tabela §5 bez nowego ptaszka i wyjątku:
   `Language` → `shared/language.h`; `AircraftInfo`, `RouteInfo`, `AirportInfo` →
@@ -842,8 +846,8 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
   - **Instalacja z GitHuba — sprawdzona (2026-11-09),** PR #37, build `v1.11.5-dev.74` z CI
     (wszystkie sprawdzenia CI zielone: wersja, firmware z testami, `native-asan` i BDD,
     dev-release), płytka startowała z `v1.11.4-39-geffad46-dirty`:
-    - `POST /update/prerelease on=1` → 200; zakładka Firmware po 19,6 s proponuje `v1.11.4` i
-      `v1.11.5-dev.74`. Log: `[update] check: http=200 latest=v1.11.4 … pre=v1.11.5-dev.74,
+    - `POST /update/prerelease on=1` → 200 (klient poszedł za przekierowaniem 303 do zakładki
+      Firmware); zakładka po 19,6 s proponuje `v1.11.4` i `v1.11.5-dev.74`. Log: `[update] check: http=200 latest=v1.11.4 … pre=v1.11.5-dev.74,
       8773 ms … stack left 8820`.
     - `POST /update/install tag=v1.11.5-dev.74` → 200. Log: `installing v1.11.5-dev.74, free heap
       133184, largest block 40948`; `install v1.11.5-dev.74: 1318944 B in 16 s -> result 0 (stack
@@ -854,21 +858,62 @@ zmienia nazwy), a numery etapów są już po nowej numeracji.
       bloku 40 948 B (poniżej 50 KB, których chce weryfikowany TLS) i się udała — to ścieżka z
       poprawki `fix/github-install-never-starts`, która jest już na main.
     - Potem „pokazuj wersje rozwojowe” z powrotem wyłączone, jak przed testem
-      (`POST /update/prerelease on=0` → 303; `check: http=200 latest=v1.11.4 (installed
+      (`POST /update/prerelease on=0` → 303, tym razem curl bez podążania za przekierowaniem —
+      ta sama odpowiedź trasy co wyżej; `check: http=200 latest=v1.11.4 (installed
       v1.11.5-dev.74) status=3`, 3952 ms). `/backup.json` względem tego sprzed dzisiejszych testów
       różni się tylko polem `firmware`; `/light.json` identyczny.
     - `[perf]` na buildzie `-dev` w 128–197 s pracy: przerwa pętli UI maks. 100–102 ms, p99
       < 20 ms, 0 wolnych przejść; sterta 139 156–141 548 B, największy blok 63 476 B; wolny stos
       ui 5 244 B, net 9 600 B (punkt odniesienia 9 388 B); net zajęty 38–57 % (pierwsze okno
       obejmuje sprawdzenie aktualizacji).
-  - **Niesprawdzone, zostaje dla właściciela:** dotyk (zakładki, strony tabeli, „!”) i fizyczne
-    zachowanie ostrzeżeń — potrzebny człowiek przy płytce. Wszystko wyżej sprawdzono zdalnie
-    (port szeregowy, panel WWW, zrzuty ekranu).
+  - **Zdalne pozycje z list etapów 5–7 — sprawdzone (2026-11-10),** płytka z `v1.11.5-dev.74`
+    (kod tego PR), przez trasy panelu, `/screenshot.bmp`, `/backup.json` i port szeregowy:
+    - Formularz: `/save` z `lat=abc`, `lon=x` → 200, „Zapisano, ale te pola były błędne i zostały
+      poprzednie wartości: Szerokość geograficzna, Długość geograficzna” (w tej kolejności);
+      `/backup.json?secrets=1` bez zmian (SHA-256).
+    - Język ekranu PL → EN (`language=en`): ekrany 0–2 pokazują FLIGHTS / NOW / RADAR, kolumny
+      FLIGHT DIST FROM TO TYPE PHASE, „4 FLIGHTS”, „NOT PASSING OVERHEAD”, wszystko w swoich
+      polach; na końcu z powrotem PL.
+    - Zasięg `radius` 0,25 → 0,50: pierścienie RADARU 9 / 19 / 28 km → 19 / 37 / 56 km po
+      następnym pollu; samolotów 4 → 5.
+    - Auto-cycle włączony, 10 s: bieżący ekran (`/screenshot.bmp` bez `screen=`, aktywna zakładka
+      odczytana z paska, próbka co ok. 4–8 s przez 70 s) szedł 0 → 1 → 2 → 0 → 1 → 2 → 0, jeden
+      krok na ok. 10 s.
+    - Zmiana przetrwa restart: przy zapisanych EN / zasięg 0,5 / auto-cycle 10 s płytka straciła
+      zasilanie z USB (komputer zasnął) i wstała ponownie; `/backup.json` dalej miał `language en`,
+      `auto_cycle true`, `auto_cycle_interval_s 10`, `radius_deg 0.5`.
+    - OTA ze złym plikiem: 16 KB śmieci jako multipart `firmware` na `/update` → HTTP 400,
+      „Nie zaktualizowano: to nie jest plik firmware ESP32.”; bez restartu (uptime 137 → 152 s),
+      firmware dalej `v1.11.5-dev.74`.
+    - Przywrócenie i zapis → restart → ta sama kopia: pierwotny formularz odesłany → „Zapisano.”,
+      SHA-256 `/backup.json?secrets=1` równe temu sprzed wszystkich dzisiejszych testów; potem
+      reset przez adapter USB (`rst:0x1 (POWERON_RESET)`, `[ota] running from app1, valid`, bez
+      paniki) → kopia dalej identyczna.
+    - `/perf.json` 130 s po tym resecie: przerwa pętli UI maks. 70 ms (najwięcej od startu 87 ms),
+      p99 20 ms, 0 wolnych przejść; sterta 152 064 B, największy blok 61 428 B; wolny stos ui
+      5 484 B, net 9 600 B; net zajęty 39,6 %, najdłużej 5 078 ms. W oknie testów auto-cycle /
+      język / zasięg: przerwa maks. 127 ms, 0 wolnych przejść, sterta 142 012 B, największy blok
+      73 716 B.
+    - „Sprawdź teraz” (lista etapu 6) było już sprawdzone: wyżej, weryfikowany TLS (`http=200`,
+      3952 ms).
+    - Dwa restarty 2026-11-10 to nie awarie: komputer zasnął i odciął zasilanie USB. Samo czytanie
+      portu szeregowego płytki nie resetuje (uptime 57 → 93 s przez otwarcie i zamknięcie portu).
+  - **Niesprawdzone, zostaje dla człowieka przy płytce (właściciel):**
+    - dotyk (zakładki, strony tabeli, „!” → ZAMKNIJ / 15 s), w tym „ostatni ekran po restarcie”
+      (ekran zmienia tylko dotknięcie) i reset hasła przy starcie (dotknięcie przy starcie);
+    - fizyczne zachowanie ostrzeżeń;
+    - panel w prawdziwej przeglądarce, czyli jego JavaScript: zakładki, kredyty na żywo, linia
+      „Teraz”, pasek postępu OTA, przeładowanie po restarcie — strony były pobierane i wysyłane
+      przez HTTP, nie obsługiwane w przeglądarce.
+
+    Wszystko wyżej sprawdzono zdalnie (port szeregowy, trasy panelu, zrzuty ekranu).
 - **Kryteria §10:** pkt 1–4 spełnione. Pkt 5 — spełniony w tym, co da się sprawdzić zdalnie: OTA z
   panelu i z GitHuba, noc (`/light.json`), dwa rdzenie i `[perf]` bez pogorszenia, ekrany na
-  zrzutach bez zmian. Ostrzeżenia mają zielone testy native (`device_alerts`,
-  `alert_screen_flow`), ale ich fizycznego zachowania i dotyku nikt nie sprawdził ręką — to jedyne,
-  co zostaje, u właściciela. Z tym zastrzeżeniem specyfikacja jest zamknięta (status „zrobione”).
+  zrzutach bez zmian, język, zasięg, auto-cycle, formularz i kopia po restarcie. Ostrzeżenia mają
+  zielone testy native (`device_alerts`, `alert_screen_flow`), ale ręką nikt nie sprawdził trzech
+  rzeczy z listy „Niesprawdzone” wyżej: dotyku (z ostatnim ekranem po restarcie i resetem hasła),
+  fizycznego zachowania ostrzeżeń i panelu w przeglądarce. Z tym zastrzeżeniem specyfikacja jest
+  zamknięta (status „zrobione”).
 - **Obserwacja (bez zmian w tym etapie):** na panelu bez hasła `curl --digest` wysyła puste
   żądanie próbne i dostaje 400 („Nie wybrano pliku”); bez `--digest` upload działa. Środowisko
   `cyd-ota` w `platformio.ini` używa `--digest`, więc przy płytce bez hasła nie zadziała.
