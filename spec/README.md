@@ -31,3 +31,4 @@ dostaje ją od agenta (`NN` = kolejny wolny numer, „Źródło: issue #N”).
 | 12 | [Reorganizacja kodu (DDD)](done/12-code-reorganization-ddd.md) | done | v1.12.0 |
 | 13 | [Strona projektu: historia zmian, zrzuty panelu, opis funkcji](done/13-project-page-layout.md) | done | v1.7.0 |
 | 14 | [Jeden firmware dla R i R „2USB” (wykrywanie wyświetlacza)](planned/14-board-variants.md) | planned | — |
+| 15 | [Wydajność: pamięć, która się nie tnie, i tańszy poll](planned/15-performance-heap.md) | planned | — |
