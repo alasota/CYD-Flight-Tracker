@@ -1,7 +1,7 @@
 # Spec 12 — Reorganizacja kodu według DDD: konteksty, warstwy, reguły zależności
 
 Z przeglądu kodu 2026-10-25, sekcje 2–3.
-Status: **zrobione** 2026-11-09, wydane w vNEXT (etap 8 z 8; etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 i 7 w v1.11.4). Do sprawdzenia przez właściciela przy płytce zostają: dotyk (w tym ostatni ekran po restarcie i reset hasła przy starcie), fizyczne zachowanie ostrzeżeń i panel w prawdziwej przeglądarce (§8 „Wynik etapu 8”). Jedna specyfikacja dla całej
+Status: **zrobione** 2026-11-09, wydane w v1.12.0 (etap 8 z 8; etap 1 wydany w v1.11.0, etap 2 w v1.11.1, etap 3 i 4 w v1.11.2, etap 5 w v1.11.3, etap 6 i 7 w v1.11.4). Do sprawdzenia przez właściciela przy płytce zostają: dotyk (w tym ostatni ekran po restarcie i reset hasła przy starcie), fizyczne zachowanie ostrzeżeń i panel w prawdziwej przeglądarce (§8 „Wynik etapu 8”). Jedna specyfikacja dla całej
 reorganizacji, wdrażana etapami (§8). Warunki wstępne: spec 07 (testy w grupach) i spec 11
 (martwy kod usunięty).
 

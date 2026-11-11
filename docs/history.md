@@ -152,7 +152,7 @@ findings of the 2026 code review: [review-notes-2026.md](review-notes-2026.md).
 - **Countdown sprite.** Created on the first visit to NOW, it split the largest heap block to
   41 KB, below the 50 KB verified TLS needs — update checks stopped until reboot. Now reserved
   in `setup()`. (The same 41 KB came back later with a different cause: next entry.)
-- **GitHub install that never started** (fixed in vNEXT). Since 395cba3 (v1.2.0) an install
+- **GitHub install that never started** (fixed in v1.12.0). Since 395cba3 (v1.2.0) an install
   asked for by hand went through the 50 KB gate of `canStartNetworkTask()`; with the gate shut it
   stayed queued with no log, no time limit and no message, while the page said it was
   downloading. It showed once the largest block settled at 40 948 B, measured on v1.11.4 too.
