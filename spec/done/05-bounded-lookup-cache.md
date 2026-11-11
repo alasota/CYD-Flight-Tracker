@@ -129,4 +129,4 @@ Płytka (CYD, v1.4.2-2-ga46bb11-dirty, COM3):
 3. **Do zrobienia:** kryterium §5.2 (24 h pracy, różnica heap / `maxBlock` < 5 KB) — sprawdzić
    `/perf.json` po dobie od wgrania.
 
-Poprawione w vNEXT: zapis `lookup_store` przy pełnym NVS (`NOT_ENOUGH_SPACE`), mogący zagrozić zapisowi ustawień — magazyn nie miał limitu i czyścił tylko przestrzeń zapisywanego rodzaju, dopiero po nieudanym zapisie. Teraz rezerwa 64 slotów sprawdzana przed zapisem, czyszczenie wszystkich trzech `lk_*` (nigdy `cydsky`); §6 „Poza zakresem” opisuje stan sprzed poprawki.
+Poprawione w v1.12.0: zapis `lookup_store` przy pełnym NVS (`NOT_ENOUGH_SPACE`), mogący zagrozić zapisowi ustawień — magazyn nie miał limitu i czyścił tylko przestrzeń zapisywanego rodzaju, dopiero po nieudanym zapisie. Teraz rezerwa 64 slotów sprawdzana przed zapisem, czyszczenie wszystkich trzech `lk_*` (nigdy `cydsky`); §6 „Poza zakresem” opisuje stan sprzed poprawki.

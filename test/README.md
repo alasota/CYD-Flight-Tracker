@@ -27,7 +27,7 @@ Rarer now than with 41 executables, but it still happens.
 
 ## Layout
 
-The six suites follow the contexts of [spec 12](../spec/planned/12-code-reorganization-ddd.md),
+The six suites follow the contexts of [spec 12](../spec/done/12-code-reorganization-ddd.md),
 so they stayed put when `src/` moved into `src/<context>/<layer>/` (stage 1). Each suite is one
 executable. Test files include `src/` headers by **full path** (`#include
 "enrichment/core/lookup_cache.h"`, `-I src`) and never an `adapters/`, `main/` (the roots) or

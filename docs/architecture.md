@@ -6,7 +6,7 @@ are in CLAUDE.md; this file is the reference behind them.
 
 ## Source layout (spec 12)
 
-Spec: `spec/planned/12-code-reorganization-ddd.md` (§2 layer names, §4 contexts, §5 dependency
+Spec: `spec/done/12-code-reorganization-ddd.md` (§2 layer names, §4 contexts, §5 dependency
 table, §8 stages and their results).
 
 ### Contexts and layers
